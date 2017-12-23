@@ -102,6 +102,23 @@ TEMPLATES = [
     },
 ]
 
+if DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+            },
+        },
+        'loggers': {
+            'projects': {
+                'handlers': ['console'],
+                'level': 'DEBUG',
+            },
+        },
+    }
+
 
 local_settings = project_root('local_settings.py')
 if os.path.exists(local_settings):
