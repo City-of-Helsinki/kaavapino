@@ -87,3 +87,7 @@ same context so that the variables defined in the settings are available.
 ## Running tests
 
 * Run `pytest`
+
+## Importing attributes
+
+* Run `python manage.py import_attributes <attribute excel file> [--sheet sheet name] [--overwrite]`
