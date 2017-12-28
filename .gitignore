@@ -105,3 +105,9 @@ ENV/
 
 # PyCharm
 .idea
+
+# Generated static files
+static/
+
+# Node
+node_modules/

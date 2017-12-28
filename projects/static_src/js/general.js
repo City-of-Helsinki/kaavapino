@@ -1,0 +1,3 @@
+$(() => {
+  // Project JS goes here
+});

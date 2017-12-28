@@ -1,0 +1,12 @@
+// Hel bootstrap dependencies
+@import "./node_modules/hel-bootstrap-3/src/sass/_helsinki-variables";
+@import "_customized_application_variables"; // Copied and edited from the original
+@import "./node_modules/hel-bootstrap-3/src/sass/_theme-bootstrap-variables";
+@import "./node_modules/bootstrap-sass/assets/stylesheets/_bootstrap";
+@import "./node_modules/hel-bootstrap-3/src/sass/_theme-custom-styles";
+
+// Font awesome
+@import "./node_modules/font-awesome/scss/font-awesome";
+
+// Project custom styles
+@import "project/common";

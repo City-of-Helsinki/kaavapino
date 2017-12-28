@@ -1,11 +1,26 @@
 {% load static %}<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Kaavapino</title>
-        <link rel="stylesheet" type="text/css" href="{% static "styles.css" %}" />
-    </head>
-    <body>
-        {% block content %}{% endblock %}
-    </body>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="theme-color" content="#0072c6">
+
+    <title>{% block title %}Kaavapino{% endblock %} - Kaavapino</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}" />
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    {% include "includes/main_nav.html" %}
+
+    <main class="main-content">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <script src="{% static 'js/project-scripts.js' %}"></script>
+    {% block extrajs %}{% endblock %}
+</body>
 </html>
