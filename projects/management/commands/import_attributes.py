@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from projects.importers import AttributeImporter, AttributeImporterException
+from projects.importing import AttributeImporter, AttributeImporterException
 
 
 class Command(BaseCommand):
