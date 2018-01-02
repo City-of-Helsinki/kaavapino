@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Attribute, AttributeValueChoice, Project, ProjectPhase, ProjectType
+from .models import Attribute, AttributeValueChoice, DocumentTemplate, Project, ProjectPhase, ProjectType
 
 
 class AttributeValueChoiceInline(admin.TabularInline):
@@ -28,3 +28,8 @@ class ProjectPhaseAdmin(admin.ModelAdmin):
 @admin.register(ProjectType)
 class ProjectTypeAdmin(admin.ModelAdmin):
     list_display = ('name',)
+
+
+@admin.register(DocumentTemplate)
+class DocumentTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'file')
