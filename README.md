@@ -84,6 +84,16 @@ same context so that the variables defined in the settings are available.
 * Run `python manage.py migrate`
 * Run `python manage.py runserver 0.0.0.0:8000`
 
+### Static assets
+
+NPM is used to install 3rd party packages. Gulp is used to compile javascript, css, fonts and images.
+Suggested version for Node.js is 6 or higher.
+
+Both of the scripts below will also install the NPM packages.
+
+* Run `npm run build` for building the assets (production ready)
+* Run `npm run watch` for compiling and watching for changes in img, javascript and scss folders (`kaavapino/static_src`)
+
 ## Running tests
 
 * Run `pytest`
