@@ -8,12 +8,10 @@ from .models import Attribute, AttributeValueChoice, DocumentTemplate, Project, 
 class AttributeValueChoiceInline(admin.TabularInline):
     model = AttributeValueChoice
     extra = 0
-    prepopulated_fields = {'slug': ('value',)}
 
 
 @admin.register(Attribute)
 class AttributeAdmin(admin.ModelAdmin):
-    prepopulated_fields = {'slug': ('name',)}
     inlines = (AttributeValueChoiceInline,)
 
 
