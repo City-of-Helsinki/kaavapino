@@ -1,9 +1,9 @@
 import logging
 
-from django.utils.text import slugify
 from openpyxl import load_workbook
 
 from ..models import Attribute
+from ..models.utils import create_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class AttributeImporter:
     def _update_models(self, data):
         for datum in data[1:]:
             name = datum[0]
-            slug = slugify(name)
+            identifier = create_identifier(name)
             value_type = VALUE_TYPES.get(datum[3])
 
             if not value_type:
@@ -71,7 +71,7 @@ class AttributeImporter:
             else:
                 method = Attribute.objects.get_or_create
 
-            attribute, created = method(slug=slug, defaults=({
+            attribute, created = method(identifier=identifier, defaults=({
                 'name': name,
                 'value_type': value_type,
             }))
