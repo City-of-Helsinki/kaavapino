@@ -14,14 +14,16 @@ validate_identifier = RegexValidator(
 
 
 class Attribute(models.Model):
-    TYPE_INT = 'int'
-    TYPE_STRING = 'string'
+    TYPE_INTEGER = 'integer'
+    TYPE_SHORT_STRING = 'short_string'
+    TYPE_LONG_STRING = 'long_string'
     TYPE_BOOLEAN = 'boolean'
     TYPE_DATE = 'date'
 
     TYPE_CHOICES = (
-        (TYPE_INT, _('int')),
-        (TYPE_STRING, _('string')),
+        (TYPE_INTEGER, _('integer')),
+        (TYPE_SHORT_STRING, _('short string')),
+        (TYPE_LONG_STRING, _('long string')),
         (TYPE_BOOLEAN, _('boolean')),
         (TYPE_DATE, _('date')),
     )
