@@ -1,0 +1,47 @@
+.application-sidebar {
+    background: $white;
+    padding: $grid-gutter-width / 2;
+    border-top: 5px solid;
+    display: none;
+    width: 212px;
+
+    @media (min-width: $screen-md-min) {
+        display: block;
+    }
+
+    @media (min-width: $screen-lg-min) {
+        width: 262px;
+    }
+
+    &.border--tram {
+        border-color: $hel-tram;
+    }
+
+    &.border--summer {
+        border-color: $hel-tram;
+    }
+
+    &.border--metro {
+        border-color: $hel-tram;
+    }
+
+    .sidebar-title {
+        margin: 0 0 10px 0;
+        font-size: $font-size-base;
+        text-transform: uppercase;
+    }
+
+    .sidebar-section + .sidebar-section {
+        margin-top: $grid-gutter-width;
+    }
+}
+
+.application-sidenav {
+    li.active a {
+        font-weight: bold;
+    }
+
+    > li > a {
+        padding: 5px 0px;
+    }
+}

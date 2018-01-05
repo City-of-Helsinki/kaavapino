@@ -3,6 +3,25 @@
     -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-    padding-top: 70px;
+.main-content {
+    padding-top: 50px;
+    padding-bottom: 100px;
+}
+
+.breadcrumb {
+    background: none;
+    padding: 0;
+}
+
+.hr-darker {
+    border-color: darken($light-gray, 7%);
+}
+
+.progress-small {
+    height: 5px;
+}
+
+.affix {
+    position: fixed !important;
+    top: 15px;
 }
