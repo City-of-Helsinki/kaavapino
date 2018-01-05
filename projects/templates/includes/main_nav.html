@@ -1,22 +1,34 @@
 {% load i18n %}
 
-<nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+<nav class="main-navigation navbar navbar-default" role="navigation">
     <div class="container-fluid">
         <div class="navbar-header">
             <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-                <span class="sr-only">Toggle navigation</span>
+                <span class="sr-only">{% trans "Toggle navigation" %}</span>
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>
-            <a href="/" class="navbar-brand">Kaavapino</a>
+            <a href="/" class="navbar-brand">
+                Kaavapino
+            </a>
         </div>
         <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
                 <li>
-                    <a href="/">{% trans "Home" %}</a>
+                    <a href="/">{% trans "Applications" %}</a>
+                </li>
+                <li>
+                    <a href="/example-form">{% trans "Example form" %}</a>
                 </li>
             </ul>
+            <div class="nav navbar-nav navbar-right">
+                <li>
+                    <a href="#">
+                        <i class="fa fa-user-o fa-fw"></i> {% trans "Log out" %}
+                    </a>
+                </li>
+            </div>
         </div>
     </div>
 </nav>

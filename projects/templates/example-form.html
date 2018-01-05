@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block extra_body_tags %}data-spy="scroll" data-target="#application-sidebar-affix" data-offset="30"{% endblock %}
+
+{% block hero %}
+    <div class="jumbotron">
+        <div class="container">
+            <ol class="breadcrumb">
+                <li><a href="/">{% trans "Home" %}</a></li>
+                <li class="active">{% trans "New application" %}</li>
+            </ol>
+            <h1>{% trans "New application" %}</h1>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="application-state-indicator">
+        <div class="steps">
+            <div class="step completed active color--tram">
+                <span class="step-number">1</span>
+                <span class="step-label">Käynnistys</span>
+            </div>
+            <div class="step color--summer">
+                <span class="step-number">2</span>
+                <span class="step-label">OAS</span>
+            </div>
+            <div class="step color--metro">
+                <span class="step-number">3</span>
+                <span class="step-label">Ehdotus</span>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-9" id="new-application">
+            <form action="" method="post">
+                <fieldset class="form-subset" id="fieldset_1">
+                    <h2 class="form-subset-header">Väliotsikko 1</h2>
+                    {% include "example/example-fields-1.html" %}
+                </fieldset>
+                <fieldset class="form-subset" id="fieldset_2">
+                    <h2 class="form-subset-header">Väliotsikko 2</h2>
+                    {% include "example/example-fields-2.html" %}
+                </fieldset>
+                <fieldset class="form-subset" id="fieldset_3">
+                    <h2 class="form-subset-header">Väliotsikko 3</h2>
+                    {% include "example/example-fields-3.html" %}
+                </fieldset>
+                <fieldset class="form-subset" id="fieldset_4">
+                    <h2 class="form-subset-header">Väliotsikko 4</h2>
+                    {% include "example/example-fields-4.html" %}
+                </fieldset>
+                <button type="submit" name="button" class="btn btn-lg btn-primary">
+                    <i class="fa fa-check"></i> {% trans "Submit" %}
+                </button>
+                <button type="button" name="button" class="btn btn-lg btn-default">
+                    <i class="fa fa-save"></i> {% trans "Save as draft" %}
+                </button>
+            </form>
+        </div>
+        <div class="col-md-3">
+            <div class="application-sidebar border--tram hidden-print" id="application-sidebar-affix" role="complementary">
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Application state</h3>
+                    <p><strong class="text--tram">1. Käynnistys</strong></p>
+                </div>
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title">Sections</h3>
+                    <ul class="nav application-sidenav">
+                        <li><a href="#fieldset_1">Väliotsikko 1</a></li>
+                        <li><a href="#fieldset_2">Väliotsikko 2</a></li>
+                        <li><a href="#fieldset_3">Väliotsikko 3</a></li>
+                        <li><a href="#fieldset_4">Väliotsikko 4</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

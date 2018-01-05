@@ -11,14 +11,18 @@
     <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}" />
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}" {% block extra_body_tags %}{% endblock %}>
     {% include "includes/main_nav.html" %}
+
+    {% block hero %}{% endblock %}
 
     <main class="main-content">
         <div class="container">
             {% block content %}{% endblock %}
         </div>
     </main>
+
+    {% include "includes/footer.html" %}
 
     <script src="{% static 'js/project-scripts.js' %}"></script>
     {% block extrajs %}{% endblock %}
