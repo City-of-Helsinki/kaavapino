@@ -10,7 +10,10 @@ admin.autodiscover()
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', projects.views.index),
+    path('', projects.views.index, name='index'),
+    path('projects/', projects.views.ProjectListView.as_view(), name='project-list'),
+    path('projects/create/', projects.views.ProjectCreateView.as_view(), name='project-create'),
+    path('projects/<int:pk>/edit', projects.views.ProjectUpdateView.as_view(), name='project-edit'),
     path('<str:path>', projects.views.index),
 ]
 
