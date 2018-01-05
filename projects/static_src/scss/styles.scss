@@ -9,4 +9,10 @@
 @import "./node_modules/font-awesome/scss/font-awesome";
 
 // Project custom styles
+@import "project/helsinki-colors";
 @import "project/common";
+@import "project/navigation";
+@import "project/footer";
+@import "project/forms";
+@import "project/sidebar";
+@import "project/progress-indicator";

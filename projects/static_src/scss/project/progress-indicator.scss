@@ -1,0 +1,116 @@
+.application-state-indicator {
+    padding: 0 0 50px 0;
+
+    .steps {
+        display: flex;
+        flex-flow: row wrap;
+        justify-content: space-between;
+
+        .step {
+            width: 33.333333%;
+            text-align: center;
+            position: relative;
+
+            &:before, &:after {
+                content: "";
+                border-top: 3px solid $medium-gray;
+                display: block;
+                position: absolute;
+                top: 25px;
+                width: 50%;
+                z-index: -1;
+            }
+
+            &:before {
+                left: 0%;
+            }
+
+            &:after {
+                left: 50%;
+            }
+
+            &:first-child:before {
+                display: none;
+            }
+
+            &:last-child:after {
+                display: none;
+            }
+
+            &.color--tram {
+                &.completed .step-number {
+                    color: $hel-tram;
+                    border-color: $hel-tram;
+                }
+
+                &.active .step-number {
+                    background: $hel-tram;
+                    border-color: $hel-tram;
+                    color: $white;
+                }
+            }
+
+            &.color--summer {
+                &.completed .step-number {
+                    color: $hel-summer;
+                    border-color: $hel-summer;
+                }
+
+                &.active .step-number {
+                    background: $hel-summer;
+                    border-color: $hel-summer;
+                    color: $text-color;
+                }
+            }
+
+            &.color--metro {
+                &.completed .step-number {
+                    color: $hel-metro;
+                    border-color: $hel-metro;
+                }
+
+                &.active .step-number {
+                    background: $hel-metro;
+                    border-color: $hel-metro;
+                    color: $white;
+                }
+            }
+
+            &.active,
+            &.completed {
+                &:before, &:after {
+                    border-color: $text-color;
+                }
+            }
+
+            &.active {
+                .step-label {
+                    color: $text-color;
+                }
+            }
+
+            .step-number {
+                display: block;
+                width: 50px;
+                height: 50px;
+                border: 3px solid $medium-gray;
+                text-align: center;
+                line-height: 44px;
+                margin: 0 auto 10px auto;
+                background: $light-gray;
+                z-index: 2;
+                position: relative;
+                border-radius: 50%;
+                font-weight: 800;
+                color: $text-muted;
+            }
+
+            .step-label {
+                text-transform: uppercase;
+                font-weight: bold;
+                font-size: $font-size-small;
+                color: $text-muted;
+            }
+        }
+    }
+}
