@@ -26,12 +26,12 @@ class Migration(migrations.Migration):
             name='identifier',
             field=models.CharField(db_index=True, max_length=50, validators=[django.core.validators.RegexValidator(re.compile('^[\\w]+\\Z'), "Enter a valid 'identifier' consisting of Unicode letters, numbers or underscores.", 'invalid')], verbose_name='identifier'),
         ),
-        migrations.RemoveField(
-            model_name='attributevaluechoice',
-            name='slug',
-        ),
         migrations.AlterUniqueTogether(
             name='attributevaluechoice',
             unique_together={('attribute', 'identifier')},
+        ),
+        migrations.RemoveField(
+            model_name='attributevaluechoice',
+            name='slug',
         ),
     ]
