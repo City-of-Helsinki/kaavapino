@@ -1,5 +1,5 @@
 from django.contrib.postgres.fields import JSONField
-from django.db import models
+from django.contrib.gis.db import models
 from django.utils.translation import ugettext_lazy as _
 
 from .attribute import Attribute
@@ -20,8 +20,11 @@ class Project(models.Model):
     created_at = models.DateTimeField(verbose_name=_('created at'), auto_now_add=True, editable=False)
     modified_at = models.DateTimeField(verbose_name=_('modified at'), auto_now=True, editable=False)
     name = models.CharField(max_length=255, verbose_name=_('name'))
+    identifier = models.CharField(max_length=50, verbose_name=_('identifier'), db_index=True, blank=True, null=True)
     type = models.ForeignKey(ProjectType, verbose_name=_('type'), related_name='projects', on_delete=models.PROTECT)
     attribute_data = JSONField(verbose_name=_('attribute data'), default=dict, blank=True, null=True)
+
+    geometry = models.MultiPolygonField(null=True, blank=True)
 
     class Meta:
         verbose_name = _('project')

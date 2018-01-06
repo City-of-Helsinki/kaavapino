@@ -18,6 +18,7 @@ class Attribute(models.Model):
     TYPE_STRING = 'string'
     TYPE_BOOLEAN = 'boolean'
     TYPE_DATE = 'date'
+
     TYPE_CHOICES = (
         (TYPE_INT, _('int')),
         (TYPE_STRING, _('string')),
@@ -27,6 +28,7 @@ class Attribute(models.Model):
 
     name = models.CharField(max_length=255, verbose_name=_('name'))
     value_type = models.CharField(max_length=64, verbose_name=_('value type'), choices=TYPE_CHOICES)
+    multiple_choice = models.BooleanField(verbose_name=_('multiple choice'), default=False)
     identifier = models.CharField(
         max_length=50, verbose_name=_('identifier'), db_index=True, unique=True, validators=[validate_identifier]
     )
@@ -45,13 +47,14 @@ class AttributeValueChoice(models.Model):
     )
     value = models.CharField(max_length=255, verbose_name=_('value'))
     identifier = models.CharField(
-        max_length=50, verbose_name=_('identifier'), db_index=True, validators=[validate_identifier]
+        max_length=150, verbose_name=_('identifier'), db_index=True, validators=[validate_identifier]
     )
+    index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
 
     class Meta:
         verbose_name = _('attribute value choice')
         verbose_name_plural = _('attribute value choices')
-        unique_together = ('attribute', 'identifier')
+        unique_together = (('attribute', 'identifier'), ('attribute', 'index'))
 
     def __str__(self):
         return self.value
