@@ -29,7 +29,8 @@ var projects = [
             "name": "{{ project.name }}",
             "height": {{ project.sqm2 }},
             "color": "{{ project.phase.color }}",
-            "phase": "{{ project.phase.name }}"
+            "phase": "{{ project.phase.name }}",
+            "strategies": {{ project.strategies|safe }}
         }
     },
     {% endfor %}
@@ -60,15 +61,33 @@ map.on('load', function () {
             'fill-extrusion-opacity': 0.8
         }
     });
-});
 
-map.on('click', 'projects', function (e) {
-    var html = "<strong>" + e.features[0].properties.name + "</strong>";
-    html += "<br />" + e.features[0].properties.phase;
-    new mapboxgl.Popup()
-        .setLngLat(e.lngLat)
-        .setHTML(html)
-        .addTo(map);
+    map.on('click', 'projects', function (e) {
+        var html = "<strong>" + e.features[0].properties.name + "</strong>";
+        html += "<p>" + e.features[0].properties.phase + "</p>";
+        html += "<strong>Strategiakytkennät</strong>"
+        html += "<ul>"
+        strategies = JSON.parse(e.features[0].properties.strategies);
+        console.log(strategies);
+        for (var i = 0; i < strategies.length; i++) {
+            html += "<li>" + strategies[i] + "</li>";
+        }
+        html += "</ul>";
+        new mapboxgl.Popup()
+            .setLngLat(e.lngLat)
+            .setHTML(html)
+            .addTo(map);
+    });
+
+    // Change the cursor to a pointer when the mouse is over the states layer.
+    map.on('mouseenter', 'projects', function () {
+        map.getCanvas().style.cursor = 'pointer';
+    });
+
+    // Change it back to a pointer when it leaves.
+    map.on('mouseleave', 'projects', function () {
+        map.getCanvas().style.cursor = '';
+    });
 });
 
 </script>
