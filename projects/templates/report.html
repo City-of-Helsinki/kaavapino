@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="min-height: 800px;" id="map">
+</div>
+{% endblock %}
+
+{% block extrajs %}
+<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.43.0/mapbox-gl.js'></script>
+<link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.43.0/mapbox-gl.css' rel='stylesheet' />
+
+<script>
+
+var map = new mapboxgl.Map({
+    container: 'map',
+    //style: 'https://openmaptiles.github.io/osm-bright-gl-style/style-cdn.json',
+    style: 'https://openmaptiles.github.io/positron-gl-style/style-cdn.json',
+    //style: 'https://openmaptiles.github.io/klokantech-basic-gl-style/style-cdn.json',
+    center: [24.9192, 60.1822],
+    zoom: 12
+});
+
+var projects = [
+    {% for project in projects %}
+    {
+        "type": "Feature",
+        "geometry": {{ project.geometry.geojson|safe }},
+        "properties": {
+            "name": "{{ project.name }}",
+            "height": {{ project.sqm2 }},
+            "color": "{{ project.phase.color }}",
+            "phase": "{{ project.phase.name }}"
+        }
+    },
+    {% endfor %}
+];
+
+map.addControl(new mapboxgl.NavigationControl());
+
+map.on('load', function () {
+    map.addLayer({
+        'id': 'projects',
+        'type': 'fill-extrusion',
+        'source': {
+            'type': 'geojson',
+            'data': {
+                'type': 'FeatureCollection',
+                'features': projects
+            }
+        },
+        'paint': {
+            'fill-extrusion-height': {
+                'property': 'height',
+                'type': 'identity'
+            },
+            'fill-extrusion-color': {
+                'property': 'color',
+                'type': 'identity'
+            },
+            'fill-extrusion-opacity': 0.8
+        }
+    });
+});
+
+map.on('click', 'projects', function (e) {
+    var html = "<strong>" + e.features[0].properties.name + "</strong>";
+    html += "<br />" + e.features[0].properties.phase;
+    new mapboxgl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(html)
+        .addTo(map);
+});
+
+</script>
+
+{% endblock %}

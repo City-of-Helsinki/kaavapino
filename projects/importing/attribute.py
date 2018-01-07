@@ -2,13 +2,24 @@ import logging
 
 from openpyxl import load_workbook
 
-from ..models import Attribute
+from ..models import Attribute, ProjectType, ProjectPhase
 from ..models.utils import create_identifier
 
 logger = logging.getLogger(__name__)
 
 EXPECTED_A1_VALUE = 'HANKETIETO'
 DEFAULT_SHEET_NAME = 'Taul2'
+
+PROJECT_PHASES = [
+    {'name': 'Käynnistys', 'color': '#009142'},
+    {'name': 'Suunnitteluperiaatteet', 'color': '#009142'},
+    {'name': 'OAS', 'color': '#ffd600'},
+    {'name': 'Luonnos', 'color': '#ffd600'},
+    {'name': 'Ehdotus', 'color': '#ff4c00'},
+    {'name': 'Tarkistettu ehdotus', 'color': '#0100be'},
+    {'name': 'Kanslia-Khs-Valtuusto', 'color': '#000000'},
+    {'name': 'Voimaantulo', 'color': '#ffffff'}
+]
 
 VALUE_TYPES = {
     'tunniste; numerotunniste': Attribute.TYPE_INT,
@@ -56,9 +67,9 @@ class AttributeImporter:
 
     def _update_models(self, data):
         for datum in data[1:]:
-            name = datum[0]
+            name = datum[0].strip()
             identifier = create_identifier(name)
-            value_type = VALUE_TYPES.get(datum[3])
+            value_type = VALUE_TYPES.get(datum[3].strip())
 
             if not value_type:
                 logger.warning('Unidentified value type "{}", defaulting to string'.format(datum[3]))
@@ -83,9 +94,24 @@ class AttributeImporter:
 
             logger.info('{} {}'.format(action_str, attribute))
 
+    def create_phases(self):
+        self.project_type, _ = ProjectType.objects.get_or_create(name='asemakaava')
+        current_phases = [obj.name for obj in self.project_type.phases.order_by('index')]
+        new_phases = [x['name'] for x in PROJECT_PHASES]
+        if current_phases == new_phases:
+            return
+
+        self.project_type.phases.all().delete()
+        for idx, phase in enumerate(PROJECT_PHASES):
+            ProjectPhase.objects.create(
+                project_type=self.project_type, name=phase['name'], index=idx, color=phase['color']
+            )
+
     def run(self):
         filename = self.options.get('filename')
         logger.info('Importing attributes from file {}...'.format(filename))
+
+        self.create_phases()
 
         workbook = self._open_workbook(filename)
         data = self._extract_data_from_workbook(workbook)

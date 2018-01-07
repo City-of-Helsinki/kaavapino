@@ -55,6 +55,7 @@ class AttributeValueChoice(models.Model):
         verbose_name = _('attribute value choice')
         verbose_name_plural = _('attribute value choices')
         unique_together = (('attribute', 'identifier'), ('attribute', 'index'))
+        ordering = ('index',)
 
     def __str__(self):
         return self.value
