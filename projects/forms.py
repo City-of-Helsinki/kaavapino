@@ -28,7 +28,7 @@ class ProjectForm(forms.ModelForm):
 
             if value_choices.exists():
                 field_class = forms.ChoiceField
-                extra['choices'] = value_choices.values_list('identifier', 'value')
+                extra['choices'] = [['', '---']] + list(value_choices.values_list('identifier', 'value'))
             else:
                 (field_class, field_kwargs) = FIELD_TYPES.get(attribute.value_type)
                 extra.update(field_kwargs)

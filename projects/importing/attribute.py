@@ -22,7 +22,7 @@ PROJECT_PHASES = [
 ]
 
 VALUE_TYPES = {
-    'tunniste; numerotunniste': Attribute.TYPE_INTEGER,
+    'tunniste; numerotunniste': Attribute.TYPE_SHORT_STRING,
     'sisältö; nimi': Attribute.TYPE_SHORT_STRING,
     'sisältö; valitaan toinen': Attribute.TYPE_BOOLEAN,
     'sisältö; teksti': Attribute.TYPE_LONG_STRING,
