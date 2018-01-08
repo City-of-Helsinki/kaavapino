@@ -1,3 +1,4 @@
+from django.contrib.gis.admin import OSMGeoAdmin
 from django.contrib import admin, messages
 from django.utils.translation import ugettext_lazy as _
 
@@ -30,7 +31,7 @@ def build_create_document_action(template):
 
 
 @admin.register(Project)
-class ProjectAdmin(admin.ModelAdmin):
+class ProjectAdmin(OSMGeoAdmin):
     list_display = ('name', 'created_at', 'modified_at')
 
     def get_actions(self, request):
