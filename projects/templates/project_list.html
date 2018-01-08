@@ -1,8 +1,6 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block extra_body_tags %}data-spy="scroll" data-target="#application-sidebar-affix" data-offset="30"{% endblock %}
-
 {% block hero %}
     <div class="jumbotron">
         <div class="container">
@@ -22,11 +20,25 @@
         </a>
     </p>
     <hr class="hr-darker">
-    <ul>
-    {% for project in object_list %}
-        <li><a href="{% url 'project-edit' pk=project.pk %}">{{ project.name }}</a></li>
-    {% empty %}
-        <li>Ei kaavahankkeita.</li>
-    {% endfor %}
-    </ul>
+
+    <table class="table table-condensed">
+        <thead>
+            <tr>
+                <th>Nimi</th>
+                <th>Vaihe</th>
+                <th>Luotu</th>
+                <th>Muokattu</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for project in object_list %}
+            <tr bgcolor="{{ project.phase.color }}">
+               <td><a href="{% url 'project-edit' pk=project.id %}">{{ project.name }}</a></td>
+               <td>{{ project.phase.name }}</td>
+               <td>{{ project.created_at }}</td>
+               <td>{{ project.modified_at }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+  </table>
 {% endblock %}

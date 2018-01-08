@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load i18n %}
 
+{% block extra_body_tags %}data-spy="scroll" data-target="#application-sidebar-affix" data-offset="30"{% endblock %}
+
 {% block hero %}
     <div class="jumbotron">
         <div class="container">
