@@ -1,15 +1,40 @@
-import random
 import json
-from django.http import HttpResponse
+import random
+
 from django.shortcuts import render
-from projects.models import Project, Attribute
+from django.urls import reverse_lazy
+from django.views.generic.edit import CreateView, UpdateView
+from django.views.generic.list import ListView
+
+from .forms import ProjectForm
+from .models import Attribute, Project
 
 
-def index(request, path='index'):
-    if 'favicon.ico' in path:
-        return HttpResponse('')
+class ProjectCreateView(CreateView):
+    model = Project
+    form_class = ProjectForm
+    template_name = 'project_form.html'
+    success_url = reverse_lazy('project-list')
 
-    template_filename = '{}.html'.format(path)
+
+class ProjectUpdateView(UpdateView):
+    model = Project
+    form_class = ProjectForm
+    template_name = 'project_form.html'
+    success_url = reverse_lazy('project-list')
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial.update(self.object.attribute_data)
+        return initial
+
+
+class ProjectListView(ListView):
+    model = Project
+    template_name = 'project_list.html'
+
+
+def report_view(request):
     project_qs = Project.objects.filter(geometry__isnull=False, phase__isnull=False)
     project_qs = project_qs.select_related('phase')
     strategy_attr = Attribute.objects.get(identifier='strategiakytkenta')
@@ -20,4 +45,4 @@ def index(request, path='index'):
         project.strategies = json.dumps([strategies[x].value for x in project_strategies])
     context = dict(projects=project_qs)
 
-    return render(request, template_filename, context=context)
+    return render(request, 'report.html', context=context)

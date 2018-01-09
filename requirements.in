@@ -3,3 +3,4 @@ django-environ
 psycopg2
 docxtpl
 openpyxl
+django-bootstrap3

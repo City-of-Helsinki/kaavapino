@@ -2,7 +2,7 @@ import logging
 
 from openpyxl import load_workbook
 
-from ..models import Attribute, ProjectType, ProjectPhase
+from ..models import Attribute, ProjectPhase, ProjectType
 from ..models.utils import create_identifier
 
 logger = logging.getLogger(__name__)
@@ -22,14 +22,14 @@ PROJECT_PHASES = [
 ]
 
 VALUE_TYPES = {
-    'tunniste; numerotunniste': Attribute.TYPE_INT,
-    'sisältö; nimi': Attribute.TYPE_STRING,
+    'tunniste; numerotunniste': Attribute.TYPE_SHORT_STRING,
+    'sisältö; nimi': Attribute.TYPE_SHORT_STRING,
     'sisältö; valitaan toinen': Attribute.TYPE_BOOLEAN,
-    'sisältö; teksti': Attribute.TYPE_STRING,
+    'sisältö; teksti': Attribute.TYPE_LONG_STRING,
     'aikataulu ja tehtävät; kyllä/ei': Attribute.TYPE_BOOLEAN,
-    'aikataulu ja tehtävät; valitaan toinen': Attribute.TYPE_STRING,
+    'aikataulu ja tehtävät; valitaan toinen': Attribute.TYPE_SHORT_STRING,
     'aikataulu ja tehtävät; pvm': Attribute.TYPE_DATE,
-    'sisältö; numero': Attribute.TYPE_INT,
+    'sisältö; numero': Attribute.TYPE_INTEGER,
 }
 
 
@@ -72,8 +72,8 @@ class AttributeImporter:
             value_type = VALUE_TYPES.get(datum[3].strip())
 
             if not value_type:
-                logger.warning('Unidentified value type "{}", defaulting to string'.format(datum[3]))
-                value_type = Attribute.TYPE_STRING
+                logger.warning('Unidentified value type "{}", defaulting to short string'.format(datum[3]))
+                value_type = Attribute.TYPE_SHORT_STRING
 
             overwrite = self.options.get('overwrite')
 

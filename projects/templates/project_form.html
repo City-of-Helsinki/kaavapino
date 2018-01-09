@@ -8,9 +8,9 @@
         <div class="container">
             <ol class="breadcrumb">
                 <li><a href="/">{% trans "Home" %}</a></li>
-                <li class="active">{% trans "New application" %}</li>
+                <li class="active">Uusi kaavahanke</li>
             </ol>
-            <h1>{% trans "New application" %}</h1>
+            <h1>Uusi kaavahanke</h1>
         </div>
     </div>
 {% endblock %}
@@ -34,47 +34,62 @@
     </div>
     <div class="row">
         <div class="col-md-9" id="new-application">
-            <form action="" method="post">
+            <form method="post" novalidate>{% csrf_token %}
                 <fieldset class="form-subset" id="fieldset_1">
-                    <h2 class="form-subset-header">Väliotsikko 1</h2>
-                    {% include "example/example-fields-1.html" %}
+                    <h2 class="form-subset-header">Perustiedot</h2>
+                    {% include "project_form_fields/start_1.html" %}
                 </fieldset>
                 <fieldset class="form-subset" id="fieldset_2">
                     <h2 class="form-subset-header">Väliotsikko 2</h2>
-                    {% include "example/example-fields-2.html" %}
+                    {% include "project_form_fields/start_2.html" %}
                 </fieldset>
                 <fieldset class="form-subset" id="fieldset_3">
-                    <h2 class="form-subset-header">Väliotsikko 3</h2>
-                    {% include "example/example-fields-3.html" %}
-                </fieldset>
-                <fieldset class="form-subset" id="fieldset_4">
-                    <h2 class="form-subset-header">Väliotsikko 4</h2>
-                    {% include "example/example-fields-4.html" %}
+                    <h2 class="form-subset-header">Asuinneliöt</h2>
+                    {% include "project_form_fields/start_3.html" %}
                 </fieldset>
                 <button type="submit" name="button" class="btn btn-lg btn-primary">
-                    <i class="fa fa-check"></i> {% trans "Submit" %}
-                </button>
-                <button type="button" name="button" class="btn btn-lg btn-default">
-                    <i class="fa fa-save"></i> {% trans "Save as draft" %}
+                    <i class="fa fa-check"></i> {% trans "Save" %}
                 </button>
             </form>
         </div>
         <div class="col-md-3">
             <div class="application-sidebar border--tram hidden-print" id="application-sidebar-affix" role="complementary">
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">Application state</h3>
+                    <h3 class="sidebar-title">Vaihe</h3>
                     <p><strong class="text--tram">1. Käynnistys</strong></p>
                 </div>
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">Sections</h3>
+                    <h3 class="sidebar-title">Osiot</h3>
                     <ul class="nav application-sidenav">
-                        <li><a href="#fieldset_1">Väliotsikko 1</a></li>
+                        <li><a href="#fieldset_1">Perustiedot</a></li>
                         <li><a href="#fieldset_2">Väliotsikko 2</a></li>
-                        <li><a href="#fieldset_3">Väliotsikko 3</a></li>
-                        <li><a href="#fieldset_4">Väliotsikko 4</a></li>
+                        <li><a href="#fieldset_3">Asuinneliöt</a></li>
                     </ul>
                 </div>
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block extrajs %}
+<script>
+    const sourceFields = $("input[name^='asuminen_kerrostalo'], input[name^='asuminen_pientalo']");
+
+    function updateTotal() {
+        let total = 0;
+        sourceFields.each(function() {
+            const val = $(this).val();
+            if (val) {
+                total += parseInt(val);
+            }
+        });
+        $("#id_asuminen_yhteensa").val(total);
+    }
+
+    sourceFields.on('change keyup paste', function() {
+        updateTotal();
+    });
+
+    updateTotal();
+</script>
 {% endblock %}

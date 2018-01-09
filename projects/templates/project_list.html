@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block hero %}
+    <div class="jumbotron">
+        <div class="container">
+            <ol class="breadcrumb">
+                <li><a href="/">{% trans "Home" %}</a></li>
+                <li class="active">Kaavahankkeet</li>
+            </ol>
+            <h1>Kaavahankkeet</h1>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <p>
+        <a href="{% url 'project-create' %}" class="btn btn-default">
+            <i class="fa fa-plus fa-fw"></i> Luo uusi
+        </a>
+    </p>
+    <hr class="hr-darker">
+
+    <table class="table table-condensed">
+        <thead>
+            <tr>
+                <th>Nimi</th>
+                <th>Vaihe</th>
+                <th>Luotu</th>
+                <th>Muokattu</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for project in object_list %}
+            <tr bgcolor="{{ project.phase.color }}">
+               <td><a href="{% url 'project-edit' pk=project.id %}">{{ project.name }}</a></td>
+               <td>{{ project.phase.name }}</td>
+               <td>{{ project.created_at }}</td>
+               <td>{{ project.modified_at }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+  </table>
+{% endblock %}

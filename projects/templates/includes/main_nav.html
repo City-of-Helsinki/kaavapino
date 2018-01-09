@@ -16,10 +16,10 @@
         <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
                 <li>
-                    <a href="/">{% trans "Applications" %}</a>
+                    <a href="{% url 'project-list' %}">Kaavahankkeet</a>
                 </li>
                 <li>
-                    <a href="/example-form">{% trans "Example form" %}</a>
+                    <a href="{% url 'reports' %}">Raportit</a>
                 </li>
             </ul>
             <div class="nav navbar-nav navbar-right">
