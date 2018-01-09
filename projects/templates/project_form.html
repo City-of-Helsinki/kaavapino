@@ -70,3 +70,26 @@
         </div>
     </div>
 {% endblock %}
+
+{% block extrajs %}
+<script>
+    const sourceFields = $("input[name^='asuminen_kerrostalo'], input[name^='asuminen_pientalo']");
+
+    function updateTotal() {
+        let total = 0;
+        sourceFields.each(function() {
+            const val = $(this).val();
+            if (val) {
+                total += parseInt(val);
+            }
+        });
+        $("#id_asuminen_yhteensa").val(total);
+    }
+
+    sourceFields.on('change keyup paste', function() {
+        updateTotal();
+    });
+
+    updateTotal();
+</script>
+{% endblock %}
