@@ -1,5 +1,5 @@
-from django.contrib.gis.admin import OSMGeoAdmin
 from django.contrib import admin, messages
+from django.contrib.gis.admin import OSMGeoAdmin
 from django.utils.translation import ugettext_lazy as _
 
 from .exporting import get_document_response

@@ -2,7 +2,7 @@ import logging
 
 from openpyxl import load_workbook
 
-from ..models import Attribute, ProjectType, ProjectPhase
+from ..models import Attribute, ProjectPhase, ProjectType
 from ..models.utils import create_identifier
 
 logger = logging.getLogger(__name__)
