@@ -1,37 +1,60 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block extra_body_tags %}data-spy="scroll" data-target="#application-sidebar-affix" data-offset="30"{% endblock %}
-
 {% block hero %}
-    <div class="jumbotron">
+    <div class="jumbotron customized">
         <div class="container">
             <ol class="breadcrumb">
                 <li><a href="/">{% trans "Home" %}</a></li>
-                <li class="active">Uusi kaavahanke</li>
+                <li class="active">Kaavahankkeen muokkaus</li>
             </ol>
-            <h1>Uusi kaavahanke</h1>
+            <div class="flex-row">
+                <div class="col col-grow">
+                    <h1>Karhusaaren eteläosan pientalotontit II, asemakaava ja asemakaavan muutos</h1>
+                </div>
+                <div class="col col-auto">
+                    <p><strong>Diaarinumero</strong><br>HEL 2015 002510</p>
+                </div>
+                <div class="col col-auto">
+                    <p><strong>Hankenumero</strong><br>1402_12</p>
+                </div>
+            </div>
         </div>
     </div>
+    <section class="application-state-indicator">
+        <div class="container">
+            <h2 class="h6 text-center">Hankkeen nykytila</h2>
+            <div class="steps">
+                <div class="step completed color--tram">
+                    <span class="step-number"></span>
+                    <span class="step-label">Käynnistys</span>
+                </div>
+                <div class="step active color--summer">
+                    <span class="step-number"></span>
+                    <span class="step-label">OAS</span>
+                </div>
+                <div class="step color--metro">
+                    <span class="step-number"></span>
+                    <span class="step-label">Ehdotus</span>
+                </div>
+                <div class="step color--bus">
+                    <span class="step-number"></span>
+                    <span class="step-label">Tarkistettu ehdotus</span>
+                </div>
+                <div class="step color--black">
+                    <span class="step-number"></span>
+                    <span class="step-label">Kanslia-Khs-Valtuusto</span>
+                </div>
+                <div class="step color--white">
+                    <span class="step-number"></span>
+                    <span class="step-label">Voimaantulo</span>
+                </div>
+            </div>
+        </div>
+    </section>
 {% endblock %}
 
 {% block content %}
-    <div class="application-state-indicator">
-        <div class="steps">
-            <div class="step completed active color--tram">
-                <span class="step-number">1</span>
-                <span class="step-label">Käynnistys</span>
-            </div>
-            <div class="step color--summer">
-                <span class="step-number">2</span>
-                <span class="step-label">OAS</span>
-            </div>
-            <div class="step color--metro">
-                <span class="step-number">3</span>
-                <span class="step-label">Ehdotus</span>
-            </div>
-        </div>
-    </div>
     <div class="row">
         <div class="col-md-9" id="new-application">
             <form method="post" novalidate>{% csrf_token %}
@@ -53,19 +76,33 @@
             </form>
         </div>
         <div class="col-md-3">
-            <div class="application-sidebar border--tram hidden-print" id="application-sidebar-affix" role="complementary">
-                <div class="sidebar-section">
-                    <h3 class="sidebar-title">Vaihe</h3>
-                    <p><strong class="text--tram">1. Käynnistys</strong></p>
-                </div>
-                <div class="sidebar-section">
-                    <h3 class="sidebar-title">Osiot</h3>
-                    <ul class="nav application-sidenav">
-                        <li><a href="#fieldset_1">Perustiedot</a></li>
-                        <li><a href="#fieldset_2">Väliotsikko 2</a></li>
-                        <li><a href="#fieldset_3">Asuinneliöt</a></li>
-                    </ul>
-                </div>
+            <div class="application-sidebar hidden-print" id="application-sidebar-affix" role="complementary">
+                <ul class="nav application-sidenav">
+                    <li class="colored--tram">
+                        <a href="#" class="sidenav-title">1. Käynnistys</a>
+                        <ul class="nav">
+                            <li><a href="#fieldset_1">Perustiedot</a></li>
+                            <li><a href="#fieldset_2">Väliotsikko 2</a></li>
+                            <li><a href="#fieldset_3">Asuinneliöt</a></li>
+                        </ul>
+                    </li>
+                    <li class="colored--summer current-page">
+                        <a href="#" class="sidenav-title">2. OAS</a>
+                        <ul class="nav">
+                            <li class="form-completed"><a href="#fieldset_1">Perustiedot</a></li>
+                            <li class="form-completed"><a href="#fieldset_2">Väliotsikko 2</a></li>
+                            <li class="unsaved-changes"><a href="#fieldset_3" data-toggle="tooltip" data-title="Tallentamattomia muutoksia" data-placement="left">Asuinneliöt</a></li>
+                        </ul>
+                    </li>
+                    <li class="colored--metro">
+                        <a href="#" class="sidenav-title">3. Ehdotus</a>
+                        <ul class="nav">
+                            <li><a href="#fieldset_1">Perustiedot</a></li>
+                            <li><a href="#fieldset_2">Väliotsikko 2</a></li>
+                            <li><a href="#fieldset_3">Asuinneliöt</a></li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
         </div>
     </div>
