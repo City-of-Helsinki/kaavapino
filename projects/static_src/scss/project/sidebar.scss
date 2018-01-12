@@ -15,7 +15,7 @@
 
 .application-sidenav {
     > li.current-page {
-        &.colored--tram {
+        &.color--tram {
             border-left-color: $hel-tram;
 
             .sidenav-title {
@@ -23,7 +23,7 @@
             }
         }
 
-        &.colored--summer {
+        &.color--summer {
             border-left-color: $hel-summer;
 
             .sidenav-title {
@@ -31,7 +31,7 @@
             }
         }
 
-        &.colored--metro {
+        &.color--metro {
             border-left-color: $hel-metro;
 
             .sidenav-title {
