@@ -9,4 +9,6 @@ $(() => {
       }
     }
   });
+
+  $('[data-toggle="tooltip"]').tooltip();
 });

@@ -1,24 +1,28 @@
 .application-state-indicator {
-    padding: 0 0 50px 0;
+    padding: 10px 0 20px 0;
+    background: #fff;
 
     .steps {
         display: flex;
         flex-flow: row wrap;
         justify-content: space-between;
+        margin-top: 3rem;
+        counter-reset: step;
 
         .step {
-            width: 33.333333%;
+            width: (100% / 6);
             text-align: center;
             position: relative;
+            counter-increment: step;
 
             &:before, &:after {
                 content: "";
-                border-top: 3px solid $medium-gray;
+                border-top: 2px solid $medium-gray;
                 display: block;
                 position: absolute;
-                top: 25px;
+                top: 20px;
                 width: 50%;
-                z-index: -1;
+                z-index: 0;
             }
 
             &:before {
@@ -38,11 +42,6 @@
             }
 
             &.color--tram {
-                &.completed .step-number {
-                    color: $hel-tram;
-                    border-color: $hel-tram;
-                }
-
                 &.active .step-number {
                     background: $hel-tram;
                     border-color: $hel-tram;
@@ -51,11 +50,6 @@
             }
 
             &.color--summer {
-                &.completed .step-number {
-                    color: $hel-summer;
-                    border-color: $hel-summer;
-                }
-
                 &.active .step-number {
                     background: $hel-summer;
                     border-color: $hel-summer;
@@ -64,11 +58,6 @@
             }
 
             &.color--metro {
-                &.completed .step-number {
-                    color: $hel-metro;
-                    border-color: $hel-metro;
-                }
-
                 &.active .step-number {
                     background: $hel-metro;
                     border-color: $hel-metro;
@@ -83,6 +72,18 @@
                 }
             }
 
+            &.completed {
+                .step-number {
+                    border-color: $text-color;
+                    color: $text-color;
+
+                    &:before {
+                        content: "\f00c"; // Font awesome check mark
+                        font-family: FontAwesome;
+                    }
+                }
+            }
+
             &.active {
                 .step-label {
                     color: $text-color;
@@ -91,25 +92,32 @@
 
             .step-number {
                 display: block;
-                width: 50px;
-                height: 50px;
-                border: 3px solid $medium-gray;
+                width: 40px;
+                height: 40px;
+                border: 2px solid $medium-gray;
                 text-align: center;
-                line-height: 44px;
-                margin: 0 auto 10px auto;
-                background: $light-gray;
+                line-height: 38px;
+                margin: 0 auto;
+                background: $white;
                 z-index: 2;
                 position: relative;
                 border-radius: 50%;
-                font-weight: 800;
                 color: $text-muted;
+                font-weight: bold;
+
+                &:before {
+                    content: counter(step);
+                }
             }
 
             .step-label {
                 text-transform: uppercase;
                 font-weight: bold;
-                font-size: $font-size-small;
+                font-size: 12px;
                 color: $text-muted;
+                line-height: 1.2;
+                display: block;
+                padding: 7px 5px 0 5px;
             }
         }
     }
