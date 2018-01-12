@@ -19,7 +19,7 @@ class ProjectListView(ListView):
 
 
 def generate_sections(project: Project=None):
-    if project:
+    if project and project.phase:
         phase = project.phase
     else:
         phase = ProjectPhase.objects.get(index=0)
@@ -55,7 +55,7 @@ def project_edit(request, pk=None):
         project.phase = ProjectPhase.objects.get(index=0)
         project.type = ProjectType.objects.first()
 
-    sections = generate_sections()
+    sections = generate_sections(project)
     active_section = None
 
     for section in sections:

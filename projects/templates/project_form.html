@@ -74,7 +74,7 @@
                             <ul class="nav">
                                 {% for phase_section in phase.sections.all %}
                                 <li{% if active_section == phase_section.id %} class="active"{% endif %}>
-                                    <a href="#section_{{ phase_section.id }}" aria-controls="section_{{ section.section.id }}" role="tab" data-toggle="tab">
+                                    <a href="#section_{{ phase_section.id }}" aria-controls="section_{{ phase_section.id }}" role="tab" data-toggle="tab">
                                         {{ phase_section.name }}
                                     </a>
                                 </li>
