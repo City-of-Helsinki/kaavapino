@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load i18n %}
+{% load i18n bootstrap3 %}
 
 {% block hero %}
     <div class="jumbotron customized">
@@ -10,14 +10,22 @@
             </ol>
             <div class="flex-row">
                 <div class="col col-grow">
-                    <h1>Karhusaaren eteläosan pientalotontit II, asemakaava ja asemakaavan muutos</h1>
+                    {% if project.id %}
+                        <h1>{{ project.name|default_if_none:"Kaavahanke" }}</h1>
+                    {% else %}
+                        <h1>{% trans "Uusi kaavahanke" %}</h1>
+                    {% endif %}
                 </div>
+                {% if project.attribute_data.diaarinumero %}
                 <div class="col col-auto">
-                    <p><strong>Diaarinumero</strong><br>HEL 2015 002510</p>
+                    <p><strong>Diaarinumero</strong><br>{{ project.attribute_data.diaarinumero }}</p>
                 </div>
+                {% endif %}
+                {% if project.attribute_data.hankenumero %}
                 <div class="col col-auto">
-                    <p><strong>Hankenumero</strong><br>1402_12</p>
+                    <p><strong>Hankenumero</strong><br>{{ project.attribute_data.hankenumero }}</p>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -25,30 +33,12 @@
         <div class="container">
             <h2 class="h6 text-center">Hankkeen nykytila</h2>
             <div class="steps">
-                <div class="step completed color--tram">
-                    <span class="step-number"></span>
-                    <span class="step-label">Käynnistys</span>
-                </div>
-                <div class="step active color--summer">
-                    <span class="step-number"></span>
-                    <span class="step-label">OAS</span>
-                </div>
-                <div class="step color--metro">
-                    <span class="step-number"></span>
-                    <span class="step-label">Ehdotus</span>
-                </div>
-                <div class="step color--bus">
-                    <span class="step-number"></span>
-                    <span class="step-label">Tarkistettu ehdotus</span>
-                </div>
-                <div class="step color--black">
-                    <span class="step-number"></span>
-                    <span class="step-label">Kanslia-Khs-Valtuusto</span>
-                </div>
-                <div class="step color--white">
-                    <span class="step-number"></span>
-                    <span class="step-label">Voimaantulo</span>
-                </div>
+                {% for phase in phases %}
+                    <div class="step{% if project.phase == phase %} active{% endif %} {{ phase.color }}">
+                        <span class="step-number"></span>
+                        <span class="step-label">{{ phase.name }}</span>
+                    </div>
+                {% endfor %}
             </div>
         </div>
     </section>
@@ -57,51 +47,41 @@
 {% block content %}
     <div class="row">
         <div class="col-md-9" id="new-application">
-            <form method="post" novalidate>{% csrf_token %}
-                <fieldset class="form-subset" id="fieldset_1">
-                    <h2 class="form-subset-header">Perustiedot</h2>
-                    {% include "project_form_fields/start_1.html" %}
-                </fieldset>
-                <fieldset class="form-subset" id="fieldset_2">
-                    <h2 class="form-subset-header">Väliotsikko 2</h2>
-                    {% include "project_form_fields/start_2.html" %}
-                </fieldset>
-                <fieldset class="form-subset" id="fieldset_3">
-                    <h2 class="form-subset-header">Asuinneliöt</h2>
-                    {% include "project_form_fields/start_3.html" %}
-                </fieldset>
-                <button type="submit" name="button" class="btn btn-lg btn-primary">
-                    <i class="fa fa-check"></i> {% trans "Save" %}
-                </button>
-            </form>
+            <div class="tab-content">
+            {% for section in sections %}
+                <div class="tab-pane{% if active_section == section.section.id %} active{% endif %}" id="section_{{ section.section.id }}" role="tabpanel">
+                    <form method="post" novalidate>{% csrf_token %}
+                        <fieldset class="form-subset" id="section_{{ section.section.id }}_">
+                            <h2 class="form-subset-header">{{ section.section.name }}</h2>
+                            {% for field in section.form %}
+                                {% bootstrap_field field %}
+                            {% endfor %}
+                        </fieldset>
+                        <button type="submit" name="save_section_{{ section.section.id }}" class="btn btn-lg btn-primary">
+                            <i class="fa fa-check"></i> {% trans "Save" %}
+                        </button>
+                    </form>
+                </div>
+            {% endfor %}
+            </div>
         </div>
         <div class="col-md-3">
             <div class="application-sidebar hidden-print" id="application-sidebar-affix" role="complementary">
                 <ul class="nav application-sidenav">
-                    <li class="colored--tram">
-                        <a href="#" class="sidenav-title">1. Käynnistys</a>
-                        <ul class="nav">
-                            <li><a href="#fieldset_1">Perustiedot</a></li>
-                            <li><a href="#fieldset_2">Väliotsikko 2</a></li>
-                            <li><a href="#fieldset_3">Asuinneliöt</a></li>
-                        </ul>
-                    </li>
-                    <li class="colored--summer current-page">
-                        <a href="#" class="sidenav-title">2. OAS</a>
-                        <ul class="nav">
-                            <li class="form-completed"><a href="#fieldset_1">Perustiedot</a></li>
-                            <li class="form-completed"><a href="#fieldset_2">Väliotsikko 2</a></li>
-                            <li class="unsaved-changes"><a href="#fieldset_3" data-toggle="tooltip" data-title="Tallentamattomia muutoksia" data-placement="left">Asuinneliöt</a></li>
-                        </ul>
-                    </li>
-                    <li class="colored--metro">
-                        <a href="#" class="sidenav-title">3. Ehdotus</a>
-                        <ul class="nav">
-                            <li><a href="#fieldset_1">Perustiedot</a></li>
-                            <li><a href="#fieldset_2">Väliotsikko 2</a></li>
-                            <li><a href="#fieldset_3">Asuinneliöt</a></li>
-                        </ul>
-                    </li>
+                    {% for phase in phases %}
+                        <li class="{{ phase.color }}{% if project.phase == phase %} current-page{% endif %}">
+                            <a href="#" class="sidenav-title">{{ phase.index|add:1 }}. {{ phase.name }}</a>
+                            <ul class="nav">
+                                {% for phase_section in phase.sections.all %}
+                                <li{% if active_section == phase_section.id %} class="active"{% endif %}>
+                                    <a href="#section_{{ phase_section.id }}" aria-controls="section_{{ section.section.id }}" role="tab" data-toggle="tab">
+                                        {{ phase_section.name }}
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                    {% endfor %}
                 </ul>
             </div>
         </div>
