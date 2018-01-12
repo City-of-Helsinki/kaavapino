@@ -1,9 +1,6 @@
-import json
-
 from django import forms
-from django.core.serializers.json import DjangoJSONEncoder
 
-from .models import Attribute, Project, ProjectType
+from .models import Attribute
 
 FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: (forms.CharField, {}),
@@ -14,44 +11,25 @@ FIELD_TYPES = {
 }
 
 
-class ProjectForm(forms.ModelForm):
-    class Meta:
-        model = Project
-        fields = []
+def create_section_form_class(section):
+    form_properties = {}
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    for section_attribute in section.projectphasesectionattribute_set.order_by('index'):
+        attribute = section_attribute.attribute
 
-        for attribute in Attribute.objects.prefetch_related('value_choices'):
-            extra = {}
-            value_choices = attribute.value_choices.all()
-
-            if value_choices.exists():
-                field_class = forms.ChoiceField
-                extra['choices'] = [['', '---']] + list(value_choices.values_list('identifier', 'value'))
-            else:
-                (field_class, field_kwargs) = FIELD_TYPES.get(attribute.value_type)
-                extra.update(field_kwargs)
-
-            self.fields[attribute.identifier] = field_class(label=attribute.name, **extra)
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-
-        attribute_identifiers = Attribute.objects.values_list('identifier', flat=True)
-
-        attribute_data = {
-            key: value
-            for key, value in self.cleaned_data.items()
-            if key in attribute_identifiers
+        extra = {
+            'required': section_attribute.required and not section_attribute.generated,
+            'disabled': section_attribute.generated,
         }
-        instance.attribute_data = json.loads(json.dumps(attribute_data, cls=DjangoJSONEncoder))
+        value_choices = attribute.value_choices.all()
 
-        # TODO
-        instance.name = str(instance.attribute_data['kaavahankkeen_nimi'])
-        instance.type, _ = ProjectType.objects.get_or_create(name='asemakaava')
+        if value_choices.exists():
+            field_class = forms.ChoiceField
+            extra['choices'] = [['', '---']] + list(value_choices.values_list('identifier', 'value'))
+        else:
+            (field_class, field_kwargs) = FIELD_TYPES.get(attribute.value_type)
+            extra.update(field_kwargs)
 
-        if commit:
-            instance.save()
+        form_properties[attribute.identifier] = field_class(label=attribute.name, **extra)
 
-        return instance
+    return type('SectionForm', (forms.Form,), form_properties)
