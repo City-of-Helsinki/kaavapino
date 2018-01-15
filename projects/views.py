@@ -22,7 +22,7 @@ def generate_sections(project: Project=None):
     if project and project.phase:
         phase = project.phase
     else:
-        phase = ProjectPhase.objects.get(index=0)
+        phase = ProjectPhase.objects.get(project_type__name='asemakaava', index=0)
 
     sections = []
     for section in phase.sections.order_by('index'):
@@ -52,7 +52,7 @@ def project_edit(request, pk=None):
         project = Project.objects.get(pk=pk)
     else:
         project = Project()
-        project.phase = ProjectPhase.objects.get(index=0)
+        project.phase = ProjectPhase.objects.get(project_type__name='asemakaava', index=0)
         project.type = ProjectType.objects.first()
 
     sections = generate_sections(project)
@@ -84,7 +84,7 @@ def project_edit(request, pk=None):
 
     context = {
         'project': project,
-        'phases': ProjectPhase.objects.all(),
+        'phases': ProjectPhase.objects.filter(project_type__name='asemakaava'),
         'sections': sections,
         'active_section': active_section,
     }
