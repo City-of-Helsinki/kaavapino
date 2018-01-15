@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load i18n bootstrap3 %}
+{% load bootstrap3 %}
 
 {% block hero %}
     <div class="jumbotron customized">
         <div class="container">
             <ol class="breadcrumb">
-                <li><a href="/">{% trans "Home" %}</a></li>
+                <li><a href="/">Etusivu</a></li>
                 <li class="active">Kaavahankkeen muokkaus</li>
             </ol>
             <div class="flex-row">
@@ -13,7 +13,7 @@
                     {% if project.id %}
                         <h1>{{ project.name|default_if_none:"Kaavahanke" }}</h1>
                     {% else %}
-                        <h1>{% trans "Uusi kaavahanke" %}</h1>
+                        <h1>Uusi kaavahanke</h1>
                     {% endif %}
                 </div>
                 {% if project.attribute_data.diaarinumero %}
@@ -58,7 +58,7 @@
                             {% endfor %}
                         </fieldset>
                         <button type="submit" name="save_section_{{ section.section.id }}" class="btn btn-lg btn-primary">
-                            <i class="fa fa-check"></i> {% trans "Save" %}
+                            <i class="fa fa-check"></i> Tallenna
                         </button>
                     </form>
                 </div>
