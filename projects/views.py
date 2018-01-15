@@ -1,37 +1,95 @@
 import json
 import random
 
+from django.core.serializers.json import DjangoJSONEncoder
+from django.http import HttpResponseRedirect
 from django.shortcuts import render
-from django.urls import reverse_lazy
-from django.views.generic.edit import CreateView, UpdateView
+from django.urls import reverse
 from django.views.generic.list import ListView
 
-from .forms import ProjectForm
+from projects.models import ProjectPhase, ProjectType
+
+from .forms import create_section_form_class
 from .models import Attribute, Project
-
-
-class ProjectCreateView(CreateView):
-    model = Project
-    form_class = ProjectForm
-    template_name = 'project_form.html'
-    success_url = reverse_lazy('project-list')
-
-
-class ProjectUpdateView(UpdateView):
-    model = Project
-    form_class = ProjectForm
-    template_name = 'project_form.html'
-    success_url = reverse_lazy('project-list')
-
-    def get_initial(self):
-        initial = super().get_initial()
-        initial.update(self.object.attribute_data)
-        return initial
 
 
 class ProjectListView(ListView):
     model = Project
     template_name = 'project_list.html'
+
+
+def generate_sections(project: Project=None):
+    if project and project.phase:
+        phase = project.phase
+    else:
+        phase = ProjectPhase.objects.get(project_type__name='asemakaava', index=0)
+
+    sections = []
+    for section in phase.sections.order_by('index'):
+        section_data = {
+            'section': section,
+            'form_class': create_section_form_class(section),
+            'form': None,
+        }
+
+        sections.append(section_data)
+
+    return sections
+
+
+def filter_data(identifiers, data):
+    filtered_data = {
+        key: value
+        for key, value in data.items()
+        if key in identifiers
+    }
+
+    return json.loads(json.dumps(filtered_data, cls=DjangoJSONEncoder))
+
+
+def project_edit(request, pk=None):
+    if pk:
+        project = Project.objects.get(pk=pk)
+    else:
+        project = Project()
+        project.phase = ProjectPhase.objects.get(project_type__name='asemakaava', index=0)
+        project.type = ProjectType.objects.first()
+
+    sections = generate_sections(project)
+    active_section = None
+
+    for section in sections:
+        attribute_identifiers = section['section'].get_attribute_identifiers()
+
+        if 'save_section_{}'.format(section['section'].id) in request.POST:
+            active_section = section['section'].id
+
+            section['form'] = section['form_class'](request.POST)
+
+            if section['form'].is_valid():
+                if 'kaavahankkeen_nimi' in request.POST:
+                    project.name = request.POST.get('kaavahankkeen_nimi')
+
+                attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
+
+                project.attribute_data.update(attribute_data)
+                project.save()
+
+                return HttpResponseRedirect(reverse('project-edit', kwargs={'pk': project.id}))
+        else:
+            if not active_section:
+                active_section = section['section'].id
+
+            section['form'] = section['form_class'](initial=filter_data(attribute_identifiers, project.attribute_data))
+
+    context = {
+        'project': project,
+        'phases': ProjectPhase.objects.filter(project_type__name='asemakaava'),
+        'sections': sections,
+        'active_section': active_section,
+    }
+
+    return render(request, 'project_form.html', context=context)
 
 
 def report_view(request):
