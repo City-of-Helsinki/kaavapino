@@ -43,7 +43,7 @@ class ProjectPhase(models.Model):
                                      related_name='phases')
     name = models.CharField(max_length=255, verbose_name=_('name'))
     color = models.CharField(max_length=64, verbose_name=_('color'), blank=True)
-    index = models.PositiveIntegerField(verbose_name=_('index'), null=True, blank=True)
+    index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
 
     class Meta:
         verbose_name = _('project phase')
@@ -58,7 +58,7 @@ class ProjectPhase(models.Model):
 class ProjectPhaseSection(models.Model):
     phase = models.ForeignKey(ProjectPhase, verbose_name=_('phase'), related_name='sections', on_delete=models.CASCADE)
     name = models.CharField(max_length=255, verbose_name=_('name'))
-    index = models.PositiveIntegerField(verbose_name=_('index'), null=True, blank=True)
+    index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
     attributes = models.ManyToManyField(
         Attribute, verbose_name=_('attributes'), related_name='phase_sections', through='ProjectPhaseSectionAttribute'
     )
@@ -81,11 +81,13 @@ class ProjectPhaseSectionAttribute(models.Model):
     section = models.ForeignKey(ProjectPhaseSection, verbose_name=_('phase section'), on_delete=models.CASCADE)
     generated = models.BooleanField(verbose_name=_('generated'))
     required = models.BooleanField(verbose_name=_('required'))
-    index = models.PositiveIntegerField(verbose_name=_('index'), null=True, blank=True)
+    index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
 
     class Meta:
         verbose_name = _('project phase section attribute')
         verbose_name_plural = _('project phase section attributes')
+        unique_together = ('section', 'index')
+        ordering = ('section', 'index')
 
     def __str__(self):
         return '{} {} {} {}'.format(self.attribute, self.section, self.section.phase, self.index)
