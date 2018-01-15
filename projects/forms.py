@@ -21,11 +21,12 @@ def create_section_form_class(section):
             'required': section_attribute.required and not section_attribute.generated,
             'disabled': section_attribute.generated,
         }
-        value_choices = attribute.value_choices.all()
 
-        if value_choices.exists():
+        value_choices = list(attribute.value_choices.values_list('identifier', 'value'))
+
+        if value_choices:
             field_class = forms.ChoiceField
-            extra['choices'] = [['', '---']] + list(value_choices.values_list('identifier', 'value'))
+            extra['choices'] = [('', '---')] + value_choices
         else:
             (field_class, field_kwargs) = FIELD_TYPES.get(attribute.value_type)
             extra.update(field_kwargs)
