@@ -1,5 +1,5 @@
 import logging
-from collections import Counter, OrderedDict
+from collections import Counter
 
 from openpyxl import load_workbook
 
