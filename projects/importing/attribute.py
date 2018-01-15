@@ -74,6 +74,8 @@ class AttributeImporter:
         return create_identifier(row[0].strip(' \t:.'))
 
     def _update_attributes(self, data):
+        logger.info('\nUpdating attributes...')
+
         for datum in data[1:]:
             identifier = self._get_datum_identifier(datum)
 
@@ -104,16 +106,25 @@ class AttributeImporter:
             logger.info('{} {}'.format(action_str, attribute))
 
     def _update_sections(self, data):
+        logger.info('\nUpdating sections...')
+
         for phase_num in [0, 1, 2]:
-            phase = ProjectPhase.objects.get(index=phase_num)
+            phase = ProjectPhase.objects.get(project_type=self.project_type, index=phase_num)
 
             # Get all distinct section names in appearance order
-            phase_sections = list(OrderedDict.fromkeys(
-                [datum[SECTION_COLUMNS[phase_num]].strip() for datum in data[1:] if datum[SECTION_COLUMNS[phase_num]]]))
+            phase_sections = []
+            for datum in data[1:]:
+                section_name = datum[SECTION_COLUMNS[phase_num]]
+
+                if not section_name or not isinstance(section_name, str):
+                    continue
+
+                section_name = section_name.strip()
+
+                if section_name and section_name not in phase_sections:
+                    phase_sections.append(section_name)
 
             for idx, phase_section_name in enumerate(phase_sections):
-                print('phase: {} index: {} section: {}'.format(phase_num, idx, phase_section_name))
-
                 overwrite = self.options.get('overwrite')
 
                 if overwrite:
@@ -133,7 +144,9 @@ class AttributeImporter:
                 logger.info('{} {}'.format(action_str, section))
 
     def _replace_attribute_section_links(self, data):
-        ProjectPhaseSectionAttribute.objects.all().delete()
+        logger.info('\nReplacing attribute section links...')
+
+        ProjectPhaseSectionAttribute.objects.filter(section__phase__project_type=self.project_type).delete()
 
         counter = Counter()
         for datum in data[1:]:
@@ -145,7 +158,7 @@ class AttributeImporter:
                 continue
 
             for phase_num in [0, 1, 2]:
-                phase = ProjectPhase.objects.get(index=phase_num)
+                phase = ProjectPhase.objects.get(project_type=self.project_type, index=phase_num)
 
                 section_name = datum[SECTION_COLUMNS[phase_num]]
                 if not section_name or not isinstance(section_name, str):
@@ -177,7 +190,7 @@ class AttributeImporter:
                 counter[section] += 1
 
     def create_phases(self):
-        self.project_type, _ = ProjectType.objects.get_or_create(name='asemakaava')
+        logger.info('\nCreating phases...')
         current_phases = [obj.name for obj in self.project_type.phases.order_by('index')]
         new_phases = [x['name'] for x in PROJECT_PHASES]
         if current_phases == new_phases:
@@ -190,8 +203,10 @@ class AttributeImporter:
             )
 
     def run(self):
+        self.project_type, _ = ProjectType.objects.get_or_create(name='asemakaava')
+
         filename = self.options.get('filename')
-        logger.info('Importing attributes from file {}...'.format(filename))
+        logger.info('Importing attributes from file {} for project type {}...'.format(filename, self.project_type))
 
         self.create_phases()
 
