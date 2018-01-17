@@ -5,7 +5,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
-from django.views.generic.list import ListView
+from django.views.generic import DetailView, ListView
 
 from projects.models import ProjectPhase, ProjectType
 
@@ -104,3 +104,15 @@ def report_view(request):
     context = dict(projects=project_qs)
 
     return render(request, 'report.html', context=context)
+
+
+class ProjectCardView(DetailView):
+    template_name = 'project_card.html'
+
+    model = Project
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project'] = self.object
+        context['project_attr'] = self.object.attribute_data
+        return context

@@ -12,6 +12,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', projects.views.ProjectListView.as_view(), name='project-list'),
     path('projects/create/', projects.views.project_edit, name='project-create'),
+    path('projects/<int:pk>/', projects.views.ProjectCardView.as_view(), name='project-card'),
     path('projects/<int:pk>/edit/', projects.views.project_edit, name='project-edit'),
     path('reports/', projects.views.report_view, name='reports'),
 ]
