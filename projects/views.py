@@ -113,6 +113,7 @@ class ProjectCardView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['phases'] = ProjectPhase.objects.filter(project_type__name='asemakaava')
         context['project'] = self.object
         context['project_attr'] = self.object.attribute_data
         return context

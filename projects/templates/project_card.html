@@ -1,5 +1,83 @@
 {% extends "base.html" %}
 
+{% block hero %}
+    <div class="jumbotron customized">
+        <div class="container">
+            <ol class="breadcrumb">
+                <li>
+                    <a href="/">Etusivu</a>
+                </li>
+                <li class="active">
+                    {{ project_attr.kaavahankkeen_nimi }}
+                </li>
+            </ol>
+            <div class="flex-row">
+                <div class="col col-grow">
+                    <h1>{{ project_attr.kaavahankkeen_nimi }}</h1>
+                </div>
+                {% if project.attribute_data.diaarinumero %}
+                    <div class="col col-auto">
+                        <p>
+                            <strong>Diaarinumero</strong><br>
+                            {{ project.attribute_data.diaarinumero }}
+                        </p>
+                    </div>
+                {% endif %}
+                {% if project.attribute_data.hankenumero %}
+                    <div class="col col-auto">
+                        <p>
+                            <strong>Hankenumero</strong><br>
+                            {{ project.attribute_data.hankenumero }}
+                        </p>
+                    </div>
+                {% endif %}
+            </div>
+            <a href="{% url 'project-edit' pk=project.id %}" class="btn btn-primary">
+                <i class="fa fa-pencil fa-fw"></i> Muokkaa
+            </a>
+        </div>
+    </div>
+    <section class="application-state-indicator">
+        <div class="container">
+            <h2 class="h6 text-center">Hankkeen nykytila</h2>
+            <div class="steps">
+                {% for phase in phases %}
+                    <div class="step{% if project.phase == phase %} active{% endif %}{% if project.phase.is_completed %} completed{% endif %} {{ phase.color }}">
+                        <span class="step-number"></span>
+                        <span class="step-label">{{ phase.name }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
 {% block content %}
-    <h1>{{ project_attr }}</h1>
+    <div class="row">
+        <div class="col-md-6">
+            <dl>
+                <dt>Asuminen</dt>
+                <dd>{{ project_attr.asuminen_yhteensa }}</dd>
+
+                <dt>Aikataulu</dt>
+                <dd>-</dd>
+
+                <dt>Vastuuhenkilöt</dt>
+                <dd>
+                    {{ project_attr.kaavan_valmistelijan_nimi }} <span class="text-muted">(Kaavan valmistelija)</span><br>
+                    {{ project_attr.liikennesuunnittelijan_nimi }} <span class="text-muted">(Liikennesuunnittelija)</span>
+                </dd>
+
+                <dt>Prosessin koko</dt>
+                <dd>{{ project_attr.prosessin_kokoluokka }}</dd>
+            </dl>
+            <dl>
+                <dt>Kuvaus sisällöstä</dt>
+                <dd>{{ project_attr.suunnittelualueen_kuvaus }}</dd>
+            </dl>
+        </div>
+        <div class="col-md-6">
+            <img src="//via.placeholder.com/600x600" alt="Kaavahankkeen havainnolistamiskuva" class="img-responsive">
+        </div>
+    </div>
 {% endblock %}
