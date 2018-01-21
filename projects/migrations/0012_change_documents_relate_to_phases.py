@@ -25,4 +25,9 @@ class Migration(migrations.Migration):
             name='generated',
             field=models.BooleanField(default=False, verbose_name='generated'),
         ),
+        migrations.AlterField(
+            model_name='documenttemplate',
+            name='project_phase',
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='document_templates', to='projects.ProjectPhase', verbose_name='project phase'),
+        ),
     ]

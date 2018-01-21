@@ -14,6 +14,9 @@ urlpatterns = [
     path('projects/create/', projects.views.project_edit, name='project-create'),
     path('projects/<int:pk>/', projects.views.ProjectCardView.as_view(), name='project-card'),
     path('projects/<int:pk>/edit/', projects.views.project_edit, name='project-edit'),
+    path('projects/<int:pk>/create-document/', projects.views.DocumentCreateView.as_view(), name='document-create'),
+    path('projects/<int:project_pk>/create-document/<int:document_pk>/',
+         projects.views.document_download_view, name='document-download'),
     path('reports/', projects.views.report_view, name='reports'),
 ]
 

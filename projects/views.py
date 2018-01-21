@@ -1,16 +1,18 @@
 import json
 import random
+from collections import OrderedDict
 
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.generic import DetailView, ListView
 
 from projects.models import ProjectPhase, ProjectType
 
+from .exporting import get_document_response
 from .forms import create_section_form_class
-from .models import Attribute, Project
+from .models import Attribute, DocumentTemplate, Project
 
 
 class ProjectListView(ListView):
@@ -117,3 +119,46 @@ class ProjectCardView(DetailView):
         context['project'] = self.object
         context['project_attr'] = self.object.attribute_data
         return context
+
+
+class DocumentCreateView(DetailView):
+    model = Project
+    context_object_name = 'project'
+    template_name = 'document_create.html'
+
+    @staticmethod
+    def _get_context_data_for_documents_in_phase(documents, phase):
+        return [
+            {
+                'enabled': True if document.name in ('OAS', 'Selostus') else False,  # TODO
+                'obj': document,
+            }
+            for document in documents if document.project_phase == phase
+        ]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        project = self.object
+        documents = list(DocumentTemplate.objects.filter(project_phase__project_type=project.type))
+        phases = list(project.type.phases.filter(document_templates__in=documents))
+        documents_per_phase = OrderedDict()
+
+        if project.phase and project.phase in phases:
+            name = '{} (Nykyinen vaihe)'.format(project.phase.name)  # TODO translate
+            documents_per_phase[name] = self._get_context_data_for_documents_in_phase(documents, project.phase)
+            phases = [p for p in phases if p.pk != project.phase.pk]
+
+        for phase in phases:
+            documents_per_phase[phase.name] = self._get_context_data_for_documents_in_phase(documents, phase)
+
+        context['documents_per_phase'] = documents_per_phase
+
+        return context
+
+
+def document_download_view(request, project_pk, document_pk):
+    document_template = get_object_or_404(DocumentTemplate, pk=document_pk)
+    project = get_object_or_404(Project, pk=project_pk)
+
+    return get_document_response(project, document_template)
