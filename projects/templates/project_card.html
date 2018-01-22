@@ -35,21 +35,12 @@
             <a href="{% url 'project-edit' pk=project.id %}" class="btn btn-primary">
                 <i class="fa fa-pencil fa-fw"></i> Muokkaa
             </a>
+            <a href="{% url 'document-create' pk=project.id %}" class="btn btn-primary">
+                <i class="fa fa-file-word-o fa-fw"></i> Luo dokumentteja
+            </a>
         </div>
     </div>
-    <section class="application-state-indicator">
-        <div class="container">
-            <h2 class="h6 text-center">Hankkeen nykytila</h2>
-            <div class="steps">
-                {% for phase in phases %}
-                    <div class="step{% if project.phase == phase %} active{% endif %}{% if project.phase.is_completed %} completed{% endif %} {{ phase.color }}">
-                        <span class="step-number"></span>
-                        <span class="step-label">{{ phase.name }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        </div>
-    </section>
+    {% include "includes/project_state_indicator.html" %}
 {% endblock %}
 
 {% block content %}

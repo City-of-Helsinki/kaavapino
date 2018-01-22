@@ -79,7 +79,7 @@ class ProjectPhaseSection(models.Model):
 class ProjectPhaseSectionAttribute(models.Model):
     attribute = models.ForeignKey(Attribute, verbose_name=_('attribute'), on_delete=models.CASCADE)
     section = models.ForeignKey(ProjectPhaseSection, verbose_name=_('phase section'), on_delete=models.CASCADE)
-    generated = models.BooleanField(verbose_name=_('generated'))
+    generated = models.BooleanField(verbose_name=_('generated'), default=False)
     required = models.BooleanField(verbose_name=_('required'))
     index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
 
