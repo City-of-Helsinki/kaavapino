@@ -5,7 +5,7 @@
         <div class="container">
             <ol class="breadcrumb">
                 <li><a href="/">Etusivu</a></li>
-                <li><a href="{% url 'project-card' pk=object.pk %}">{{ object.name }}</a></li>
+                <li><a href="{% url 'projects:card' pk=object.pk %}">{{ object.name }}</a></li>
                 <li class="active">Luo dokumentteja</li>
             </ol>
             <div class="flex-row">
@@ -42,7 +42,7 @@
         <div class="list-group">
             {% for document in documents %}
                 <div class="list-group-item{% if not document.enabled %} disabled{% endif %}">
-                   {% if document.enabled %}<a href="{% url 'document-download' project_pk=project.pk document_pk=document.obj.pk %}">{% endif %}
+                   {% if document.enabled %}<a href="{% url 'projects:document-download' project_pk=project.pk document_pk=document.obj.pk %}">{% endif %}
                        <i class="fa fa-file-word-o fa-fw fa-3x"></i> {{ document.obj.name }}
                    {% if document.enabled %}</a>{% endif %}
                 </div>

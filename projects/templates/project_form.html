@@ -33,9 +33,11 @@
                     </div>
                 {% endif %}
             </div>
-            <a href="{% url 'document-create' pk=project.id %}" class="btn btn-primary">
+            {% if project.id %}
+            <a href="{% url 'projects:document-create' pk=project.id %}" class="btn btn-primary">
                 <i class="fa fa-file-word-o fa-fw"></i> Luo dokumentteja
             </a>
+            {% endif %}
         </div>
     </div>
     <section class="application-state-indicator">

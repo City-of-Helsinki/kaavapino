@@ -77,7 +77,7 @@ def project_edit(request, pk=None):
                 project.attribute_data.update(attribute_data)
                 project.save()
 
-                return HttpResponseRedirect(reverse('project-edit', kwargs={'pk': project.id}))
+                return HttpResponseRedirect(reverse('projects:edit', kwargs={'pk': project.id}))
         else:
             if not active_section:
                 active_section = section['section'].id

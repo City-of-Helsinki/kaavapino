@@ -14,7 +14,7 @@
 
 {% block content %}
     <p>
-        <a href="{% url 'project-create' %}" class="btn btn-default">
+        <a href="{% url 'projects:create' %}" class="btn btn-default">
             <i class="fa fa-plus fa-fw"></i> Luo uusi
         </a>
     </p>
@@ -39,13 +39,13 @@
                             <small data-toggle="tooltip" data-title="{{ project.phase.name }}" data-placement="bottom">
                                 <i class="fa fa-circle fa-fw project-phase-status-circle {{ project.phase.color }}"></i>
                             </small>
-                            <a href="{% url 'project-card' pk=project.id %}">{{ project.name }}</a>
+                            <a href="{% url 'projects:card' pk=project.id %}">{{ project.name }}</a>
                         </td>
                         <td>{{ project.phase }}</td>
                         <td>{{ project.created_at|date:"d.m.Y H:i" }}</td>
                         <td>{{ project.modified_at|date:"d.m.Y H:i" }}</td>
                         <td class="text-right small-padding">
-                            <a href="{% url 'project-edit' pk=project.id %}" class="btn btn-primary btn-xs">
+                            <a href="{% url 'projects:edit' pk=project.id %}" class="btn btn-primary btn-xs">
                                 <i class="fa fa-pencil fa-fw"></i> Muokkaa
                             </a>
                         </td>

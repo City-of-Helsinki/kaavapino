@@ -1,23 +1,22 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.contrib.auth import views as auth_views
+from django.urls import path, include
+from django.views.generic import TemplateView
 
-import projects.views
+from projects import views as projects_views
 
 admin.autodiscover()
 
 
 urlpatterns = [
+    path('', TemplateView.as_view(template_name='index.html')),
     path('admin/', admin.site.urls),
-    path('', projects.views.ProjectListView.as_view(), name='project-list'),
-    path('projects/create/', projects.views.project_edit, name='project-create'),
-    path('projects/<int:pk>/', projects.views.ProjectCardView.as_view(), name='project-card'),
-    path('projects/<int:pk>/edit/', projects.views.project_edit, name='project-edit'),
-    path('projects/<int:pk>/create-document/', projects.views.DocumentCreateView.as_view(), name='document-create'),
-    path('projects/<int:project_pk>/create-document/<int:document_pk>/',
-         projects.views.document_download_view, name='document-download'),
-    path('reports/', projects.views.report_view, name='reports'),
+    path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('projects/', include('projects.urls', namespace='projects')),
+    path('reports/', projects_views.report_view, name='reports'),
 ]
 
 if settings.DEBUG:
