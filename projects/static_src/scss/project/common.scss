@@ -66,3 +66,27 @@
         font-size: $font-size-base;
     }
 }
+
+.nav-tabs {
+    border-bottom: 0;
+
+    > li {
+        margin-bottom: 0;
+
+        &.active > a {
+            background: #fff;
+            border: 0;
+            box-shadow: 0px -2px 12px rgba(0,0,0,0.07);
+            font-weight: bold;
+
+            &:hover, &:focus {
+                background: #fff;
+                border: 0;
+            }
+        }
+
+        > a {
+            border: 0;
+        }
+    }
+}
