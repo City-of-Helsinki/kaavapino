@@ -1,4 +1,5 @@
 Django
+django-helusers
 django-environ
 psycopg2
 docxtpl

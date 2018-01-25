@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block hero %}
+    <div class="jumbotron">
+        <div class="container">
+            <h1>Kaavapino</h1>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+
+    <p>Tämä on Helsingin kaupungin ...</p>
+
+    <p>
+        <a href="{% url 'projects:create' %}" class="btn btn-default">
+            <i class="fa fa-user fa-fw"></i> Kirjaudu sisään
+        </a>
+    </p>
+
+{% endblock %}
