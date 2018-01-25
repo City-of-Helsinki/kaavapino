@@ -25,7 +25,7 @@ def create_section_form_class(section):
         value_choices = list(attribute.value_choices.values_list('identifier', 'value'))
 
         if value_choices:
-            field_class = forms.ChoiceField
+            field_class = forms.MultipleChoiceField if attribute.multiple_choice else forms.ChoiceField
             extra['choices'] = [('', '---')] + value_choices
         else:
             (field_class, field_kwargs) = FIELD_TYPES.get(attribute.value_type)
