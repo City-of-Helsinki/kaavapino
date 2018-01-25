@@ -8,50 +8,65 @@
                 <li class="active">Kaavahankkeet</li>
             </ol>
             <h1>Kaavahankkeet</h1>
+            <a href="{% url 'project-create' %}" class="btn btn-default">
+                <i class="fa fa-plus fa-fw"></i> Luo uusi hanke
+            </a>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <p>
-        <a href="{% url 'project-create' %}" class="btn btn-default">
-            <i class="fa fa-plus fa-fw"></i> Luo uusi
-        </a>
-    </p>
-
-    <hr class="hr-darker">
-
-    <div class="project-list-wrapper">
-        <table class="table project-list-table">
-            <thead>
-                <tr>
-                    <th>Nimi</th>
-                    <th>Vaihe</th>
-                    <th>Luotu</th>
-                    <th>Muokattu</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for project in object_list %}
-                    <tr>
-                        <td>
-                            <small data-toggle="tooltip" data-title="{{ project.phase.name }}" data-placement="bottom">
-                                <i class="fa fa-circle fa-fw project-phase-status-circle {{ project.phase.color }}"></i>
-                            </small>
-                            <a href="{% url 'project-card' pk=project.id %}">{{ project.name }}</a>
-                        </td>
-                        <td>{{ project.phase }}</td>
-                        <td>{{ project.created_at|date:"d.m.Y H:i" }}</td>
-                        <td>{{ project.modified_at|date:"d.m.Y H:i" }}</td>
-                        <td class="text-right small-padding">
-                            <a href="{% url 'project-edit' pk=project.id %}" class="btn btn-primary btn-xs">
-                                <i class="fa fa-pencil fa-fw"></i> Muokkaa
-                            </a>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div>
+        <ul class="nav nav-tabs" role="tablist">
+            <li role="presentation" class="active">
+                <a href="#public-list" aria-controls="profile" role="tab" data-toggle="tab">Kaikki hankkeet</a>
+            </li>
+            <li role="presentation">
+                <a href="#user-list" aria-controls="home" role="tab" data-toggle="tab">Omat hankkeet</a>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div role="tabpanel" class="tab-pane active" id="public-list">
+                <div class="project-list-wrapper">
+                    <table class="table project-list-table">
+                        <thead>
+                            <tr>
+                                <th>Nimi</th>
+                                <th>Vaihe</th>
+                                <th>Luotu</th>
+                                <th>Muokattu</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in object_list %}
+                            <tr>
+                                <td>
+                                    <small data-toggle="tooltip" data-title="{{ project.phase.name }}" data-placement="bottom">
+                                        <i class="fa fa-circle fa-fw project-phase-status-circle {{ project.phase.color }}"></i>
+                                    </small>
+                                    <a href="{% url 'project-card' pk=project.id %}">{{ project.name }}</a>
+                                </td>
+                                <td>{{ project.phase }}</td>
+                                <td>{{ project.created_at|date:"d.m.Y H:i" }}</td>
+                                <td>{{ project.modified_at|date:"d.m.Y H:i" }}</td>
+                                <td class="text-right small-padding">
+                                    <a href="{% url 'project-edit' pk=project.id %}" class="btn btn-primary btn-xs">
+                                        <i class="fa fa-pencil fa-fw"></i> Muokkaa
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div role="tabpanel" class="tab-pane" id="user-list">
+                <div class="project-list-wrapper">
+                    <!-- TODO: Display users projects -->
+                    Ei näytettävää
+                </div>
+            </div>
+        </div>
     </div>
 {% endblock %}

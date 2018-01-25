@@ -2,6 +2,8 @@
     background: $white;
     padding: $grid-gutter-width/2 $grid-gutter-width;
     margin-bottom: $grid-gutter-width;
+    position: relative;
+    z-index: 2;
 }
 
 .project-list-table {
