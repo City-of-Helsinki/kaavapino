@@ -13,18 +13,26 @@
         </div>
         <div class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
+                {% if user.is_authenticated %}
                 <li>
-                    <a href="{% url 'project-list' %}">Kaavahankkeet</a>
+                    <a href="{% url 'projects:list' %}">Kaavahankkeet</a>
                 </li>
                 <li>
                     <a href="{% url 'reports' %}">Raportit</a>
                 </li>
+                {% endif %}
             </ul>
             <div class="nav navbar-nav navbar-right">
                 <li>
-                    <a href="#">
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'logout' %}">
                         <i class="fa fa-user-o fa-fw"></i> Kirjaudu ulos
                     </a>
+                    {% else %}
+                    <a href="{% url 'login' %}?next=/projects/">
+                        <i class="fa fa-user fa-fw"></i> Kirjaudu sisään
+                    </a>
+                    {% endif %}
                 </li>
             </div>
         </div>

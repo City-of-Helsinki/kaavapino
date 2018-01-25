@@ -64,6 +64,10 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
+AUTH_USER_MODEL = 'users.User'
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/projects/'
+LOGOUT_REDIRECT_URL = '/'
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -73,10 +77,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
+    'stronghold',
+    'helusers',
 
     'bootstrap3',
 
     'projects',
+    'users',
 ]
 
 MIDDLEWARE = [
@@ -87,6 +94,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'stronghold.middleware.LoginRequiredMiddleware',
 ]
 
 TEMPLATES = [

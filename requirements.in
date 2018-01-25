@@ -1,5 +1,7 @@
 Django
+django-helusers
 django-environ
+django-stronghold
 psycopg2
 docxtpl
 openpyxl
