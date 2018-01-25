@@ -2,8 +2,6 @@ import json
 import random
 from collections import OrderedDict
 
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
@@ -17,7 +15,7 @@ from .forms import create_section_form_class
 from .models import Attribute, DocumentTemplate, Project
 
 
-class ProjectListView(LoginRequiredMixin, ListView):
+class ProjectListView(ListView):
     model = Project
     template_name = 'project_list.html'
 
@@ -51,7 +49,6 @@ def filter_data(identifiers, data):
     return json.loads(json.dumps(filtered_data, cls=DjangoJSONEncoder))
 
 
-@login_required
 def project_edit(request, pk=None):
     if pk:
         project = Project.objects.get(pk=pk)
@@ -97,7 +94,6 @@ def project_edit(request, pk=None):
     return render(request, 'project_form.html', context=context)
 
 
-@login_required
 def report_view(request):
     project_qs = Project.objects.filter(geometry__isnull=False, phase__isnull=False)
     project_qs = project_qs.select_related('phase')
@@ -112,7 +108,7 @@ def report_view(request):
     return render(request, 'report.html', context=context)
 
 
-class ProjectCardView(LoginRequiredMixin, DetailView):
+class ProjectCardView(DetailView):
     template_name = 'project_card.html'
 
     model = Project
@@ -125,7 +121,7 @@ class ProjectCardView(LoginRequiredMixin, DetailView):
         return context
 
 
-class DocumentCreateView(LoginRequiredMixin, DetailView):
+class DocumentCreateView(DetailView):
     model = Project
     context_object_name = 'project'
     template_name = 'document_create.html'
@@ -161,7 +157,6 @@ class DocumentCreateView(LoginRequiredMixin, DetailView):
         return context
 
 
-@login_required
 def document_download_view(request, project_pk, document_pk):
     document_template = get_object_or_404(DocumentTemplate, pk=document_pk)
     project = get_object_or_404(Project, pk=project_pk)

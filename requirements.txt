@@ -8,6 +8,7 @@ django==2.0
 django-bootstrap3==9.1.0
 django-environ==0.4.4
 django-helusers==0.4.2
+django-stronghold==0.3.0
 djangorestframework==3.7.7  # via drf-oidc-auth
 docxtpl==0.4.6
 drf-oidc-auth==0.9        # via django-helusers
