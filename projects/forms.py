@@ -11,14 +11,14 @@ FIELD_TYPES = {
 }
 
 
-def create_section_form_class(section):
+def create_section_form_class(section, for_validation=False):
     form_properties = {}
 
     for section_attribute in section.projectphasesectionattribute_set.order_by('index'):
         attribute = section_attribute.attribute
 
         extra = {
-            'required': section_attribute.required and not section_attribute.generated,
+            'required': section_attribute.required and not section_attribute.generated and for_validation,
             'disabled': section_attribute.generated,
         }
 
