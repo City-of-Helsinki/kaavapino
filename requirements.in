@@ -6,3 +6,4 @@ psycopg2
 docxtpl
 openpyxl
 django-bootstrap3
+django-allauth
