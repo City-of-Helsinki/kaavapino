@@ -43,6 +43,7 @@ class ProjectPhase(models.Model):
                                      related_name='phases')
     name = models.CharField(max_length=255, verbose_name=_('name'))
     color = models.CharField(max_length=64, verbose_name=_('color'), blank=True)
+    color_code = models.CharField(max_length=10, verbose_name=_('color code'), blank=True)
     index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
 
     class Meta:

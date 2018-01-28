@@ -63,7 +63,6 @@ for key, values in attr_values.items():
     for name, count in counter.items():
         print("\t%-5d %s" % (count, name))
 
-
 # save the ksv planning metadata with geometry
 f = open('data/ksv_kaavahanke.json', 'r')
 json_dict = json.load(f)
@@ -89,9 +88,24 @@ for feat in json_dict['features']:
     project['geometry'] = geom
 
 
+f = open('data/Kerrosalainventaari_data_08_2017.csv', 'r', encoding='utf-8')
+# initialize the reader
+reader = csv.DictReader(f)
+
+
+KERROS_ATTRS = ('Asuminen_yht', 'KERROSTALO_K', 'KERROSTALO_V', 'KERROSTALO_M', 'PIENTALO_K', 'PIENTALO_V', 'PIENTALO_M')
+for row in reader:
+    pr_id = row['Hankenumero']
+    if pr_id not in projects:
+        continue
+    project = projects[pr_id]
+    for attr in KERROS_ATTRS:
+        project['PROJECT_%s' % attr.upper()] = row[attr]
+
+
 ATTRIBUTE_MAP = {
     'kaavahankkeen_nimi': 'kaavahankkeen_nimi',
-    'kaavahanke_kuvaus': None,
+    'kaavahanke_kuvaus': 'suunnittelualueen_kuvaus',
     'vastuuhenkilo': 'kaavan_valmistelijan_nimi',
     'vastuuyksikko': None,
     'muut_vastuuhenkilot': None,
@@ -99,22 +113,50 @@ ATTRIBUTE_MAP = {
     'kaavanumero': None,
     'hanketyyppi': None,
     'vireillaolo': None,
-    'oa': None,
-    'su': None,
-    'lu': None,
-    'eh': None,
+    'oa': 'oas_aineiston_esillaoloaika_alkaa',
+    # 'su': None,
+    # 'lu': None,
+    # 'eh': None,
     'la': None,
-    'kv': None,
+    # 'kv': None,
+    'ehdotus_kslk_suu': None,
+    # 'hanke_tila'
+    'toimsuunnitelma_hanke': None,
+    'tunnistenumero': None,
+    'suojelukaava': None,
+    'hyvaksyja': 'kaavan_hyvaksyjataho',
+    'hy': None,
+    'lisatietoja': None,
+    'ka': None,
+    'kaavaarkistotilassa': None,
+    'esittelysuun_selite_eh': None,
+    'esittelysuun_selite_la': None,
+    'esittelysuun_selite_lu': None,
+    'esittelysuun_selite_su': None,
+    'uutta_tai_siirrettv_in': 'uutta_tai_siirettavaa_infraa',
+    #: 'oas_aineiston_esillaoloaika_paattyy',
+    #: 'ehdotuksen_suunniteltu_lautakuntapaivamaara_arvio',
+    #: 'ehdotuksen_esittely_lautakunnalle_pvm_toteutunut',
+    'la': 'ehdotuksesta_paatetty_lautakunnassa_pvm_toteutunut',
+
+    'kerrostalo_k': 'asuminen_kerrostalo_uusi_k_m2kunta',
+    'kerrostalo_v': 'asuminen_kerrostalo_uusi_k_m2valtio',
+    'kerrostalo_m': 'asuminen_kerrostalo_uusi_k_m2muut',
+    'kerrostalo_k': 'asuminen_pientalo_uusi_k_m2kunta',
+    'kerrostalo_v': 'asuminen_pientalo_uusi_k_m2valtio',
+    'kerrostalo_m': 'asuminen_pientalo_uusi_k_m2muut',
+    'asuminen_yht': 'asuminen_yhteensa',
+
 }
 
 PHASE_MAP = {
-    '01 Suunnitteluvaihe': 'Käynnistys',
-    '02 Vireilletullut': 'Käynnistys',
-    '03 Suunnitteluperiaatteet': 'Suunnitteluperiaatteet',
-    '04 Kaavaluonnos': 'Luonnos',
-    '05 Kaavaehdotus': 'Ehdotus',
-    '06 Tarkistettu kaavaehdotus': 'Tarkistettu ehdotus',
-    '07 Hyväksytty': 'Kanslia-Khs-Valtuusto',
+    '01 Suunnitteluvaihe': 'OAS',
+    '02 Vireilletullut': 'Ehdotus',
+    '03 Suunnitteluperiaatteet': 'OAS',
+    '04 Kaavaluonnos': 'Ehdotus',
+    '05 Kaavaehdotus': 'Tarkistettu ehdotus',
+    '06 Tarkistettu kaavaehdotus': 'Kanslia-Khs-Valtuusto',
+    '07 Hyväksytty': 'Tarkistettu ehdotus',
     '08 Lainvoimainen': 'Voimaantulo',
     '13 Rauennut': None
 }
@@ -159,6 +201,16 @@ for project in projects.values():
     else:
         obj.phase = None
 
+    print(obj.name)
+    print('\tdiaarinumero: %s' % project['PROJECT_DIAARINUMERO'])
+    print('\tvaihe: %s' % project['PROJECT_KAAVAVAIHE'])
+    for attr in ATTRIBUTE_MAP.keys():
+        if len(attr) != 2:
+            continue
+        val = project.get('PROJECT_%s' % (attr.upper()))
+        if val != '' and val is not None:
+            print("\t%s: %s" % (attr, val))
+
     data = obj.attribute_data
     for pr_attr, obj_attr in ATTRIBUTE_MAP.items():
         val = project.get('PROJECT_%s' % (pr_attr.upper()))
@@ -189,4 +241,3 @@ for project in projects.values():
     obj.geometry = geometry
 
     obj.save()
-    print("saved %s" % obj.id)

@@ -27,8 +27,8 @@ var projects = [
         "geometry": {{ project.geometry.geojson|safe }},
         "properties": {
             "name": "{{ project.name }}",
-            "height": {{ project.sqm2 }},
-            "color": "{{ project.phase.color }}",
+            "height": {{ project.attribute_data.asuminen_yhteensa|default:"0" }} / 500,
+            "color": "{{ project.phase.color_code }}",
             "phase": "{{ project.phase.name }}",
             "strategies": {{ project.strategies|safe }}
         }
@@ -79,7 +79,7 @@ map.on('load', function () {
             .addTo(map);
     });
 
-    // Change the cursor to a pointer when the mouse is over the states layer.
+    // Change the cursor to a pointer when the mouse is over a project.
     map.on('mouseenter', 'projects', function () {
         map.getCanvas().style.cursor = 'pointer';
     });

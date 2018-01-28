@@ -16,15 +16,17 @@ DEFAULT_SHEET_NAME = 'Taul2'
 SECTION_COLUMNS = [4, 5, 6]
 
 PROJECT_PHASES = [
-    {'name': 'Käynnistys', 'color': 'color--tram'},
+    {'name': 'Käynnistys', 'color': 'color--tram', 'color_code': '#009246'},  # None
     # {'name': 'Suunnitteluperiaatteet', 'color': '#009142'},
-    {'name': 'OAS', 'color': 'color--summer'},
+    {'name': 'OAS', 'color': 'color--summer', 'color_code': '#ffc61e'},  # 01, 03
     # {'name': 'Luonnos', 'color': '#ffd600'},
-    {'name': 'Ehdotus', 'color': 'color--metro'},
-    {'name': 'Tarkistettu ehdotus', 'color': 'color--bus'},
-    {'name': 'Kanslia-Khs-Valtuusto', 'color': 'color--black'},
-    {'name': 'Voimaantulo', 'color': 'color--white'}
+    {'name': 'Ehdotus', 'color': 'color--metro', 'color_code': '#fd4f00'},  # 02, 04
+    {'name': 'Tarkistettu ehdotus', 'color': 'color--bus', 'color_code': '#0000bf'},  # 05, 07
+    {'name': 'Kanslia-Khs-Valtuusto', 'color': 'color--black', 'color_code': '#000000'},  # 06, 07 <- Kvsto
+    {'name': 'Voimaantulo', 'color': 'color--white', 'color_code': '#ffffff'}
 ]
+
+# projektin vuosi <- tarkistetun ehdotuksen lautakuntapvm
 
 VALUE_TYPES = {
     'tunniste; numerotunniste': Attribute.TYPE_SHORT_STRING,
@@ -199,7 +201,8 @@ class AttributeImporter:
         self.project_type.phases.all().delete()
         for idx, phase in enumerate(PROJECT_PHASES):
             ProjectPhase.objects.create(
-                project_type=self.project_type, name=phase['name'], index=idx, color=phase['color']
+                project_type=self.project_type, name=phase['name'], index=idx,
+                color=phase['color'], color_code=phase['color_code']
             )
 
     def run(self):
