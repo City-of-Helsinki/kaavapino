@@ -11,21 +11,21 @@ FIELD_TYPES = {
 }
 
 
-def create_section_form_class(section):
+def create_section_form_class(section, for_validation=False):
     form_properties = {}
 
     for section_attribute in section.projectphasesectionattribute_set.order_by('index'):
         attribute = section_attribute.attribute
 
         extra = {
-            'required': section_attribute.required and not section_attribute.generated,
+            'required': section_attribute.required and not section_attribute.generated and for_validation,
             'disabled': section_attribute.generated,
         }
 
         value_choices = list(attribute.value_choices.values_list('identifier', 'value'))
 
         if value_choices:
-            field_class = forms.ChoiceField
+            field_class = forms.MultipleChoiceField if attribute.multiple_choice else forms.ChoiceField
             extra['choices'] = [('', '---')] + value_choices
         else:
             (field_class, field_kwargs) = FIELD_TYPES.get(attribute.value_type)

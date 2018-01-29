@@ -20,7 +20,7 @@ class ProjectListView(ListView):
     template_name = 'project_list.html'
 
 
-def generate_sections(project: Project=None):
+def generate_sections(project: Project=None, for_validation=False):
     if project and project.phase:
         phase = project.phase
     else:
@@ -30,7 +30,7 @@ def generate_sections(project: Project=None):
     for section in phase.sections.order_by('index'):
         section_data = {
             'section': section,
-            'form_class': create_section_form_class(section),
+            'form_class': create_section_form_class(section, for_validation),
             'form': None,
         }
 
@@ -57,32 +57,36 @@ def project_edit(request, pk=None):
         project.phase = ProjectPhase.objects.get(project_type__name='asemakaava', index=0)
         project.type = ProjectType.objects.first()
 
-    sections = generate_sections(project)
     active_section = None
+    validate = any(field.endswith('_and_validate') for field in request.POST)
+    sections = generate_sections(project, validate)
 
     for section in sections:
         attribute_identifiers = section['section'].get_attribute_identifiers()
+        form_class = section['form_class']
 
-        if 'save_section_{}'.format(section['section'].id) in request.POST:
+        if any(field.startswith('save_section_{}'.format(section['section'].id)) for field in request.POST):
             active_section = section['section'].id
 
-            section['form'] = section['form_class'](request.POST)
+            section['form'] = form_class(request.POST)
 
-            if section['form'].is_valid():
-                if 'kaavahankkeen_nimi' in request.POST:
-                    project.name = request.POST.get('kaavahankkeen_nimi')
+            if 'kaavahankkeen_nimi' in request.POST:
+                project.name = request.POST.get('kaavahankkeen_nimi')
 
-                attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
+            is_valid = section['form'].is_valid()
+            attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
 
-                project.attribute_data.update(attribute_data)
-                project.save()
+            project.attribute_data.update(attribute_data)
+            project.save()
 
+            if is_valid and not validate:
                 return HttpResponseRedirect(reverse('projects:edit', kwargs={'pk': project.id}))
         else:
             if not active_section:
                 active_section = section['section'].id
 
-            section['form'] = section['form_class'](initial=filter_data(attribute_identifiers, project.attribute_data))
+            attribute_data = filter_data(attribute_identifiers, project.attribute_data)
+            section['form'] = form_class(attribute_data) if validate else form_class(initial=attribute_data)
 
     context = {
         'project': project,
