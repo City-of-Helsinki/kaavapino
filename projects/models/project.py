@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import JSONField
 from django.utils.translation import ugettext_lazy as _
@@ -18,6 +19,8 @@ class ProjectType(models.Model):
 
 
 class Project(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'), related_name='projects', null=True,
+                             blank=True, on_delete=models.PROTECT)
     created_at = models.DateTimeField(verbose_name=_('created at'), auto_now_add=True, editable=False)
     modified_at = models.DateTimeField(verbose_name=_('modified at'), auto_now=True, editable=False)
     name = models.CharField(max_length=255, verbose_name=_('name'))
