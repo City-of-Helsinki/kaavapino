@@ -19,6 +19,7 @@ class Attribute(models.Model):
     TYPE_LONG_STRING = 'long_string'
     TYPE_BOOLEAN = 'boolean'
     TYPE_DATE = 'date'
+    TYPE_USER = 'user'
 
     TYPE_CHOICES = (
         (TYPE_INTEGER, _('integer')),
@@ -26,6 +27,7 @@ class Attribute(models.Model):
         (TYPE_LONG_STRING, _('long string')),
         (TYPE_BOOLEAN, _('boolean')),
         (TYPE_DATE, _('date')),
+        (TYPE_USER, _('user')),
     )
 
     name = models.CharField(max_length=255, verbose_name=_('name'))
