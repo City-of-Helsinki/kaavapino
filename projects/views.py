@@ -19,6 +19,9 @@ class ProjectListView(ListView):
     model = Project
     template_name = 'project_list.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['own_projects'] = Project.objects.filter(user=self.request.user)
 
 def generate_sections(project: Project=None, for_validation=False):
     if project and project.phase:
