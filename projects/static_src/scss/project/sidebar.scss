@@ -80,7 +80,12 @@
 
     li.form-completed a:before {
         content: "\f00c"; // Font awesome check mark
-        opacity: 0.4;
+        color: $theme-success;
+    }
+
+    li.form-error a:before {
+        content: "\f071"; // Font awesome exclamation triangle
+        color: $theme-danger;
     }
 
     li.unsaved-changes a:before {

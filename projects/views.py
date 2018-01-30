@@ -19,12 +19,17 @@ class ProjectListView(ListView):
     model = Project
     template_name = 'project_list.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['own_projects'] = Project.objects.filter(user=self.request.user)
 
-def generate_sections(project: Project=None, for_validation=False):
-    if project and project.phase:
-        phase = project.phase
-    else:
-        phase = ProjectPhase.objects.get(project_type__name='asemakaava', index=0)
+        return context
+
+
+def generate_sections(project: Project=None, phase=None, for_validation=False):
+    if not phase:
+        phase = project.phase if project and project.phase else ProjectPhase.objects.get(
+            project_type__name='asemakaava', index=0)
 
     sections = []
     for section in phase.sections.order_by('index'):
@@ -49,7 +54,7 @@ def filter_data(identifiers, data):
     return json.loads(json.dumps(filtered_data, cls=DjangoJSONEncoder))
 
 
-def project_edit(request, pk=None):
+def project_edit(request, pk=None, phase_id=None):
     if pk:
         project = Project.objects.get(pk=pk)
     else:
@@ -57,17 +62,23 @@ def project_edit(request, pk=None):
         project.phase = ProjectPhase.objects.get(project_type__name='asemakaava', index=0)
         project.type = ProjectType.objects.first()
 
-    active_section = None
-    validate = any(field.endswith('_and_validate') for field in request.POST)
-    sections = generate_sections(project, validate)
+    if phase_id:
+        edit_phase = ProjectPhase.objects.get(pk=phase_id, project_type__name='asemakaava')
+    else:
+        edit_phase = project.phase
+
+    is_valid = True
+    validate = 'save_and_validate' in request.POST
+    sections = generate_sections(project=project, phase=edit_phase, for_validation=validate)
+    project_current_data = {}
 
     for section in sections:
         attribute_identifiers = section['section'].get_attribute_identifiers()
         form_class = section['form_class']
 
-        if any(field.startswith('save_section_{}'.format(section['section'].id)) for field in request.POST):
-            active_section = section['section'].id
+        project_current_data.update(filter_data(attribute_identifiers, project.attribute_data))
 
+        if 'save' in request.POST or 'save_and_validate' in request.POST:
             section['form'] = form_class(request.POST)
 
             if 'kaavahankkeen_nimi' in request.POST:
@@ -77,22 +88,24 @@ def project_edit(request, pk=None):
             attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
 
             project.attribute_data.update(attribute_data)
+            project.user = request.user
             project.save()
-
-            if is_valid and not validate:
-                return HttpResponseRedirect(reverse('projects:edit', kwargs={'pk': project.id}))
         else:
-            if not active_section:
-                active_section = section['section'].id
-
             attribute_data = filter_data(attribute_identifiers, project.attribute_data)
             section['form'] = form_class(attribute_data) if validate else form_class(initial=attribute_data)
 
+    if request.method == 'POST':
+        if is_valid and not validate:
+            return HttpResponseRedirect(reverse('projects:edit', kwargs={
+                'pk': project.id
+            }))
+
     context = {
         'project': project,
+        'project_current_data': json.dumps(project_current_data),
+        'edit_phase': edit_phase,
         'phases': ProjectPhase.objects.filter(project_type__name='asemakaava'),
         'sections': sections,
-        'active_section': active_section,
     }
 
     return render(request, 'project_form.html', context=context)
