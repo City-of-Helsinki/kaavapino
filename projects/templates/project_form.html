@@ -58,37 +58,37 @@
 {% block content %}
     <div class="row">
         <div class="col-md-9" id="new-application">
-            <div class="tab-content">
-            {% for section in sections %}
-                <div class="tab-pane{% if active_section == section.section.id %} active{% endif %}" id="section_{{ section.section.id }}" role="tabpanel">
-                    <form method="post" novalidate>{% csrf_token %}
-                        <fieldset class="form-subset" id="section_{{ section.section.id }}_">
-                            <h2 class="form-subset-header">{{ section.section.name }}</h2>
-                            {% for field in section.form %}
-                                {% bootstrap_field field %}
-                            {% endfor %}
-                        </fieldset>
-                        <button type="submit" name="save_section_{{ section.section.id }}" class="btn btn-lg btn-primary">
-                            <i class="fa fa-check"></i> Tallenna
-                        </button>
-                        <button type="submit" name="save_section_{{ section.section.id }}_and_validate" class="btn btn-lg btn-primary">
-                            <i class="fa fa-check"></i> Tallenna ja tarkista
-                        </button>
-                    </form>
+            <form id="project_form" method="post" novalidate>{% csrf_token %}
+                <div class="tab-content">
+                    {% for section in sections %}
+                        <div class="tab-pane{% if forloop.first %} active{% endif %}" id="section_tab_{{ section.section.id }}" data-section="{{ section.section.id }}" role="tabpanel">
+                            <fieldset class="form-subset">
+                                <h2 class="form-subset-header">{{ section.section.name }}</h2>
+                                {% for field in section.form %}
+                                    {% bootstrap_field field %}
+                                {% endfor %}
+                            </fieldset>
+                        </div>
+                    {% endfor %}
+                    <button type="submit" name="save" class="btn btn-lg btn-primary">
+                        <i class="fa fa-check"></i> Tallenna
+                    </button>
+                    <button type="submit" name="save_and_validate" class="btn btn-lg btn-primary">
+                        <i class="fa fa-check"></i> Tallenna ja tarkista
+                    </button>
                 </div>
-            {% endfor %}
-            </div>
+            </form>
         </div>
         <div class="col-md-3">
             <div class="application-sidebar hidden-print" id="application-sidebar-affix" role="complementary">
                 <ul class="nav application-sidenav">
                     {% for phase in phases %}
-                        <li class="{{ phase.color }}{% if project.phase == phase %} current-page{% endif %}">
-                            <a href="#" class="sidenav-title">{{ phase.index|add:1 }}. {{ phase.name }}</a>
+                        <li class="{{ phase.color }}{% if edit_phase == phase %} current-page{% endif %}">
+                            <a href="{% if project.id and edit_phase != phase %}{% url 'projects:edit-phase' pk=project.id phase_id=phase.id %}{% else %}#{% endif %}" class="sidenav-title">{{ phase.index|add:1 }}. {{ phase.name }}</a>
                             <ul class="nav">
                                 {% for phase_section in phase.sections.all %}
-                                <li{% if active_section == phase_section.id %} class="active"{% endif %}>
-                                    <a href="#section_{{ phase_section.id }}" aria-controls="section_{{ phase_section.id }}" role="tab" data-toggle="tab">
+                                <li{% if forloop.first %} class="active"{% endif %} data-section="{{ phase_section.id }}">
+                                    <a href="#section_tab_{{ phase_section.id }}" aria-controls="section_tab_{{ phase_section.id }}" role="tab" data-toggle="tab">
                                         {{ phase_section.name }}
                                     </a>
                                 </li>
@@ -103,24 +103,93 @@
 {% endblock %}
 
 {% block extrajs %}
-<script>
-    const sourceFields = $("input[name^='asuminen_kerrostalo'], input[name^='asuminen_pientalo']");
+<script type="text/javascript">
+let currentProjectData = {{ project_current_data|safe }};
 
-    function updateTotal() {
-        let total = 0;
-        sourceFields.each(function() {
-            const val = $(this).val();
-            if (val) {
-                total += parseInt(val);
-            }
-        });
-        $("#id_asuminen_yhteensa").val(total);
+$(document).ready(function () {
+  // Calculate totals
+  const sourceFields = $("input[name^='asuminen_kerrostalo'], input[name^='asuminen_pientalo']");
+
+  function updateTotal() {
+    let total = 0;
+    sourceFields.each(function () {
+      const val = $(this).val();
+      if (val) {
+        total += parseInt(val);
+      }
+    });
+    $("#id_asuminen_yhteensa").val(total);
+  }
+
+  sourceFields.on('change keyup paste', function () {
+    updateTotal();
+  });
+
+  updateTotal();
+
+  // Modified section indicators
+  const enabledInputs = $('[id^=id_]').not(':disabled');
+
+  function getInputValue(input) {
+    let $input = $(input);
+
+    switch ($input.attr('type')) {
+      case 'checkbox':
+        return $input.is(':checked');
+      case 'number':
+        return $input.val() || null;
+      default:
+        return $input.val();
     }
+  }
 
-    sourceFields.on('change keyup paste', function() {
-        updateTotal();
+  function getModifiedSections() {
+    let modifiedSections = [];
+
+    enabledInputs.each(function () {
+      let sectionId = $(this).closest('[data-section]').data('section');
+
+      if (currentProjectData.hasOwnProperty($(this).attr('name')) && currentProjectData[$(this).attr('name')] != getInputValue(this) && modifiedSections.indexOf(sectionId) === -1) {
+        modifiedSections.push(sectionId);
+      }
     });
 
-    updateTotal();
+    return modifiedSections;
+  }
+
+  function setModifiedSectionIndicators() {
+    let modifiedSections = getModifiedSections();
+    $('.application-sidebar li[data-section]').removeClass('unsaved-changes');
+
+    for (let i in modifiedSections) {
+      $('.application-sidebar li[data-section=' + modifiedSections[i] + ']').addClass('unsaved-changes');
+    }
+  }
+
+  enabledInputs.on('change keyup paste blur', function () {
+    setModifiedSectionIndicators();
+  });
+
+  setModifiedSectionIndicators();
+
+  // Do you want to leave this site?
+  window.onbeforeunload = function (e) {
+    if (e.target.activeElement.type === 'submit') {
+      return;
+    }
+
+    if (getModifiedSections().length) {
+      return true;
+    }
+  };
+
+  // Section error indicators
+  const formGroupsWithErrors = $('.form-group.has-error');
+
+  formGroupsWithErrors.each(function () {
+    const sectionId = $(this).closest('[data-section]').data('section');
+    $('.application-sidebar li[data-section=' + sectionId + ']').addClass('form-error');
+  });
+});
 </script>
 {% endblock %}
