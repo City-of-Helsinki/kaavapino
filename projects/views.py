@@ -68,7 +68,7 @@ def project_edit(request, pk=None, phase_id=None):
         edit_phase = project.phase
 
     is_valid = True
-    validate = any(field.endswith('_and_validate') for field in request.POST)
+    validate = 'save_and_validate' in request.POST
     sections = generate_sections(project=project, phase=edit_phase, for_validation=validate)
     project_current_data = {}
 
