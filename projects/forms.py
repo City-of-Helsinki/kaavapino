@@ -1,8 +1,9 @@
-from django import forms
+from django.contrib.gis import forms
 
 from .models import Attribute
 from users.models import User
 
+from .widgets import MapboxWidget
 
 FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: (forms.CharField, {}),
@@ -10,6 +11,7 @@ FIELD_TYPES = {
     Attribute.TYPE_INTEGER: (forms.IntegerField, {}),
     Attribute.TYPE_BOOLEAN: (forms.BooleanField, {'required': False}),
     Attribute.TYPE_DATE: (forms.DateField, {}),
+    Attribute.TYPE_GEOMETRY: (forms.MultiPolygonField, {'widget': MapboxWidget}),
 }
 
 
@@ -42,7 +44,10 @@ def create_section_form_class(section, for_validation=False, project=None):
             field_class = forms.MultipleChoiceField if attribute.multiple_choice else forms.ChoiceField
             extra['choices'] = [('', '---')] + value_choices
         else:
-            (field_class, field_kwargs) = FIELD_TYPES.get(attribute.value_type)
+            try:
+                (field_class, field_kwargs) = FIELD_TYPES[attribute.value_type]
+            except KeyError:
+                continue
             extra.update(field_kwargs)
 
         form_properties[attribute.identifier] = field_class(label=attribute.name, **extra)

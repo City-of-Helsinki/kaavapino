@@ -56,7 +56,7 @@
 {% endblock %}
 
 {% block content %}
-    <div class="row">
+   <div class="row">
         <div class="col-md-9" id="new-application">
             <form id="project_form" method="post" novalidate>{% csrf_token %}
                 <div class="tab-content">
@@ -103,6 +103,12 @@
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block extrahead %}
+{% for section in sections %}
+{{ section.form.media }}
+{% endfor %}
 {% endblock %}
 
 {% block extrajs %}
@@ -216,5 +222,6 @@ $(document).ready(function () {
   });
 
 });
+
 </script>
 {% endblock %}

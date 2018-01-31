@@ -1,7 +1,7 @@
 import re
 
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
 
 identifier_re = re.compile(r'^[\w]+\Z')
@@ -20,6 +20,7 @@ class Attribute(models.Model):
     TYPE_BOOLEAN = 'boolean'
     TYPE_DATE = 'date'
     TYPE_USER = 'user'
+    TYPE_GEOMETRY = 'geometry'
 
     TYPE_CHOICES = (
         (TYPE_INTEGER, _('integer')),
@@ -28,6 +29,7 @@ class Attribute(models.Model):
         (TYPE_BOOLEAN, _('boolean')),
         (TYPE_DATE, _('date')),
         (TYPE_USER, _('user')),
+        (TYPE_GEOMETRY, _('geometry')),
     )
 
     name = models.CharField(max_length=255, verbose_name=_('name'))
@@ -44,6 +46,14 @@ class Attribute(models.Model):
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.value_type)
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.value_type == Attribute.TYPE_GEOMETRY:
+            if Attribute.objects.exclude(id=self.id).filter(value_type=Attribute.TYPE_GEOMETRY).exists():
+                raise NotImplementedError('Currently only one geometry type attribute at a time is supported.')
 
 
 class AttributeValueChoice(models.Model):
