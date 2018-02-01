@@ -38,6 +38,7 @@ VALUE_TYPES = {
     'aikataulu ja tehtävät; pvm': Attribute.TYPE_DATE,
     'sisältö; numero': Attribute.TYPE_INTEGER,
     'resurssit; valintalista (Hijatista)': Attribute.TYPE_USER,
+    'spatiaalinen': Attribute.TYPE_GEOMETRY,
 }
 
 

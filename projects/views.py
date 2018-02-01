@@ -51,8 +51,7 @@ def filter_data(identifiers, data):
         for key, value in data.items()
         if key in identifiers
     }
-
-    return json.loads(json.dumps(filtered_data, cls=DjangoJSONEncoder))
+    return filtered_data
 
 
 def project_edit(request, pk=None, phase_id=None):
@@ -68,31 +67,13 @@ def project_edit(request, pk=None, phase_id=None):
     else:
         edit_phase = project.phase
 
-    try:
-        geometry_attribute = Attribute.objects.get(value_type=Attribute.TYPE_GEOMETRY)
-    except Attribute.DoesNotExist:
-        geometry_attribute = None
-
     is_valid = True
     validate = 'save_and_validate' in request.POST
     sections = generate_sections(project=project, phase=edit_phase, for_validation=validate)
-    project_current_data = {}
 
     for section in sections:
         attribute_identifiers = section['section'].get_attribute_identifiers()
-
-        if geometry_attribute:
-            try:
-                attribute_identifiers.remove(geometry_attribute.identifier)
-                section_contains_geometry_attribute = True
-            except ValueError:
-                section_contains_geometry_attribute = False
-
         form_class = section['form_class']
-
-        project_current_data.update(filter_data(attribute_identifiers, project.attribute_data))
-        if section_contains_geometry_attribute:
-            project_current_data[geometry_attribute.identifier] = project.geometry.geojson
 
         if 'save' in request.POST or 'save_and_validate' in request.POST:
             section['form'] = form_class(request.POST)
@@ -101,23 +82,13 @@ def project_edit(request, pk=None, phase_id=None):
                 project.name = request.POST.get('kaavahankkeen_nimi')
 
             is_valid = section['form'].is_valid()
-            cleaned_data = section['form'].cleaned_data
 
-            if geometry_attribute and geometry_attribute.identifier in cleaned_data:
-                project.geometry = cleaned_data.pop(geometry_attribute.identifier)
+            attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
 
-            attribute_data = filter_data(attribute_identifiers, cleaned_data)
-
-            project.attribute_data.update(attribute_data)
-            project.user = request.user
-
+            project.update_attribute_data(attribute_data)
             project.save()
         else:
-            attribute_data = filter_data(attribute_identifiers, project.attribute_data)
-
-            if section_contains_geometry_attribute:
-                attribute_data[geometry_attribute.identifier] = project.geometry
-
+            attribute_data = filter_data(attribute_identifiers, project.get_attribute_data())
             section['form'] = form_class(attribute_data) if validate else form_class(initial=attribute_data)
 
     if request.method == 'POST':
@@ -128,7 +99,7 @@ def project_edit(request, pk=None, phase_id=None):
 
     context = {
         'project': project,
-        'project_current_data': json.dumps(project_current_data),
+        'project_current_data': json.dumps(project.attribute_data),
         'edit_phase': edit_phase,
         'phases': ProjectPhase.objects.filter(project_type__name='asemakaava'),
         'sections': sections,
