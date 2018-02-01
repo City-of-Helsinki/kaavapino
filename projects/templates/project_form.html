@@ -113,7 +113,6 @@
 
 {% block extrajs %}
 <script type="text/javascript">
-let currentProjectData = {{ project_current_data|safe }};
 
 $(document).ready(function () {
   // Calculate totals
@@ -148,9 +147,16 @@ $(document).ready(function () {
       case 'number':
         return $input.val() || null;
       default:
-        return $input.val();
+        return JSON.stringify($input.val());
     }
   }
+
+  let currentProjectData = {};
+
+  enabledInputs.each(function () {
+    let current = getInputValue(this);
+    currentProjectData[$(this).attr('name')] = current;
+  });
 
   function getModifiedSections() {
     let modifiedSections = [];

@@ -99,7 +99,6 @@ def project_edit(request, pk=None, phase_id=None):
 
     context = {
         'project': project,
-        'project_current_data': json.dumps(project.attribute_data),
         'edit_phase': edit_phase,
         'phases': ProjectPhase.objects.filter(project_type__name='asemakaava'),
         'sections': sections,
