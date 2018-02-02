@@ -52,6 +52,11 @@ def filter_data(identifiers, data):
     return filtered_data
 
 
+def filter_image_data(identifiers, data):
+    image_identifiers = Attribute.objects.filter(value_type=Attribute.TYPE_IMAGE).values_list('identifier', flat=True)
+    return filter_data(set(identifiers) & set(image_identifiers), data)
+
+
 def project_edit(request, pk=None, phase_id=None):
     if pk:
         project = Project.objects.get(pk=pk)
@@ -66,35 +71,45 @@ def project_edit(request, pk=None, phase_id=None):
         edit_phase = project.phase
 
     validate = 'save_and_validate' in request.POST
+    save = validate or 'save' in request.POST
     sections = generate_sections(project=project, phase=edit_phase, for_validation=validate)
 
     for section in sections:
         attribute_identifiers = section['section'].get_attribute_identifiers()
         form_class = section['form_class']
 
-        if 'save' in request.POST or 'save_and_validate' in request.POST:
-            section['form'] = form_class(request.POST)
+        if save:
+            # basically POST
 
             if 'kaavahankkeen_nimi' in request.POST:
                 project.name = request.POST.get('kaavahankkeen_nimi')
 
-            section['form'].is_valid()
+            # first build a form for cleaning all the posted values and save those in the project
+            cleaning_form_class = create_section_form_class(section['section'], project=project)
+            cleaning_form = cleaning_form_class(request.POST, request.FILES)
+            cleaning_form.full_clean()
 
-            attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
-
+            attribute_data = filter_data(attribute_identifiers, cleaning_form.cleaned_data)
             project.update_attribute_data(attribute_data)
             project.save()
+
+            if validate:
+                # when validation is needed, build another form for it that will be returned in the context.
+                # we must use initial instead of request.FILES because we need saved images, not ones loaded
+                # in memory (because we need URLs for the images).
+                image_data = filter_image_data(attribute_identifiers, project.get_attribute_data())
+                section['form'] = form_class(request.POST, initial=image_data)
+                section['form'].is_valid()
         else:
+            # basically GET
+
             attribute_data = filter_data(attribute_identifiers, project.get_attribute_data())
-            section['form'] = form_class(attribute_data) if validate else form_class(initial=attribute_data)
+            section['form'] = form_class(initial=attribute_data)
 
-    if request.method == 'POST':
-        is_valid = all([section['form'].is_valid() for section in sections])
-
-        if is_valid and not validate:
-            return HttpResponseRedirect(reverse('projects:edit', kwargs={
-                'pk': project.id
-            }))
+    if save and not validate:
+        return HttpResponseRedirect(reverse('projects:edit', kwargs={
+            'pk': project.id
+        }))
 
     context = {
         'project': project,
@@ -156,14 +171,15 @@ def project_change_phase(request, pk):
         for section in context['sections']:
             attribute_identifiers = section['section'].get_attribute_identifiers()
             attribute_data = filter_data(attribute_identifiers, project.get_attribute_data())
+            image_data = filter_image_data(attribute_identifiers, attribute_data)
             form_class = section['form_class']
 
-            # Use tempopary form to get prepared values for the attribute_data
+            # Use temporary form to get prepared values for the attribute_data
             tmp_form = form_class(attribute_data)
             for field in tmp_form.fields:
                 attribute_data[field] = tmp_form[field].value()
 
-            section['form'] = form_class(attribute_data)
+            section['form'] = form_class(attribute_data, initial=image_data)
 
         context['is_valid'] = all([section['form'].is_valid() for section in context['sections']])
 

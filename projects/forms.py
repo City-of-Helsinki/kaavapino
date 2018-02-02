@@ -3,7 +3,7 @@ from django.contrib.gis import forms
 from django.forms import ChoiceField
 
 from .models import Attribute
-from .widgets import MapboxWidget
+from .widgets import ImageWidget, MapboxWidget
 
 FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: (forms.CharField, {}),
@@ -12,6 +12,7 @@ FIELD_TYPES = {
     Attribute.TYPE_BOOLEAN: (forms.BooleanField, {'required': False}),
     Attribute.TYPE_DATE: (forms.DateField, {}),
     Attribute.TYPE_GEOMETRY: (forms.MultiPolygonField, {'widget': MapboxWidget}),
+    Attribute.TYPE_IMAGE: (forms.ImageField, {'widget': ImageWidget}),
 }
 
 

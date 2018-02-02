@@ -74,7 +74,7 @@
 {% block content %}
    <div class="row">
         <div class="col-md-9" id="new-application">
-            <form id="project_form" method="post" novalidate>{% csrf_token %}
+            <form id="project_form" method="post" enctype="multipart/form-data" novalidate>{% csrf_token %}
                 <div class="tab-content">
                     {% for section in sections %}
                         <div class="tab-pane{% if forloop.first %} active{% endif %}" id="section_tab_{{ section.section.id }}" data-section="{{ section.section.id }}" role="tabpanel">

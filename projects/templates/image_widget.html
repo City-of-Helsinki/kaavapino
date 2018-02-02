@@ -1,0 +1,39 @@
+<img id="{{ widget.name }}_image" class="img-responsive" style="padding-bottom: 10px;" {% if widget.url %}src="{{ widget.url }}"{% endif %}/>
+<label class="btn btn-default btn-file btn-sm">
+    <i class="fa fa-plus fa-file-image-o"></i> Valitse kuva...
+    <input type="file" style="display: none;" name="{{ widget.name }}" id="id_{{ widget.name }}" accept="image/*">
+</label>
+<label id="{{ widget.name }}_delete-button" class="btn btn-danger btn-sm" {% if not widget.url %}style="display: none;"{% endif %}>
+  <i class="fa fa-plus fa-trash"></i> Poista
+</label>
+<input type="hidden" id="{{ widget.delete_input_name }}" name="{{ widget.delete_input_name }}" val="">
+
+<script>
+const $deleteButton = $('#{{ widget.name }}_delete-button');
+const $deleteInput = $('#{{ widget.delete_input_name }}');
+const $image = $('#{{ widget.name }}_image');
+const $fileInput = $('#id_{{ widget.name }}');
+
+$fileInput.on('change', function() {
+  if (this.files && this.files[0]) {
+    $deleteButton.show();
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      $image.attr('src', e.target.result)
+    };
+    reader.readAsDataURL(this.files[0]);
+
+    $deleteInput.val('');
+    $deleteInput.change();
+  }
+});
+
+$deleteButton.click(function() {
+  $deleteButton.hide();
+  $image.attr('src', '');
+  $deleteInput.val('true');
+  $deleteInput.change();
+  $fileInput.replaceWith($fileInput.val('').clone(true));  // beautiful
+})
+</script>
