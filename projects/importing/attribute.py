@@ -85,6 +85,12 @@ class AttributeImporter:
             name = datum[0].strip(' \t:.')
             value_type = VALUE_TYPES.get(datum[3].strip())
 
+            help_text = None
+            try:
+                help_text = datum[14].strip()
+            except (IndexError, AttributeError):
+                pass
+
             if not value_type:
                 logger.warning('Unidentified value type "{}", defaulting to short string'.format(datum[3]))
                 value_type = Attribute.TYPE_SHORT_STRING
@@ -99,6 +105,7 @@ class AttributeImporter:
             attribute, created = method(identifier=identifier, defaults=({
                 'name': name,
                 'value_type': value_type,
+                'help_text': help_text,
             }))
 
             if created:

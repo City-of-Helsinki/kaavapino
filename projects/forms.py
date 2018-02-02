@@ -22,6 +22,7 @@ def create_section_form_class(section, for_validation=False, project=None):
         extra = {
             'required': section_attribute.required and not section_attribute.generated and for_validation,
             'disabled': section_attribute.generated,
+            'help_text': attribute.help_text,
         }
 
         if attribute.value_type == Attribute.TYPE_USER:
