@@ -218,6 +218,8 @@ for project in projects.values():
             if not obj_attr:
                 # print("%s: %s" % (pr_attr, val))
                 continue
+            if pr_attr in ('oa', 'la'):
+                val = datetime.strptime(val, '%d.%m.%Y').strftime('%Y-%m-%d')
             data[obj_attr] = val
 
     strategy = project.get('PROJECT_TAVOITE'), project.get('PROJECT_TAVOITE_2'), project.get('PROJECT_TAVOITE_3')
