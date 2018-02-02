@@ -35,7 +35,7 @@ def generate_sections(project: Project=None, phase=None, for_validation=False):
     for section in phase.sections.order_by('index'):
         section_data = {
             'section': section,
-            'form_class': create_section_form_class(section, for_validation),
+            'form_class': create_section_form_class(section, for_validation=for_validation, project=project),
             'form': None,
         }
 

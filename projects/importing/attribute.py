@@ -37,6 +37,7 @@ VALUE_TYPES = {
     'aikataulu ja tehtävät; valitaan toinen': Attribute.TYPE_SHORT_STRING,
     'aikataulu ja tehtävät; pvm': Attribute.TYPE_DATE,
     'sisältö; numero': Attribute.TYPE_INTEGER,
+    'resurssit; valintalista (Hijatista)': Attribute.TYPE_USER,
 }
 
 
