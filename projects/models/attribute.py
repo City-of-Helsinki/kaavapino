@@ -36,6 +36,7 @@ class Attribute(models.Model):
     identifier = models.CharField(
         max_length=50, verbose_name=_('identifier'), db_index=True, unique=True, validators=[validate_identifier]
     )
+    help_text = models.TextField(verbose_name=_('Help text'), blank=True)
 
     class Meta:
         verbose_name = _('attribute')

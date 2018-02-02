@@ -65,7 +65,10 @@
                             <fieldset class="form-subset">
                                 <h2 class="form-subset-header">{{ section.section.name }}</h2>
                                 {% for field in section.form %}
-                                    {% bootstrap_field field %}
+                                    {% bootstrap_field field show_help=False %}
+                                    {% if field.help_text %}
+                                        <div class="field-help-text" data-field-id="{{ field.auto_id }}" style="display:none;">{{ field.help_text|safe }}</div>
+                                    {% endif %}
                                 {% endfor %}
                             </fieldset>
                         </div>
@@ -190,6 +193,28 @@ $(document).ready(function () {
     const sectionId = $(this).closest('[data-section]').data('section');
     $('.application-sidebar li[data-section=' + sectionId + ']').addClass('form-error');
   });
+
+  // Help text
+  const helpTexts = $('.field-help-text');
+  helpTexts.each(function () {
+    const fieldId = $(this).data('field-id');
+    const fieldLabel = $('label[for=' + fieldId + ']');
+    const questionMarkEl = $('<i class="fa fa-fw fa-question-circle"></i>');
+
+    questionMarkEl.popover({
+      title: 'Ohje',
+      content: $(this).html(),
+      trigger: 'manual',
+    });
+
+    questionMarkEl.on('click', function (e) {
+      e.preventDefault();
+      $(this).popover('toggle');
+    });
+
+    questionMarkEl.appendTo(fieldLabel);
+  });
+
 });
 </script>
 {% endblock %}
