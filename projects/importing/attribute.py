@@ -86,7 +86,7 @@ class AttributeImporter:
             name = datum[0].strip(' \t:.')
             value_type = VALUE_TYPES.get(datum[3].strip())
 
-            help_text = None
+            help_text = ''
             try:
                 help_text = datum[14].strip()
             except (IndexError, AttributeError):
