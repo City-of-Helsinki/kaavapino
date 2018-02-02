@@ -2,8 +2,6 @@ import json
 import random
 from collections import OrderedDict
 
-from django.contrib.gis.geos import GEOSGeometry
-from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse

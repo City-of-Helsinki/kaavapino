@@ -1,8 +1,8 @@
-from django.contrib.gis import forms
 from django.contrib.auth import get_user_model
+from django.contrib.gis import forms
 from django.forms import ChoiceField
-from .models import Attribute
 
+from .models import Attribute
 from .widgets import MapboxWidget
 
 FIELD_TYPES = {

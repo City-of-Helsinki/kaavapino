@@ -1,12 +1,10 @@
 import datetime
 import re
 
-from django.core.validators import RegexValidator
-from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.auth import get_user_model
+from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
-
 
 DATE_SERIALIZATION_FORMAT = '%Y-%m-%d'
 
