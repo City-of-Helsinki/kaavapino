@@ -240,6 +240,32 @@ $(document).ready(function () {
     questionMarkEl.appendTo(fieldLabel);
   });
 
+  // Tab focus
+  $(document).ready(function () {
+    const hash = window.location.hash.substring(1);
+    if (!hash) {
+      return;
+    }
+
+    const tabIds = $('.tab-pane').map(function () {
+      return this.id;
+    }).get();
+
+    if (tabIds.indexOf(hash) !== -1) {
+      $('a[href="#' + hash + '"]').tab('show')
+    }
+
+    const fieldIds = $('[id^=id_]').map(function () {
+      return this.id;
+    }).get();
+
+    if (fieldIds.indexOf(hash) !== -1) {
+      let tabId = $('#' + hash).closest('.tab-pane').attr('id');
+      if (tabId) {
+        $('a[href="#' + tabId + '"]').tab('show')
+      }
+    }
+  });
 });
 
 </script>
