@@ -61,11 +61,10 @@ def project_edit(request, pk=None, phase_id=None):
         project.type = ProjectType.objects.first()
 
     if phase_id:
-        edit_phase = ProjectPhase.objects.get(pk=phase_id, project_type__name='asemakaava')
+        edit_phase = ProjectPhase.objects.get(pk=phase_id, project_type=project.type)
     else:
         edit_phase = project.phase
 
-    is_valid = True
     validate = 'save_and_validate' in request.POST
     sections = generate_sections(project=project, phase=edit_phase, for_validation=validate)
 
@@ -79,7 +78,7 @@ def project_edit(request, pk=None, phase_id=None):
             if 'kaavahankkeen_nimi' in request.POST:
                 project.name = request.POST.get('kaavahankkeen_nimi')
 
-            is_valid = section['form'].is_valid()
+            section['form'].is_valid()
 
             attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
 
@@ -90,6 +89,8 @@ def project_edit(request, pk=None, phase_id=None):
             section['form'] = form_class(attribute_data) if validate else form_class(initial=attribute_data)
 
     if request.method == 'POST':
+        is_valid = all([section['form'].is_valid() for section in sections])
+
         if is_valid and not validate:
             return HttpResponseRedirect(reverse('projects:edit', kwargs={
                 'pk': project.id
@@ -98,7 +99,7 @@ def project_edit(request, pk=None, phase_id=None):
     context = {
         'project': project,
         'edit_phase': edit_phase,
-        'phases': ProjectPhase.objects.filter(project_type__name='asemakaava'),
+        'phases': ProjectPhase.objects.filter(project_type=project.type),
         'sections': sections,
     }
 
@@ -126,10 +127,56 @@ class ProjectCardView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['phases'] = ProjectPhase.objects.filter(project_type__name='asemakaava')
+        context['phases'] = ProjectPhase.objects.filter(project_type=self.object.type)
         context['project'] = self.object
         context['project_attr'] = self.object.attribute_data
         return context
+
+
+def project_change_phase(request, pk):
+    project = Project.objects.get(pk=pk)
+    next_phase = None
+
+    try:
+        # TODO: Determine the next phase better
+        next_phase = ProjectPhase.objects.get(project_type=project.type, index=project.phase.index + 1)
+    except ProjectPhase.DoesNotExist:
+        pass
+
+    context = {
+        'project': project,
+        'phases': ProjectPhase.objects.filter(project_type=project.type),
+        'project_attr': project.attribute_data,
+        'next_phase': next_phase,
+    }
+
+    if request.method == 'POST' and 'change-phase' in request.POST:
+        context['sections'] = generate_sections(project=project, for_validation=True)
+
+        for section in context['sections']:
+            attribute_identifiers = section['section'].get_attribute_identifiers()
+            attribute_data = filter_data(attribute_identifiers, project.get_attribute_data())
+            form_class = section['form_class']
+
+            # Use tempopary form to get prepared values for the attribute_data
+            tmp_form = form_class(attribute_data)
+            for field in tmp_form.fields:
+                attribute_data[field] = tmp_form[field].value()
+
+            section['form'] = form_class(attribute_data)
+
+        context['is_valid'] = all([section['form'].is_valid() for section in context['sections']])
+
+        # TODO: Check that the next_phase is valid and the user has suitable permissions
+        if context['is_valid']:
+            project.phase = next_phase
+            project.save()
+
+            return HttpResponseRedirect(reverse('projects:change-phase', kwargs={
+                'pk': project.id
+            }))
+
+    return render(request, 'project_change_phase.html', context=context)
 
 
 class DocumentCreateView(DetailView):

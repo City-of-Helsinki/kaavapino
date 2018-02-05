@@ -7,13 +7,16 @@
                 <li>
                     <a href="/">Etusivu</a>
                 </li>
+                <li>
+                    <a href="{% url "projects:list" %}">Kaavahankkeet</a>
+                </li>
                 <li class="active">
-                    {{ project_attr.kaavahankkeen_nimi }}
+                    <a href="{% url "projects:card" pk=project.id %}">{{ project.name|default:"(nimetön)" }}</a>
                 </li>
             </ol>
             <div class="flex-row">
                 <div class="col col-grow">
-                    <h1>{{ project_attr.kaavahankkeen_nimi }}</h1>
+                    <h1>{{ project.name|default:"(nimetön)" }}</h1>
                 </div>
                 {% if project.attribute_data.diaarinumero %}
                     <div class="col col-auto">
@@ -38,6 +41,9 @@
             <a href="{% url 'projects:document-create' pk=project.id %}" class="btn btn-primary">
                 <i class="fa fa-file-word-o fa-fw"></i> Luo dokumentteja
             </a>
+            <a href="{% url 'projects:change-phase' pk=project.id %}" class="btn btn-primary">
+                <i class="fa fa-refresh fa-fw"></i> Vaihda vaihetta
+            </a>
         </div>
     </div>
     {% include "includes/project_state_indicator.html" %}
@@ -48,7 +54,7 @@
         <div class="col-md-6">
             <dl>
                 <dt>Asuminen</dt>
-                <dd>{{ project_attr.asuminen_yhteensa }}</dd>
+                <dd>{{ project_attr.asuminen_yhteensa|default_if_none:"-" }}</dd>
 
                 <dt>Aikataulu</dt>
                 <dd>-</dd>

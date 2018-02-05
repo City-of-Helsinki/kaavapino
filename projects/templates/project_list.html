@@ -4,8 +4,12 @@
     <div class="jumbotron">
         <div class="container">
             <ol class="breadcrumb">
-                <li><a href="/">Etusivu</a></li>
-                <li class="active">Kaavahankkeet</li>
+                <li>
+                    <a href="/">Etusivu</a>
+                </li>
+                <li class="active">
+                    <a href="{% url "projects:list" %}">Kaavahankkeet</a>
+                </li>
             </ol>
             <h1>Kaavahankkeet</h1>
             <a href="{% url 'projects:create' %}" class="btn btn-default">
