@@ -80,8 +80,12 @@ def create_section_form_class(section, for_validation=False, project=None):
         if not field_class:
             continue
 
+        if for_validation and not section_attribute.generated and attribute.value_type != Attribute.TYPE_BOOLEAN:
+            extra['required'] = section_attribute.required
+        else:
+            extra['required'] = False
+
         extra.update({
-            'required': section_attribute.required and not section_attribute.generated and for_validation,
             'disabled': section_attribute.generated,
             'help_text': attribute.help_text,
         })
