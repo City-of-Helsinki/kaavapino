@@ -13,10 +13,20 @@ const NODE_PATH = './node_modules/';
 const SRC_PATH = './projects/static_src/';
 const DEST_PATH = './projects/static/';
 
-gulp.task("js", require("unigulp/js")({
+gulp.task("js", ["js:jquery", "js:scripts"]);
+
+gulp.task("js:jquery", require("unigulp/js")({
   name: "js",
   src: [
     NODE_PATH + "jquery/dist/jquery.js",
+  ],
+  dest: DEST_PATH + "js/jquery.js",
+  production,
+}));
+
+gulp.task("js:scripts", require("unigulp/js")({
+  name: "js",
+  src: [
     NODE_PATH + "bootstrap-sass/assets/javascripts/bootstrap.js",
     SRC_PATH + "js/general.js",
   ],
