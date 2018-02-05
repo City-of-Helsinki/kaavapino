@@ -41,6 +41,9 @@
             <a href="{% url 'projects:document-create' pk=project.id %}" class="btn btn-primary">
                 <i class="fa fa-file-word-o fa-fw"></i> Luo dokumentteja
             </a>
+            <a href="{% url 'projects:change-phase' pk=project.id %}" class="btn btn-primary">
+                <i class="fa fa-refresh fa-fw"></i> Vaihda vaihetta
+            </a>
         </div>
     </div>
     {% include "includes/project_state_indicator.html" %}

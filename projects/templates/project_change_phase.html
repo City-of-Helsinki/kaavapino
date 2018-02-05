@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block hero %}
+    <div class="jumbotron customized">
+        <div class="container">
+            <ol class="breadcrumb">
+                <li>
+                    <a href="/">Etusivu</a>
+                </li>
+                <li>
+                    <a href="{% url "projects:list" %}">Kaavahankkeet</a>
+                </li>
+                <li>
+                    <a href="{% url "projects:card" pk=project.id %}">{{ project.name|default:"(nimetön)" }}</a>
+                </li>
+                <li class="active">
+                    <a href="{% url "projects:change-phase" pk=project.id %}">Vaihda vaihetta</a>
+                </li>
+            </ol>
+            <div class="flex-row">
+                <div class="col col-grow">
+                    <h1>{{ project.name|default:"(nimetön)" }}</h1>
+                </div>
+                {% if project.attribute_data.diaarinumero %}
+                    <div class="col col-auto">
+                        <p>
+                            <strong>Diaarinumero</strong><br>
+                            {{ project.attribute_data.diaarinumero }}
+                        </p>
+                    </div>
+                {% endif %}
+                {% if project.attribute_data.hankenumero %}
+                    <div class="col col-auto">
+                        <p>
+                            <strong>Hankenumero</strong><br>
+                            {{ project.attribute_data.hankenumero }}
+                        </p>
+                    </div>
+                {% endif %}
+            </div>
+            <a href="{% url 'projects:edit' pk=project.id %}" class="btn btn-primary">
+                <i class="fa fa-pencil fa-fw"></i> Muokkaa
+            </a>
+            <a href="{% url 'projects:document-create' pk=project.id %}" class="btn btn-primary">
+                <i class="fa fa-file-word-o fa-fw"></i> Luo dokumentteja
+            </a>
+        </div>
+    </div>
+
+    <section class="application-state-indicator">
+        <div class="container">
+            <h2 class="h6 text-center">Hankkeen vaihe</h2>
+            <div class="steps">
+                {% for phase in project.type.phases.all %}
+                    <div class="step{% if project.phase == phase %} active{% endif %}{% if project.phase.is_completed %} completed{% endif %} {{ phase.color }}">
+                        <span class="step-number"></span>
+                        <span class="step-label">{{ phase.name }}</span>
+                        {% if phase == next_phase %}
+                            <form method="post">{% csrf_token %}
+                                <button type="submit" name="change-phase" class="btn btn-sm btn-primary" style="margin-top: 1em;">
+                                    Siirry
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+{% block content %}
+    {% if sections and not is_valid %}
+        <div class="row">
+            <div class="col-md-9" id="new-application">
+                <p>Seuraavat virheet on korjattava ennen kuin vaihetta voi vaihtaa</p>
+                {% for section in sections %}
+                    {% if section.form.errors %}
+                        <h3>{{ section.section.name }}</h3>
+
+                        {% for error in section.form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                <strong>{{ error|escape }}</strong>
+                            </div>
+                        {% endfor %}
+
+                        {% for field in section.form %}
+                            {% for error in field.errors %}
+                                <div class="alert alert-danger">
+                                    <strong>{{ field.label }}: {{ error|escape }}</strong>
+                                    <a href="{% url 'projects:edit' pk=project.id %}#{{ field.auto_id }}">Muokkaa</a>
+                                </div>
+                            {% endfor %}
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
