@@ -5,8 +5,21 @@
     <div class="jumbotron customized">
         <div class="container">
             <ol class="breadcrumb">
-                <li><a href="/">Etusivu</a></li>
-                <li class="active">Kaavahankkeen muokkaus</li>
+                <li>
+                    <a href="/">Etusivu</a>
+                </li>
+                <li>
+                    <a href="{% url "projects:list" %}">Kaavahankkeet</a>
+                </li>
+                {% if project and project.id %}
+                <li class="active">
+                    <a href="{% url "projects:edit" pk=project.id %}">Kaavahankkeen muokkaus</a>
+                </li>
+                {% else %}
+                <li class="active">
+                    <a href="{% url "projects:create" %}">Uusi kaavahanke</a>
+                </li>
+                {% endif %}
             </ol>
             <div class="flex-row">
                 <div class="col col-grow">
@@ -42,7 +55,7 @@
     </div>
     <section class="application-state-indicator">
         <div class="container">
-            <h2 class="h6 text-center">Hankkeen nykytila</h2>
+            <h2 class="h6 text-center">Hankkeen vaihe</h2>
             <div class="steps">
                 {% for phase in phases %}
                     <div class="step{% if project.phase == phase %} active{% endif %} {% if project.phase.is_completed %} completed{% endif %} {{ phase.color }}">

@@ -1,6 +1,6 @@
 <section class="application-state-indicator">
     <div class="container">
-        <h2 class="h6 text-center">Hankkeen nykytila</h2>
+        <h2 class="h6 text-center">Hankkeen vaihe</h2>
         <div class="steps">
             {% for phase in project.type.phases.all %}
                 <div class="step{% if project.phase == phase %} active{% endif %}{% if project.phase.is_completed %} completed{% endif %} {{ phase.color }}">
