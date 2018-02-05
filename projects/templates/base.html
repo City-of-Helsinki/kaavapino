@@ -10,6 +10,10 @@
     <title>{% block title %}Kaavapino{% endblock %} - Kaavapino</title>
     <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}" />
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+
+    {% comment %}We need to load jquery here because we need it with inline scripts{% endcomment %}
+    <script src="{% static 'js/jquery.js' %}"></script>
+
     {% block extrahead %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}" {% block extra_body_tags %}{% endblock %}>
