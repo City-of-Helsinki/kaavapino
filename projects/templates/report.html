@@ -68,7 +68,6 @@ map.on('load', function () {
         html += "<strong>Strategiakytkennät</strong>"
         html += "<ul>"
         strategies = JSON.parse(e.features[0].properties.strategies);
-        console.log(strategies);
         for (var i = 0; i < strategies.length; i++) {
             html += "<li>" + strategies[i] + "</li>";
         }
