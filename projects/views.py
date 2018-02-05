@@ -2,7 +2,6 @@ import json
 import random
 from collections import OrderedDict
 
-from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -50,8 +49,7 @@ def filter_data(identifiers, data):
         for key, value in data.items()
         if key in identifiers
     }
-
-    return json.loads(json.dumps(filtered_data, cls=DjangoJSONEncoder))
+    return filtered_data
 
 
 def project_edit(request, pk=None, phase_id=None):
@@ -70,13 +68,10 @@ def project_edit(request, pk=None, phase_id=None):
     is_valid = True
     validate = 'save_and_validate' in request.POST
     sections = generate_sections(project=project, phase=edit_phase, for_validation=validate)
-    project_current_data = {}
 
     for section in sections:
         attribute_identifiers = section['section'].get_attribute_identifiers()
         form_class = section['form_class']
-
-        project_current_data.update(filter_data(attribute_identifiers, project.attribute_data))
 
         if 'save' in request.POST or 'save_and_validate' in request.POST:
             section['form'] = form_class(request.POST)
@@ -85,13 +80,13 @@ def project_edit(request, pk=None, phase_id=None):
                 project.name = request.POST.get('kaavahankkeen_nimi')
 
             is_valid = section['form'].is_valid()
+
             attribute_data = filter_data(attribute_identifiers, section['form'].cleaned_data)
 
-            project.attribute_data.update(attribute_data)
-            project.user = request.user
+            project.update_attribute_data(attribute_data)
             project.save()
         else:
-            attribute_data = filter_data(attribute_identifiers, project.attribute_data)
+            attribute_data = filter_data(attribute_identifiers, project.get_attribute_data())
             section['form'] = form_class(attribute_data) if validate else form_class(initial=attribute_data)
 
     if request.method == 'POST':
@@ -102,7 +97,6 @@ def project_edit(request, pk=None, phase_id=None):
 
     context = {
         'project': project,
-        'project_current_data': json.dumps(project_current_data),
         'edit_phase': edit_phase,
         'phases': ProjectPhase.objects.filter(project_type__name='asemakaava'),
         'sections': sections,

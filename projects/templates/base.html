@@ -10,6 +10,7 @@
     <title>{% block title %}Kaavapino{% endblock %} - Kaavapino</title>
     <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}" />
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+    {% block extrahead %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}" {% block extra_body_tags %}{% endblock %}>
     {% include "includes/main_nav.html" %}

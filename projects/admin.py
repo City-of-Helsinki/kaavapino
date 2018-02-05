@@ -15,6 +15,13 @@ class AttributeValueChoiceInline(admin.TabularInline):
 class AttributeAdmin(admin.ModelAdmin):
     inlines = (AttributeValueChoiceInline,)
 
+    def save_model(self, request, obj, form, change):
+        try:
+            super().save_model(request, obj, form, change)
+        except NotImplementedError as e:
+            messages.set_level(request, messages.ERROR)
+            messages.error(request, e)
+
 
 def build_create_document_action(template):
     def create_document(modeladmin, request, queryset):

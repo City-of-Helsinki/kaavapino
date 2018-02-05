@@ -1,8 +1,12 @@
+import datetime
 import re
 
+from django.contrib.auth import get_user_model
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
+
+DATE_SERIALIZATION_FORMAT = '%Y-%m-%d'
 
 identifier_re = re.compile(r'^[\w]+\Z')
 
@@ -20,6 +24,7 @@ class Attribute(models.Model):
     TYPE_BOOLEAN = 'boolean'
     TYPE_DATE = 'date'
     TYPE_USER = 'user'
+    TYPE_GEOMETRY = 'geometry'
 
     TYPE_CHOICES = (
         (TYPE_INTEGER, _('integer')),
@@ -28,6 +33,7 @@ class Attribute(models.Model):
         (TYPE_BOOLEAN, _('boolean')),
         (TYPE_DATE, _('date')),
         (TYPE_USER, _('user')),
+        (TYPE_GEOMETRY, _('geometry')),
     )
 
     name = models.CharField(max_length=255, verbose_name=_('name'))
@@ -44,6 +50,61 @@ class Attribute(models.Model):
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.value_type)
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        if self.value_type == Attribute.TYPE_GEOMETRY:
+            if Attribute.objects.exclude(id=self.id).filter(value_type=Attribute.TYPE_GEOMETRY).exists():
+                raise NotImplementedError('Currently only one geometry type attribute at a time is supported.')
+
+    def serialize_value(self, value):
+        value_choices = self.value_choices.all()
+
+        if value_choices.exists():
+            if self.multiple_choice:
+                return [v.identifier for v in value]
+            else:
+                return value.identifier if value else None
+        elif self.value_type == Attribute.TYPE_INTEGER:
+            return int(value) if value is not None else None
+        elif self.value_type in (Attribute.TYPE_SHORT_STRING, Attribute.TYPE_LONG_STRING):
+            return str(value) if value else None
+        elif self.value_type == Attribute.TYPE_BOOLEAN:
+            return bool(value)
+        elif self.value_type == Attribute.TYPE_DATE:
+            return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
+        elif self.value_type == Attribute.TYPE_USER:
+            # allow saving non-existing users using their names (str) at least for now.
+            # actual users are saved using their ids (int).
+            if isinstance(value, get_user_model()):
+                return value.id
+            else:
+                return value or None
+        else:
+            raise Exception('Cannot serialize attribute type "%s".' % self.value_type)
+
+    def deserialize_value(self, value):
+        value_choices = self.value_choices.all()
+
+        if value_choices.exists():
+            if self.multiple_choice:
+                return [v for v in value_choices.filter(identifier__in=value)]
+            else:
+                return value_choices.get(identifier=value)
+        elif self.value_type in (Attribute.TYPE_INTEGER, Attribute.TYPE_SHORT_STRING, Attribute.TYPE_LONG_STRING,
+                                 Attribute.TYPE_BOOLEAN):
+            return value
+        elif self.value_type == Attribute.TYPE_DATE:
+            return datetime.datetime.strptime(value, DATE_SERIALIZATION_FORMAT) if value else None
+        elif self.value_type == Attribute.TYPE_USER:
+            if isinstance(value, str):
+                return value
+            else:
+                return get_user_model().objects.get(id=value)
+        else:
+            raise Exception('Cannot deserialize attribute type "%s".' % self.value_type)
 
 
 class AttributeValueChoice(models.Model):

@@ -40,6 +40,44 @@ class Project(models.Model):
     def __str__(self):
         return self.name
 
+    def get_attribute_data(self):
+        ret = {}
+
+        for attribute in Attribute.objects.all().prefetch_related('value_choices'):
+            deserialized_value = None
+
+            if attribute.value_type == Attribute.TYPE_GEOMETRY:
+                deserialized_value = self.geometry
+            elif attribute.identifier in self.attribute_data:
+                deserialized_value = attribute.deserialize_value(self.attribute_data[attribute.identifier])
+
+            ret[attribute.identifier] = deserialized_value
+        return ret
+
+    def set_attribute_data(self, data):
+        self.attribute_data = {}
+        self.geometry = None
+        self.update_attribute_data(data)
+
+    def update_attribute_data(self, data):
+        attributes = {a.identifier: a for a in Attribute.objects.all().prefetch_related('value_choices')}
+
+        for identifier, value in data.items():
+            attribute = attributes.get(identifier)
+
+            if not attribute:
+                continue
+
+            if attribute.value_type == Attribute.TYPE_GEOMETRY:
+                self.geometry = value
+            else:
+                serialized_value = attribute.serialize_value(value)
+
+                if serialized_value is not None:
+                    self.attribute_data[identifier] = serialized_value
+                else:
+                    self.attribute_data.pop(identifier, None)
+
 
 class ProjectPhase(models.Model):
     project_type = models.ForeignKey(ProjectType, verbose_name=_('project type'), on_delete=models.CASCADE,
