@@ -3,7 +3,9 @@ from django.contrib.gis.admin import OSMGeoAdmin
 from django.utils.translation import ugettext_lazy as _
 
 from .exporting import get_document_response
-from .models import Attribute, AttributeValueChoice, DocumentTemplate, Project, ProjectPhase, ProjectType
+from .models import (
+    Attribute, AttributeValueChoice, DocumentTemplate, Project, ProjectAttributeImage, ProjectPhase, ProjectType
+)
 
 
 class AttributeValueChoiceInline(admin.TabularInline):
@@ -64,3 +66,8 @@ class ProjectTypeAdmin(admin.ModelAdmin):
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ('name', 'file')
+
+
+@admin.register(ProjectAttributeImage)
+class ProjectAttributeImageAdmin(admin.ModelAdmin):
+    pass

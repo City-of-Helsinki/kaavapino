@@ -7,3 +7,4 @@ docxtpl
 openpyxl
 django-bootstrap3
 django-allauth
+pillow

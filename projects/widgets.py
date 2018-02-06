@@ -1,7 +1,8 @@
-from django.contrib.gis import forms
+from django.contrib.gis.forms import Widget
+from django.forms import FileInput
 
 
-class MapboxWidget(forms.Widget):
+class MapboxWidget(Widget):
     template_name = 'mapbox_widget.html'
 
     class Media:
@@ -24,3 +25,32 @@ class MapboxWidget(forms.Widget):
         if isinstance(value, str):
             return value
         return value.geojson
+
+
+class ImageWidget(FileInput):
+    template_name = 'image_widget.html'
+
+    @staticmethod
+    def get_delete_input_name(name):
+        return 'id_{}_delete'.format(name)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        try:
+            url = value.url
+        # catch empty image field and None
+        except (AttributeError, ValueError):
+            url = None
+        context['widget'].update({
+            'url': url,
+            'delete_input_name': self.get_delete_input_name(name),
+        })
+
+        return context
+
+    def value_from_datadict(self, data, files, name):
+        if data.get(self.get_delete_input_name(name), False):
+            return False
+
+        upload = super().value_from_datadict(data, files, name)
+        return upload or None

@@ -50,6 +50,14 @@ class Project(models.Model):
                 deserialized_value = self.geometry
             elif attribute.identifier in self.attribute_data:
                 deserialized_value = attribute.deserialize_value(self.attribute_data[attribute.identifier])
+            elif attribute.value_type == Attribute.TYPE_IMAGE:
+                try:
+                    deserialized_value = ProjectAttributeImage.objects.get(
+                        attribute=attribute,
+                        project=self,
+                    ).image
+                except ProjectAttributeImage.DoesNotExist:
+                    deserialized_value = None
 
             ret[attribute.identifier] = deserialized_value
         return ret
@@ -70,6 +78,20 @@ class Project(models.Model):
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 self.geometry = value
+            elif attribute.value_type == Attribute.TYPE_IMAGE:
+                if value is False:
+                    ProjectAttributeImage.objects.filter(attribute=attribute, project=self).delete()
+                elif value is None:
+                    # None is handled in the same way as omitting this attribute from the update in the first place
+                    # would have been, ie. do nothing. This is to make life easier as the form where these images
+                    # mainly come from uses False for "delete" and None for "no update".
+                    return
+                else:
+                    ProjectAttributeImage.objects.update_or_create(
+                        attribute=attribute,
+                        project=self,
+                        defaults={'image': value}
+                    )
             else:
                 serialized_value = attribute.serialize_value(value)
 
@@ -133,3 +155,17 @@ class ProjectPhaseSectionAttribute(models.Model):
 
     def __str__(self):
         return '{} {} {} {}'.format(self.attribute, self.section, self.section.phase, self.index)
+
+
+class ProjectAttributeImage(models.Model):
+    attribute = models.ForeignKey(Attribute, verbose_name=_('attribute'), related_name='images',
+                                  on_delete=models.CASCADE)
+    project = models.ForeignKey(Project, verbose_name=_('project'), related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(verbose_name=_('image'))
+
+    class Meta:
+        verbose_name = _('project attribute image')
+        verbose_name_plural = _('project attribute images')
+
+    def __str__(self):
+        return '{} {}'.format(self.project, self.attribute)

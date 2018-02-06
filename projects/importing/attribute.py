@@ -39,6 +39,7 @@ VALUE_TYPES = {
     'sisältö; numero': Attribute.TYPE_INTEGER,
     'resurssit; valintalista (Hijatista)': Attribute.TYPE_USER,
     'spatiaalinen': Attribute.TYPE_GEOMETRY,
+    'sisältö; kuva': Attribute.TYPE_IMAGE,
 }
 
 

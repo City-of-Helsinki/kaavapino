@@ -25,6 +25,7 @@ class Attribute(models.Model):
     TYPE_DATE = 'date'
     TYPE_USER = 'user'
     TYPE_GEOMETRY = 'geometry'
+    TYPE_IMAGE = 'image'
 
     TYPE_CHOICES = (
         (TYPE_INTEGER, _('integer')),
@@ -34,6 +35,7 @@ class Attribute(models.Model):
         (TYPE_DATE, _('date')),
         (TYPE_USER, _('user')),
         (TYPE_GEOMETRY, _('geometry')),
+        (TYPE_IMAGE, _('image')),
     )
 
     name = models.CharField(max_length=255, verbose_name=_('name'))

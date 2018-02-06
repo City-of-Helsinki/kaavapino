@@ -23,6 +23,7 @@ lxml==4.1.1               # via docxtpl, python-docx
 markupsafe==1.0           # via jinja2
 oauthlib==2.0.6           # via requests-oauthlib
 openpyxl==2.5.0
+pillow==5.0.0
 psycopg2==2.7.3.2
 pycryptodomex==3.4.8      # via pyjwkest
 pyjwkest==1.4.0           # via drf-oidc-auth
