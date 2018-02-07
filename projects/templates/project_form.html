@@ -269,6 +269,17 @@ $(document).ready(function () {
 
   // Tab focus
   $(document).ready(function () {
+
+    // update hash fragment on tab change
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+      if(history.replaceState) {
+          history.replaceState(null, null, '#' + $(e.target).attr('href').substr(1));
+      } else {
+          location.replace('#' + $(e.target).attr('href').substr(1));
+      }
+      $(document).trigger('scroll');  // seems to help with sometimes disappearing sidebar
+    });
+
     const hash = window.location.hash.substring(1);
     if (!hash) {
       return;
@@ -292,6 +303,11 @@ $(document).ready(function () {
         $('a[href="#' + tabId + '"]').tab('show')
       }
     }
+  });
+
+  $('#project_form').on('submit', function() {
+    const sectionId = $("div.tab-pane.active").first().data('section');
+    $(this).append('<input type="hidden" name="_active_tab" value="' + sectionId + '" />');
   });
 });
 

@@ -107,9 +107,9 @@ def project_edit(request, pk=None, phase_id=None):
             section['form'] = form_class(initial=attribute_data)
 
     if save and not validate:
-        return HttpResponseRedirect(reverse('projects:edit', kwargs={
-            'pk': project.id
-        }))
+        active_tab = request.POST.get('_active_tab')
+        active_tab_fragment = '#section_tab_{}'.format(active_tab) if active_tab else ''
+        return HttpResponseRedirect(reverse('projects:edit', kwargs={'pk': project.id}) + active_tab_fragment)
 
     context = {
         'project': project,
