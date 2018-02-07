@@ -81,9 +81,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
-    'stronghold',
 
+    'stronghold',
     'bootstrap3',
+    'adminsortable2',
 
     'projects',
     'users',

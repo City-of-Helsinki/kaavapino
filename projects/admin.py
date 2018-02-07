@@ -2,13 +2,16 @@ from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.utils.translation import ugettext_lazy as _
 
+from adminsortable2.admin import SortableInlineAdminMixin
+
 from .exporting import get_document_response
 from .models import (
-    Attribute, AttributeValueChoice, DocumentTemplate, Project, ProjectAttributeImage, ProjectPhase, ProjectType
+    Attribute, AttributeValueChoice, DocumentTemplate, Project, ProjectAttributeImage, ProjectPhase,
+    ProjectPhaseSection, ProjectPhaseSectionAttribute, ProjectType
 )
 
 
-class AttributeValueChoiceInline(admin.TabularInline):
+class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
     model = AttributeValueChoice
     extra = 0
 
@@ -53,14 +56,40 @@ class ProjectAdmin(OSMGeoAdmin):
         return actions
 
 
+class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectPhaseSection
+    extra = 0
+
+
 @admin.register(ProjectPhase)
 class ProjectPhaseAdmin(admin.ModelAdmin):
     list_display = ('name', 'project_type')
+    exclude = ('index',)
+    inlines = (ProjectPhaseSectionInline,)
+
+
+class ProjectPhaseSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectPhaseSectionAttribute
+    extra = 0
+
+
+@admin.register(ProjectPhaseSection)
+class ProjectPhaseSectionAdmin(admin.ModelAdmin):
+    list_display = ('name', 'phase')
+    exclude = ('index',)
+    inlines = (ProjectPhaseSectionAttributeInline,)
+    ordering = ('phase', 'index')
+
+
+class ProjectPhaseInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectPhase
+    extra = 0
 
 
 @admin.register(ProjectType)
 class ProjectTypeAdmin(admin.ModelAdmin):
     list_display = ('name',)
+    inlines = (ProjectPhaseInline,)
 
 
 @admin.register(DocumentTemplate)
