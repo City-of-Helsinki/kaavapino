@@ -85,7 +85,7 @@ class Project(models.Model):
                     # None is handled in the same way as omitting this attribute from the update in the first place
                     # would have been, ie. do nothing. This is to make life easier as the form where these images
                     # mainly come from uses False for "delete" and None for "no update".
-                    return
+                    continue
                 else:
                     ProjectAttributeImage.objects.update_or_create(
                         attribute=attribute,
