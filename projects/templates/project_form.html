@@ -151,6 +151,30 @@ $(document).ready(function () {
 
   updateTotal();
 
+  // Update input "Kaavan hyväksyjätaho"
+
+  const $inputProsessinKokoluokka = $("#id_prosessin_kokoluokka");
+
+  function updateInputKaavanHyvaksyjataho() {
+    const $inputKaavanHyvaksyjataho = $("#id_kaavan_hyvaksyjataho");
+    const val = $inputProsessinKokoluokka.val();
+
+    if (['xs', 's'].indexOf(val) !== -1) {
+      $inputKaavanHyvaksyjataho.val('kaupunkiympäristölautakunta');
+    } else if (['mini_m', 'm', 'l'].indexOf(val) !== -1) {
+      $inputKaavanHyvaksyjataho.val('kaupunginvaltuusto');
+    }
+    else {
+      $inputKaavanHyvaksyjataho.val('');
+    }
+  }
+
+  $inputProsessinKokoluokka.on('change keyup paste', function () {
+    updateInputKaavanHyvaksyjataho();
+  });
+
+  updateInputKaavanHyvaksyjataho();
+
   // Modified section indicators
   const enabledInputs = $('[id^=id_]').not(':disabled');
 
