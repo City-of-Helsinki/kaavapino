@@ -14,11 +14,14 @@ from .models import (
 class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
     model = AttributeValueChoice
     extra = 0
+    prepopulated_fields = {'identifier': ('value',)}
 
 
 @admin.register(Attribute)
 class AttributeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'value_type', 'identifier')
     inlines = (AttributeValueChoiceInline,)
+    prepopulated_fields = {'identifier': ('name',)}
 
     def save_model(self, request, obj, form, change):
         try:
