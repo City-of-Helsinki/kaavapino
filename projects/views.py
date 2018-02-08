@@ -57,6 +57,27 @@ def filter_image_data(identifiers, data):
     return filter_data(set(identifiers) & set(image_identifiers), data)
 
 
+def apply_hardcoded_rules(attribute_data):
+    if 'prosessin_kokoluokka' in attribute_data:
+        if attribute_data['prosessin_kokoluokka'].identifier in ('xs', 's'):
+            attribute_data['kaavan_hyvaksyjataho'] = 'kaupunkiympäristölautakunta'
+        elif attribute_data['prosessin_kokoluokka'].identifier in ('mini_m', 'm', 'l'):
+            attribute_data['kaavan_hyvaksyjataho'] = 'kaupunginvaltuusto'
+        else:
+            attribute_data['kaavan_hyvaksyjataho'] = None
+
+    total = None
+
+    for identifier, value in attribute_data.items():
+        if identifier.startswith('asuminen_'):
+            total = (total or 0) + (value or 0)
+
+    if total is not None:
+        attribute_data['asuminen_yhteensa'] = total
+
+    return attribute_data
+
+
 def project_edit(request, pk=None, phase_id=None):
     if pk:
         project = Project.objects.get(pk=pk)
@@ -106,10 +127,15 @@ def project_edit(request, pk=None, phase_id=None):
             attribute_data = filter_data(attribute_identifiers, project.get_attribute_data())
             section['form'] = form_class(initial=attribute_data)
 
-    if save and not validate:
-        active_tab = request.POST.get('_active_tab')
-        active_tab_fragment = '#section_tab_{}'.format(active_tab) if active_tab else ''
-        return HttpResponseRedirect(reverse('projects:edit', kwargs={'pk': project.id}) + active_tab_fragment)
+    if save:
+        attribute_data = apply_hardcoded_rules(project.get_attribute_data())
+        project.update_attribute_data(attribute_data)
+        project.save()
+
+        if not validate:
+            active_tab = request.POST.get('_active_tab')
+            active_tab_fragment = '#section_tab_{}'.format(active_tab) if active_tab else ''
+            return HttpResponseRedirect(reverse('projects:edit', kwargs={'pk': project.id}) + active_tab_fragment)
 
     context = {
         'project': project,
