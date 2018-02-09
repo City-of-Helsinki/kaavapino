@@ -85,7 +85,7 @@ class Project(models.Model):
                     # None is handled in the same way as omitting this attribute from the update in the first place
                     # would have been, ie. do nothing. This is to make life easier as the form where these images
                     # mainly come from uses False for "delete" and None for "no update".
-                    return
+                    continue
                 else:
                     ProjectAttributeImage.objects.update_or_create(
                         attribute=attribute,
@@ -107,13 +107,12 @@ class ProjectPhase(models.Model):
     name = models.CharField(max_length=255, verbose_name=_('name'))
     color = models.CharField(max_length=64, verbose_name=_('color'), blank=True)
     color_code = models.CharField(max_length=10, verbose_name=_('color code'), blank=True)
-    index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
+    index = models.PositiveIntegerField(verbose_name=_('index'))
 
     class Meta:
         verbose_name = _('project phase')
         verbose_name_plural = _('project phases')
-        unique_together = ('project_type', 'index')
-        ordering = ('project_type', 'index',)
+        ordering = ('index',)
 
     def __str__(self):
         return self.name
@@ -122,7 +121,7 @@ class ProjectPhase(models.Model):
 class ProjectPhaseSection(models.Model):
     phase = models.ForeignKey(ProjectPhase, verbose_name=_('phase'), related_name='sections', on_delete=models.CASCADE)
     name = models.CharField(max_length=255, verbose_name=_('name'))
-    index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
+    index = models.PositiveIntegerField(verbose_name=_('index'))
     attributes = models.ManyToManyField(
         Attribute, verbose_name=_('attributes'), related_name='phase_sections', through='ProjectPhaseSectionAttribute'
     )
@@ -130,8 +129,7 @@ class ProjectPhaseSection(models.Model):
     class Meta:
         verbose_name = _('project phase section')
         verbose_name_plural = _('project phase sections')
-        unique_together = ('phase', 'index')
-        ordering = ('phase', 'index')
+        ordering = ('index',)
 
     def __str__(self):
         return self.name
@@ -145,13 +143,12 @@ class ProjectPhaseSectionAttribute(models.Model):
     section = models.ForeignKey(ProjectPhaseSection, verbose_name=_('phase section'), on_delete=models.CASCADE)
     generated = models.BooleanField(verbose_name=_('generated'), default=False)
     required = models.BooleanField(verbose_name=_('required'))
-    index = models.PositiveIntegerField(verbose_name=_('index'), default=0)
+    index = models.PositiveIntegerField(verbose_name=_('index'))
 
     class Meta:
         verbose_name = _('project phase section attribute')
         verbose_name_plural = _('project phase section attributes')
-        unique_together = ('section', 'index')
-        ordering = ('section', 'index')
+        ordering = ('index',)
 
     def __str__(self):
         return '{} {} {} {}'.format(self.attribute, self.section, self.section.phase, self.index)

@@ -49,6 +49,7 @@ class Attribute(models.Model):
     class Meta:
         verbose_name = _('attribute')
         verbose_name_plural = _('attributes')
+        ordering = ('identifier',)
 
     def __str__(self):
         return '{} ({})'.format(self.name, self.value_type)

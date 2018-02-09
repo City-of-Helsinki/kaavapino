@@ -8,3 +8,4 @@ openpyxl
 django-bootstrap3
 django-allauth
 pillow
+django-admin-sortable2
