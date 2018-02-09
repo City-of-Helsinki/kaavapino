@@ -1,16 +1,21 @@
 from django.contrib.auth import get_user_model
 from django.contrib.gis import forms
-from django.forms import ChoiceField
+from django.forms import ChoiceField, DateInput
 
 from .models import Attribute
 from .widgets import ImageWidget, MapboxWidget
+
+
+class DateInputType(DateInput):
+    input_type = 'date'
+
 
 FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: (forms.CharField, {}),
     Attribute.TYPE_LONG_STRING: (forms.CharField, {'widget': forms.Textarea}),
     Attribute.TYPE_INTEGER: (forms.IntegerField, {}),
     Attribute.TYPE_BOOLEAN: (forms.BooleanField, {'required': False}),
-    Attribute.TYPE_DATE: (forms.DateField, {}),
+    Attribute.TYPE_DATE: (forms.DateField, {'widget': DateInputType(format=('%Y-%m-%d'))}),
     Attribute.TYPE_GEOMETRY: (forms.MultiPolygonField, {'widget': MapboxWidget}),
     Attribute.TYPE_IMAGE: (forms.ImageField, {'widget': ImageWidget}),
 }

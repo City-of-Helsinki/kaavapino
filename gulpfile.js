@@ -28,6 +28,7 @@ gulp.task("js:scripts", require("unigulp/js")({
   name: "js",
   src: [
     NODE_PATH + "bootstrap-sass/assets/javascripts/bootstrap.js",
+    NODE_PATH + "vis/dist/vis.js",
     SRC_PATH + "js/general.js",
   ],
   dest: DEST_PATH + "js/project-scripts.js",

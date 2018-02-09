@@ -1,8 +1,7 @@
+from adminsortable2.admin import SortableInlineAdminMixin
 from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.utils.translation import ugettext_lazy as _
-
-from adminsortable2.admin import SortableInlineAdminMixin
 
 from .exporting import get_document_response
 from .models import (

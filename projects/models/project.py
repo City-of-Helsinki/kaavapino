@@ -1,6 +1,9 @@
+import datetime
+
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import JSONField
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
 from .attribute import Attribute
@@ -48,8 +51,6 @@ class Project(models.Model):
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 deserialized_value = self.geometry
-            elif attribute.identifier in self.attribute_data:
-                deserialized_value = attribute.deserialize_value(self.attribute_data[attribute.identifier])
             elif attribute.value_type == Attribute.TYPE_IMAGE:
                 try:
                     deserialized_value = ProjectAttributeImage.objects.get(
@@ -58,6 +59,8 @@ class Project(models.Model):
                     ).image
                 except ProjectAttributeImage.DoesNotExist:
                     deserialized_value = None
+            elif attribute.identifier in self.attribute_data:
+                deserialized_value = attribute.deserialize_value(self.attribute_data[attribute.identifier])
 
             ret[attribute.identifier] = deserialized_value
         return ret
@@ -100,6 +103,65 @@ class Project(models.Model):
                 else:
                     self.attribute_data.pop(identifier, None)
 
+    def get_time_line(self):
+        timeline = [
+            {
+                'content': 'Luontipvm',
+                'start': self.created_at,
+                'group': self.id,
+                'type': 'point',
+            }
+        ]
+
+        for log_entry in self.phase_logs.order_by('created_at'):
+            timeline.append({
+                # 'title': None,
+                'content': log_entry.phase.name,
+                'start': log_entry.created_at,
+                'end': None,
+                'group': self.id,
+                'type': 'background',
+                'className': log_entry.phase.color,
+            })
+
+            if timeline[-2]['type'] == 'background':
+                timeline[-2]['end'] = log_entry.created_at
+
+        if timeline[-1]['type'] == 'background' and not timeline[-1]['end']:
+            timeline[-1]['end'] = timezone.now()
+
+        for attribute in Attribute.objects.filter(value_type=Attribute.TYPE_DATE):
+            if attribute.identifier in self.attribute_data and self.attribute_data[attribute.identifier]:
+                start_dt = attribute.deserialize_value(self.attribute_data[attribute.identifier])
+
+                timeline.append({
+                    'type': 'point',
+                    'content': attribute.name,
+                    'start': start_dt,
+                    'group': self.id,
+                })
+
+                # TODO: Remove hard-coded logic
+                if attribute.identifier == 'oas_aineiston_esillaoloaika_alkaa':
+                    timeline.append({
+                        'type': 'point',
+                        'content': 'OAS-paketin määräaika',
+                        'start': start_dt - datetime.timedelta(weeks=2),
+                        'group': self.id,
+                    })
+
+                if attribute.identifier == 'ehdotuksen_suunniteltu_lautakuntapaivamaara_arvio':
+                    weeks = 6 if self.attribute_data['prosessin_kokoluokka'] in ['l', 'xl'] else 14
+
+                    timeline.append({
+                        'type': 'point',
+                        'content': 'Lautakuntapaketin määräaika',
+                        'start': start_dt - datetime.timedelta(weeks=weeks),
+                        'group': self.id,
+                    })
+
+        return timeline
+
 
 class ProjectPhase(models.Model):
     project_type = models.ForeignKey(ProjectType, verbose_name=_('project type'), on_delete=models.CASCADE,
@@ -116,6 +178,24 @@ class ProjectPhase(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ProjectPhaseLog(models.Model):
+    project = models.ForeignKey('Project', verbose_name=_('project'), related_name='phase_logs',
+                                on_delete=models.CASCADE)
+    phase = models.ForeignKey(ProjectPhase, verbose_name=_('phase'), related_name='phase_logs',
+                              on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, verbose_name=_('user'), related_name='phase_logs',
+                             on_delete=models.PROTECT)
+    created_at = models.DateTimeField(verbose_name=_('created at'), auto_now_add=True, editable=False)
+
+    class Meta:
+        verbose_name = _('project phase log entry')
+        verbose_name_plural = _('project phase log entries')
+        ordering = ('created_at', )
+
+    def __str__(self):
+        return '{} {} {}'.format(self.project.name, self.phase.name, self.created_at)
 
 
 class ProjectPhaseSection(models.Model):
