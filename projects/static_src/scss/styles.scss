@@ -8,6 +8,9 @@
 // Font awesome
 @import "./node_modules/font-awesome/scss/font-awesome";
 
+// Vis
+@import "./node_modules/vis/dist/vis";
+
 // Project custom styles
 @import "project/helsinki-colors";
 @import "project/common";
@@ -17,3 +20,4 @@
 @import "project/sidebar";
 @import "project/progress-indicator";
 @import "project/project-list";
+@import "project/time-line";

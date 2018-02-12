@@ -2,12 +2,15 @@ import json
 import random
 from collections import OrderedDict
 
+from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils.safestring import mark_safe
 from django.views.generic import DetailView, ListView
 
 from projects.models import ProjectPhase, ProjectType
+from projects.models.project import ProjectPhaseLog
 
 from .exporting import get_document_response
 from .forms import create_section_form_class
@@ -21,6 +24,21 @@ class ProjectListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['own_projects'] = Project.objects.filter(user=self.request.user)
+
+        context['time_line_groups'] = []
+        context['time_line_items'] = []
+        for project in context['own_projects']:
+            context['time_line_groups'].append({
+                'id': project.id,
+                'content': project.name if project.name else '(nimetön)',
+            })
+            context['time_line_items'].extend(project.get_time_line())
+
+        context['time_line_groups'] = mark_safe(json.dumps(
+            context['time_line_groups'], cls=DjangoJSONEncoder))
+
+        context['time_line_items'] = mark_safe(json.dumps(
+            context['time_line_items'], cls=DjangoJSONEncoder))
 
         return context
 
@@ -112,7 +130,11 @@ def project_edit(request, pk=None, phase_id=None):
 
             attribute_data = filter_data(attribute_identifiers, cleaning_form.cleaned_data)
             project.update_attribute_data(attribute_data)
+            new_project = False if project.id else True
             project.save()
+
+            if new_project:
+                ProjectPhaseLog.objects.create(project=project, phase=project.phase, user=request.user)
 
             if validate:
                 # when validation is needed, build another form for it that will be returned in the context.
@@ -213,6 +235,8 @@ def project_change_phase(request, pk):
         if context['is_valid']:
             project.phase = next_phase
             project.save()
+
+            ProjectPhaseLog.objects.create(project=project, phase=project.phase, user=request.user)
 
             return HttpResponseRedirect(reverse('projects:change-phase', kwargs={
                 'pk': project.id

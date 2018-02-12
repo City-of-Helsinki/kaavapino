@@ -33,6 +33,7 @@
             <div role="tabpanel" class="tab-pane active" id="user-list">
                 <div class="project-list-wrapper">
                     {% include 'includes/project_list_table.html' with object_list=own_projects %}
+                    <div id="time-line"></div>
                 </div>
             </div>
             <div role="tabpanel" class="tab-pane" id="public-list">
@@ -42,4 +43,21 @@
             </div>
         </div>
     </div>
+
+{% endblock %}
+
+{% block extrajs %}
+    <script type="text/javascript">
+      let container = document.getElementById('time-line');
+
+      let groups = {{ time_line_groups }};
+      let items = new vis.DataSet({{ time_line_items }});
+
+      let options = {
+        'orientation': 'top',
+        'selectable': false,
+      };
+
+      let timeline = new vis.Timeline(container, items, groups, options);
+    </script>
 {% endblock %}

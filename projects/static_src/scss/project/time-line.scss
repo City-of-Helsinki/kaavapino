@@ -1,0 +1,75 @@
+.vis-item {
+  background-color: $hel-suomenlinna;
+  border-color: transparent;
+
+  &.color {
+    &--tram {
+      color: #fff;
+      background-color: $hel-tram;
+    }
+
+    &--silver {
+      background-color: $hel-silver;
+    }
+
+    &--gold {
+      color: #fff;
+      background-color: $hel-gold;
+    }
+
+    &--black {
+      color: #fff;
+      background-color: $black;
+    }
+
+    &--copper {
+      color: #fff;
+      background-color: $hel-copper;
+    }
+
+    &--bus {
+      color: #fff;
+      background-color: $hel-bus;
+    }
+
+    &--coat {
+      color: #fff;
+      background-color: $hel-coat;
+    }
+
+    &--fog {
+      background-color: $hel-fog;
+    }
+
+    &--metro {
+      color: #fff;
+      background-color: $hel-metro;
+    }
+
+    &--brick {
+      color: #fff;
+      background-color: $hel-brick;
+    }
+
+    &--light-gray {
+      background-color: $light-gray;
+    }
+
+    &--suomenlinna {
+      background-color: $hel-suomenlinna;
+    }
+
+    &--engel {
+      background-color: $hel-engel;
+    }
+
+    &--summer {
+      background-color: $hel-summer;
+    }
+
+    &--white {
+      background-color: #fff;
+      border-color: #ddd;
+    }
+  }
+}
