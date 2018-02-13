@@ -52,7 +52,7 @@
             <h2 class="h6 text-center">Hankkeen vaihe</h2>
             <div class="steps">
                 {% for phase in project.type.phases.all %}
-                    <div class="step{% if project.phase == phase %} active{% endif %}{% if project.phase.is_completed %} completed{% endif %} {{ phase.color }}">
+                    <div class="step{% if project.phase == phase %} active{% endif %}{% if project.phase.index > phase.index %} completed{% endif %} {{ phase.color }}">
                         <span class="step-number"></span>
                         <span class="step-label">{{ phase.name }}</span>
                         {% if phase == next_phase %}
