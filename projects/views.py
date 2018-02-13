@@ -23,14 +23,19 @@ class ProjectListView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['own_projects'] = Project.objects.filter(user=self.request.user)
+        context['own_projects'] = Project.objects.filter(user=self.request.user).order_by('name')
 
         context['time_line_groups'] = []
         context['time_line_items'] = []
         for project in context['own_projects']:
+            display_name = project.name
+            # TODO: better display name
+            if len(display_name) > 25:
+                display_name = display_name.split(',')[0]
+
             context['time_line_groups'].append({
                 'id': project.id,
-                'content': project.name if project.name else '(nimetön)',
+                'content': display_name,
             })
             context['time_line_items'].extend(project.get_time_line())
 
@@ -76,7 +81,7 @@ def filter_image_data(identifiers, data):
 
 
 def apply_hardcoded_rules(attribute_data):
-    if 'prosessin_kokoluokka' in attribute_data:
+    if 'prosessin_kokoluokka' in attribute_data and attribute_data['prosessin_kokoluokka']:
         if attribute_data['prosessin_kokoluokka'].identifier in ('xs', 's'):
             attribute_data['kaavan_hyvaksyjataho'] = 'kaupunkiympäristölautakunta'
         elif attribute_data['prosessin_kokoluokka'].identifier in ('mini_m', 'm', 'l'):
@@ -192,7 +197,8 @@ class ProjectCardView(DetailView):
         context = super().get_context_data(**kwargs)
         context['phases'] = ProjectPhase.objects.filter(project_type=self.object.type)
         context['project'] = self.object
-        context['project_attr'] = self.object.attribute_data
+        context['project_attr'] = self.object.get_attribute_data()
+
         return context
 
 

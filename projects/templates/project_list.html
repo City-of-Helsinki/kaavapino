@@ -50,7 +50,7 @@
     <script type="text/javascript">
       let container = document.getElementById('time-line');
 
-      let groups = {{ time_line_groups }};
+      let groups = new vis.DataSet({{ time_line_groups }});
       let items = new vis.DataSet({{ time_line_items }});
 
       let options = {
