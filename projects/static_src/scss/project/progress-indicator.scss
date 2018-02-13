@@ -65,6 +65,29 @@
                 }
             }
 
+            &.color--bus {
+                &.active .step-number {
+                    background: $hel-bus;
+                    border-color: $hel-bus;
+                    color: $white;
+                }
+            }
+
+            &.color--black {
+                &.active .step-number {
+                    background: $black;
+                    border-color: $black;
+                    color: $white;
+                }
+            }
+
+            &.color--white {
+                &.active .step-number {
+                    border-color: $black;
+                    color: $text-color;
+                }
+            }
+
             &.active,
             &.completed {
                 &:before, &:after {
