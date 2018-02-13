@@ -3,6 +3,8 @@ from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.utils.translation import ugettext_lazy as _
 
+from projects.models.project import ProjectPhaseLog
+
 from .exporting import get_document_response
 from .models import (
     Attribute, AttributeValueChoice, DocumentTemplate, Project, ProjectAttributeImage, ProjectPhase,
@@ -44,9 +46,19 @@ def build_create_document_action(template):
     return create_document
 
 
+class ProjectPhaseLogInline(admin.TabularInline):
+    model = ProjectPhaseLog
+    fields = ('phase', 'user', 'created_at')
+    readonly_fields = ('project', 'phase', 'user', 'created_at')
+    can_delete = False
+    extra = 0
+    max_num = 0
+
+
 @admin.register(Project)
 class ProjectAdmin(OSMGeoAdmin):
     list_display = ('name', 'created_at', 'modified_at')
+    inlines = (ProjectPhaseLogInline,)
 
     def get_actions(self, request):
         actions = super().get_actions(request)
