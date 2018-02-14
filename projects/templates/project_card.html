@@ -54,19 +54,32 @@
         <div class="col-md-6">
             <dl>
                 <dt>Asuminen</dt>
-                <dd>{{ project_attr.asuminen_yhteensa|default_if_none:"-" }}</dd>
+                <dd>{{ project_attr.asuminen_yhteensa|default_if_none:"-" }} k-m<sup>2</sup></dd>
 
                 <dt>Aikataulu</dt>
                 <dd>-</dd>
 
+                {% if project_attr.kaavan_valmistelijan_nimi or project_attr.liikennesuunnittelijan_nimi %}
                 <dt>Vastuuhenkilöt</dt>
                 <dd>
-                    {{ project_attr.kaavan_valmistelijan_nimi }} <span class="text-muted">(Kaavan valmistelija)</span><br>
-                    {{ project_attr.liikennesuunnittelijan_nimi }} <span class="text-muted">(Liikennesuunnittelija)</span>
+                    {% if project_attr.kaavan_valmistelijan_nimi %}
+                        {% if project_attr.kaavan_valmistelijan_nimi.get_display_name %}
+                            {{ project_attr.kaavan_valmistelijan_nimi.get_display_name }} <span class="text-muted">(Kaavan valmistelija)</span><br>
+                        {% else %}
+                            {{ project_attr.kaavan_valmistelijan_nimi }} <span class="text-muted">(Kaavan valmistelija)</span><br>
+                        {% endif %}
+                    {% endif %}
+                    {% if project_attr.liikennesuunnittelijan_nimi %}
+                        {% if project_attr.liikennesuunnittelijan_nimi.get_display_name %}
+                            {{ project_attr.liikennesuunnittelijan_nimi.get_display_name }} <span class="text-muted">(Liikennesuunnittelija)</span>
+                        {% else %}
+                            {{ project_attr.liikennesuunnittelijan_nimi }} <span class="text-muted">(Liikennesuunnittelija)</span>
+                        {% endif %}
+                    {% endif %}
                 </dd>
-
+                {% endif %}
                 <dt>Prosessin koko</dt>
-                <dd>{{ project_attr.prosessin_kokoluokka }}</dd>
+                <dd>{{ project_attr.prosessin_kokoluokka|default:"-" }}</dd>
             </dl>
             <dl>
                 <dt>Kuvaus sisällöstä</dt>

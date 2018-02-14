@@ -1,17 +1,24 @@
 # -*- coding: UTF-8 -*-
-import json
 import csv
-from datetime import datetime
-
+import json
 import os
+import re
+from collections import Counter, defaultdict
+from datetime import date, datetime, timedelta
+from random import randint
+
 import django
+from django.contrib.gis.gdal import CoordTransform, SpatialReference
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
+from django.core.serializers.json import DjangoJSONEncoder
+
+from projects.models import Attribute, AttributeValueChoice, Project, ProjectPhase, ProjectPhaseLog, ProjectType
+from projects.models.utils import create_identifier
+from users.models import User
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "kaavapino.settings")
 django.setup()
 
-from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
-from django.contrib.gis.gdal import CoordTransform, SpatialReference
-from projects.models import Project, ProjectType, ProjectPhase, Attribute, AttributeValueChoice
-from projects.models.utils import create_identifier
 
 
 # read the ksv planning metadata
@@ -53,7 +60,93 @@ for row in reader:
     # print('Metadata for planning project id ' + pr_id + ' found')
 
 
-from collections import Counter
+# read the ksv planning metadata
+f = open('data/ksv_kaavahanke-meta.csv', 'r', encoding='utf-8')
+# skip blank header line
+next(f)
+# initialize the reader
+reader = csv.reader(f, delimiter='|')
+# strip the whitespace
+# reader = ({str(k).strip(): str(v).strip() for k, v in row.items()} for row in reader)
+
+
+date_column_map = {
+    10: 'oas_aineiston_esillaoloaika_alkaa',
+    11: 'oas_aineiston_esillaoloaika_paattyy',
+    26: 'ehdotuksen_suunniteltu_lautakuntapaivamaara_arvio',
+    16: 'ehdotuksen_esittely_lautakunnalle_pvm_toteutunut',
+    27: 'ehdotuksesta_paatetty_lautakunnassa_pvm_toteutunut',
+    # 19: 'tarkistetusta ehdotuksesta päätetty lautakunnassa, pvm (toteutunut)',
+    # 46: 'hyväksytty kaupunginvaltuustossa',
+    # 21: 'lainvoimainen',
+}
+
+date_values = defaultdict(dict)
+phase_names = ['Käynnistys', 'OAS', 'Ehdotus', 'Tarkistettu ehdotus', 'Kanslia-Khs-Valtuusto', 'Voimaantulo']
+phases = {}
+for phase_name in phase_names:
+    phases[phase_name] = ProjectPhase.objects.get(name=phase_name)
+phase_user = User.objects.get(pk=3)
+
+for row in reader:
+    row = [str(v).strip() for v in row]
+    if not row or row[0] == '-------------':
+        continue
+
+    try:
+        pr_id = row[38]
+    except IndexError:
+        continue
+
+    if not pr_id or pr_id == 'PROJECT_TUNNISTENUMERO' or set(pr_id) <= set('-'):
+        continue
+
+    for column_num, attribute_name in date_column_map.items():
+        if not row[column_num]:
+            continue
+
+        date_values[pr_id][attribute_name] = datetime.strptime(row[column_num], "%d.%m.%Y").date()
+
+    if row[10]:
+        try:
+            k_date = datetime.strptime(row[10], "%d.%m.%Y").date()
+            date_values[pr_id]['Käynnistys'] = k_date - timedelta(days=randint(30*3, 30*5))
+            date_values[pr_id]['OAS'] = k_date - timedelta(days=30*2)
+        except ValueError:
+            pass
+
+    if 'Käynnistys' not in date_values[pr_id]:
+        matches = re.match(r'\w+\s*(\d{4})-\d+', row[6])  # Diaarinumero
+        if matches:
+            date_values[pr_id]['Käynnistys'] = date(day=1, month=1, year=int(matches.group(1)))
+
+    if row[11]:
+        try:
+            l_date = datetime.strptime(row[11], "%d.%m.%Y").date()
+            date_values[pr_id]['Ehdotus'] = l_date
+        except ValueError:
+            pass
+
+    if row[18]:
+        try:
+            s_date = datetime.strptime(row[18], "%d.%m.%Y").date()
+            date_values[pr_id]['Tarkistettu ehdotus'] = s_date
+        except ValueError:
+            pass
+
+    if row[19]:
+        try:
+            t_date = datetime.strptime(row[19], "%d.%m.%Y").date()
+            date_values[pr_id]['Kanslia-Khs-Valtuusto'] = t_date
+        except ValueError:
+            pass
+
+    if row[21]:
+        try:
+            v_date = datetime.strptime(row[21], "%d.%m.%Y").date()
+            date_values[pr_id]['Voimaantulo'] = v_date
+        except ValueError:
+            pass
 
 for key, values in attr_values.items():
     print(key)
@@ -228,6 +321,12 @@ for project in projects.values():
     if 'null' in data:
         del data['null']
 
+    # Save date fields
+    if pr_id in date_values:
+        for attribute_name in date_column_map.values():
+            if attribute_name in date_values[pr_id]:
+                data[attribute_name] = date_values[pr_id][attribute_name]
+
     geometry = project.get('geometry')
     if geometry is not None:
         # Drop the Z dimension
@@ -243,3 +342,20 @@ for project in projects.values():
     obj.geometry = geometry
 
     obj.save()
+
+    # Save ProjectPhaseLogs
+    if pr_id in date_values:
+        for phase_name in phase_names:
+            if phase_name not in date_values[pr_id]:
+                continue
+
+            log_entry = None
+            try:
+                log_entry = ProjectPhaseLog.objects.get(project=obj, phase=phases[phase_name])
+            except ProjectPhaseLog.DoesNotExist:
+                log_entry = ProjectPhaseLog(project=obj, phase=phases[phase_name])
+
+            log_entry.user = phase_user
+            # TODO: remove auto_now_add because this doesn't have any effect if the log entry is new
+            log_entry.created_at = date_values[pr_id][phase_name]
+            log_entry.save()

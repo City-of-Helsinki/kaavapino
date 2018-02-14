@@ -3,6 +3,7 @@ import datetime
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import JSONField
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
@@ -29,7 +30,8 @@ class Project(models.Model):
     name = models.CharField(max_length=255, verbose_name=_('name'))
     identifier = models.CharField(max_length=50, verbose_name=_('identifier'), db_index=True, blank=True, null=True)
     type = models.ForeignKey(ProjectType, verbose_name=_('type'), related_name='projects', on_delete=models.PROTECT)
-    attribute_data = JSONField(verbose_name=_('attribute data'), default=dict, blank=True, null=True)
+    attribute_data = JSONField(verbose_name=_('attribute data'), default=dict, blank=True, null=True,
+                               encoder=DjangoJSONEncoder)
     phase = models.ForeignKey('ProjectPhase', verbose_name=_('phase'), null=True, related_name='projects',
                               on_delete=models.PROTECT)
 
@@ -38,7 +40,7 @@ class Project(models.Model):
     class Meta:
         verbose_name = _('project')
         verbose_name_plural = _('projects')
-        ordering = ('id',)
+        ordering = ('name',)
 
     def __str__(self):
         return self.name
@@ -150,7 +152,8 @@ class Project(models.Model):
                         'group': self.id,
                     })
 
-                if attribute.identifier == 'ehdotuksen_suunniteltu_lautakuntapaivamaara_arvio':
+                if attribute.identifier == 'ehdotuksen_suunniteltu_lautakuntapaivamaara_arvio' and \
+                        'prosessin_kokoluokka' in self.attribute_data:
                     weeks = 6 if self.attribute_data['prosessin_kokoluokka'] in ['l', 'xl'] else 14
 
                     timeline.append({
