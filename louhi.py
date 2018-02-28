@@ -155,7 +155,7 @@ for key, values in attr_values.items():
         print("\t%-5d %s" % (count, name))
 
 # save the ksv planning metadata with geometry
-f = open('data/ksv_kaavahanke.json', 'r')
+f = open('data/ksv_kaavahanke.json', 'r', encoding='utf-8')
 json_dict = json.load(f)
 for feat in json_dict['features']:
     props = feat['properties']
