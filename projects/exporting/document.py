@@ -6,6 +6,7 @@ from django.utils import timezone
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing
 
+from users.models import User
 from ..models import Attribute
 from ..models.utils import create_identifier
 
@@ -13,13 +14,13 @@ IMAGE_WIDTH = Mm(136)
 
 
 def _get_single_display_value(attribute, value):
-    if value is None:
+    if value is None or attribute.value_type == Attribute.TYPE_GEOMETRY:
         return None
     if attribute.value_type == Attribute.TYPE_BOOLEAN:
         return 'Kyllä' if value else 'Ei'  # TODO
     elif attribute.value_type == Attribute.TYPE_DATE:
         return value.strftime('%d.%m.%Y')
-    elif attribute.value_type == Attribute.TYPE_USER:
+    elif attribute.value_type == Attribute.TYPE_USER and isinstance(value, User):
         return value.get_full_name()
     else:
         return escape(str(value))
@@ -44,14 +45,15 @@ def render_template(project, document_template):
         if not attribute:
             continue
 
-        if attribute.value_type == Attribute.TYPE_IMAGE:
+        if attribute.value_type == Attribute.TYPE_IMAGE and value:
             display_value = InlineImage(doc, value, width=IMAGE_WIDTH)
         else:
             display_value = get_attribute_display(attribute, value)
-            if display_value is None or display_value == '':
-                display_value = escape(' < {} >'.format(attribute.name))
-            elif attribute.value_type == Attribute.TYPE_LONG_STRING:
-                display_value = Listing(display_value)
+
+        if display_value is None or display_value == '':
+            display_value = escape(' < {} >'.format(attribute.name))
+        elif attribute.value_type == Attribute.TYPE_LONG_STRING:
+            display_value = Listing(display_value)
 
         attribute_data_display[identifier] = display_value
 
