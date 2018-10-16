@@ -77,7 +77,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.gis",
     "stronghold",
-    "bootstrap3",
     "adminsortable2",
     "projects",
     "users",
