@@ -25,6 +25,7 @@ before_script:
 
 script:
   - flake8
+  - black --check .
   - pytest -ra -vvv --cov
 
 after_success: codecov
