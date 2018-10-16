@@ -7,22 +7,25 @@ from .widgets import ImageWidget, MapboxWidget
 
 
 class DateInputType(DateInput):
-    input_type = 'date'
+    input_type = "date"
 
 
 FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: (forms.CharField, {}),
-    Attribute.TYPE_LONG_STRING: (forms.CharField, {'widget': forms.Textarea}),
+    Attribute.TYPE_LONG_STRING: (forms.CharField, {"widget": forms.Textarea}),
     Attribute.TYPE_INTEGER: (forms.IntegerField, {}),
-    Attribute.TYPE_BOOLEAN: (forms.BooleanField, {'required': False}),
-    Attribute.TYPE_DATE: (forms.DateField, {'widget': DateInputType(format=('%Y-%m-%d'))}),
-    Attribute.TYPE_GEOMETRY: (forms.MultiPolygonField, {'widget': MapboxWidget}),
-    Attribute.TYPE_IMAGE: (forms.ImageField, {'widget': ImageWidget}),
+    Attribute.TYPE_BOOLEAN: (forms.BooleanField, {"required": False}),
+    Attribute.TYPE_DATE: (
+        forms.DateField,
+        {"widget": DateInputType(format=("%Y-%m-%d"))},
+    ),
+    Attribute.TYPE_GEOMETRY: (forms.MultiPolygonField, {"widget": MapboxWidget}),
+    Attribute.TYPE_IMAGE: (forms.ImageField, {"widget": ImageWidget}),
 }
 
 
 def _generate_form_user_id(user):
-    return '__' + str(user.id)
+    return "__" + str(user.id)
 
 
 class UserChoiceField(ChoiceField):
@@ -33,13 +36,16 @@ class UserChoiceField(ChoiceField):
 
     def clean(self, value):
         value = super().clean(value)
-        if value.startswith('__'):
+        if value.startswith("__"):
             value = get_user_model().objects.get(id=int(value[2:]))
         return value
 
 
 def _get_field_class_and_extra_for_user(attribute, project):
-    value_choices = [(_generate_form_user_id(u), u.get_full_name()) for u in get_user_model().objects.all()]
+    value_choices = [
+        (_generate_form_user_id(u), u.get_full_name())
+        for u in get_user_model().objects.all()
+    ]
 
     if project:
         # if the field already has a value that is not from current actual users (from an import for example)
@@ -49,7 +55,7 @@ def _get_field_class_and_extra_for_user(attribute, project):
             value_choices = [(original_value, original_value)] + value_choices
 
     field_class = UserChoiceField
-    extra = {'choices': [('', '---')] + value_choices}
+    extra = {"choices": [("", "---")] + value_choices}
 
     return field_class, extra
 
@@ -62,7 +68,7 @@ def _get_field_class_and_extra(attribute):
             field_class = forms.ModelMultipleChoiceField
         else:
             field_class = forms.ModelChoiceField
-        extra = {'to_field_name': 'identifier', 'queryset': value_choices}
+        extra = {"to_field_name": "identifier", "queryset": value_choices}
     else:
         try:
             (field_class, extra) = FIELD_TYPES[attribute.value_type]
@@ -75,7 +81,7 @@ def _get_field_class_and_extra(attribute):
 def create_section_form_class(section, for_validation=False, project=None):
     form_properties = {}
 
-    for section_attribute in section.projectphasesectionattribute_set.order_by('index'):
+    for section_attribute in section.projectphasesectionattribute_set.order_by("index"):
         attribute = section_attribute.attribute
 
         if attribute.value_type == Attribute.TYPE_USER:
@@ -86,16 +92,21 @@ def create_section_form_class(section, for_validation=False, project=None):
         if not field_class:
             continue
 
-        if for_validation and not section_attribute.generated and attribute.value_type != Attribute.TYPE_BOOLEAN:
-            extra['required'] = section_attribute.required
+        if (
+            for_validation
+            and not section_attribute.generated
+            and attribute.value_type != Attribute.TYPE_BOOLEAN
+        ):
+            extra["required"] = section_attribute.required
         else:
-            extra['required'] = False
+            extra["required"] = False
 
-        extra.update({
-            'disabled': section_attribute.generated,
-            'help_text': attribute.help_text,
-        })
+        extra.update(
+            {"disabled": section_attribute.generated, "help_text": attribute.help_text}
+        )
 
-        form_properties[attribute.identifier] = field_class(label=attribute.name, **extra)
+        form_properties[attribute.identifier] = field_class(
+            label=attribute.name, **extra
+        )
 
-    return type('SectionForm', (forms.Form,), form_properties)
+    return type("SectionForm", (forms.Form,), form_properties)

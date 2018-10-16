@@ -7,22 +7,29 @@ from projects.models.project import ProjectPhaseLog
 
 from .exporting import get_document_response
 from .models import (
-    Attribute, AttributeValueChoice, DocumentTemplate, Project, ProjectAttributeImage, ProjectPhase,
-    ProjectPhaseSection, ProjectPhaseSectionAttribute, ProjectType
+    Attribute,
+    AttributeValueChoice,
+    DocumentTemplate,
+    Project,
+    ProjectAttributeImage,
+    ProjectPhase,
+    ProjectPhaseSection,
+    ProjectPhaseSectionAttribute,
+    ProjectType,
 )
 
 
 class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
     model = AttributeValueChoice
     extra = 0
-    prepopulated_fields = {'identifier': ('value',)}
+    prepopulated_fields = {"identifier": ("value",)}
 
 
 @admin.register(Attribute)
 class AttributeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'value_type', 'identifier')
+    list_display = ("name", "value_type", "identifier")
     inlines = (AttributeValueChoiceInline,)
-    prepopulated_fields = {'identifier': ('name',)}
+    prepopulated_fields = {"identifier": ("name",)}
 
     def save_model(self, request, obj, form, change):
         try:
@@ -35,21 +42,21 @@ class AttributeAdmin(admin.ModelAdmin):
 def build_create_document_action(template):
     def create_document(modeladmin, request, queryset):
         if queryset.count() > 1:
-            messages.error(request, _('Please select only one project.'))
+            messages.error(request, _("Please select only one project."))
             return None
         project = queryset.first()
         return get_document_response(project, template)
 
-    create_document.short_description = _('Create document {}').format(template.name)
-    create_document.__name__ = 'create_document_{}'.format(template.id)
+    create_document.short_description = _("Create document {}").format(template.name)
+    create_document.__name__ = "create_document_{}".format(template.id)
 
     return create_document
 
 
 class ProjectPhaseLogInline(admin.TabularInline):
     model = ProjectPhaseLog
-    fields = ('phase', 'user', 'created_at')
-    readonly_fields = ('project', 'phase', 'user', 'created_at')
+    fields = ("phase", "user", "created_at")
+    readonly_fields = ("project", "phase", "user", "created_at")
     can_delete = False
     extra = 0
     max_num = 0
@@ -57,7 +64,7 @@ class ProjectPhaseLogInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(OSMGeoAdmin):
-    list_display = ('name', 'created_at', 'modified_at')
+    list_display = ("name", "created_at", "modified_at")
     inlines = (ProjectPhaseLogInline,)
 
     def get_actions(self, request):
@@ -65,7 +72,11 @@ class ProjectAdmin(OSMGeoAdmin):
 
         for template in DocumentTemplate.objects.all():
             action = build_create_document_action(template)
-            actions[action.__name__] = (action, action.__name__, action.short_description)
+            actions[action.__name__] = (
+                action,
+                action.__name__,
+                action.short_description,
+            )
 
         return actions
 
@@ -77,8 +88,8 @@ class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(ProjectPhase)
 class ProjectPhaseAdmin(admin.ModelAdmin):
-    list_display = ('name', 'project_type')
-    exclude = ('index',)
+    list_display = ("name", "project_type")
+    exclude = ("index",)
     inlines = (ProjectPhaseSectionInline,)
 
 
@@ -89,10 +100,10 @@ class ProjectPhaseSectionAttributeInline(SortableInlineAdminMixin, admin.Tabular
 
 @admin.register(ProjectPhaseSection)
 class ProjectPhaseSectionAdmin(admin.ModelAdmin):
-    list_display = ('name', 'phase')
-    exclude = ('index',)
+    list_display = ("name", "phase")
+    exclude = ("index",)
     inlines = (ProjectPhaseSectionAttributeInline,)
-    ordering = ('phase', 'index')
+    ordering = ("phase", "index")
 
 
 class ProjectPhaseInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -102,13 +113,13 @@ class ProjectPhaseInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(ProjectType)
 class ProjectTypeAdmin(admin.ModelAdmin):
-    list_display = ('name',)
+    list_display = ("name",)
     inlines = (ProjectPhaseInline,)
 
 
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'file')
+    list_display = ("name", "file")
 
 
 @admin.register(ProjectAttributeImage)

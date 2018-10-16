@@ -16,14 +16,19 @@ class PublicTemplateView(StrongholdPublicMixin, TemplateView):
 
 
 urlpatterns = [
-    path('', PublicTemplateView.as_view(template_name='index.html')),
-    path('accounts/', include('allauth.urls')),
-    path('admin/', admin.site.urls),
-    path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
-    path('projects/', include('projects.urls', namespace='projects')),
-    path('reports/', projects_views.report_view, name='reports'),
-    path('ohje/kokoluokka.html', TemplateView.as_view(template_name='static/ohje_kokoluokka.html'))
+    path("", PublicTemplateView.as_view(template_name="index.html")),
+    path("accounts/", include("allauth.urls")),
+    path("admin/", admin.site.urls),
+    path(
+        "login/", auth_views.LoginView.as_view(template_name="login.html"), name="login"
+    ),
+    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("projects/", include("projects.urls", namespace="projects")),
+    path("reports/", projects_views.report_view, name="reports"),
+    path(
+        "ohje/kokoluokka.html",
+        TemplateView.as_view(template_name="static/ohje_kokoluokka.html"),
+    ),
 ]
 
 if settings.DEBUG:

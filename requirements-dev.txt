@@ -2,9 +2,11 @@
 #
 #   prequ update
 #
+appdirs==1.4.3            # via black
 appnope==0.1.0            # via ipython
-attrs==17.3.0             # via pytest
-click==6.7                # via prequ
+attrs==18.2.0             # via black, pytest
+black==18.9b0
+click==6.7                # via black, prequ
 coverage==4.4.2           # via pytest-cov
 decorator==4.1.2          # via ipython, traitlets
 flake8==3.5.0
@@ -29,6 +31,7 @@ pytest-cov==2.5.1
 pytest-django==3.1.2
 simplegeneric==0.8.1      # via ipython
 six==1.11.0               # via prequ, prompt-toolkit, pytest, traitlets
+toml==0.10.0              # via black
 traitlets==4.3.2          # via ipython
 wcwidth==0.1.7            # via prompt-toolkit
 
