@@ -12,12 +12,13 @@ from django.contrib.gis.gdal import CoordTransform, SpatialReference
 from django.contrib.gis.geos import GEOSGeometry, MultiPolygon
 from django.core.serializers.json import DjangoJSONEncoder
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "kaavapino.settings")
-django.setup()
-
 from projects.models import Attribute, AttributeValueChoice, Project, ProjectPhase, ProjectPhaseLog, ProjectType
 from projects.models.utils import create_identifier
 from users.models import User
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "kaavapino.settings")
+django.setup()
+
 
 # read the ksv planning metadata
 f = open('data/ksv_kaavahanke-meta.csv', 'r', encoding='utf-8')

@@ -7,6 +7,7 @@ from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing
 
 from users.models import User
+
 from ..models import Attribute
 from ..models.utils import create_identifier
 
