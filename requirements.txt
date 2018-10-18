@@ -2,6 +2,8 @@
 #
 #   prequ update
 #
+--no-binary psycopg2
+
 certifi==2018.10.15       # via requests
 chardet==3.0.4            # via requests
 defusedxml==0.5.0         # via python3-openid
