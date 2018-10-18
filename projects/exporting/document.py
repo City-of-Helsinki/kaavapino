@@ -7,6 +7,7 @@ from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing
 
 from users.models import User
+
 from ..models import Attribute
 from ..models.utils import create_identifier
 
@@ -17,9 +18,9 @@ def _get_single_display_value(attribute, value):
     if value is None or attribute.value_type == Attribute.TYPE_GEOMETRY:
         return None
     if attribute.value_type == Attribute.TYPE_BOOLEAN:
-        return 'Kyllä' if value else 'Ei'  # TODO
+        return "Kyllä" if value else "Ei"  # TODO
     elif attribute.value_type == Attribute.TYPE_DATE:
-        return value.strftime('%d.%m.%Y')
+        return value.strftime("%d.%m.%Y")
     elif attribute.value_type == Attribute.TYPE_USER and isinstance(value, User):
         return value.get_full_name()
     else:
@@ -50,8 +51,8 @@ def render_template(project, document_template):
         else:
             display_value = get_attribute_display(attribute, value)
 
-        if display_value is None or display_value == '':
-            display_value = escape(' < {} >'.format(attribute.name))
+        if display_value is None or display_value == "":
+            display_value = escape(" < {} >".format(attribute.name))
         elif attribute.value_type == Attribute.TYPE_LONG_STRING:
             display_value = Listing(display_value)
 
@@ -65,11 +66,16 @@ def render_template(project, document_template):
 
 def get_document_response(project, document_template, filename=None):
     if filename is None:
-        filename = '{}-{}-{}'.format(create_identifier(project.name), document_template.name, timezone.now().date())
+        filename = "{}-{}-{}".format(
+            create_identifier(project.name),
+            document_template.name,
+            timezone.now().date(),
+        )
 
     output = render_template(project, document_template)
     response = HttpResponse(
-        output, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        output,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
-    response['Content-Disposition'] = 'attachment; filename={}.docx'.format(filename)
+    response["Content-Disposition"] = "attachment; filename={}.docx".format(filename)
     return response
