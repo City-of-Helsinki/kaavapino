@@ -68,6 +68,7 @@ LOGOUT_REDIRECT_URL = "/"
 INSTALLED_APPS = [
     "helusers",
     "helusers.providers.helsinki_oidc",
+    "rest_framework",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.sites",
