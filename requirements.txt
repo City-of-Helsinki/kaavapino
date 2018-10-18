@@ -13,7 +13,7 @@ django-allauth==0.38.0
 django-environ==0.4.4
 django-helusers==0.4.2
 django-stronghold==0.3.0
-djangorestframework==3.8.2  # via drf-oidc-auth
+djangorestframework==3.8.2
 docxtpl==0.5.5
 drf-oidc-auth==0.9        # via django-helusers
 et-xmlfile==1.0.1         # via openpyxl
