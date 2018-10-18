@@ -1,0 +1,30 @@
+version: "3.5"
+services:
+  db:
+    image: skywidesoft/postgis-hstore
+    environment:
+       - POSTGRES_USER=kaavapino
+       - POSTGRES_PASSWORD=kaavapino
+       - POSTGRES_DB=kaavapino
+    volumes:
+      - db_kaavapino_data:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    container_name: kaavapino-db
+
+  api:
+    build: .
+    entrypoint: /entrypoint/docker-entrypoint.sh
+    volumes:
+      - .:/code
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    container_name: kaavapino-api
+
+volumes:
+    db_kaavapino_data:
