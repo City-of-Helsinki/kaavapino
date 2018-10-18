@@ -2,6 +2,8 @@
 #
 #   prequ update
 #
+--no-binary psycopg2
+
 appdirs==1.4.3            # via black
 appnope==0.1.0            # via ipython
 atomicwrites==1.2.1       # via pytest
