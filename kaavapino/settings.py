@@ -131,6 +131,14 @@ if DEBUG:
     }
 
 
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "helusers.oidc.ApiTokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+}
+
 local_settings = project_root("local_settings.py")
 if os.path.exists(local_settings):
     with open(local_settings) as fp:
