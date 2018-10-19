@@ -7,5 +7,6 @@ app_name = "projects"
 router = routers.SimpleRouter()
 
 router.register(r"projects", ProjectViewSet)
+router.register(r"phases", ProjectPhaseViewSet)
 
 urlpatterns = router.urls

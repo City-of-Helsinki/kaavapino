@@ -116,3 +116,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             instance.update_attribute_data(attribute_data)
 
         return super(ProjectSerializer, self).update(instance, validated_data)
+
+
+class ProjectPhaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectPhase
+        fields = ["project_type", "name", "color", "color_code", "index"]
