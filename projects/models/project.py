@@ -105,6 +105,12 @@ class Project(models.Model):
         self.update_attribute_data(data)
 
     def update_attribute_data(self, data):
+        if not isinstance(self.attribute_data, dict):
+            self.attribute_data = {}
+
+        if not data:
+            return False
+
         attributes = {
             a.identifier: a
             for a in Attribute.objects.all().prefetch_related("value_choices")
@@ -139,6 +145,7 @@ class Project(models.Model):
                     self.attribute_data[identifier] = serialized_value
                 else:
                     self.attribute_data.pop(identifier, None)
+        return True
 
     def get_time_line(self):
         timeline = [
