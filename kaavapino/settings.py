@@ -2,10 +2,10 @@
 Django settings for kaavapino project.
 
 For more information on this file, see
-https://docs.djangoproject.com/en/1.11/topics/settings/
+https://docs.djangoproject.com/en/2.1/topics/settings/
 
 For the full list of settings and their values, see
-https://docs.djangoproject.com/en/1.11/ref/settings/
+https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
@@ -25,6 +25,10 @@ env = environ.Env(
     STATIC_ROOT=(environ.Path, project_root("static")),
     MEDIA_URL=(str, "/media/"),
     STATIC_URL=(str, "/static/"),
+    OIDC_API_TOKEN_AUDIENCE=(str, "AUDIENCE_UNSET"),
+    OIDC_API_TOKEN_API_SCOPE_PREFIX=(str, "API_SCOPE_PREFIX_UNSET"),
+    OIDC_API_TOKEN_REQUIRE_API_SCOPE_FOR_AUTHENTICATION=(bool, True),
+    OIDC_API_TOKEN_ISSUER=(str, "ISSUER_UNSET"),
 )
 
 env_file = project_root(".env")
@@ -60,14 +64,11 @@ USE_I18N = True
 USE_L10N = True
 USE_TZ = True
 
-AUTH_USER_MODEL = "users.User"
-LOGIN_URL = "/login/"
-LOGIN_REDIRECT_URL = "/projects/"
-LOGOUT_REDIRECT_URL = "/"
 
 INSTALLED_APPS = [
     "helusers",
     "helusers.providers.helsinki_oidc",
+    "rest_framework",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.sites",
@@ -76,7 +77,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.gis",
-    "stronghold",
     "adminsortable2",
     "projects",
     "users",
@@ -93,7 +93,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "stronghold.middleware.LoginRequiredMiddleware",
 ]
 
 TEMPLATES = [
@@ -126,6 +125,15 @@ SOCIALACCOUNT_AUTO_SIGNUP = True
 
 OIDC_AUTH = {"OIDC_LEEWAY": 3600}
 
+OIDC_API_TOKEN_AUTH = {
+    "AUDIENCE": env.str("OIDC_API_TOKEN_AUDIENCE"),
+    "API_SCOPE_PREFIX": env.str("OIDC_API_TOKEN_API_SCOPE_PREFIX"),
+    "REQUIRE_API_SCOPE_FOR_AUTHENTICATION": env.bool(
+        "OIDC_API_TOKEN_REQUIRE_API_SCOPE_FOR_AUTHENTICATION"
+    ),
+    "ISSUER": env.str("OIDC_API_TOKEN_ISSUER"),
+}
+
 
 if DEBUG:
     LOGGING = {
@@ -135,6 +143,14 @@ if DEBUG:
         "loggers": {"projects": {"handlers": ["console"], "level": "DEBUG"}},
     }
 
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "helusers.oidc.ApiTokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+}
 
 local_settings = project_root("local_settings.py")
 if os.path.exists(local_settings):
