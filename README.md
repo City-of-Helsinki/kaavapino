@@ -43,7 +43,7 @@ Install PostgreSQL and PostGIS.
 
 ### Creating a Python virtualenv
 
-Create a Python 3.x virtualenv either using the [`venv`](https://docs.python.org/3/library/venv.html) tool or using
+Create a Python >=3.6 virtualenv either using the [`venv`](https://docs.python.org/3/library/venv.html) tool or using
 the great [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/) toolset. Assuming the latter,
 once installed, simply do:
 
