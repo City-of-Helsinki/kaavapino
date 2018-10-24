@@ -8,6 +8,25 @@ Project management system for city planning projects.
 
 ## Development
 
+It is possible to either use `docker-compose` or set up the development environment manually
+as described below.
+
+### Using docker-compose
+
+Development environment can be initialized using `docker-compose`.
+You need to have `docker` and `docker-compose` available on your system.
+
+To bring up the dev environment run:
+
+    docker-compose up
+
+To manage docker-compose setup:
+
+    docker-compose build                # Builds project container from the Dockerfile
+    docker-compose up -d                # Start all required services in the background
+    docker-compose stop                 # Stop services
+    docker exec -it kaavapino-api bash  # Open bash into the django container
+
 ### Install required system packages
 
 #### PostgreSQL and PostGIS
