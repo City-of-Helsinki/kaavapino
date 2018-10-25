@@ -5,6 +5,10 @@ from .project import ProjectPhase
 
 
 class DocumentTemplate(models.Model):
+    """Document that is produced in a certain phase of a project. Project attribute
+    data is rendered into the given document template.
+    """
+
     name = models.CharField(max_length=255, verbose_name=_("name"))
     project_phase = models.ForeignKey(
         ProjectPhase,

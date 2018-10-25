@@ -20,6 +20,8 @@ validate_identifier = RegexValidator(
 
 
 class Attribute(models.Model):
+    """Defines a single attribute type."""
+
     TYPE_INTEGER = "integer"
     TYPE_SHORT_STRING = "short_string"
     TYPE_LONG_STRING = "long_string"
@@ -138,6 +140,8 @@ class Attribute(models.Model):
 
 
 class AttributeValueChoice(models.Model):
+    """Single value choice for a single attribute."""
+
     attribute = models.ForeignKey(
         Attribute,
         verbose_name=_("attribute"),

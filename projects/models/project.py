@@ -11,6 +11,8 @@ from .attribute import Attribute
 
 
 class ProjectType(models.Model):
+    """Types of projects that the system supports e.g. asemakaava/city plan."""
+
     name = models.CharField(max_length=255, verbose_name=_("name"))
 
     class Meta:
@@ -23,6 +25,8 @@ class ProjectType(models.Model):
 
 
 class Project(models.Model):
+    """Represents a single project in the system."""
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name=_("user"),
@@ -148,6 +152,7 @@ class Project(models.Model):
         return True
 
     def get_time_line(self):
+        """Produce data for a timeline graph for the given project."""
         timeline = [
             {
                 "content": "Luontipvm",
@@ -229,6 +234,8 @@ class Project(models.Model):
 
 
 class ProjectPhase(models.Model):
+    """Describes a phase of a certain project type."""
+
     project_type = models.ForeignKey(
         ProjectType,
         verbose_name=_("project type"),
@@ -252,6 +259,8 @@ class ProjectPhase(models.Model):
 
 
 class ProjectPhaseLog(models.Model):
+    """Records project phase changes."""
+
     project = models.ForeignKey(
         "Project",
         verbose_name=_("project"),
@@ -284,6 +293,8 @@ class ProjectPhaseLog(models.Model):
 
 
 class ProjectPhaseSection(models.Model):
+    """Defines a section within a project phase."""
+
     phase = models.ForeignKey(
         ProjectPhase,
         verbose_name=_("phase"),
@@ -312,6 +323,8 @@ class ProjectPhaseSection(models.Model):
 
 
 class ProjectPhaseSectionAttribute(models.Model):
+    """Links an attribute into a project phase section."""
+
     attribute = models.ForeignKey(
         Attribute, verbose_name=_("attribute"), on_delete=models.CASCADE
     )
@@ -334,6 +347,8 @@ class ProjectPhaseSectionAttribute(models.Model):
 
 
 class ProjectAttributeImage(models.Model):
+    """Project attribute value that is an image."""
+
     attribute = models.ForeignKey(
         Attribute,
         verbose_name=_("attribute"),
