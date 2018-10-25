@@ -26,6 +26,9 @@ class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
     name = serializers.CharField(source="attribute.identifier")
     help_text = serializers.CharField(source="attribute.help_text")
     multiple_choice = serializers.BooleanField(source="attribute.multiple_choice")
+    relies_on = serializers.CharField(
+        source="relies_on.attribute.identifier", allow_null=True
+    )
     type = serializers.SerializerMethodField()
     required = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()

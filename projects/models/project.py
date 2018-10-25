@@ -335,6 +335,14 @@ class ProjectPhaseSectionAttribute(models.Model):
     required = models.BooleanField(verbose_name=_("required"))
     index = models.PositiveIntegerField(verbose_name=_("index"))
 
+    relies_on = models.ForeignKey(
+        "self",
+        verbose_name=_("relies on"),
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+
     class Meta:
         verbose_name = _("project phase section attribute")
         verbose_name_plural = _("project phase section attributes")
