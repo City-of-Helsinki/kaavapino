@@ -186,7 +186,7 @@ def f_project_section_attribute_3(f_long_string_attribute, f_project_section_2):
         section=f_project_section_2,
         generated=False,
         required=False,
-        index=0,
+        index=2,
     )
 
 
@@ -198,7 +198,7 @@ def f_project_section_attribute_4(f_short_string_choice_attribute, f_project_sec
         section=f_project_section_2,
         generated=False,
         required=False,
-        index=0,
+        index=3,
     )
 
 
