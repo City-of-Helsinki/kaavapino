@@ -75,14 +75,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             # as it would mutate the dict while looping over it.
             valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
-        errors = []
+        errors = {}
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
             if not serializer.is_valid():
-                errors += serializer.errors
-
-            valid_attributes.update(serializer.data)
+                errors.update(serializer.errors)
+            valid_attributes.update(serializer.validated_data)
 
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
