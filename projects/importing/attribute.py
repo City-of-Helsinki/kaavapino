@@ -1,6 +1,7 @@
 import logging
 from collections import Counter
 
+from django.db import transaction
 from openpyxl import load_workbook
 
 from projects.models import ProjectPhaseSection, ProjectPhaseSectionAttribute
@@ -252,6 +253,7 @@ class AttributeImporter:
                 color_code=phase["color_code"],
             )
 
+    @transaction.atomic
     def run(self):
         self.project_type, _ = ProjectType.objects.get_or_create(name="asemakaava")
 
