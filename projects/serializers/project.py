@@ -96,13 +96,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         validated_data["type"] = ProjectType.objects.first()
 
         with transaction.atomic():
+            attribute_data = validated_data.pop("attribute_data", {})
             project: Project = super().create(validated_data)
 
             # Update attribute data after saving the initial creation has
             # taken place so that there is no need to rewrite the entire
             # create function, even if the `update_attribute_data())` method
             # only sets values and does not make a `save()` call
-            attribute_data = validated_data.pop("attribute_data", {})
             if attribute_data:
                 project.update_attribute_data(attribute_data)
                 project.save()
