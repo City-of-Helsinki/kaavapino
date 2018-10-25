@@ -25,10 +25,12 @@ def _get_serializer_field_data(attribute):
 
     choices = attribute.value_choices.all()
     if choices:
-        field_arguments["choices"] = choices
+        field_class = serializers.SlugRelatedField
+        field_arguments["queryset"] = choices
+        field_arguments["slug_field"] = "identifier"
 
         if attribute.multiple_choice:
-            field_class = serializers.MultipleChoiceField
+            field_arguments["many"] = True
 
     if attribute.value_type == Attribute.TYPE_USER:
         field_arguments["queryset"] = get_user_model().objects.all()

@@ -50,16 +50,16 @@ def test_get_serializer_field_data(
 
     assert short_string_field.field_class == serializers.CharField
     assert user_field.field_class == serializers.PrimaryKeyRelatedField
-    assert multi_choice_field.field_class == serializers.MultipleChoiceField
-    assert choice_field.field_class == serializers.CharField
+    assert multi_choice_field.field_class == serializers.SlugRelatedField
+    assert choice_field.field_class == serializers.SlugRelatedField
 
     for field in fields:
         assert "help_text" in field.field_arguments
 
     for choice_field in choices_field:
-        assert len(choice_field.field_arguments["choices"]) > 0
+        assert len(choice_field.field_arguments["queryset"]) > 0
         assert (
-            type(choice_field.field_arguments["choices"].first())
+            type(choice_field.field_arguments["queryset"].first())
             == AttributeValueChoice
         )
 
