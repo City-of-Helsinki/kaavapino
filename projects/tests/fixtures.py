@@ -15,7 +15,9 @@ from projects.models import (
 @pytest.fixture()
 @pytest.mark.django_db()
 def f_user():
-    return get_user_model().objects.create(username="test", email="test@example.com")
+    return get_user_model().objects.create(
+        username="test", email="test@example.com", first_name="Tim", last_name="Tester"
+    )
 
 
 @pytest.fixture()
@@ -135,7 +137,7 @@ def f_project_section_1(f_project_phase_1):
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_project_section_2(f_project_phase_1):
+def f_project_section_2(f_project_phase_2):
     return ProjectPhaseSection.objects.create(
         name="Second section", phase=f_project_phase_2, index=0
     )
@@ -170,6 +172,18 @@ def f_project_section_attribute_2(f_user_attribute, f_project_section_1):
 def f_project_section_attribute_3(f_long_string_attribute, f_project_section_2):
     return ProjectPhaseSectionAttribute.objects.create(
         attribute=f_long_string_attribute,
+        section=f_project_section_2,
+        generated=False,
+        required=False,
+        index=0,
+    )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_project_section_attribute_4(f_short_string_choice_attribute, f_project_section_2):
+    return ProjectPhaseSectionAttribute.objects.create(
+        attribute=f_short_string_choice_attribute,
         section=f_project_section_2,
         generated=False,
         required=False,

@@ -35,6 +35,7 @@ pygments==2.2.0           # via ipython
 pytest==3.8.2
 pytest-cov==2.6.0
 pytest-django==3.4.3
+pytest-lazy-fixture==0.4.2
 simplegeneric==0.8.1      # via ipython
 six==1.11.0               # via flake8-print, more-itertools, prompt-toolkit, pytest, traitlets
 toml==0.10.0              # via black
