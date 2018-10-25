@@ -55,6 +55,17 @@ def f_user_attribute(f_user):
 
 @pytest.fixture()
 @pytest.mark.django_db()
+def f_boolean_attribute(f_user):
+    return Attribute.objects.create(
+        name="Boolean attribute",
+        value_type=Attribute.TYPE_BOOLEAN,
+        identifier="bool_attr",
+        help_text="This is an boolean attribute",
+    )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
 def f_short_string_multi_choice_attribute():
     attribute = Attribute.objects.create(
         name="Short string multiple choice attribute",
@@ -188,6 +199,33 @@ def f_project_section_attribute_4(f_short_string_choice_attribute, f_project_sec
         generated=False,
         required=False,
         index=0,
+    )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_project_section_attribute_5(f_boolean_attribute, f_project_section_2):
+    return ProjectPhaseSectionAttribute.objects.create(
+        attribute=f_boolean_attribute,
+        section=f_project_section_2,
+        generated=False,
+        required=False,
+        index=4,
+    )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_project_section_attribute_6(
+    f_short_string_attribute, f_project_section_2, f_project_section_attribute_5
+):
+    return ProjectPhaseSectionAttribute.objects.create(
+        attribute=f_short_string_attribute,
+        section=f_project_section_2,
+        generated=False,
+        required=False,
+        index=5,
+        relies_on=f_project_section_attribute_5,
     )
 
 
