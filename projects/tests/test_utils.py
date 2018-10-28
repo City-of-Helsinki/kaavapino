@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from projects.models import Attribute, AttributeValueChoice
+from projects.models.utils import truncate_identifier
 from projects.serializers.utils import (
     _is_attribute_required,
     _get_serializer_field_data,
@@ -67,3 +68,30 @@ def test_get_serializer_field_data(
         get_user_model().objects.all()
     )
     assert type(user_field.field_arguments["queryset"].first()) == get_user_model()
+
+
+def test_identifier_truncation():
+    identifier = "identifier"
+
+    # Length is the same, nothing is done
+    truncated_identifier = truncate_identifier(identifier, length=len(identifier))
+    assert identifier == truncated_identifier
+
+    # Length is bigger, not thing is done
+    truncated_identifier = truncate_identifier(identifier, length=len(identifier) + 5)
+    assert identifier == truncated_identifier
+
+    # Length is smaller, identifier is truncated
+    truncated_identifier = truncate_identifier(identifier, length=len(identifier) - 1)
+    assert identifier != truncated_identifier
+    assert identifier[:-5] == truncated_identifier[:-4]
+    assert len(truncated_identifier) == len(identifier) - 1
+
+    # Check that truncation produces the currently expected result (sha1)
+    assert truncated_identifier == "identfae9"
+
+    # Truncating consistently returns the same result
+    t1 = truncate_identifier(identifier, length=len(identifier) - 1)
+    t2 = truncate_identifier(identifier, length=len(identifier) - 1)
+
+    assert t1 == t2
