@@ -289,7 +289,7 @@ class ProjectPhaseLog(models.Model):
         ordering = ("created_at",)
 
     def __str__(self):
-        return "{} {} {}".format(self.project.name, self.phase.name, self.created_at)
+        return f"{self.project.name} {self.phase.name} {self.created_at}"
 
 
 class ProjectPhaseSection(models.Model):
@@ -349,9 +349,7 @@ class ProjectPhaseSectionAttribute(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return "{} {} {} {}".format(
-            self.attribute, self.section, self.section.phase, self.index
-        )
+        return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
 class ProjectAttributeImage(models.Model):
@@ -376,4 +374,4 @@ class ProjectAttributeImage(models.Model):
         verbose_name_plural = _("project attribute images")
 
     def __str__(self):
-        return "{} {}".format(self.project, self.attribute)
+        return f"{self.project} {self.attribute}"

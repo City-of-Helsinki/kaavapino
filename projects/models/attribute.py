@@ -65,7 +65,7 @@ class Attribute(models.Model):
         ordering = ("identifier",)
 
     def __str__(self):
-        return "{} ({})".format(self.name, self.value_type)
+        return f"{self.name} ({self.value_type})"
 
     @transaction.atomic
     def save(self, *args, **kwargs):
