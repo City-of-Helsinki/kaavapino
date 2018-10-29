@@ -47,7 +47,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     def generate_sections_data(self, phase: ProjectPhase) -> List[SectionData]:
         sections = []
         for section in phase.sections.order_by("index"):
-            serializer_class = create_section_serializer(section)
+            serializer_class = create_section_serializer(
+                section, context=self.context, project=self.instance
+            )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
 
@@ -75,14 +77,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             # as it would mutate the dict while looping over it.
             valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
-        errors = []
+        errors = {}
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
             if not serializer.is_valid():
-                errors += serializer.errors
-
-            valid_attributes.update(serializer.data)
+                errors.update(serializer.errors)
+            valid_attributes.update(serializer.validated_data)
 
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
@@ -97,13 +98,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         validated_data["type"] = ProjectType.objects.first()
 
         with transaction.atomic():
+            attribute_data = validated_data.pop("attribute_data", {})
             project: Project = super().create(validated_data)
 
             # Update attribute data after saving the initial creation has
             # taken place so that there is no need to rewrite the entire
             # create function, even if the `update_attribute_data())` method
             # only sets values and does not make a `save()` call
-            attribute_data = validated_data.pop("attribute_data", {})
             if attribute_data:
                 project.update_attribute_data(attribute_data)
                 project.save()

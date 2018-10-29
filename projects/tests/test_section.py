@@ -1,12 +1,11 @@
 import pytest
-from django.contrib.auth import get_user_model
-from rest_framework import serializers
+from django.http import HttpRequest
+from rest_framework.request import Request
 
-from projects.models import Attribute, AttributeValueChoice
 from projects.serializers.section import (
     create_section_serializer,
-    _is_attribute_required,
-    _get_serializer_field_data,
+    get_attribute_data,
+    is_relevant_attribute,
 )
 
 
@@ -14,66 +13,51 @@ from projects.serializers.section import (
 def test_create_section_serializer(
     f_project_section_1, f_project_section_attribute_1, f_project_section_attribute_2
 ):
-    serializer = create_section_serializer(f_project_section_1)
+    http_request = HttpRequest()
+    request = Request(http_request)
+    context = {"request": request}
+    serializer = create_section_serializer(f_project_section_1, context)
     fields = serializer._declared_fields
     assert len(fields) == 2
 
 
 @pytest.mark.django_db()
-def test_is_attribute_required(f_project_section_attribute_1):
-    required = _is_attribute_required(f_project_section_attribute_1)
-    assert required is False
-
-    # required = True
-    f_project_section_attribute_1.required = True
-    required = _is_attribute_required(f_project_section_attribute_1)
-    assert required is True
-
-    # required = True, generated = True
-    f_project_section_attribute_1.generated = True
-    required = _is_attribute_required(f_project_section_attribute_1)
-    assert required is False
-
-    # required = True, generated = False, Boolean field
-    f_project_section_attribute_1.generated = False
-    f_project_section_attribute_1.attribute.value_type = Attribute.TYPE_BOOLEAN
-    required = _is_attribute_required(f_project_section_attribute_1)
-    assert required is False
+@pytest.mark.parametrize(
+    "request_data, project, attribute_data",
+    [
+        ({}, None, {}),
+        ([], None, {}),
+        (None, None, {}),
+        ({"test": "test"}, None, {"test": "test"}),
+        (
+            {},
+            pytest.lazy_fixture("f_project_with_attribute_data"),
+            {"test": "test", "test2": "test2"},
+        ),
+        (
+            {"hello": "test"},
+            pytest.lazy_fixture("f_project_with_attribute_data"),
+            {"test": "test", "test2": "test2", "hello": "test"},
+        ),
+    ],
+)
+def test_get_attribute_data(request_data, project, attribute_data):
+    http_request = HttpRequest()
+    request = Request(http_request)
+    request._full_data = {"attribute_data": request_data}
+    assert get_attribute_data(request, project) == attribute_data
 
 
 @pytest.mark.django_db()
-def test_get_serializer_field_data(
-    f_short_string_attribute,
-    f_user_attribute,
-    f_short_string_multi_choice_attribute,
-    f_short_string_choice_attribute,
+def test_is_relevant_attribute(
+    f_project_section_attribute_5, f_project_section_attribute_6
 ):
-    short_string_field = _get_serializer_field_data(f_short_string_attribute)
-    user_field = _get_serializer_field_data(f_user_attribute)
-    multi_choice_field = _get_serializer_field_data(
-        f_short_string_multi_choice_attribute
-    )
-    choice_field = _get_serializer_field_data(f_short_string_choice_attribute)
-
-    fields = [short_string_field, user_field, multi_choice_field, choice_field]
-    choices_field = [multi_choice_field, choice_field]
-
-    assert short_string_field.field_class == serializers.CharField
-    assert user_field.field_class == serializers.PrimaryKeyRelatedField
-    assert multi_choice_field.field_class == serializers.MultipleChoiceField
-    assert choice_field.field_class == serializers.CharField
-
-    for field in fields:
-        assert "help_text" in field.field_arguments
-
-    for choice_field in choices_field:
-        assert len(choice_field.field_arguments["choices"]) > 0
-        assert (
-            type(choice_field.field_arguments["choices"].first())
-            == AttributeValueChoice
+    assert is_relevant_attribute(f_project_section_attribute_5, {}) is True
+    assert is_relevant_attribute(f_project_section_attribute_6, {}) is False
+    assert (
+        is_relevant_attribute(
+            f_project_section_attribute_6,
+            {f_project_section_attribute_5.attribute.identifier: True},
         )
-
-    assert len(user_field.field_arguments["queryset"]) == len(
-        get_user_model().objects.all()
+        is True
     )
-    assert type(user_field.field_arguments["queryset"].first()) == get_user_model()
