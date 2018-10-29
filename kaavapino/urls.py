@@ -5,12 +5,14 @@ from django.urls import path, include
 from rest_framework import routers
 
 from projects.urls import router as projects_router
+from users.urls import router as users_router
 
 admin.autodiscover()
 
 
 router = routers.DefaultRouter()
 router.registry.extend(projects_router.registry)
+router.registry.extend(users_router.registry)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
