@@ -54,17 +54,35 @@ PROJECT_PHASES = [
 # projektin vuosi <- tarkistetun ehdotuksen lautakuntapvm
 
 VALUE_TYPES = {
-    "tunniste; numerotunniste": Attribute.TYPE_SHORT_STRING,
     "sisältö; nimi": Attribute.TYPE_SHORT_STRING,
-    "sisältö; valitaan toinen": Attribute.TYPE_BOOLEAN,
+    "tunniste; numerotunniste": Attribute.TYPE_SHORT_STRING,
+    "tunniste; numero": Attribute.TYPE_SHORT_STRING,
     "sisältö; teksti": Attribute.TYPE_LONG_STRING,
-    "aikataulu ja tehtävät; kyllä/ei": Attribute.TYPE_BOOLEAN,
-    "aikataulu ja tehtävät; valitaan toinen": Attribute.TYPE_SHORT_STRING,
-    "aikataulu ja tehtävät; pvm": Attribute.TYPE_DATE,
-    "sisältö; numero": Attribute.TYPE_INTEGER,
-    "resurssit; valintalista (Hijatista)": Attribute.TYPE_USER,
     "spatiaalinen": Attribute.TYPE_GEOMETRY,
     "sisältö; kuva": Attribute.TYPE_IMAGE,
+    "aikataulu ja tehtävät; pvm": Attribute.TYPE_DATE,
+    "aikataulu ja tehtävät; teksti": Attribute.TYPE_LONG_STRING,
+    "sisältö; laaja teksti": Attribute.TYPE_LONG_STRING,
+    "sisältö; vuosiluku": Attribute.TYPE_SHORT_STRING,
+    "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
+    "sisältö; numero": Attribute.TYPE_INTEGER,  # TODO Also decimal?
+    "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "aikataulu ja tehtävät; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "sisältö; tekstivalikko": Attribute.TYPE_LONG_STRING,  # TODO Choice of values
+    "sisältö; valitaan yksi viidestä": Attribute.TYPE_SHORT_STRING,  # TODO e.g. project size, choice of values
+    "aikataulu ja tehtävät; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice of values
+    "resurssit; valintalista Hijatista": Attribute.TYPE_USER,  # TODO User select or responsible unit
+    "sisältö; luettelo": Attribute.TYPE_LONG_STRING,  # TODO List of things
+    "sisältö; pvm": Attribute.TYPE_DATE,  # TODO Might need to contain multiple dates
+    "sisältö; osoite": Attribute.TYPE_LONG_STRING,  # TODO Might need to contain multiple addresses
+    "sisältö; kaavanumero(t)": Attribute.TYPE_LONG_STRING,  # TODO List of identifiers
+    "sisältö; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "talous; teksti": Attribute.TYPE_LONG_STRING,  # TODO List of strings
+    "talous; numero (€)": Attribute.TYPE_LONG_STRING,  # TODO Might have multiple values
+    "talous; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "aikataulu ja tehtävät; pvm ja paikka": Attribute.TYPE_LONG_STRING,  # TODO Time and place
+    "sisältö; vakioteksti": Attribute.TYPE_LONG_STRING,  # TODO Text always the same
+    "sisältö; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice
 }
 
 
