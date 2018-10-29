@@ -1,8 +1,17 @@
 from rest_framework import viewsets
 
 from projects.models import Project, ProjectPhase, ProjectType
-from projects.serializers.project import ProjectSerializer, ProjectPhaseSerializer
+from projects.serializers.project import (
+    ProjectSerializer,
+    ProjectPhaseSerializer,
+    ProjectTypeSerializer,
+)
 from projects.serializers.projectschema import ProjectTypeSchemaSerializer
+
+
+class ProjectTypeViewSet(viewsets.ModelViewSet):
+    queryset = ProjectType.objects.all()
+    serializer_class = ProjectTypeSerializer
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
