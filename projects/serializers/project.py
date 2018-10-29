@@ -1,6 +1,7 @@
 import copy
 from typing import List, NamedTuple, Type
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -22,6 +23,10 @@ class SectionData(NamedTuple):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(
+        read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
+    )
+
     class Meta:
         model = Project
         fields = [
