@@ -21,19 +21,21 @@ def test_create_section_serializer(
     assert len(fields) == 2
 
 
-def test_get_attribute_data():
+@pytest.mark.django_db()
+@pytest.mark.parametrize(
+    "request_data, instance, attribute_data",
+    [
+        ({}, None, {}),
+        ([], None, {}),
+        (None, None, {}),
+        ({"test": "test"}, None, {"test": "test"}),
+    ],
+)
+def test_get_attribute_data(request_data, instance, attribute_data):
     http_request = HttpRequest()
     request = Request(http_request)
-
-    assert get_attribute_data(None) == {}
-    assert get_attribute_data(request) == {}
-
-    test_attribute_data = {"test": "test"}
-    request._full_data = {"attribute_data": test_attribute_data}
-    assert get_attribute_data(request) == test_attribute_data
-
-    request._full_data = {"attribute_data": []}
-    assert get_attribute_data(request) == {}
+    request._full_data = {"attribute_data": request_data}
+    assert get_attribute_data(request) == attribute_data
 
 
 @pytest.mark.django_db()
