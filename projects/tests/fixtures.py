@@ -239,3 +239,16 @@ def f_project(f_user, f_project_type, f_project_phase_1):
         type=f_project_type,
         phase=f_project_phase_1,
     )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_project_with_attribute_data(f_user, f_project_type, f_project_phase_1):
+    return Project.objects.create(
+        user=f_user,
+        name="Test project",
+        identifier="test_project",
+        type=f_project_type,
+        phase=f_project_phase_1,
+        attribute_data={"test": "test", "test2": "test2"},
+    )

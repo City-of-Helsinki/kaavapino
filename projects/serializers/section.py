@@ -8,7 +8,7 @@ from projects.serializers.utils import (
 )
 
 
-def create_section_serializer(section, context):
+def create_section_serializer(section, context, project=None):
     """
     Dynamically create a serializer for a ProjectPhaseSection instance
 
@@ -24,7 +24,7 @@ def create_section_serializer(section, context):
     """
 
     request = context.get("request", None)
-    attribute_data = get_attribute_data(request)
+    attribute_data = get_attribute_data(request, project)
 
     if not request:
         return None
@@ -53,19 +53,26 @@ def create_section_serializer(section, context):
     return serializer
 
 
-def get_attribute_data(request) -> dict:
+def get_attribute_data(request, project=None) -> dict:
     """
     Extract attribute data from request
 
     Always returns a dict of the attribute data
     no matter the input or value of the attribute data.
     """
+
+    # No need to validate anything if there is no request
     if not request:
         return {}
 
+    # Extract all attribute data that exists in the request
     attribute_data = request.data.get("attribute_data", {})
     if not isinstance(attribute_data, collections.Mapping):
         attribute_data = {}
+
+    # Include any existing project attribute data
+    project_attribute_data = getattr(project, "attribute_data", {})
+    attribute_data.update(project_attribute_data)
 
     return attribute_data
 

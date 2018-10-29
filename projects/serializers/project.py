@@ -47,7 +47,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     def generate_sections_data(self, phase: ProjectPhase) -> List[SectionData]:
         sections = []
         for section in phase.sections.order_by("index"):
-            serializer_class = create_section_serializer(section, context=self.context)
+            serializer_class = create_section_serializer(
+                section, context=self.context, project=self.instance
+            )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
 

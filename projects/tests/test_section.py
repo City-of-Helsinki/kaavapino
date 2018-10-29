@@ -23,19 +23,29 @@ def test_create_section_serializer(
 
 @pytest.mark.django_db()
 @pytest.mark.parametrize(
-    "request_data, instance, attribute_data",
+    "request_data, project, attribute_data",
     [
         ({}, None, {}),
         ([], None, {}),
         (None, None, {}),
         ({"test": "test"}, None, {"test": "test"}),
+        (
+            {},
+            pytest.lazy_fixture("f_project_with_attribute_data"),
+            {"test": "test", "test2": "test2"},
+        ),
+        (
+            {"hello": "test"},
+            pytest.lazy_fixture("f_project_with_attribute_data"),
+            {"test": "test", "test2": "test2", "hello": "test"},
+        ),
     ],
 )
-def test_get_attribute_data(request_data, instance, attribute_data):
+def test_get_attribute_data(request_data, project, attribute_data):
     http_request = HttpRequest()
     request = Request(http_request)
     request._full_data = {"attribute_data": request_data}
-    assert get_attribute_data(request) == attribute_data
+    assert get_attribute_data(request, project) == attribute_data
 
 
 @pytest.mark.django_db()
