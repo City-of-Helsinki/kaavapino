@@ -46,6 +46,7 @@ class Attribute(models.Model):
     value_type = models.CharField(
         max_length=64, verbose_name=_("value type"), choices=TYPE_CHOICES
     )
+    public = models.BooleanField(verbose_name=_("public information"), default=False)
     multiple_choice = models.BooleanField(
         verbose_name=_("multiple choice"), default=False
     )
