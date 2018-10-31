@@ -93,6 +93,7 @@ class ProjectSectionSchemaSerializer(serializers.Serializer):
 
 
 class ProjectPhaseSchemaSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     title = serializers.CharField(source="name")
     color = serializers.CharField()
     color_code = serializers.CharField()
@@ -100,5 +101,6 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
 
 
 class ProjectTypeSchemaSerializer(serializers.Serializer):
-    title = serializers.CharField(source="name")
+    type_name = serializers.CharField(source="name")
+    type = serializers.IntegerField(source="id")
     phases = ProjectPhaseSchemaSerializer(many=True)
