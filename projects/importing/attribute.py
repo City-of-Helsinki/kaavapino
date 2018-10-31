@@ -1,19 +1,36 @@
 import logging
 from collections import Counter
+from typing import Iterable, Sequence
 
+from django.db import transaction
 from openpyxl import load_workbook
 
 from projects.models import ProjectPhaseSection, ProjectPhaseSectionAttribute
-
 from ..models import Attribute, ProjectPhase, ProjectType
-from ..models.utils import create_identifier
+from ..models.utils import create_identifier, truncate_identifier
 
 logger = logging.getLogger(__name__)
 
+IDENTIFIER_MAX_LENGTH = 50
 EXPECTED_A1_VALUE = "HANKETIETO"
-DEFAULT_SHEET_NAME = "Taul2"
 
-SECTION_COLUMNS = [4, 5, 6]
+DEFAULT_SHEET_NAME = "kaikki tiedot (keskeneräinen)"
+
+ATTRIBUTE_NAME = "HANKETIETO"
+ATTRIBUTE_TYPE = "TIETOTYYPPI"
+ATTRIBUTE_REQUIRED = (
+    "pakollinen tieto (jos EI niin kohdan voi valita poistettavaksi)"
+)  # kyllä/ei
+PHASE_SECTION_NAME = "Minkä VÄLIOTSIKON alle kuuluu"
+PUBLIC_ATTRIBUTE = "JULKINEN TIETO"  # kyllä/ei julkinen
+HELP_TEXT = "OHJE"
+
+ATTRIBUTE_PHASE_COLUMNS = [
+    "syöttövaihe",
+    "Päivitys-vaihe 2",
+    "Päivitys-vaihe 3",
+    "Päivitys-vaihe 4",
+]
 
 PROJECT_PHASES = [
     {"name": "Käynnistys", "color": "color--tram", "color_code": "#009246"},  # None
@@ -37,17 +54,35 @@ PROJECT_PHASES = [
 # projektin vuosi <- tarkistetun ehdotuksen lautakuntapvm
 
 VALUE_TYPES = {
-    "tunniste; numerotunniste": Attribute.TYPE_SHORT_STRING,
     "sisältö; nimi": Attribute.TYPE_SHORT_STRING,
-    "sisältö; valitaan toinen": Attribute.TYPE_BOOLEAN,
+    "tunniste; numerotunniste": Attribute.TYPE_SHORT_STRING,
+    "tunniste; numero": Attribute.TYPE_SHORT_STRING,
     "sisältö; teksti": Attribute.TYPE_LONG_STRING,
-    "aikataulu ja tehtävät; kyllä/ei": Attribute.TYPE_BOOLEAN,
-    "aikataulu ja tehtävät; valitaan toinen": Attribute.TYPE_SHORT_STRING,
-    "aikataulu ja tehtävät; pvm": Attribute.TYPE_DATE,
-    "sisältö; numero": Attribute.TYPE_INTEGER,
-    "resurssit; valintalista (Hijatista)": Attribute.TYPE_USER,
     "spatiaalinen": Attribute.TYPE_GEOMETRY,
     "sisältö; kuva": Attribute.TYPE_IMAGE,
+    "aikataulu ja tehtävät; pvm": Attribute.TYPE_DATE,
+    "aikataulu ja tehtävät; teksti": Attribute.TYPE_LONG_STRING,
+    "sisältö; laaja teksti": Attribute.TYPE_LONG_STRING,
+    "sisältö; vuosiluku": Attribute.TYPE_SHORT_STRING,
+    "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
+    "sisältö; numero": Attribute.TYPE_INTEGER,  # TODO Also decimal?
+    "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "aikataulu ja tehtävät; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "sisältö; tekstivalikko": Attribute.TYPE_LONG_STRING,  # TODO Choice of values
+    "sisältö; valitaan yksi viidestä": Attribute.TYPE_SHORT_STRING,  # TODO e.g. project size, choice of values
+    "aikataulu ja tehtävät; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice of values
+    "resurssit; valintalista Hijatista": Attribute.TYPE_USER,  # TODO User select or responsible unit
+    "sisältö; luettelo": Attribute.TYPE_LONG_STRING,  # TODO List of things
+    "sisältö; pvm": Attribute.TYPE_DATE,  # TODO Might need to contain multiple dates
+    "sisältö; osoite": Attribute.TYPE_LONG_STRING,  # TODO Might need to contain multiple addresses
+    "sisältö; kaavanumero(t)": Attribute.TYPE_LONG_STRING,  # TODO List of identifiers
+    "sisältö; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "talous; teksti": Attribute.TYPE_LONG_STRING,  # TODO List of strings
+    "talous; numero (€)": Attribute.TYPE_LONG_STRING,  # TODO Might have multiple values
+    "talous; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
+    "aikataulu ja tehtävät; pvm ja paikka": Attribute.TYPE_LONG_STRING,  # TODO Time and place
+    "sisältö; vakioteksti": Attribute.TYPE_LONG_STRING,  # TODO Text always the same
+    "sisältö; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice
 }
 
 
@@ -56,6 +91,8 @@ class AttributeImporterException(Exception):
 
 
 class AttributeImporter:
+    """Import attributes and project phase sections for asemakaava project type from the given Excel."""
+
     def __init__(self, options=None):
         self.options = options
 
@@ -67,9 +104,7 @@ class AttributeImporter:
 
     def _extract_data_from_workbook(self, workbook):
         try:
-            sheet = workbook.get_sheet_by_name(
-                self.options.get("sheet") or DEFAULT_SHEET_NAME
-            )
+            sheet = workbook[self.options.get("sheet") or DEFAULT_SHEET_NAME]
         except KeyError as e:
             raise AttributeImporterException(e)
 
@@ -87,29 +122,64 @@ class AttributeImporter:
 
         return data
 
-    def _get_datum_identifier(self, row):
-        return create_identifier(row[0].strip(" \t:."))
+    def _set_row_indexes(self, header_row: Iterable[str]):
+        """Determine index number for all columns."""
+        self.column_index: dict = {}
 
-    def _update_attributes(self, data):
+        for index, column in enumerate(header_row):
+            self.column_index[column] = index
+
+    def _check_if_row_valid(self, row: Sequence) -> bool:
+        """Check if the row has all required data.
+
+        For importing a field the requirements are:
+        - Name
+        - Type
+        - Is part of a phase
+        - Phase section name has been defined
+        """
+        name = row[self.column_index[ATTRIBUTE_NAME]]
+        attr_type = row[self.column_index[ATTRIBUTE_TYPE]]
+        belongs_to_phase = bool(self._get_attribute_input_phases(row))
+        phase_has_name = bool(row[self.column_index[PHASE_SECTION_NAME]])
+
+        if name and attr_type and belongs_to_phase and phase_has_name:
+            return True
+
+        logger.info(f"Field {name} is not valid, it will not be imported.")
+        return False
+
+    def _get_attribute_identifier(self, row: Sequence) -> str:
+        identifier = create_identifier(
+            row[self.column_index[ATTRIBUTE_NAME]].strip(" \t:.")
+        )
+        return truncate_identifier(identifier, length=IDENTIFIER_MAX_LENGTH)
+
+    def _update_attributes(self, rows: Iterable[Sequence[str]]):
         logger.info("\nUpdating attributes...")
 
-        for datum in data[1:]:
-            identifier = self._get_datum_identifier(datum)
+        for row in rows:
+            identifier = self._get_attribute_identifier(row)
 
-            name = datum[0].strip(" \t:.")
-            value_type = VALUE_TYPES.get(datum[3].strip())
+            name = row[self.column_index[ATTRIBUTE_NAME]].strip(" \t:.")
 
-            help_text = ""
+            value_type_string = row[self.column_index[ATTRIBUTE_TYPE]]
+            value_type = (
+                VALUE_TYPES.get(value_type_string.strip())
+                if value_type_string
+                else None
+            )
+
             try:
-                help_text = datum[14].strip()
+                help_text = row[self.column_index[HELP_TEXT]].strip()
             except (IndexError, AttributeError):
-                pass
+                help_text = ""
+
+            is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
 
             if not value_type:
                 logger.warning(
-                    'Unidentified value type "{}", defaulting to short string'.format(
-                        datum[3]
-                    )
+                    f'Unidentified value type "{value_type_string}", defaulting to short string'
                 )
                 value_type = Attribute.TYPE_SHORT_STRING
 
@@ -122,9 +192,12 @@ class AttributeImporter:
 
             attribute, created = method(
                 identifier=identifier,
-                defaults=(
-                    {"name": name, "value_type": value_type, "help_text": help_text}
-                ),
+                defaults={
+                    "name": name,
+                    "value_type": value_type,
+                    "help_text": help_text,
+                    "public": is_public,
+                },
             )
 
             if created:
@@ -132,30 +205,42 @@ class AttributeImporter:
             else:
                 action_str = "Updated" if overwrite else "Already exists, skipping"
 
-            logger.info("{} {}".format(action_str, attribute))
+            logger.info(f"{action_str} {attribute}")
 
-    def _update_sections(self, data):
+    def _get_attribute_input_phases(self, row):
+        input_phases = []
+
+        for column_name in ATTRIBUTE_PHASE_COLUMNS:
+            value = row[self.column_index[column_name]]
+            if value is None:
+                continue
+
+            try:
+                value = int(value)
+                input_phases.append(value)
+            except ValueError:
+                logger.info(f"Cannot covert {value} into an integer.")
+
+        return filter(lambda x: x is not None, input_phases)
+
+    def _update_sections(self, rows):
         logger.info("\nUpdating sections...")
 
-        for phase_num in [0, 1, 2]:
-            phase = ProjectPhase.objects.get(
-                project_type=self.project_type, index=phase_num
-            )
+        for phase in ProjectPhase.objects.filter(project_type=self.project_type):
 
             # Get all distinct section names in appearance order
             phase_sections = []
-            for datum in data[1:]:
-                section_name = datum[SECTION_COLUMNS[phase_num]]
 
-                if not section_name or not isinstance(section_name, str):
-                    continue
+            for row in rows:
+                section_phase_name = row[self.column_index[PHASE_SECTION_NAME]].strip()
 
-                section_name = section_name.strip()
+                if (
+                    phase.index in self._get_attribute_input_phases(row)
+                    and section_phase_name not in phase_sections
+                ):
+                    phase_sections.append(section_phase_name)
 
-                if section_name and section_name not in phase_sections:
-                    phase_sections.append(section_name)
-
-            for idx, phase_section_name in enumerate(phase_sections):
+            for i, phase_section_name in enumerate(phase_sections, start=1):
                 overwrite = self.options.get("overwrite")
 
                 if overwrite:
@@ -164,7 +249,7 @@ class AttributeImporter:
                     method = ProjectPhaseSection.objects.get_or_create
 
                 section, created = method(
-                    phase=phase, index=idx, defaults=({"name": phase_section_name})
+                    phase=phase, index=i, defaults={"name": phase_section_name}
                 )
 
                 if created:
@@ -172,66 +257,52 @@ class AttributeImporter:
                 else:
                     action_str = "Updated" if overwrite else "Already exists, skipping"
 
-                logger.info("{} {}".format(action_str, section))
+                logger.info(f"{action_str} {section}")
 
-    def _replace_attribute_section_links(self, data):
+    def _replace_attribute_section_links(self, rows):
         logger.info("\nReplacing attribute section links...")
 
         ProjectPhaseSectionAttribute.objects.filter(
             section__phase__project_type=self.project_type
         ).delete()
 
-        counter = Counter()
-        for datum in data[1:]:
-            identifier = self._get_datum_identifier(datum)
-            try:
+        for phase in ProjectPhase.objects.filter(project_type=self.project_type):
+
+            # Index for attribute within a phase section
+            counter = Counter()
+
+            for row in rows:
+                identifier = self._get_attribute_identifier(row)
                 attribute = Attribute.objects.get(identifier=identifier)
-            except Attribute.DoesNotExist:
-                logger.warning('Attribute "{}" does not exist.'.format(identifier))
-                continue
 
-            for phase_num in [0, 1, 2]:
-                phase = ProjectPhase.objects.get(
-                    project_type=self.project_type, index=phase_num
-                )
-
-                section_name = datum[SECTION_COLUMNS[phase_num]]
-                if not section_name or not isinstance(section_name, str):
+                if phase.index not in self._get_attribute_input_phases(row):
                     # Attribute doesn't appear in this phase
                     continue
 
-                section_name = section_name.strip()
-                try:
-                    section = ProjectPhaseSection.objects.get(
-                        phase=phase, name=section_name
-                    )
-                except ProjectPhaseSection.DoesNotExist:
-                    logger.warning(
-                        'Section "{}" in phase {} does not exist.'.format(
-                            section_name, phase
-                        )
-                    )
+                section_phase_name = row[self.column_index[PHASE_SECTION_NAME]].strip()
 
-                is_generated = False
+                section = ProjectPhaseSection.objects.get(
+                    phase=phase, name=section_phase_name
+                )
 
-                master_data_description = datum[1].strip()
-                if (
-                    "muodostuu" in master_data_description
-                    and "perusteella" in master_data_description
-                ):
-                    is_generated = True
+                is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
 
-                is_required = True
-
-                ProjectPhaseSectionAttribute.objects.create(
+                section_attribute = ProjectPhaseSectionAttribute.objects.create(
                     attribute=attribute,
                     section=section,
-                    generated=is_generated,
                     required=is_required,
                     index=counter[section],
                 )
 
                 counter[section] += 1
+
+                logger.info(
+                    f"Created "
+                    f"{section_attribute.section.phase} / "
+                    f"{section_attribute.section} / "
+                    f"{section_attribute.index} / "
+                    f"{section_attribute.attribute}"
+                )
 
     def create_phases(self):
         logger.info("\nCreating phases...")
@@ -243,31 +314,45 @@ class AttributeImporter:
             return
 
         self.project_type.phases.all().delete()
-        for idx, phase in enumerate(PROJECT_PHASES):
+        for i, phase in enumerate(PROJECT_PHASES, start=1):
             ProjectPhase.objects.create(
                 project_type=self.project_type,
                 name=phase["name"],
-                index=idx,
+                index=i,
                 color=phase["color"],
                 color_code=phase["color_code"],
             )
 
+    @transaction.atomic
     def run(self):
         self.project_type, _ = ProjectType.objects.get_or_create(name="asemakaava")
 
         filename = self.options.get("filename")
         logger.info(
-            "Importing attributes from file {} for project type {}...".format(
-                filename, self.project_type
-            )
+            f"Importing attributes from file {filename} for project type {self.project_type}..."
         )
 
         self.create_phases()
 
         workbook = self._open_workbook(filename)
-        data = self._extract_data_from_workbook(workbook)
-        self._update_attributes(data)
-        self._update_sections(data)
-        self._replace_attribute_section_links(data)
+        rows = self._extract_data_from_workbook(workbook)
+
+        header_row = rows[0]
+        self._set_row_indexes(header_row)
+
+        data_rows = list(filter(self._check_if_row_valid, rows[1:]))
+
+        self._update_attributes(data_rows)
+        self._update_sections(data_rows)
+        self._replace_attribute_section_links(data_rows)
+
+        logger.info("Phases {}".format(ProjectPhase.objects.count()))
+        logger.info("Attributes {}".format(Attribute.objects.count()))
+        logger.info("Phase sections {}".format(ProjectPhaseSection.objects.count()))
+        logger.info(
+            "Phase section attributes {}".format(
+                ProjectPhaseSectionAttribute.objects.count()
+            )
+        )
 
         logger.info("Import done.")
