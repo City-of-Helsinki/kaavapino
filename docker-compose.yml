@@ -13,8 +13,11 @@ services:
     container_name: kaavapino-db
 
   api:
-    build: .
+    build:
+      target: "test"
+      context: "."
     entrypoint: /entrypoint/docker-entrypoint.sh
+    image: kaavapino
     volumes:
       - .:/code
     environment:
