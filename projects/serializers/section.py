@@ -8,7 +8,7 @@ from projects.serializers.utils import (
 )
 
 
-def create_section_serializer(section, context, project=None):
+def create_section_serializer(section, context, project=None, validation=True):
     """
     Dynamically create a serializer for a ProjectPhaseSection instance
 
@@ -40,9 +40,11 @@ def create_section_serializer(section, context, project=None):
             # TODO: Handle this by failing instead of continuing
             continue
 
-        field_data.field_arguments["required"] = _is_attribute_required(
-            section_attribute
-        )
+        field_data.field_arguments["required"] = False
+        if validation:
+            field_data.field_arguments["required"] = _is_attribute_required(
+                section_attribute
+            )
 
         serializer_field = field_data.field_class(**field_data.field_arguments)
         serializer_fields[attribute.identifier] = serializer_field
