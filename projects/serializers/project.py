@@ -65,7 +65,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         phase = (
             self.instance.phase
             if self.instance and getattr(self.instance, "phase", None)
-            else ProjectPhase.objects.get(project_type__name="asemakaava", index=0)
+            else ProjectPhase.objects.filter(project_type__name="asemakaava").first()
         )
 
         # Get serializers for all sections in the phase
@@ -97,9 +97,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         return valid_attributes
 
     def create(self, validated_data: dict) -> Project:
-        validated_data["phase"] = ProjectPhase.objects.get(
-            project_type__name="asemakaava", index=0
-        )
+        validated_data["phase"] = ProjectPhase.objects.filter(
+            project_type__name="asemakaava"
+        ).first()
         validated_data["type"] = ProjectType.objects.first()
 
         with transaction.atomic():
