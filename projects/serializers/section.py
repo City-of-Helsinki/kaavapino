@@ -47,7 +47,7 @@ def create_section_serializer(section, context, project=None):
         serializer_field = field_data.field_class(**field_data.field_arguments)
         serializer_fields[attribute.identifier] = serializer_field
 
-    serializer = serializers.Serializer
+    serializer = type("SectionSerializer", (serializers.Serializer,), {})
     serializer._declared_fields = serializer_fields
 
     return serializer
