@@ -67,14 +67,15 @@ def get_attribute_data(request, project=None) -> dict:
     if not request:
         return {}
 
-    # Extract all attribute data that exists in the request
-    attribute_data = request.data.get("attribute_data", {})
-    if not isinstance(attribute_data, collections.Mapping):
-        attribute_data = {}
-
     # Include any existing project attribute data
-    project_attribute_data = getattr(project, "attribute_data", {})
-    attribute_data.update(project_attribute_data)
+    attribute_data = getattr(project, "attribute_data", {})
+
+    # Extract all attribute data that exists in the request
+    request_attribute_data = request.data.get("attribute_data", {})
+    if not isinstance(request_attribute_data, collections.Mapping):
+        request_attribute_data = {}
+
+    attribute_data.update(request_attribute_data)
 
     return attribute_data
 
