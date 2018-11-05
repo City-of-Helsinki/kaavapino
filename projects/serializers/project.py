@@ -49,11 +49,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
         return serializers.BooleanField().to_internal_value(validate_field_data)
 
-    def generate_sections_data(self, phase: ProjectPhase) -> List[SectionData]:
+    def generate_sections_data(
+        self, phase: ProjectPhase, validation: bool = True
+    ) -> List[SectionData]:
         sections = []
         for section in phase.sections.order_by("index"):
             serializer_class = create_section_serializer(
-                section, context=self.context, project=self.instance
+                section,
+                context=self.context,
+                project=self.instance,
+                validation=validation,
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
@@ -65,11 +70,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         phase = (
             self.instance.phase
             if self.instance and getattr(self.instance, "phase", None)
-            else ProjectPhase.objects.get(project_type__name="asemakaava", index=0)
+            else ProjectPhase.objects.filter(project_type__name="asemakaava").first()
         )
 
         # Get serializers for all sections in the phase
-        sections_data = self.generate_sections_data(phase=phase)
+        sections_data = self.generate_sections_data(
+            phase=phase, validation=self.should_validate_attributes()
+        )
 
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
@@ -97,9 +104,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         return valid_attributes
 
     def create(self, validated_data: dict) -> Project:
-        validated_data["phase"] = ProjectPhase.objects.get(
-            project_type__name="asemakaava", index=0
-        )
+        validated_data["phase"] = ProjectPhase.objects.filter(
+            project_type__name="asemakaava"
+        ).first()
         validated_data["type"] = ProjectType.objects.first()
 
         with transaction.atomic():

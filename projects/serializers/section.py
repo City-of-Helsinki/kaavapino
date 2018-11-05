@@ -8,7 +8,7 @@ from projects.serializers.utils import (
 )
 
 
-def create_section_serializer(section, context, project=None):
+def create_section_serializer(section, context, project=None, validation=True):
     """
     Dynamically create a serializer for a ProjectPhaseSection instance
 
@@ -40,14 +40,16 @@ def create_section_serializer(section, context, project=None):
             # TODO: Handle this by failing instead of continuing
             continue
 
-        field_data.field_arguments["required"] = _is_attribute_required(
-            section_attribute
-        )
+        field_data.field_arguments["required"] = False
+        if validation:
+            field_data.field_arguments["required"] = _is_attribute_required(
+                section_attribute
+            )
 
         serializer_field = field_data.field_class(**field_data.field_arguments)
         serializer_fields[attribute.identifier] = serializer_field
 
-    serializer = serializers.Serializer
+    serializer = type("SectionSerializer", (serializers.Serializer,), {})
     serializer._declared_fields = serializer_fields
 
     return serializer
@@ -65,14 +67,15 @@ def get_attribute_data(request, project=None) -> dict:
     if not request:
         return {}
 
-    # Extract all attribute data that exists in the request
-    attribute_data = request.data.get("attribute_data", {})
-    if not isinstance(attribute_data, collections.Mapping):
-        attribute_data = {}
-
     # Include any existing project attribute data
-    project_attribute_data = getattr(project, "attribute_data", {})
-    attribute_data.update(project_attribute_data)
+    attribute_data = getattr(project, "attribute_data", {})
+
+    # Extract all attribute data that exists in the request
+    request_attribute_data = request.data.get("attribute_data", {})
+    if not isinstance(request_attribute_data, collections.Mapping):
+        request_attribute_data = {}
+
+    attribute_data.update(request_attribute_data)
 
     return attribute_data
 
