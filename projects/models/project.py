@@ -2,7 +2,7 @@ import datetime
 
 from django.conf import settings
 from django.contrib.gis.db import models
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
@@ -375,3 +375,23 @@ class ProjectAttributeImage(models.Model):
 
     def __str__(self):
         return f"{self.project} {self.attribute}"
+
+
+class PhaseAttributeMatrixStructure(models.Model):
+    column_names = ArrayField(models.CharField(max_length=255))
+    row_names = ArrayField(models.CharField(max_length=255))
+
+    section = models.ForeignKey(
+        ProjectPhaseSection, verbose_name=_("phase section"), on_delete=models.CASCADE
+    )
+
+
+class PhaseAttributeMatrixCell(models.Model):
+    attribute = models.ForeignKey(
+        ProjectPhaseSectionAttribute, on_delete=models.CASCADE
+    )
+    row = models.IntegerField()
+    column = models.IntegerField()
+    structure = models.ForeignKey(
+        PhaseAttributeMatrixStructure, on_delete=models.CASCADE
+    )

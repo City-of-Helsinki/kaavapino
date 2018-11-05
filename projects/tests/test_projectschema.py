@@ -5,6 +5,7 @@ from projects.models import Attribute, ProjectPhaseSectionAttribute
 from projects.serializers.projectschema import (
     VALUE_TYPE_MAP,
     ProjectSectionAttributeSchemaSerializer,
+    ProjectSectionSchemaSerializer,
 )
 
 
@@ -80,3 +81,54 @@ class TestProjectSectionAttributeSchemaSerializer:
             f_project_section_attribute_1
         )
         assert choices == []
+
+
+@pytest.mark.django_db(transaction=True)
+class TestProjectSectionSchemaSerializer:
+    @pytest.mark.parametrize(
+        "matrix_data, max_index, result",
+        [({"index": 2}, 1, 1), ({"index": 2}, 4, 1), ({"index": 2}, 2, 1)],
+    )
+    def test__get_matrix_attribute_index(self, matrix_data, max_index, result):
+        assert (
+            ProjectSectionSchemaSerializer._get_matrix_attribute_index(
+                matrix_data, max_index
+            )
+            == result
+        )
+
+    def test__sort_matrices(self):
+        matrices = {
+            1: {
+                "fields": [
+                    {"row": 3, "column": 3},
+                    {"row": 2, "column": 2},
+                    {"row": 3, "column": 1},
+                    {"row": 2, "column": 3},
+                    {"row": 3, "column": 2},
+                    {"row": 2, "column": 1},
+                    {"row": 1, "column": 1},
+                    {"row": 1, "column": 2},
+                    {"row": 1, "column": 3},
+                ]
+            }
+        }
+
+        sorted_matrices = {
+            1: {
+                "fields": [
+                    {"row": 1, "column": 1},
+                    {"row": 1, "column": 2},
+                    {"row": 1, "column": 3},
+                    {"row": 2, "column": 1},
+                    {"row": 2, "column": 2},
+                    {"row": 2, "column": 3},
+                    {"row": 3, "column": 1},
+                    {"row": 3, "column": 2},
+                    {"row": 3, "column": 3},
+                ]
+            }
+        }
+
+        ProjectSectionSchemaSerializer._sort_matrices(matrices)
+        assert matrices == sorted_matrices

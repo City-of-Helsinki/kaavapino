@@ -1,0 +1,47 @@
+{% extends "admin/change_form.html" %}
+{% load list_tools %}
+
+{% block after_related_objects %}
+    <div class="form-row field-section">
+        <label class="required" for="id_section">Phase attributes:</label>
+        <div>
+            <div class="related-widget-wrapper">
+                <table>
+                    <thead>
+                    <tr>
+                        <th></th>
+                        {% for column in original.column_names %}
+                            <th>{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in original.row_names %}
+                        <tr>
+                            <th> {{ row }} </th>
+                            {% for cell in cells|index:forloop.counter0 %}
+                                <td>
+                                    <select name="attribute_matrix-{{ forloop.parentloop.counter0 }}-{{ forloop.counter0 }}">
+                                        {% for attribute_pk, name in attribute_choices.items %}
+                                            <option
+                                                    value="{{ attribute_pk }}"
+                                                    {% if cell.attribute.pk == attribute_pk %}
+                                                    selected="selected"
+                                                    {% endif %}
+                                            >
+                                                {{ name }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block pagination %}{% endblock %}
