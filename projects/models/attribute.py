@@ -20,8 +20,14 @@ validate_identifier = RegexValidator(
 
 
 class Attribute(models.Model):
-    """Defines a single attribute type."""
+    """Defines a single attribute type.
 
+    Fieldset defines a group of tightly related attributes that define a single entity. E.g. information regarding
+    a person might consist of several fields. If there is a need to store information for multiple entities, we
+    can define a fieldset which knows the attributes for a single entity.
+    """
+
+    TYPE_FIELDSET = "fieldset"
     TYPE_INTEGER = "integer"
     TYPE_SHORT_STRING = "short_string"
     TYPE_LONG_STRING = "long_string"
@@ -33,6 +39,7 @@ class Attribute(models.Model):
     TYPE_FILE = "file"
 
     TYPE_CHOICES = (
+        (TYPE_FIELDSET, _("fieldset")),
         (TYPE_INTEGER, _("integer")),
         (TYPE_SHORT_STRING, _("short string")),
         (TYPE_LONG_STRING, _("long string")),
@@ -59,6 +66,8 @@ class Attribute(models.Model):
         unique=True,
         validators=[validate_identifier],
     )
+
+    fieldset_attributes = models.ManyToManyField("self", symmetrical=False, related_name="fieldsets")
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
 
     class Meta:
