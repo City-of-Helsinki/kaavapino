@@ -14,6 +14,13 @@ class ProjectType(models.Model):
     """Types of projects that the system supports e.g. asemakaava/city plan."""
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
+    metadata = JSONField(
+        verbose_name=_("metadata"),
+        default=dict,
+        blank=True,
+        null=True,
+        encoder=DjangoJSONEncoder,
+    )
 
     class Meta:
         verbose_name = _("project type")
