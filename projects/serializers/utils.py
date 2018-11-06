@@ -33,7 +33,9 @@ def _get_serializer_field_data(attribute):
             field_arguments["many"] = True
 
     if attribute.value_type == Attribute.TYPE_USER:
+        field_class = serializers.SlugRelatedField
         field_arguments["queryset"] = get_user_model().objects.all()
+        field_arguments["slug_field"] = "uuid"
 
     field_arguments["help_text"] = attribute.help_text
 

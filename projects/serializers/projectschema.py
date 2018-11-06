@@ -14,6 +14,7 @@ FOREIGN_KEY_TYPE_MODELS = {
         "model": get_user_model(),
         "filters": {},
         "label_format": "{instance.first_name} {instance.last_name}",
+        "value_field": "uuid",
     }
 }
 
@@ -73,10 +74,16 @@ class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
         model = choice_data["model"]
         filters = choice_data["filters"]
         label_format = choice_data["label_format"]
+        value_field = (
+            choice_data["value_field"] if choice_data.get("value_field", None) else "pk"
+        )
         choice_instances = model.objects.filter(**filters)
         for choice in choice_instances:
             choices.append(
-                {"label": label_format.format(instance=choice), "value": choice.pk}
+                {
+                    "label": label_format.format(instance=choice),
+                    "value": getattr(choice, value_field),
+                }
             )
         return choices
 

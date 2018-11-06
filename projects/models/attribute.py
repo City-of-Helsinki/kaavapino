@@ -104,7 +104,7 @@ class Attribute(models.Model):
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).
             if isinstance(value, get_user_model()):
-                return value.id
+                return value.uuid
             else:
                 return value or None
         else:

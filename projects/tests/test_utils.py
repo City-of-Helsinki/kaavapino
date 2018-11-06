@@ -50,7 +50,7 @@ def test_get_serializer_field_data(
     choices_field = [multi_choice_field, choice_field]
 
     assert short_string_field.field_class == serializers.CharField
-    assert user_field.field_class == serializers.PrimaryKeyRelatedField
+    assert user_field.field_class == serializers.SlugRelatedField
     assert multi_choice_field.field_class == serializers.SlugRelatedField
     assert choice_field.field_class == serializers.SlugRelatedField
 
