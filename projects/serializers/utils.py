@@ -47,13 +47,8 @@ def _get_serializer_field_data(attribute):
     return FieldData(field_class, field_arguments)
 
 
-def _is_attribute_required(section_attribute):
-    attribute = section_attribute.attribute
-
-    if (
-        attribute.value_type != Attribute.TYPE_BOOLEAN
-        and not section_attribute.generated
-    ):
-        return section_attribute.required
+def _is_attribute_required(attribute: Attribute):
+    if attribute.value_type != Attribute.TYPE_BOOLEAN and not attribute.generated:
+        return attribute.required
     else:
         return False

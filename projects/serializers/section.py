@@ -42,7 +42,7 @@ def create_section_serializer(section, context, project=None, validation=True):
 
         field_data.field_arguments["required"] = False
         if validation:
-            required = _is_attribute_required(section_attribute)
+            required = _is_attribute_required(section_attribute.attribute)
             if required:
                 field_data.field_arguments["required"] = True
                 field_data.field_arguments["allow_null"] = False

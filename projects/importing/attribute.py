@@ -182,6 +182,7 @@ class AttributeImporter:
                 help_text = ""
 
             is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
+            is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
 
             if not value_type:
                 logger.warning(
@@ -203,6 +204,7 @@ class AttributeImporter:
                     "value_type": value_type,
                     "help_text": help_text,
                     "public": is_public,
+                    "required": is_required,
                 },
             )
 
@@ -291,13 +293,8 @@ class AttributeImporter:
                     phase=phase, name=section_phase_name
                 )
 
-                is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
-
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(
-                    attribute=attribute,
-                    section=section,
-                    required=is_required,
-                    index=counter[section],
+                    attribute=attribute, section=section, index=counter[section]
                 )
 
                 counter[section] += 1

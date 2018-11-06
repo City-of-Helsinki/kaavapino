@@ -11,24 +11,24 @@ from projects.serializers.utils import (
 
 
 @pytest.mark.django_db()
-def test_is_attribute_required(f_project_section_attribute_1):
-    required = _is_attribute_required(f_project_section_attribute_1)
+def test_is_attribute_required(f_short_string_attribute):
+    required = _is_attribute_required(f_short_string_attribute)
     assert required is False
 
     # required = True
-    f_project_section_attribute_1.required = True
-    required = _is_attribute_required(f_project_section_attribute_1)
+    f_short_string_attribute.required = True
+    required = _is_attribute_required(f_short_string_attribute)
     assert required is True
 
     # required = True, generated = True
-    f_project_section_attribute_1.generated = True
-    required = _is_attribute_required(f_project_section_attribute_1)
+    f_short_string_attribute.generated = True
+    required = _is_attribute_required(f_short_string_attribute)
     assert required is False
 
     # required = True, generated = False, Boolean field
-    f_project_section_attribute_1.generated = False
-    f_project_section_attribute_1.attribute.value_type = Attribute.TYPE_BOOLEAN
-    required = _is_attribute_required(f_project_section_attribute_1)
+    f_short_string_attribute.generated = False
+    f_short_string_attribute.value_type = Attribute.TYPE_BOOLEAN
+    required = _is_attribute_required(f_short_string_attribute)
     assert required is False
 
 

@@ -40,7 +40,7 @@ class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
 
     @staticmethod
     def get_required(section_attribute):
-        return _is_attribute_required(section_attribute)
+        return _is_attribute_required(section_attribute.attribute)
 
     @staticmethod
     def get_type(section_attribute):
