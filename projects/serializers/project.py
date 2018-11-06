@@ -13,8 +13,8 @@ from projects.serializers.section import create_section_serializer
 
 class ProjectTypeSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Project
-        fields = ["id", "name"]
+        model = ProjectType
+        fields = ["id", "name", "metadata"]
 
 
 class SectionData(NamedTuple):

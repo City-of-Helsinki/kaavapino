@@ -24,6 +24,12 @@ ATTRIBUTE_REQUIRED = (
 PHASE_SECTION_NAME = "Minkä VÄLIOTSIKON alle kuuluu"
 PUBLIC_ATTRIBUTE = "JULKINEN TIETO"  # kyllä/ei julkinen
 HELP_TEXT = "OHJE"
+METADATA_FIELDS = {
+    "project_cards": {
+        "normal": "Normaali hankekortti",
+        "extended": "Laajennettu hankekortti",
+    }
+}
 
 ATTRIBUTE_PHASE_COLUMNS = [
     "syöttövaihe",
@@ -304,6 +310,52 @@ class AttributeImporter:
                     f"{section_attribute.attribute}"
                 )
 
+    def _update_type_metadata(self, rows):
+        metadata = {}
+        metadata.update(self._get_project_card_attributes_metadata(rows))
+
+        self.project_type.metadata = metadata
+        self.project_type.save()
+
+    def _get_project_card_attributes_metadata(self, rows) -> dict:
+        # TODO: Remove when the proper excel file has been defined
+        if not all(
+            value in self.column_index
+            for value in METADATA_FIELDS["project_cards"].values()
+        ):
+            logger.info("No project card support: Skipping")
+            return {}
+
+        metadata = {}
+        project_card_mapping = {
+            key: {} for key in METADATA_FIELDS["project_cards"].keys()
+        }
+        for row in rows:
+            identifier = self._get_attribute_identifier(row)
+
+            for card_type in project_card_mapping.keys():
+                card_index = row[
+                    self.column_index[METADATA_FIELDS["project_cards"][card_type]]
+                ]
+
+                if not card_index:
+                    continue
+
+                try:
+                    card_index = int(card_index)
+                    project_card_mapping[card_type][identifier] = card_index
+                except ValueError:
+                    logger.info(
+                        f"Metadata: Cannot covert {card_index} into an integer."
+                    )
+
+        for card_type in project_card_mapping.keys():
+            metadata_key = f"{card_type}_project_card_attributes"
+            metadata[metadata_key] = sorted(
+                project_card_mapping[card_type], key=project_card_mapping[card_type].get
+            )
+        return metadata
+
     def create_phases(self):
         logger.info("\nCreating phases...")
         current_phases = [
@@ -345,6 +397,7 @@ class AttributeImporter:
         self._update_attributes(data_rows)
         self._update_sections(data_rows)
         self._replace_attribute_section_links(data_rows)
+        self._update_type_metadata(data_rows)
 
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
         logger.info("Attributes {}".format(Attribute.objects.count()))
