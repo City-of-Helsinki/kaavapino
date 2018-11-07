@@ -11,12 +11,6 @@ from projects.models import Project, ProjectPhase, ProjectPhaseSection, ProjectT
 from projects.serializers.section import create_section_serializer
 
 
-class ProjectTypeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectType
-        fields = ["id", "name", "metadata"]
-
-
 class SectionData(NamedTuple):
     section: ProjectPhaseSection
     serializer_class: Type[Serializer]
