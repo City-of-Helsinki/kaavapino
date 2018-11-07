@@ -1,3 +1,4 @@
+from django.db.models import Case, When
 from rest_framework import serializers
 
 from projects.models import ProjectType, Attribute
@@ -28,7 +29,22 @@ class ProjectTypeMetadataSerializer(serializers.Serializer):
         if not attribute_identifiers:
             return attribute_identifiers
 
-        attributes = Attribute.objects.filter(identifier__in=attribute_identifiers)
+        # Order for qs, taken from https://stackoverflow.com/a/38390480
+        # Note: Ordering like this is not recommended for larger sets since
+        # the query gets mighty long, but we will never have more then a few
+        # tens of fields here which should not cause any performance degradation.
+        # Note2: This can also be done by convering to a list and order that
+        # according to another list, but then the a QuerySet would not longer
+        # exist.
+        identifier_ordering = Case(
+            *[
+                When(identifier=identifier, then=pos)
+                for pos, identifier in enumerate(attribute_identifiers)
+            ]
+        )
+        attributes = Attribute.objects.filter(
+            identifier__in=attribute_identifiers
+        ).order_by(identifier_ordering)
         return ProjectTypeMetadataCardAttributeSerializer(attributes, many=True).data
 
 
