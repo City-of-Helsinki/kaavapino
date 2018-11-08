@@ -68,8 +68,13 @@ class Attribute(models.Model):
         unique=True,
         validators=[validate_identifier],
     )
-
-    fieldset_attributes = models.ManyToManyField("self", symmetrical=False, related_name="fieldsets")
+    fieldset_attributes = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="fieldsets",
+        through="FieldSetAttribute",
+        through_fields=("attribute_source", "attribute_target"),
+    )
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
 
     class Meta:
@@ -179,3 +184,22 @@ class AttributeValueChoice(models.Model):
 
     def __str__(self):
         return self.value
+
+
+class FieldSetAttribute(models.Model):
+
+    attribute_source = models.ForeignKey(
+        Attribute, on_delete=models.CASCADE, related_name="fieldset_attribute_source"
+    )
+    attribute_target = models.ForeignKey(
+        Attribute, on_delete=models.CASCADE, related_name="fieldset_attribute_target"
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+
+    class Meta:
+        verbose_name = _("fieldset attribute")
+        verbose_name_plural = _("fieldset attributes")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.attribute_source} -> {self.attribute_target}"
