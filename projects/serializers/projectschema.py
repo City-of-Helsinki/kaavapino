@@ -31,9 +31,21 @@ class AttributeSchemaSerializer(serializers.Serializer):
     name = serializers.CharField(source="identifier")
     help_text = serializers.CharField()
     multiple_choice = serializers.BooleanField()
+    fieldset_attributes = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
     required = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_fieldset_attributes(attribute):
+        if attribute.value_type == Attribute.TYPE_FIELDSET:
+            return [
+                AttributeSchemaSerializer(attr).data
+                for attr in attribute.fieldset_attributes.order_by(
+                    "fieldset_attribute_source"
+                )
+            ]
+        return []
 
     @staticmethod
     def get_required(attribute):
