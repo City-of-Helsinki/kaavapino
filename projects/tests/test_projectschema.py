@@ -4,8 +4,9 @@ from django.contrib.auth import get_user_model
 from projects.models import Attribute
 from projects.serializers.projectschema import (
     VALUE_TYPE_MAP,
-    ProjectSectionSchemaSerializer,
     AttributeSchemaSerializer,
+    ProjectPhaseSchemaSerializer,
+    ProjectSectionSchemaSerializer,
 )
 
 
@@ -50,9 +51,7 @@ class TestAttributeSchemaSerializer:
     def test__get_attribute_choices(
         self, f_short_string_attribute, f_short_string_choice_attribute
     ):
-        asserted_value_choices = (
-            f_short_string_choice_attribute.value_choices.all()
-        )
+        asserted_value_choices = f_short_string_choice_attribute.value_choices.all()
         asserted_choices = []
         for choice in asserted_value_choices:
             asserted_choices.append({"label": choice.value, "value": choice.identifier})
@@ -118,3 +117,49 @@ class TestProjectSectionSchemaSerializer:
 
         ProjectSectionSchemaSerializer._sort_matrices(matrices)
         assert matrices == sorted_matrices
+
+
+@pytest.mark.parametrize(
+    "value_type", [(Attribute.TYPE_SHORT_STRING, Attribute.TYPE_FIELDSET)]
+)
+@pytest.mark.django_db()
+def test_fieldset_schema_renders(
+    attribute_factory,
+    field_set_attribute_factory,
+    project_phase_section_attribute_factory,
+    value_type,
+):
+    fieldset_attribute = attribute_factory(value_type=value_type, multiple_choice=True)
+    attr1 = field_set_attribute_factory(attribute_source=fieldset_attribute)
+    attr2 = field_set_attribute_factory(attribute_source=fieldset_attribute)
+
+    ppsa = project_phase_section_attribute_factory(attribute=fieldset_attribute)
+
+    phase = ppsa.section.phase
+    schema = ProjectPhaseSchemaSerializer(phase).data
+
+    fields_schema = schema["sections"][0]["fields"]
+    assert len(fields_schema) == 1
+
+    fieldset_field = fields_schema[0]
+
+    if value_type == Attribute.TYPE_FIELDSET:
+        # Fieldset includes related attributes in the correct order
+        assert fieldset_field["type"] == Attribute.TYPE_FIELDSET
+        assert fieldset_field["multiple_choice"] is True
+
+        assert len(fieldset_field["fieldset_attributes"]) == 2
+
+        assert (
+            fieldset_field["fieldset_attributes"][0]["name"]
+            == attr1.attribute_target.identifier
+        )
+        assert (
+            fieldset_field["fieldset_attributes"][1]["name"]
+            == attr2.attribute_target.identifier
+        )
+
+    elif value_type == Attribute.TYPE_SHORT_STRING:
+        # Non-fieldset attributes ignore possibly related fields
+        assert fieldset_field["type"] == Attribute.TYPE_SHORT_STRING
+        assert len(fieldset_field["fieldset_attributes"]) == 0
