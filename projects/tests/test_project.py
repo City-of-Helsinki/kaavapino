@@ -10,6 +10,7 @@ def test_update_attribute_data(f_project, f_project_section_attribute_1):
     # Test empty data
     empty_attribute_data = {}
     f_project.update_attribute_data(empty_attribute_data)
+    assert f_project.attribute_data == {}
 
     # Test add non proper attribute
     attribute_data = {"this_is_no_proper": "test"}
