@@ -3,13 +3,13 @@ from factory import fuzzy
 
 from projects.models import (
     Attribute,
+    FieldSetAttribute,
     Project,
     ProjectType,
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
 )
-from projects.models.attribute import FieldSetAttribute
 from users.tests.factories import UserFactory
 
 __all__ = (
