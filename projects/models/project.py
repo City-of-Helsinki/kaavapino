@@ -95,12 +95,12 @@ class Project(models.Model):
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 deserialized_value = self.geometry
-            elif attribute.value_type == Attribute.TYPE_IMAGE:
+            elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 try:
-                    deserialized_value = ProjectAttributeImage.objects.get(
+                    deserialized_value = ProjectAttributeFile.objects.get(
                         attribute=attribute, project=self
-                    ).image
-                except ProjectAttributeImage.DoesNotExist:
+                    ).file
+                except ProjectAttributeFile.DoesNotExist:
                     deserialized_value = None
             elif attribute.identifier in self.attribute_data:
                 deserialized_value = attribute.deserialize_value(
@@ -135,20 +135,10 @@ class Project(models.Model):
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 self.geometry = value
-            elif attribute.value_type == Attribute.TYPE_IMAGE:
-                if value is False:
-                    ProjectAttributeImage.objects.filter(
-                        attribute=attribute, project=self
-                    ).delete()
-                elif value is None:
-                    # None is handled in the same way as omitting this attribute from the update in the first place
-                    # would have been, ie. do nothing. This is to make life easier as the form where these images
-                    # mainly come from uses False for "delete" and None for "no update".
-                    continue
-                else:
-                    ProjectAttributeImage.objects.update_or_create(
-                        attribute=attribute, project=self, defaults={"image": value}
-                    )
+            elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
+                # Files are not stored in the attribute data and are
+                # stored in the ProjectAttributeFile model
+                continue
             else:
                 serialized_value = attribute.serialize_value(value)
 
@@ -359,26 +349,28 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
-class ProjectAttributeImage(models.Model):
-    """Project attribute value that is an image."""
+class ProjectAttributeFile(models.Model):
+    """Project attribute value that is an file."""
 
     attribute = models.ForeignKey(
         Attribute,
         verbose_name=_("attribute"),
-        related_name="images",
+        related_name="files",
         on_delete=models.CASCADE,
     )
     project = models.ForeignKey(
         Project,
         verbose_name=_("project"),
-        related_name="images",
+        related_name="files",
         on_delete=models.CASCADE,
     )
-    image = models.ImageField(verbose_name=_("image"))
+
+    file = models.FileField(verbose_name=_("file"))
+
 
     class Meta:
-        verbose_name = _("project attribute image")
-        verbose_name_plural = _("project attribute images")
+        verbose_name = _("project attribute file")
+        verbose_name_plural = _("project attribute files")
 
     def __str__(self):
         return f"{self.project} {self.attribute}"
