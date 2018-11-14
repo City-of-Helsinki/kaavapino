@@ -1,7 +1,9 @@
-FROM python:3.6.6-slim-stretch
+FROM python:3.6.6-slim-stretch AS base
 
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND noninteractive
+ENV APP_NAME kaavapino
+
 
 RUN mkdir /code
 RUN mkdir /entrypoint
@@ -24,6 +26,8 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN pip install -U pip
 
+FROM base AS test
+
 # Install python dependencies
 ADD requirements.txt /code/
 ADD requirements-dev.txt /code/
@@ -34,3 +38,12 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 # Add entrypoint script
 ADD docker-entrypoint.sh /entrypoint/
 RUN chmod +x /entrypoint/docker-entrypoint.sh
+
+FROM base AS deploy
+ADD requirements.txt /code/
+ADD deploy/requirements.txt ./deploy/requirements.txt
+RUN pip install --no-cache-dir -r ./deploy/requirements.txt
+
+COPY . .
+
+CMD deploy/server.sh
