@@ -6,6 +6,8 @@ from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
+from private_storage.fields import PrivateFileField
+from private_storage.storage.files import PrivateFileSystemStorage
 
 from .attribute import Attribute
 
@@ -365,8 +367,8 @@ class ProjectAttributeFile(models.Model):
         on_delete=models.CASCADE,
     )
 
-    file = models.FileField(verbose_name=_("file"))
 
+    file = PrivateFileField("File")
 
     class Meta:
         verbose_name = _("project attribute file")
