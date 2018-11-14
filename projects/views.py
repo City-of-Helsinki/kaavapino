@@ -6,6 +6,9 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from projects.models import Project, ProjectPhase, ProjectType, ProjectAttributeFile
+from projects.permissions.media_file_permissions import (
+    has_project_attribute_file_permissions,
+)
 from projects.serializers.project import (
     ProjectSerializer,
     ProjectPhaseSerializer,
@@ -52,3 +55,18 @@ class ProjectPhaseViewSet(viewsets.ModelViewSet):
 class ProjectTypeSchemaViewSet(viewsets.ModelViewSet):
     queryset = ProjectType.objects.all()
     serializer_class = ProjectTypeSchemaSerializer
+
+
+class ProjectAttributeFileDownloadView(PrivateStorageDetailView):
+    model = ProjectAttributeFile
+    slug_field = "file"
+    slug_url_kwarg = "path"
+
+    def get_queryset(self):
+        # Queryset that is allowed to be downloaded
+        return ProjectAttributeFile.objects.all()
+
+    def can_access_file(self, private_file):
+        # NOTE: This overrides PRIVATE_STORAGE_AUTH_FUNCTION
+        # TODO: Change permission function when user permissions has been implemented
+        return has_project_attribute_file_permissions(private_file, self.request)
