@@ -129,3 +129,35 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPhase
         fields = ["project_type", "name", "color", "color_code", "index"]
+
+
+class ProjectFileSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(use_url=True)
+    attribute = serializers.SlugRelatedField(
+        slug_field="identifier",
+        queryset=Attribute.objects.filter(
+            value_type__in=[Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]
+        ),
+    )
+    project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
+
+    class Meta:
+        model = ProjectAttributeFile
+        fields = ["file", "attribute", "project"]
+
+    @staticmethod
+    def _validate_attribute(attribute: Attribute, project: Project):
+        # Check if the attribute is part of the project
+        project_has_attribute = bool(
+            ProjectPhaseSectionAttribute.objects.filter(
+                section__phase__project_type=project.type, attribute=attribute
+            ).count()
+        )
+        if not project_has_attribute:
+            # Using the same error message as SlugRelatedField
+            raise ValidationError(_("Object with {slug_name}={value} does not exist."))
+
+    def validate(self, attrs: dict):
+        self._validate_attribute(attrs["attribute"], attrs["project"])
+
+        return attrs
