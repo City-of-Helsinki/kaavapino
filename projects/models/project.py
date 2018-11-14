@@ -382,8 +382,15 @@ class ProjectAttributeFile(models.Model):
         on_delete=models.CASCADE,
     )
 
+    def get_upload_subfolder(self):
+        project_id = str(self.project.pk)
+        if not project_id:
+            raise ValueError("No project id could be found, can't save file!")
+        return ["projects", project_id]
 
-    file = PrivateFileField("File", storage=OverwriteStorage())
+    file = PrivateFileField(
+        "File", storage=OverwriteStorage(), upload_subfolder=get_upload_subfolder
+    )
 
     class Meta:
         verbose_name = _("project attribute file")
