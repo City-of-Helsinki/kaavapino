@@ -6,7 +6,7 @@ from projects.serializers.projectschema import ProjectTypeSchemaSerializer
 from projects.serializers.projecttype import ProjectTypeSerializer
 
 
-class ProjectTypeViewSet(viewsets.ModelViewSet):
+class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
     serializer_class = ProjectTypeSerializer
 
@@ -16,11 +16,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
 
 
-class ProjectPhaseViewSet(viewsets.ModelViewSet):
+class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all()
     serializer_class = ProjectPhaseSerializer
 
 
-class ProjectTypeSchemaViewSet(viewsets.ModelViewSet):
+class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
     serializer_class = ProjectTypeSchemaSerializer
