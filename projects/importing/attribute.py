@@ -1,11 +1,16 @@
 import logging
-from collections import Counter
+from collections import Counter, defaultdict
+from itertools import filterfalse
 from typing import Iterable, Sequence
 
 from django.db import transaction
 from openpyxl import load_workbook
 
-from projects.models import ProjectPhaseSection, ProjectPhaseSectionAttribute
+from projects.models import (
+    FieldSetAttribute,
+    ProjectPhaseSection,
+    ProjectPhaseSectionAttribute,
+)
 from ..models import Attribute, ProjectPhase, ProjectType
 from ..models.utils import create_identifier, truncate_identifier
 
@@ -30,6 +35,8 @@ METADATA_FIELDS = {
         "extended": "Laajennettu hankekortti",
     }
 }
+
+ATTRIBUTE_FIELDSET = "Hanketieto fieldset"
 
 ATTRIBUTE_PHASE_COLUMNS = [
     "syöttövaihe",
@@ -60,6 +67,7 @@ PROJECT_PHASES = [
 # projektin vuosi <- tarkistetun ehdotuksen lautakuntapvm
 
 VALUE_TYPES = {
+    "fieldset": Attribute.TYPE_FIELDSET,
     "sisältö; nimi": Attribute.TYPE_SHORT_STRING,
     "tunniste; numerotunniste": Attribute.TYPE_SHORT_STRING,
     "tunniste; numero": Attribute.TYPE_SHORT_STRING,
@@ -155,17 +163,25 @@ class AttributeImporter:
         logger.info(f"Field {name} is not valid, it will not be imported.")
         return False
 
-    def _get_attribute_identifier(self, row: Sequence) -> str:
-        identifier = create_identifier(
-            row[self.column_index[ATTRIBUTE_NAME]].strip(" \t:.")
-        )
+    def _row_part_of_fieldset(self, row: Sequence) -> bool:
+        """Check if the row should be a part of a fieldset."""
+        if ATTRIBUTE_FIELDSET not in self.column_index:
+            return False
+        fieldset_value = row[self.column_index[ATTRIBUTE_FIELDSET]]
+        return bool(fieldset_value)
+
+    def _get_identifier_for_value(self, value: str) -> str:
+        identifier = create_identifier(value.strip(" \t:."))
         return truncate_identifier(identifier, length=IDENTIFIER_MAX_LENGTH)
+
+    def _get_attribute_row_identifier(self, row: Sequence) -> str:
+        return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
     def _update_attributes(self, rows: Iterable[Sequence[str]]):
         logger.info("\nUpdating attributes...")
 
         for row in rows:
-            identifier = self._get_attribute_identifier(row)
+            identifier = self._get_attribute_row_identifier(row)
 
             name = row[self.column_index[ATTRIBUTE_NAME]].strip(" \t:.")
 
@@ -214,6 +230,38 @@ class AttributeImporter:
                 action_str = "Updated" if overwrite else "Already exists, skipping"
 
             logger.info(f"{action_str} {attribute}")
+
+    def _replace_fieldset_links(self, rows: Iterable[Sequence[str]]):
+        logger.info("\nUpdating fieldsets...")
+
+        if ATTRIBUTE_FIELDSET not in self.column_index:
+            logger.warning(f'Fieldset column "{ATTRIBUTE_FIELDSET}" missing: Skipping')
+            return
+
+        FieldSetAttribute.objects.all().delete()
+        fieldset_map = defaultdict(list)
+
+        # Map out the link that need to be created
+        for row in rows:
+            fieldset_attr = row[self.column_index[ATTRIBUTE_FIELDSET]]
+            if not fieldset_attr:
+                continue
+
+            attr_id = self._get_attribute_row_identifier(row)
+            fieldset_attr_id = self._get_identifier_for_value(fieldset_attr)
+
+            fieldset_map[fieldset_attr_id].append(attr_id)
+
+        # Create the links
+        for source_id in fieldset_map:
+            source = Attribute.objects.get(identifier=source_id)
+
+            for index, target_id in enumerate(fieldset_map[source_id], start=1):
+                target = Attribute.objects.get(identifier=target_id)
+                fsa = FieldSetAttribute.objects.create(
+                    attribute_source=source, attribute_target=target, index=index
+                )
+                logger.info(f"Created {fsa}")
 
     def _get_attribute_input_phases(self, row):
         input_phases = []
@@ -280,7 +328,7 @@ class AttributeImporter:
             counter = Counter()
 
             for row in rows:
-                identifier = self._get_attribute_identifier(row)
+                identifier = self._get_attribute_row_identifier(row)
                 attribute = Attribute.objects.get(identifier=identifier)
 
                 if phase.index not in self._get_attribute_input_phases(row):
@@ -328,7 +376,7 @@ class AttributeImporter:
             key: {} for key in METADATA_FIELDS["project_cards"].keys()
         }
         for row in rows:
-            identifier = self._get_attribute_identifier(row)
+            identifier = self._get_attribute_row_identifier(row)
 
             for card_type in project_card_mapping.keys():
                 card_index = row[
@@ -392,17 +440,26 @@ class AttributeImporter:
         data_rows = list(filter(self._check_if_row_valid, rows[1:]))
 
         self._update_attributes(data_rows)
+        self._replace_fieldset_links(data_rows)
+
+        # Remove all attributes from further processing that were part of a fieldset
+        data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
+
         self._update_sections(data_rows)
         self._replace_attribute_section_links(data_rows)
         self._update_type_metadata(data_rows)
 
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
         logger.info("Attributes {}".format(Attribute.objects.count()))
+        logger.info(
+            "FieldSets {}".format(
+                Attribute.objects.filter(value_type=Attribute.TYPE_FIELDSET).count()
+            )
+        )
         logger.info("Phase sections {}".format(ProjectPhaseSection.objects.count()))
         logger.info(
             "Phase section attributes {}".format(
                 ProjectPhaseSectionAttribute.objects.count()
             )
         )
-
         logger.info("Import done.")
