@@ -6,8 +6,21 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import Serializer
+from django.utils.translation import ugettext_lazy as _
 
-from projects.models import Project, ProjectPhase, ProjectPhaseSection, ProjectType
+
+from projects.models import (
+    Project,
+    ProjectPhase,
+    ProjectPhaseSection,
+    ProjectType,
+    ProjectAttributeFile,
+    Attribute,
+    ProjectPhaseSectionAttribute,
+)
+from projects.permissions.media_file_permissions import (
+    has_project_attribute_file_permissions,
+)
 from projects.serializers.section import create_section_serializer
 
 
@@ -20,6 +33,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
+    attribute_data = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -36,6 +50,27 @@ class ProjectSerializer(serializers.ModelSerializer):
             "id",
         ]
         read_only_fields = ["phase", "type", "created_at", "modified_at"]
+
+    def get_attribute_data(self, project):
+        attribute_data = project.attribute_data
+        self._set_file_attributes(attribute_data, project)
+
+        return attribute_data
+
+    def _set_file_attributes(self, attribute_data, project):
+        request = self.context["request"]
+        attribute_files = ProjectAttributeFile.objects.filter(project=project)
+
+        # Add file attributes to the attribute data
+        # File values are represented as absolute URLs
+        file_attributes = {
+            attribute_file.attribute.identifier: request.build_absolute_uri(
+                attribute_file.file.url
+            )
+            for attribute_file in attribute_files
+            if has_project_attribute_file_permissions(attribute_file, request)
+        }
+        attribute_data.update(file_attributes)
 
     def should_validate_attributes(self):
         validate_field_data = self.context["request"].data.get(
