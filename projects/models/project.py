@@ -351,6 +351,21 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
+class OverwriteStorage(PrivateFileSystemStorage):
+    """
+    Storage class that overwrites files instead of renaming
+
+    Since the system is not used for the purpose of keeping
+    data history nor as a primary storage service, there is
+    no reason to keep any old files laying around or keeping
+    a history of old files.
+    """
+
+    def get_available_name(self, name, max_length=None):
+        self.delete(name)
+        return name
+
+
 class ProjectAttributeFile(models.Model):
     """Project attribute value that is an file."""
 
@@ -368,7 +383,7 @@ class ProjectAttributeFile(models.Model):
     )
 
 
-    file = PrivateFileField("File")
+    file = PrivateFileField("File", storage=OverwriteStorage())
 
     class Meta:
         verbose_name = _("project attribute file")
