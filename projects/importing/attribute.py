@@ -104,7 +104,7 @@ class AttributeImporter:
 
     def _open_workbook(self, filename):
         try:
-            return load_workbook(filename, read_only=True)
+            return load_workbook(filename, read_only=True, data_only=True)
         except FileNotFoundError as e:
             raise AttributeImporterException(e)
 
