@@ -6,6 +6,8 @@ from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
+from private_storage.fields import PrivateFileField
+from private_storage.storage.files import PrivateFileSystemStorage
 
 from .attribute import Attribute
 
@@ -95,12 +97,12 @@ class Project(models.Model):
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 deserialized_value = self.geometry
-            elif attribute.value_type == Attribute.TYPE_IMAGE:
+            elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 try:
-                    deserialized_value = ProjectAttributeImage.objects.get(
+                    deserialized_value = ProjectAttributeFile.objects.get(
                         attribute=attribute, project=self
-                    ).image
-                except ProjectAttributeImage.DoesNotExist:
+                    ).file
+                except ProjectAttributeFile.DoesNotExist:
                     deserialized_value = None
             elif attribute.identifier in self.attribute_data:
                 deserialized_value = attribute.deserialize_value(
@@ -135,20 +137,10 @@ class Project(models.Model):
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 self.geometry = value
-            elif attribute.value_type == Attribute.TYPE_IMAGE:
-                if value is False:
-                    ProjectAttributeImage.objects.filter(
-                        attribute=attribute, project=self
-                    ).delete()
-                elif value is None:
-                    # None is handled in the same way as omitting this attribute from the update in the first place
-                    # would have been, ie. do nothing. This is to make life easier as the form where these images
-                    # mainly come from uses False for "delete" and None for "no update".
-                    continue
-                else:
-                    ProjectAttributeImage.objects.update_or_create(
-                        attribute=attribute, project=self, defaults={"image": value}
-                    )
+            elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
+                # Files are not stored in the attribute data and are
+                # stored in the ProjectAttributeFile model
+                continue
             else:
                 serialized_value = attribute.serialize_value(value)
 
@@ -359,26 +351,50 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
-class ProjectAttributeImage(models.Model):
-    """Project attribute value that is an image."""
+class OverwriteStorage(PrivateFileSystemStorage):
+    """
+    Storage class that overwrites files instead of renaming
+
+    Since the system is not used for the purpose of keeping
+    data history nor as a primary storage service, there is
+    no reason to keep any old files laying around or keeping
+    a history of old files.
+    """
+
+    def get_available_name(self, name, max_length=None):
+        self.delete(name)
+        return name
+
+
+class ProjectAttributeFile(models.Model):
+    """Project attribute value that is an file."""
 
     attribute = models.ForeignKey(
         Attribute,
         verbose_name=_("attribute"),
-        related_name="images",
+        related_name="files",
         on_delete=models.CASCADE,
     )
     project = models.ForeignKey(
         Project,
         verbose_name=_("project"),
-        related_name="images",
+        related_name="files",
         on_delete=models.CASCADE,
     )
-    image = models.ImageField(verbose_name=_("image"))
+
+    def get_upload_subfolder(self):
+        project_id = str(self.project.pk)
+        if not project_id:
+            raise ValueError("No project id could be found, can't save file!")
+        return ["projects", project_id]
+
+    file = PrivateFileField(
+        "File", storage=OverwriteStorage(), upload_subfolder=get_upload_subfolder
+    )
 
     class Meta:
-        verbose_name = _("project attribute image")
-        verbose_name_plural = _("project attribute images")
+        verbose_name = _("project attribute file")
+        verbose_name_plural = _("project attribute files")
 
     def __str__(self):
         return f"{self.project} {self.attribute}"

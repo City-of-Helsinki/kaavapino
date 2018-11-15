@@ -66,6 +66,17 @@ def f_boolean_attribute(f_user):
 
 @pytest.fixture()
 @pytest.mark.django_db()
+def f_file_attribute(f_user):
+    return Attribute.objects.create(
+        name="Boolean attribute",
+        value_type=Attribute.TYPE_FILE,
+        identifier="file_attr",
+        help_text="This is an file attribute",
+    )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
 def f_short_string_multi_choice_attribute():
     attribute = Attribute.objects.create(
         name="Short string multiple choice attribute",
@@ -226,6 +237,18 @@ def f_project_section_attribute_6(
         required=False,
         index=5,
         relies_on=f_project_section_attribute_5,
+    )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_project_section_attribute_6_file(f_file_attribute, f_project_section_1):
+    return ProjectPhaseSectionAttribute.objects.create(
+        attribute=f_file_attribute,
+        section=f_project_section_1,
+        generated=False,
+        required=False,
+        index=6,
     )
 
 

@@ -83,6 +83,7 @@ INSTALLED_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
+    "private_storage",
 ]
 
 MIDDLEWARE = [
@@ -157,3 +158,11 @@ if os.path.exists(local_settings):
     with open(local_settings) as fp:
         code = compile(fp.read(), local_settings, "exec")
     exec(code, globals(), locals())
+
+
+# Private storage
+PRIVATE_STORAGE_ROOT = MEDIA_ROOT
+
+if not DEBUG:
+    PRIVATE_STORAGE_SERVER = "nginx"
+    PRIVATE_STORAGE_INTERNAL_URL = "/private-x-accel-redirect/"

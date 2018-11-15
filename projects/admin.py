@@ -15,7 +15,7 @@ from .models import (
     AttributeValueChoice,
     DocumentTemplate,
     Project,
-    ProjectAttributeImage,
+    ProjectAttributeFile,
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
@@ -126,8 +126,8 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "file")
 
 
-@admin.register(ProjectAttributeImage)
-class ProjectAttributeImageAdmin(admin.ModelAdmin):
+@admin.register(ProjectAttributeFile)
+class ProjectAttributeFileAdmin(admin.ModelAdmin):
     pass
 
 
