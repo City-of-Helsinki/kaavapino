@@ -24,7 +24,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
-    queryset = Project.objects.all()
+    queryset = Project.objects.all().select_related("user")
     serializer_class = ProjectSerializer
 
     def get_serializer_context(self):
