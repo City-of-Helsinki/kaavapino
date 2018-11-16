@@ -3,11 +3,10 @@ from typing import List, NamedTuple, Type
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import Serializer
-from django.utils.translation import ugettext_lazy as _
-
 
 from projects.models import (
     Project,
@@ -23,6 +22,8 @@ from projects.permissions.media_file_permissions import (
 )
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.section import create_section_serializer
+from users.models import User
+from users.serializers import UserSerializer
 
 
 class SectionData(NamedTuple):
@@ -35,6 +36,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
+
+    _metadata = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -49,6 +52,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "phase",
             "geometry",
             "id",
+            "_metadata",
         ]
         read_only_fields = ["phase", "type", "created_at", "modified_at"]
 
@@ -72,6 +76,28 @@ class ProjectSerializer(serializers.ModelSerializer):
             if has_project_attribute_file_permissions(attribute_file, request)
         }
         attribute_data.update(file_attributes)
+
+    def get__metadata(self, project):
+        list_view = self.context.get("action", None) == "list"
+        return {"users": self._get_users(project, list_view=list_view)}
+
+    @staticmethod
+    def _get_users(project, list_view=False):
+        users = [project.user]
+
+        if not list_view:
+            attributes = Attribute.objects.filter(
+                value_type=Attribute.TYPE_USER
+            ).values_list("identifier", flat=True)
+            user_attribute_ids = []
+            for attribute in attributes:
+                user_id = project.attribute_data.get(attribute, None)
+                if user_id:
+                    user_attribute_ids.append(user_id)
+
+            users += list(User.objects.filter(uuid__in=user_attribute_ids))
+
+        return UserSerializer(users, many=True).data
 
     def should_validate_attributes(self):
         validate_field_data = self.context["request"].data.get(
