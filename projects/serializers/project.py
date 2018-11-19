@@ -97,17 +97,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def validate_attribute_data(self, attribute_data):
-        # Get instance phase or use the first phase for the project type
-        phase = (
-            self.instance.phase
-            if self.instance and getattr(self.instance, "phase", None)
-            else ProjectPhase.objects.filter(project_type__name="asemakaava").first()
-        )
-
-        # Get serializers for all sections in the phase
-        sections_data = self.generate_sections_data(
-            phase=phase, validation=self.should_validate_attributes()
-        )
+        # Get serializers for all sections in all phases
+        sections_data = []
+        current_phase = getattr(self.instance, "phase", None)
+        current_phase_index = current_phase.index if current_phase else 1
+        for phase in ProjectPhase.objects.filter(
+            project_type__name="asemakaava", index__lte=current_phase_index
+        ):
+            sections_data += self.generate_sections_data(
+                phase=phase, validation=self.should_validate_attributes()
+            )
 
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
