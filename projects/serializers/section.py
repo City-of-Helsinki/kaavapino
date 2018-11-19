@@ -42,9 +42,10 @@ def create_section_serializer(section, context, project=None, validation=True):
 
         field_data.field_arguments["required"] = False
         if validation:
-            field_data.field_arguments["required"] = _is_attribute_required(
-                section_attribute
-            )
+            required = _is_attribute_required(section_attribute)
+            if required:
+                field_data.field_arguments["required"] = True
+                field_data.field_arguments["allow_null"] = False
 
         serializer_field = field_data.field_class(**field_data.field_arguments)
         serializer_fields[attribute.identifier] = serializer_field

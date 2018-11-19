@@ -40,6 +40,10 @@ def _get_serializer_field_data(attribute):
 
     field_arguments["help_text"] = attribute.help_text
 
+    # Allow fields to be set to null so that they can be emptied
+    if attribute.value_type not in [Attribute.TYPE_BOOLEAN]:
+        field_arguments["allow_null"] = True
+
     return FieldData(field_class, field_arguments)
 
 
