@@ -138,9 +138,11 @@ class Project(models.Model):
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 self.geometry = value
             elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
-                # Files are not stored in the attribute data and are
-                # stored in the ProjectAttributeFile model
-                continue
+                if not value:
+                    ProjectAttributeFile.objects.filter(
+                        attribute=attribute, project=self
+                    ).delete()
+                    self.attribute_data.pop(identifier, None)
             else:
                 serialized_value = attribute.serialize_value(value)
 
