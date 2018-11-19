@@ -263,3 +263,15 @@ def f_project_with_attribute_data(f_user, f_project_type, f_project_phase_1):
         phase=f_project_phase_1,
         attribute_data={"test": "test", "test2": "test2"},
     )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_fieldset_attribute(attribute_factory, field_set_attribute_factory):
+    fieldset_attribute = attribute_factory(
+        value_type=Attribute.TYPE_FIELDSET, multiple_choice=True
+    )
+    field_set_attribute_factory(attribute_source=fieldset_attribute)
+    field_set_attribute_factory(attribute_source=fieldset_attribute)
+
+    return fieldset_attribute
