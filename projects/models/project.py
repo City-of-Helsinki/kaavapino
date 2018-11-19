@@ -388,7 +388,7 @@ class ProjectAttributeFile(models.Model):
         project_id = str(self.project.pk)
         if not project_id:
             raise ValueError("No project id could be found, can't save file!")
-        return ["projects", project_id]
+        return ["projects", project_id, self.attribute.identifier]
 
     file = PrivateFileField(
         "File", storage=OverwriteStorage(), upload_subfolder=get_upload_subfolder
