@@ -21,6 +21,7 @@ from projects.models import (
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
+from projects.serializers.fields import AttributeDataField
 from projects.serializers.section import create_section_serializer
 
 
@@ -33,7 +34,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
-    attribute_data = serializers.SerializerMethodField()
+    attribute_data = AttributeDataField(allow_null=True, required=False)
 
     class Meta:
         model = Project
@@ -51,9 +52,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["phase", "type", "created_at", "modified_at"]
 
-    def get_attribute_data(self, project):
-        attribute_data = project.attribute_data
-        self._set_file_attributes(attribute_data, project)
+    def get_attribute_data(self, attribute_data):
+        project = self.instance
+        if project:
+            self._set_file_attributes(attribute_data, project)
 
         return attribute_data
 

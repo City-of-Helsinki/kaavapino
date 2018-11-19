@@ -1,7 +1,8 @@
 import os
 from io import StringIO
+
 import pytest
-from django.core.files.uploadedfile import SimpleUploadedFile, InMemoryUploadedFile
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from rest_framework.exceptions import ValidationError
 
 from projects.serializers.project import ProjectFileSerializer
@@ -42,7 +43,6 @@ class TestProjectFileSerializer:
         else:
             assert ProjectFileSerializer._validate_attribute(attribute, project) is None
 
-
     @pytest.mark.parametrize(
         "section_attribute, attribute, project, is_valid",
         [
@@ -66,9 +66,7 @@ class TestProjectFileSerializer:
             ),
         ],
     )
-    def test_serializer(
-        self, section_attribute, attribute, project, is_valid
-    ):
+    def test_serializer(self, section_attribute, attribute, project, is_valid):
         attribute = attribute.identifier
         project = project.pk
 
