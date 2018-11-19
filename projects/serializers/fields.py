@@ -21,6 +21,11 @@ class AttributeDataField(JSONField):
 
         super().bind(field_name, parent)
 
-    def to_representation(self, value):
+    def get_attribute(self, obj):
+        # We pass the object instance onto `to_representation`,
+        # not just the field attribute.
+        return obj
+
+    def to_representation(self, instance):
         method = getattr(self.parent, self.method_name)
-        return super().to_representation(method(value))
+        return super().to_representation(method(instance))
