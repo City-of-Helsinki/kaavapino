@@ -1,6 +1,5 @@
-from extended_choices import Choices
 from django.utils.translation import ugettext_lazy as _
-
+from extended_choices import Choices
 
 GROUPS = Choices(
     ("ADMINISTRATOR", "admin", _("Administrator")),
@@ -8,3 +7,5 @@ GROUPS = Choices(
     ("EXPERT", "expert", _("Expert")),
     ("PLANNER", "planner", _("Planner")),
 )
+
+GROUPS.add_subset("ADMINISTRATIVE_PERSONNEL", ("ADMINISTRATOR", "SECRETARY"))
