@@ -53,9 +53,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only_fields = ["phase", "type", "created_at", "modified_at"]
 
     def get_attribute_data(self, project):
-        attribute_data = getattr(project, "attribute_data", None)
-        if attribute_data:
-            self._set_file_attributes(attribute_data, project)
+        attribute_data = getattr(project, "attribute_data", {})
+        self._set_file_attributes(attribute_data, project)
 
         return attribute_data
 
