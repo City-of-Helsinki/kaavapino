@@ -32,7 +32,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project = self.get_object()
         request.data["project"] = project.pk
 
-        serializer = ProjectFileSerializer(data=request.data)
+        context = self.get_serializer_context()
+        serializer = ProjectFileSerializer(data=request.data, context=context)
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
