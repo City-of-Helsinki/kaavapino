@@ -8,6 +8,9 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import Serializer
 
+from django.utils.translation import ugettext_lazy as _
+
+from projects import validators
 from projects.models import (
     Project,
     ProjectPhase,
@@ -56,7 +59,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "public",
             "_metadata",
         ]
-        read_only_fields = ["phase", "type", "created_at", "modified_at"]
+        read_only_fields = ["type", "created_at", "modified_at"]
 
     def get_attribute_data(self, project):
         attribute_data = getattr(project, "attribute_data", {})
@@ -176,6 +179,20 @@ class ProjectSerializer(serializers.ModelSerializer):
             raise ValidationError(_("You do not have permissions to change this value"))
 
         return public
+
+    def validate_phase(self, phase):
+        user = self.context["request"].user
+        is_responsible = user == self.instance.user
+
+        if is_responsible:
+            return phase
+
+        return validators.admin_or_read_only(
+            phase, "phase", self.instance, self.context
+        )
+
+    def validate_user(self, user):
+        return validators.admin_or_read_only(user, "user", self.instance, self.context)
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
