@@ -1,5 +1,6 @@
 import datetime
 import re
+from collections import Sequence
 
 from django.contrib.auth import get_user_model
 from django.core.validators import RegexValidator
@@ -125,6 +126,8 @@ class Attribute(models.Model):
                 return value.uuid
             else:
                 return value or None
+        elif self.value_type == Attribute.TYPE_FIELDSET:
+            return self._get_fieldset_serialization(value)
         else:
             raise Exception('Cannot serialize attribute type "%s".' % self.value_type)
 
@@ -154,8 +157,32 @@ class Attribute(models.Model):
                 return value
             else:
                 return get_user_model().objects.get(id=value)
+        elif self.value_type == Attribute.TYPE_FIELDSET:
+            return self._get_fieldset_serialization(value, deserialize=True)
         else:
             raise Exception('Cannot deserialize attribute type "%s".' % self.value_type)
+
+    def _get_fieldset_serialization(self, value: Sequence, deserialize: bool = False):
+        """Recursively go through the fields in the fieldset and (de)serialize them."""
+        if not isinstance(value, Sequence):
+            return None
+
+        entities = []
+        fieldset_attributes = self.fieldset_attributes.all()
+        for entity in value:
+            processed_entity = {}
+            for attr in fieldset_attributes:
+                if attr.identifier in entity:
+                    if deserialize:
+                        processed_value = attr.deserialize_value(
+                            entity[attr.identifier]
+                        )
+                    else:
+                        processed_value = attr.serialize_value(entity[attr.identifier])
+                    processed_entity[attr.identifier] = processed_value
+            if processed_entity:
+                entities.append(processed_entity)
+        return entities
 
 
 class AttributeValueChoice(models.Model):
