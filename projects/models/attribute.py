@@ -1,5 +1,6 @@
 import datetime
 import re
+from collections import Sequence
 
 from django.contrib.auth import get_user_model
 from django.core.validators import RegexValidator
@@ -20,8 +21,14 @@ validate_identifier = RegexValidator(
 
 
 class Attribute(models.Model):
-    """Defines a single attribute type."""
+    """Defines a single attribute type.
 
+    Fieldset defines a group of tightly related attributes that define a single entity. E.g. information regarding
+    a person might consist of several fields. If there is a need to store information for multiple entities, we
+    can define a fieldset which knows the attributes for a single entity.
+    """
+
+    TYPE_FIELDSET = "fieldset"
     TYPE_INTEGER = "integer"
     TYPE_SHORT_STRING = "short_string"
     TYPE_LONG_STRING = "long_string"
@@ -33,6 +40,7 @@ class Attribute(models.Model):
     TYPE_FILE = "file"
 
     TYPE_CHOICES = (
+        (TYPE_FIELDSET, _("fieldset")),
         (TYPE_INTEGER, _("integer")),
         (TYPE_SHORT_STRING, _("short string")),
         (TYPE_LONG_STRING, _("long string")),
@@ -49,6 +57,8 @@ class Attribute(models.Model):
         max_length=64, verbose_name=_("value type"), choices=TYPE_CHOICES
     )
     public = models.BooleanField(verbose_name=_("public information"), default=False)
+    generated = models.BooleanField(verbose_name=_("generated"), default=False)
+    required = models.BooleanField(verbose_name=_("required"), default=False)
     multiple_choice = models.BooleanField(
         verbose_name=_("multiple choice"), default=False
     )
@@ -58,6 +68,13 @@ class Attribute(models.Model):
         db_index=True,
         unique=True,
         validators=[validate_identifier],
+    )
+    fieldset_attributes = models.ManyToManyField(
+        "self",
+        symmetrical=False,
+        related_name="fieldsets",
+        through="FieldSetAttribute",
+        through_fields=("attribute_source", "attribute_target"),
     )
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
 
@@ -109,6 +126,8 @@ class Attribute(models.Model):
                 return value.uuid
             else:
                 return value or None
+        elif self.value_type == Attribute.TYPE_FIELDSET:
+            return self._get_fieldset_serialization(value)
         else:
             raise Exception('Cannot serialize attribute type "%s".' % self.value_type)
 
@@ -138,8 +157,32 @@ class Attribute(models.Model):
                 return value
             else:
                 return get_user_model().objects.get(id=value)
+        elif self.value_type == Attribute.TYPE_FIELDSET:
+            return self._get_fieldset_serialization(value, deserialize=True)
         else:
             raise Exception('Cannot deserialize attribute type "%s".' % self.value_type)
+
+    def _get_fieldset_serialization(self, value: Sequence, deserialize: bool = False):
+        """Recursively go through the fields in the fieldset and (de)serialize them."""
+        if not isinstance(value, Sequence):
+            return None
+
+        entities = []
+        fieldset_attributes = self.fieldset_attributes.all()
+        for entity in value:
+            processed_entity = {}
+            for attr in fieldset_attributes:
+                if attr.identifier in entity:
+                    if deserialize:
+                        processed_value = attr.deserialize_value(
+                            entity[attr.identifier]
+                        )
+                    else:
+                        processed_value = attr.serialize_value(entity[attr.identifier])
+                    processed_entity[attr.identifier] = processed_value
+            if processed_entity:
+                entities.append(processed_entity)
+        return entities
 
 
 class AttributeValueChoice(models.Model):
@@ -168,3 +211,22 @@ class AttributeValueChoice(models.Model):
 
     def __str__(self):
         return self.value
+
+
+class FieldSetAttribute(models.Model):
+
+    attribute_source = models.ForeignKey(
+        Attribute, on_delete=models.CASCADE, related_name="fieldset_attribute_source"
+    )
+    attribute_target = models.ForeignKey(
+        Attribute, on_delete=models.CASCADE, related_name="fieldset_attribute_target"
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+
+    class Meta:
+        verbose_name = _("fieldset attribute")
+        verbose_name_plural = _("fieldset attributes")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.attribute_source} -> {self.attribute_target}"

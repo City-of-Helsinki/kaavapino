@@ -1,3 +1,17 @@
-# Disable Flake8 checks here as having fixtures in their
-# own file is a lot nicer for readability.
-from .fixtures import *  # noqa: F401,F403
+# flake8: noqa
+# Disable Flake8 checks here as having fixtures and factories in their
+# own files is a lot nicer for readability.
+from pytest_factoryboy import register
+
+from users.tests.factories import UserFactory
+from .fixtures import *
+from .factories import *
+
+register(UserFactory)
+register(AttributeFactory)
+register(FieldSetAttributeFactory)
+register(ProjectTypeFactory)
+register(ProjectPhaseFactory)
+register(ProjectPhaseSectionFactory)
+register(ProjectPhaseSectionAttributeFactory)
+register(ProjectFactory)

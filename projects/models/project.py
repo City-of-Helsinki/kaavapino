@@ -90,6 +90,7 @@ class Project(models.Model):
         return self.name
 
     def get_attribute_data(self):
+        """Returns deserialized attribute data for the project."""
         ret = {}
 
         for attribute in Attribute.objects.all().prefetch_related("value_choices"):
@@ -332,8 +333,6 @@ class ProjectPhaseSectionAttribute(models.Model):
     section = models.ForeignKey(
         ProjectPhaseSection, verbose_name=_("phase section"), on_delete=models.CASCADE
     )
-    generated = models.BooleanField(verbose_name=_("generated"), default=False)
-    required = models.BooleanField(verbose_name=_("required"))
     index = models.PositiveIntegerField(verbose_name=_("index"))
 
     relies_on = models.ForeignKey(

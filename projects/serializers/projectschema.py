@@ -21,52 +21,57 @@ FOREIGN_KEY_TYPE_MODELS = {
 MatrixSectionAttribute = namedtuple("MatrixSectionAttribute", ["matrix"])
 
 
-class ProjectAttributeChoiceSchemaSerializer(serializers.Serializer):
+class AttributeChoiceSchemaSerializer(serializers.Serializer):
     label = serializers.CharField()
     value = serializers.CharField()
 
 
-class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
-    label = serializers.CharField(source="attribute.name")
-    name = serializers.CharField(source="attribute.identifier")
-    help_text = serializers.CharField(source="attribute.help_text")
-    multiple_choice = serializers.BooleanField(source="attribute.multiple_choice")
-    relies_on = serializers.CharField(
-        source="relies_on.attribute.identifier", allow_null=True
-    )
+class AttributeSchemaSerializer(serializers.Serializer):
+    label = serializers.CharField(source="name")
+    name = serializers.CharField(source="identifier")
+    help_text = serializers.CharField()
+    multiple_choice = serializers.BooleanField()
+    fieldset_attributes = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
     required = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()
 
     @staticmethod
-    def get_required(section_attribute):
-        return _is_attribute_required(section_attribute)
+    def get_fieldset_attributes(attribute):
+        if attribute.value_type == Attribute.TYPE_FIELDSET:
+            return [
+                AttributeSchemaSerializer(attr).data
+                for attr in attribute.fieldset_attributes.order_by(
+                    "fieldset_attribute_source"
+                )
+            ]
+        return []
 
     @staticmethod
-    def get_type(section_attribute):
-        value_type = section_attribute.attribute.value_type
+    def get_required(attribute):
+        return _is_attribute_required(attribute)
+
+    @staticmethod
+    def get_type(attribute):
+        value_type = attribute.value_type
         # Remap values if applicable
         return VALUE_TYPE_MAP.get(value_type, value_type)
 
     @staticmethod
-    def get_choices(section_attribute):
-        foreign_key_choice = FOREIGN_KEY_TYPE_MODELS.get(
-            section_attribute.attribute.value_type, None
-        )
+    def get_choices(attribute):
+        foreign_key_choice = FOREIGN_KEY_TYPE_MODELS.get(attribute.value_type, None)
 
         if foreign_key_choice:
-            choices = ProjectSectionAttributeSchemaSerializer._get_foreign_key_choices(
+            choices = AttributeSchemaSerializer._get_foreign_key_choices(
                 foreign_key_choice
             )
         else:
-            choices = ProjectSectionAttributeSchemaSerializer._get_section_attribute_choices(
-                section_attribute
-            )
+            choices = AttributeSchemaSerializer._get_attribute_choices(attribute)
 
         if not choices:
             return None
 
-        return ProjectAttributeChoiceSchemaSerializer(choices, many=True).data
+        return AttributeChoiceSchemaSerializer(choices, many=True).data
 
     @staticmethod
     def _get_foreign_key_choices(choice_data):
@@ -88,12 +93,18 @@ class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
         return choices
 
     @staticmethod
-    def _get_section_attribute_choices(section_attribute):
+    def _get_attribute_choices(attribute):
         choices = []
-        choice_instances = section_attribute.attribute.value_choices.all()
+        choice_instances = attribute.value_choices.all()
         for choice in choice_instances:
             choices.append({"label": choice.value, "value": choice.identifier})
         return choices
+
+
+class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
+    relies_on = serializers.CharField(
+        source="relies_on.attribute.identifier", allow_null=True
+    )
 
     @staticmethod
     def get_matrix(section_attribute):
@@ -182,11 +193,20 @@ class ProjectSectionSchemaSerializer(serializers.Serializer):
         if hasattr(section_attribute, "matrix"):
             return ProjectSectionAttributeMatrixSchemaSerializer(section_attribute).data
 
-        return ProjectSectionAttributeSchemaSerializer(section_attribute).data
+        serialized_attribute = ProjectSectionAttributeSchemaSerializer(
+            section_attribute
+        ).data
+        serialized_attribute.update(
+            AttributeSchemaSerializer(section_attribute.attribute).data
+        )
+        return serialized_attribute
 
     @staticmethod
     def _create_matrix_cell_attribute(cell, section_attribute):
         cell_attribute = ProjectSectionAttributeSchemaSerializer(section_attribute).data
+        cell_attribute.update(
+            AttributeSchemaSerializer(section_attribute.attribute).data
+        )
         cell_attribute["row"] = cell.row
         cell_attribute["column"] = cell.column
 

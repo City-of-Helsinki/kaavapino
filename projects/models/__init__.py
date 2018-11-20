@@ -1,4 +1,4 @@
-from .attribute import Attribute, AttributeValueChoice  # noqa
+from .attribute import Attribute, AttributeValueChoice, FieldSetAttribute  # noqa
 from .document import DocumentTemplate  # noqa
 from .project import (  # noqa
     Project,

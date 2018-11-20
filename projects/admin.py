@@ -31,7 +31,7 @@ class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(Attribute)
 class AttributeAdmin(admin.ModelAdmin):
-    list_display = ("name", "value_type", "identifier")
+    list_display = ("name", "value_type", "identifier", "required", "public")
     inlines = (AttributeValueChoiceInline,)
     prepopulated_fields = {"identifier": ("name",)}
 
