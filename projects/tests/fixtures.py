@@ -80,6 +80,8 @@ def f_file_attribute(f_user):
         value_type=Attribute.TYPE_FILE,
         identifier="file_attr",
         help_text="This is an file attribute",
+        generated=False,
+        required=False,
     )
 
 
@@ -232,11 +234,7 @@ def f_project_section_attribute_6(
 @pytest.mark.django_db()
 def f_project_section_attribute_6_file(f_file_attribute, f_project_section_1):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_file_attribute,
-        section=f_project_section_1,
-        generated=False,
-        required=False,
-        index=6,
+        attribute=f_file_attribute, section=f_project_section_1, index=6
     )
 
 
