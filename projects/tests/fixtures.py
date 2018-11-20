@@ -269,9 +269,13 @@ def f_project_with_attribute_data(f_user, f_project_type, f_project_phase_1):
 @pytest.mark.django_db()
 def f_fieldset_attribute(attribute_factory, field_set_attribute_factory):
     fieldset_attribute = attribute_factory(
-        value_type=Attribute.TYPE_FIELDSET, multiple_choice=True
+        value_type=Attribute.TYPE_FIELDSET, multiple_choice=True, required=True
     )
-    field_set_attribute_factory(attribute_source=fieldset_attribute)
-    field_set_attribute_factory(attribute_source=fieldset_attribute)
+    field_set_attribute_factory(
+        attribute_source=fieldset_attribute, attribute_target__required=True
+    )
+    field_set_attribute_factory(
+        attribute_source=fieldset_attribute, attribute_target__required=True
+    )
 
     return fieldset_attribute

@@ -90,6 +90,7 @@ class Project(models.Model):
         return self.name
 
     def get_attribute_data(self):
+        """Returns deserialized attribute data for the project."""
         ret = {}
 
         for attribute in Attribute.objects.all().prefetch_related("value_choices"):

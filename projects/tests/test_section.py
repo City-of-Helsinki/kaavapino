@@ -1,7 +1,11 @@
 import pytest
+from django.contrib.auth import get_user_model
 from django.http import HttpRequest
+from rest_framework import serializers
 from rest_framework.request import Request
 
+from projects.models import AttributeValueChoice
+from projects.serializers.section import create_attribute_field_data
 from projects.serializers.section import (
     create_section_serializer,
     get_attribute_data,
@@ -19,6 +23,42 @@ def test_create_section_serializer(
     serializer = create_section_serializer(f_project_section_1, context)
     fields = serializer._declared_fields
     assert len(fields) == 2
+
+
+@pytest.mark.django_db()
+def test_create_section_serialized_for_fieldset(
+    f_fieldset_attribute, project, project_phase_section_attribute_factory
+):
+    # Setup the data
+    ppsa = project_phase_section_attribute_factory(attribute=f_fieldset_attribute)
+    section = ppsa.section
+    phase = section.phase
+    project.phase = phase
+    project.save()
+
+    field1 = f_fieldset_attribute.fieldset_attributes.all()[0]
+    field2 = f_fieldset_attribute.fieldset_attributes.all()[1]
+
+    data = {
+        f_fieldset_attribute.identifier: [
+            {field1.identifier: "AAA", field2.identifier: "BBB"},
+            {field1.identifier: "CCC", field2.identifier: "DDD"},
+        ]
+    }
+
+    http_request = HttpRequest()
+    request = Request(http_request)
+    context = {"request": request}
+    serializer = create_section_serializer(section, context)
+    fields = serializer._declared_fields
+    assert len(fields) == 1
+
+    assert serializer(data=data).is_valid()
+
+    del data[f_fieldset_attribute.identifier][0][field1.identifier]
+    assert not serializer(data=data).is_valid()
+
+    assert not serializer(data={"nope": False}).is_valid()
 
 
 @pytest.mark.django_db()
@@ -61,3 +101,41 @@ def test_is_relevant_attribute(
         )
         is True
     )
+
+
+@pytest.mark.django_db()
+def test_create_attribute_field_data(
+    f_short_string_attribute,
+    f_user_attribute,
+    f_short_string_multi_choice_attribute,
+    f_short_string_choice_attribute,
+):
+    short_string_field = create_attribute_field_data(f_short_string_attribute, True)
+    user_field = create_attribute_field_data(f_user_attribute, True)
+    multi_choice_field = create_attribute_field_data(
+        f_short_string_multi_choice_attribute, True
+    )
+    choice_field = create_attribute_field_data(f_short_string_choice_attribute, True)
+
+    fields = [short_string_field, user_field, multi_choice_field, choice_field]
+    choices_field = [multi_choice_field, choice_field]
+
+    assert short_string_field.field_class == serializers.CharField
+    assert user_field.field_class == serializers.SlugRelatedField
+    assert multi_choice_field.field_class == serializers.SlugRelatedField
+    assert choice_field.field_class == serializers.SlugRelatedField
+
+    for field in fields:
+        assert "help_text" in field.field_arguments
+
+    for choice_field in choices_field:
+        assert len(choice_field.field_arguments["queryset"]) > 0
+        assert (
+            type(choice_field.field_arguments["queryset"].first())
+            == AttributeValueChoice
+        )
+
+    assert len(user_field.field_arguments["queryset"]) == len(
+        get_user_model().objects.all()
+    )
+    assert type(user_field.field_arguments["queryset"].first()) == get_user_model()

@@ -2,10 +2,88 @@ import collections
 
 from rest_framework import serializers
 
-from projects.serializers.utils import (
-    _get_serializer_field_data,
-    _is_attribute_required,
-)
+from projects.models import Attribute
+from projects.serializers.utils import _is_attribute_required
+
+from collections import namedtuple
+
+from django.contrib.auth import get_user_model
+
+
+FIELD_TYPES = {
+    Attribute.TYPE_SHORT_STRING: serializers.CharField,
+    Attribute.TYPE_LONG_STRING: serializers.CharField,
+    Attribute.TYPE_INTEGER: serializers.IntegerField,
+    Attribute.TYPE_BOOLEAN: serializers.BooleanField,
+    Attribute.TYPE_DATE: serializers.DateField,
+    Attribute.TYPE_IMAGE: serializers.ImageField,  # TODO: Figure out file uploads with DRF
+    Attribute.TYPE_USER: serializers.PrimaryKeyRelatedField,
+    # TODO Add Attribute.TYPE_GEOMETRY
+}
+
+
+FieldData = namedtuple("FieldData", ["field_class", "field_arguments"])
+
+
+def create_attribute_field_data(attribute, validation):
+    """Create data for initializing attribute field serializer."""
+    field_arguments = {}
+    field_class = FIELD_TYPES.get(attribute.value_type, None)
+
+    choices = attribute.value_choices.all()
+    if choices:
+        field_class = serializers.SlugRelatedField
+        field_arguments["queryset"] = choices
+        field_arguments["slug_field"] = "identifier"
+
+        if attribute.multiple_choice:
+            field_arguments["many"] = True
+
+    if attribute.value_type == Attribute.TYPE_USER:
+        field_class = serializers.SlugRelatedField
+        field_arguments["queryset"] = get_user_model().objects.all()
+        field_arguments["slug_field"] = "uuid"
+
+    field_arguments["help_text"] = attribute.help_text
+
+    # Allow fields to be set to null so that they can be emptied
+    if attribute.value_type not in [Attribute.TYPE_BOOLEAN]:
+        field_arguments["allow_null"] = True
+
+    field_arguments["required"] = False
+    if validation:
+        field_arguments["required"] = _is_attribute_required(attribute)
+        field_arguments["allow_null"] = False
+
+    return FieldData(field_class, field_arguments)
+
+
+def create_fieldset_field_data(attribute, validation):
+    """Dynamically create a serializer for a fieldset type Attribute instance."""
+    serializer_fields = {}
+    field_arguments = {}
+
+    if attribute.multiple_choice:
+        field_arguments["many"] = True
+
+    for attr in attribute.fieldset_attributes.order_by("fieldset_attribute_source"):
+        field_data = create_attribute_field_data(attr, validation)
+        if not field_data.field_class:
+            # TODO: Handle this by failing instead of continuing
+            continue
+
+        serializer_field = field_data.field_class(**field_data.field_arguments)
+        serializer_fields[attr.identifier] = serializer_field
+
+    field_arguments["required"] = False
+    if validation:
+        field_arguments["required"] = _is_attribute_required(attribute)
+        field_arguments["allow_null"] = False
+
+    serializer = type("FieldSetSerializer", (serializers.Serializer,), {})
+    serializer._declared_fields = serializer_fields
+
+    return FieldData(serializer, field_arguments)
 
 
 def create_section_serializer(section, context, project=None, validation=True):
@@ -34,18 +112,15 @@ def create_section_serializer(section, context, project=None, validation=True):
         if not is_relevant_attribute(section_attribute, attribute_data):
             continue
         attribute = section_attribute.attribute
-        field_data = _get_serializer_field_data(attribute)
 
-        if not field_data.field_class:
-            # TODO: Handle this by failing instead of continuing
-            continue
+        if attribute.value_type == Attribute.TYPE_FIELDSET:
+            field_data = create_fieldset_field_data(attribute, validation)
+        else:
+            field_data = create_attribute_field_data(attribute, validation)
 
-        field_data.field_arguments["required"] = False
-        if validation:
-            required = _is_attribute_required(section_attribute.attribute)
-            if required:
-                field_data.field_arguments["required"] = True
-                field_data.field_arguments["allow_null"] = False
+            if not field_data.field_class:
+                # TODO: Handle this by failing instead of continuing
+                continue
 
         serializer_field = field_data.field_class(**field_data.field_arguments)
         serializer_fields[attribute.identifier] = serializer_field
