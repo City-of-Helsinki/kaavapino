@@ -183,8 +183,10 @@ class AttributeImporter:
     def _get_attribute_row_identifier(self, row: Sequence) -> str:
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
-    def _update_attributes(self, rows: Iterable[Sequence[str]]):
-        logger.info("\nUpdating attributes...")
+    def _create_attributes(self, rows: Iterable[Sequence[str]]):
+        logger.info("\nCreating attributes...")
+
+        Attribute.objects.all().delete()
 
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
@@ -212,14 +214,7 @@ class AttributeImporter:
                 )
                 value_type = Attribute.TYPE_SHORT_STRING
 
-            overwrite = self.options.get("overwrite")
-
-            if overwrite:
-                method = Attribute.objects.update_or_create
-            else:
-                method = Attribute.objects.get_or_create
-
-            attribute, created = method(
+            attribute, created = Attribute.objects.get_or_create(
                 identifier=identifier,
                 defaults={
                     "name": name,
@@ -231,20 +226,17 @@ class AttributeImporter:
             )
 
             if created:
-                action_str = "Created"
-            else:
-                action_str = "Updated" if overwrite else "Already exists, skipping"
+                logger.info(f"Created {attribute}")
 
-            logger.info(f"{action_str} {attribute}")
+    def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
+        logger.info("\nCreating fieldsets...")
 
-    def _replace_fieldset_links(self, rows: Iterable[Sequence[str]]):
-        logger.info("\nUpdating fieldsets...")
+        FieldSetAttribute.objects.all().delete()
 
         if ATTRIBUTE_FIELDSET not in self.column_index:
             logger.warning(f'Fieldset column "{ATTRIBUTE_FIELDSET}" missing: Skipping')
             return
 
-        FieldSetAttribute.objects.all().delete()
         fieldset_map = defaultdict(list)
 
         # Map out the link that need to be created
@@ -285,8 +277,12 @@ class AttributeImporter:
 
         return filter(lambda x: x is not None, input_phases)
 
-    def _update_sections(self, rows):
-        logger.info("\nUpdating sections...")
+    def _create_sections(self, rows):
+        logger.info("\nReplacing sections...")
+
+        ProjectPhaseSection.objects.filter(
+            phase__project_type=self.project_type
+        ).delete()
 
         for phase in ProjectPhase.objects.filter(project_type=self.project_type):
 
@@ -303,25 +299,12 @@ class AttributeImporter:
                     phase_sections.append(section_phase_name)
 
             for i, phase_section_name in enumerate(phase_sections, start=1):
-                overwrite = self.options.get("overwrite")
-
-                if overwrite:
-                    method = ProjectPhaseSection.objects.update_or_create
-                else:
-                    method = ProjectPhaseSection.objects.get_or_create
-
-                section, created = method(
-                    phase=phase, index=i, defaults={"name": phase_section_name}
+                section = ProjectPhaseSection.objects.create(
+                    phase=phase, index=i, name=phase_section_name
                 )
+                logger.info(f"Created {section}")
 
-                if created:
-                    action_str = "Created"
-                else:
-                    action_str = "Updated" if overwrite else "Already exists, skipping"
-
-                logger.info(f"{action_str} {section}")
-
-    def _replace_attribute_section_links(self, rows):
+    def _create_attribute_section_links(self, rows):
         logger.info("\nReplacing attribute section links...")
 
         ProjectPhaseSectionAttribute.objects.filter(
@@ -437,14 +420,14 @@ class AttributeImporter:
 
         data_rows = list(filter(self._check_if_row_valid, rows[1:]))
 
-        self._update_attributes(data_rows)
-        self._replace_fieldset_links(data_rows)
+        self._create_attributes(data_rows)
+        self._create_fieldset_links(data_rows)
 
         # Remove all attributes from further processing that were part of a fieldset
         data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
 
-        self._update_sections(data_rows)
-        self._replace_attribute_section_links(data_rows)
+        self._create_sections(data_rows)
+        self._create_attribute_section_links(data_rows)
         self._update_type_metadata(data_rows)
 
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
