@@ -369,14 +369,6 @@ class AttributeImporter:
         self.project_type.save()
 
     def _get_project_card_attributes_metadata(self, rows) -> dict:
-        # TODO: Remove when the proper excel file has been defined
-        if not all(
-            value in self.column_index
-            for value in METADATA_FIELDS["project_cards"].values()
-        ):
-            logger.info("No project card support: Skipping")
-            return {}
-
         metadata = {}
         project_card_mapping = {
             key: {} for key in METADATA_FIELDS["project_cards"].keys()
