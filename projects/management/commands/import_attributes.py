@@ -12,7 +12,6 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("filename", type=str)
         parser.add_argument("--sheet", nargs="?", type=str)
-        parser.add_argument("--overwrite", action="store_true")
 
     def handle(self, *args, **options):
         attribute_importer = AttributeImporter(options)
