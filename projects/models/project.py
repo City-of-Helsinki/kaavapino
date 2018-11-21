@@ -33,6 +33,33 @@ class ProjectType(models.Model):
         return self.name
 
 
+class ProjectSubtype(models.Model):
+    project_type = models.ForeignKey(
+        ProjectType,
+        verbose_name=_("project type"),
+        on_delete=models.CASCADE,
+        related_name="subtypes",
+    )
+
+    name = models.CharField(max_length=255, verbose_name=_("name"))
+    metadata = JSONField(
+        verbose_name=_("metadata"),
+        default=dict,
+        blank=True,
+        null=True,
+        encoder=DjangoJSONEncoder,
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"))
+
+    class Meta:
+        verbose_name = _("project subtype")
+        verbose_name_plural = _("project subtypes")
+        ordering = ("index",)
+
+    def __str__(self):
+        return self.name
+
+
 class Project(models.Model):
     """Represents a single project in the system."""
 
@@ -58,9 +85,9 @@ class Project(models.Model):
         blank=True,
         null=True,
     )
-    type = models.ForeignKey(
-        ProjectType,
-        verbose_name=_("type"),
+    subtype = models.ForeignKey(
+        ProjectSubtype,
+        verbose_name=_("subtype"),
         related_name="projects",
         on_delete=models.PROTECT,
     )
@@ -234,12 +261,16 @@ class Project(models.Model):
 
         return timeline
 
+    @property
+    def type(self):
+        return self.subtype.project_type
+
 
 class ProjectPhase(models.Model):
     """Describes a phase of a certain project type."""
 
-    project_type = models.ForeignKey(
-        ProjectType,
+    project_subtype = models.ForeignKey(
+        ProjectSubtype,
         verbose_name=_("project type"),
         on_delete=models.CASCADE,
         related_name="phases",
@@ -258,6 +289,10 @@ class ProjectPhase(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def project_type(self):
+        return self.project_subtype.project_type
 
 
 class ProjectPhaseLog(models.Model):
