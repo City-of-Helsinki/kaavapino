@@ -10,12 +10,14 @@ from projects.models import (
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
 )
+from projects.models.project import ProjectSubtype
 from users.tests.factories import UserFactory
 
 __all__ = (
     "AttributeFactory",
     "FieldSetAttributeFactory",
     "ProjectTypeFactory",
+    "ProjectSubtypeFactory",
     "ProjectPhaseFactory",
     "ProjectPhaseSectionFactory",
     "ProjectPhaseSectionAttributeFactory",
@@ -50,8 +52,18 @@ class ProjectTypeFactory(factory.DjangoModelFactory):
         django_get_or_create = ("name",)
 
 
-class ProjectPhaseFactory(factory.DjangoModelFactory):
+class ProjectSubtypeFactory(factory.DjangoModelFactory):
     project_type = factory.SubFactory(ProjectTypeFactory)
+    name = factory.fuzzy.FuzzyChoice(["XS", "S", "M", "L", "XL"])
+    index = factory.Sequence(int)
+
+    class Meta:
+        model = ProjectSubtype
+        django_get_or_create = ("name", "project_type")
+
+
+class ProjectPhaseFactory(factory.DjangoModelFactory):
+    project_subtype = factory.SubFactory(ProjectSubtypeFactory)
     name = fuzzy.FuzzyText()
     index = factory.Sequence(int)
 
@@ -81,7 +93,7 @@ class ProjectFactory(factory.DjangoModelFactory):
     identifier = fuzzy.FuzzyText()
     name = factory.Faker("street_name")
     user = factory.SubFactory(UserFactory)
-    type = factory.SubFactory(ProjectTypeFactory)
+    subtype = factory.SubFactory(ProjectSubtypeFactory)
     phase = factory.SubFactory(ProjectPhaseFactory)
 
     class Meta:
