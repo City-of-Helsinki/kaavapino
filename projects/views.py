@@ -30,7 +30,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
     @action(methods=["put"], detail=True, parser_classes=[MultiPartParser])
     def files(self, request, pk=None):
         project = self.get_object()
+
+        # Query dicts are not mutable by default, temporarily change that
+        request.data._mutable = True
         request.data["project"] = project.pk
+        request.data._mutable = False
 
         context = self.get_serializer_context()
         serializer = ProjectFileSerializer(data=request.data, context=context)
