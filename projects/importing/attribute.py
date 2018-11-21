@@ -1,7 +1,7 @@
 import logging
 from collections import Counter, defaultdict
 from itertools import filterfalse
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, List
 
 from django.db import transaction
 from openpyxl import load_workbook
@@ -11,12 +11,16 @@ from projects.models import (
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
 )
+from projects.models.project import ProjectSubtype
 from ..models import Attribute, ProjectPhase, ProjectType
 from ..models.utils import create_identifier, truncate_identifier
 
 logger = logging.getLogger(__name__)
 
 IDENTIFIER_MAX_LENGTH = 50
+
+PROJECT_SIZE = "kokoluokka"
+PROJECT_PHASE = "syöttövaihe"
 
 DEFAULT_SHEET_NAME = "Hanketiedot (työversio)"
 
@@ -277,14 +281,12 @@ class AttributeImporter:
 
         return filter(lambda x: x is not None, input_phases)
 
-    def _create_sections(self, rows):
+    def _create_sections(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing sections...")
 
-        ProjectPhaseSection.objects.filter(
-            phase__project_type=self.project_type
-        ).delete()
+        ProjectPhaseSection.objects.filter(phase__project_subtype=subtype).delete()
 
-        for phase in ProjectPhase.objects.filter(project_type=self.project_type):
+        for phase in ProjectPhase.objects.filter(project_subtype=subtype):
 
             # Get all distinct section names in appearance order
             phase_sections = []
@@ -304,14 +306,14 @@ class AttributeImporter:
                 )
                 logger.info(f"Created {section}")
 
-    def _create_attribute_section_links(self, rows):
+    def _create_attribute_section_links(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing attribute section links...")
 
         ProjectPhaseSectionAttribute.objects.filter(
-            section__phase__project_type=self.project_type
+            section__phase__project_subtype=subtype
         ).delete()
 
-        for phase in ProjectPhase.objects.filter(project_type=self.project_type):
+        for phase in ProjectPhase.objects.filter(project_subtype=subtype):
 
             # Index for attribute within a phase section
             counter = Counter()
@@ -382,24 +384,72 @@ class AttributeImporter:
             )
         return metadata
 
-    def create_phases(self):
-        logger.info("\nCreating phases...")
-        current_phases = [
-            obj.name for obj in self.project_type.phases.order_by("index")
-        ]
+    def get_subtypes_from_cell(self, cell_content: str) -> List[str]:
+        if "," in cell_content:
+            # Split names and remove whitespace
+            return [name.strip().lower() for name in cell_content.split(",")]
+        else:
+            # Always handle a list
+            return [cell_content.lower()]
+
+    def create_phases(self, subtype: ProjectSubtype):
+        logger.info(f"\nCreating phases for {subtype.name}...")
+        current_phases = [obj.name for obj in subtype.phases.order_by("index")]
         new_phases = [x["name"] for x in PROJECT_PHASES]
         if current_phases == new_phases:
             return
 
-        self.project_type.phases.all().delete()
+        subtype.phases.all().delete()
         for i, phase in enumerate(PROJECT_PHASES, start=1):
             ProjectPhase.objects.create(
-                project_type=self.project_type,
+                project_subtype=subtype,
                 name=phase["name"],
                 index=i,
                 color=phase["color"],
                 color_code=phase["color_code"],
             )
+
+    def create_subtypes(
+        self, rows: Iterable[Sequence[str]]
+    ) -> Iterable[ProjectSubtype]:
+
+        subtype_names = [
+            subtype.name.lower() for subtype in ProjectSubtype.objects.all()
+        ]
+        for row in rows:
+            subtypes_cell_content = row[self.column_index[PROJECT_SIZE]]
+            row_subtypes = self.get_subtypes_from_cell(subtypes_cell_content)
+
+            # If all ("kaikki") of the subtypes are included, continue
+            if "kaikki" in row_subtypes:
+                continue
+
+            for subtype_name in row_subtypes:
+                # Skip non-single word and existing subtypes
+                if " " in subtype_name or subtype_name in subtype_names:
+                    continue
+
+                subtype_names.append(subtype_name)
+
+        # Sort subtypes by "clothing sizes"
+        sort_order = ["xxs", "xs", "s", "m", "l", "xl", "xxl"]
+        # Note that if a value is not in the sort order list, it will be ordered first in the list
+        ordered_subtype_names = sorted(
+            subtype_names,
+            key=lambda x: next((i for i, t in enumerate(sort_order) if x == t), 0),
+        )
+
+        # Create subtypes
+        ordered_subtypes = []
+        for index, subtype_name in enumerate(ordered_subtype_names):
+            project_subtype, created = ProjectSubtype.objects.update_or_create(
+                project_type=self.project_type,
+                name=subtype_name.upper(),
+                defaults={"index": index},
+            )
+            ordered_subtypes.append(project_subtype)
+
+        return ordered_subtypes
 
     @transaction.atomic
     def run(self):
@@ -410,8 +460,6 @@ class AttributeImporter:
             f"Importing attributes from file {filename} for project type {self.project_type}..."
         )
 
-        self.create_phases()
-
         workbook = self._open_workbook(filename)
         rows = self._extract_data_from_workbook(workbook)
 
@@ -420,16 +468,21 @@ class AttributeImporter:
 
         data_rows = list(filter(self._check_if_row_valid, rows[1:]))
 
+        subtypes = self.create_subtypes(data_rows)
+        for subtype in subtypes:
+            self.create_phases(subtype)
         self._create_attributes(data_rows)
         self._create_fieldset_links(data_rows)
 
         # Remove all attributes from further processing that were part of a fieldset
         data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
 
-        self._create_sections(data_rows)
-        self._create_attribute_section_links(data_rows)
+        for subtype in subtypes:
+            self._create_sections(data_rows, subtype)
+            self._create_attribute_section_links(data_rows, subtype)
         self._update_type_metadata(data_rows)
 
+        logger.info("Project subtypes {}".format(ProjectSubtype.objects.count()))
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
         logger.info("Attributes {}".format(Attribute.objects.count()))
         logger.info(
