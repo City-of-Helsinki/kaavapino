@@ -35,6 +35,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
+    type = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -45,6 +46,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "name",
             "identifier",
             "type",
+            "subtype",
             "attribute_data",
             "phase",
             "geometry",
@@ -57,6 +59,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         self._set_file_attributes(attribute_data, project)
 
         return attribute_data
+
+    def get_type(self, project):
+        return project.type.pk
 
     def _set_file_attributes(self, attribute_data, project):
         request = self.context["request"]
