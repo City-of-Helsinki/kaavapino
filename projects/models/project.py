@@ -390,7 +390,10 @@ class ProjectAttributeFile(models.Model):
         return ["projects", project_id, self.attribute.identifier]
 
     file = PrivateFileField(
-        "File", storage=OverwriteStorage(), upload_subfolder=get_upload_subfolder
+        "File",
+        storage=OverwriteStorage(),
+        upload_subfolder=get_upload_subfolder,
+        max_length=255,
     )
 
     class Meta:
