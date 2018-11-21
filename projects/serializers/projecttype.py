@@ -2,6 +2,13 @@ from django.db.models import Case, When
 from rest_framework import serializers
 
 from projects.models import ProjectType, Attribute
+from projects.models.project import ProjectSubtype
+
+
+class ProjectSubtypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectSubtype
+        fields = ["id", "name", "metadata", "project_type"]
 
 
 class ProjectTypeMetadataCardAttributeSerializer(serializers.ModelSerializer):
@@ -50,7 +57,8 @@ class ProjectTypeMetadataSerializer(serializers.Serializer):
 
 class ProjectTypeSerializer(serializers.ModelSerializer):
     metadata = ProjectTypeMetadataSerializer()
+    subtypes = ProjectSubtypeSerializer(many=True)
 
     class Meta:
         model = ProjectType
-        fields = ["id", "name", "metadata"]
+        fields = ["id", "name", "metadata", "subtypes"]
