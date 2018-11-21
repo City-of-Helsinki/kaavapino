@@ -17,33 +17,34 @@ from ..models.utils import create_identifier, truncate_identifier
 logger = logging.getLogger(__name__)
 
 IDENTIFIER_MAX_LENGTH = 50
-EXPECTED_A1_VALUE = "HANKETIETO"
 
-DEFAULT_SHEET_NAME = "kaikki tiedot (keskeneräinen)"
+DEFAULT_SHEET_NAME = "Hanketiedot (työversio)"
 
-ATTRIBUTE_NAME = "HANKETIETO"
-ATTRIBUTE_TYPE = "TIETOTYYPPI"
+ATTRIBUTE_NAME = "hanketieto"
+ATTRIBUTE_TYPE = "tietotyyppi"
 ATTRIBUTE_REQUIRED = (
-    "pakollinen tieto (jos EI niin kohdan voi valita poistettavaksi)"
+    "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
 )  # kyllä/ei
-PHASE_SECTION_NAME = "Minkä VÄLIOTSIKON alle kuuluu"
-PUBLIC_ATTRIBUTE = "JULKINEN TIETO"  # kyllä/ei julkinen
-HELP_TEXT = "OHJE"
+PHASE_SECTION_NAME = "minkä väliotsikon alle kuuluu"
+PUBLIC_ATTRIBUTE = "julkinen tieto"  # kyllä/ei julkinen
+HELP_TEXT = "ohje"
 METADATA_FIELDS = {
     "project_cards": {
-        "normal": "Normaali hankekortti",
-        "extended": "Laajennettu hankekortti",
+        "normal": "normaali hankekortti",
+        "extended": "laajennettu hankekortti",
     }
 }
 
-ATTRIBUTE_FIELDSET = "Hanketieto fieldset"
+ATTRIBUTE_FIELDSET = "hanketieto fieldset"
 
 ATTRIBUTE_PHASE_COLUMNS = [
     "syöttövaihe",
-    "Päivitys-vaihe 2",
-    "Päivitys-vaihe 3",
-    "Päivitys-vaihe 4",
+    "päivitys-vaihe 2",
+    "päivitys-vaihe 3",
+    "päivitys-vaihe 4",
 ]
+
+EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
 PROJECT_PHASES = [
     {"name": "Käynnistys", "color": "color--tram", "color_code": "#009246"},  # None
@@ -125,7 +126,8 @@ class AttributeImporter:
         except KeyError as e:
             raise AttributeImporterException(e)
 
-        if sheet["A1"].value != EXPECTED_A1_VALUE:
+        primary_sheet_value = sheet["A1"].value
+        if primary_sheet_value and primary_sheet_value.lower() != EXPECTED_A1_VALUE:
             raise AttributeImporterException(
                 "This does not seem to be a valid attribute sheet."
             )
@@ -144,7 +146,8 @@ class AttributeImporter:
         self.column_index: dict = {}
 
         for index, column in enumerate(header_row):
-            self.column_index[column] = index
+            if column:
+                self.column_index[column.lower()] = index
 
     def _check_if_row_valid(self, row: Sequence) -> bool:
         """Check if the row has all required data.
