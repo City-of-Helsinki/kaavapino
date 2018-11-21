@@ -97,6 +97,9 @@ VALUE_TYPES = {
     "aikataulu ja tehtävät; pvm ja paikka": Attribute.TYPE_LONG_STRING,  # TODO Time and place
     "sisältö; vakioteksti": Attribute.TYPE_LONG_STRING,  # TODO Text always the same
     "sisältö; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice
+    "aikataulu ja tehtävät; vaihe 1…6": Attribute.TYPE_SHORT_STRING,  # TODO Choice
+    "sisältö; teksti (automaattinen täyttö?)": Attribute.TYPE_LONG_STRING,  # TODO Generated
+    "sisältö; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,  # TODO Boolean or choice?
 }
 
 
