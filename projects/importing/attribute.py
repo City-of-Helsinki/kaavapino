@@ -17,33 +17,34 @@ from ..models.utils import create_identifier, truncate_identifier
 logger = logging.getLogger(__name__)
 
 IDENTIFIER_MAX_LENGTH = 50
-EXPECTED_A1_VALUE = "HANKETIETO"
 
-DEFAULT_SHEET_NAME = "kaikki tiedot (keskeneräinen)"
+DEFAULT_SHEET_NAME = "Hanketiedot (työversio)"
 
-ATTRIBUTE_NAME = "HANKETIETO"
-ATTRIBUTE_TYPE = "TIETOTYYPPI"
+ATTRIBUTE_NAME = "hanketieto"
+ATTRIBUTE_TYPE = "tietotyyppi"
 ATTRIBUTE_REQUIRED = (
-    "pakollinen tieto (jos EI niin kohdan voi valita poistettavaksi)"
+    "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
 )  # kyllä/ei
-PHASE_SECTION_NAME = "Minkä VÄLIOTSIKON alle kuuluu"
-PUBLIC_ATTRIBUTE = "JULKINEN TIETO"  # kyllä/ei julkinen
-HELP_TEXT = "OHJE"
+PHASE_SECTION_NAME = "minkä väliotsikon alle kuuluu"
+PUBLIC_ATTRIBUTE = "julkinen tieto"  # kyllä/ei julkinen
+HELP_TEXT = "ohje"
 METADATA_FIELDS = {
     "project_cards": {
-        "normal": "Normaali hankekortti",
-        "extended": "Laajennettu hankekortti",
+        "normal": "normaali hankekortti",
+        "extended": "laajennettu hankekortti",
     }
 }
 
-ATTRIBUTE_FIELDSET = "Hanketieto fieldset"
+ATTRIBUTE_FIELDSET = "hanketieto fieldset"
 
 ATTRIBUTE_PHASE_COLUMNS = [
     "syöttövaihe",
-    "Päivitys-vaihe 2",
-    "Päivitys-vaihe 3",
-    "Päivitys-vaihe 4",
+    "päivitys-vaihe 2",
+    "päivitys-vaihe 3",
+    "päivitys-vaihe 4",
 ]
+
+EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
 PROJECT_PHASES = [
     {"name": "Käynnistys", "color": "color--tram", "color_code": "#009246"},  # None
@@ -97,6 +98,9 @@ VALUE_TYPES = {
     "aikataulu ja tehtävät; pvm ja paikka": Attribute.TYPE_LONG_STRING,  # TODO Time and place
     "sisältö; vakioteksti": Attribute.TYPE_LONG_STRING,  # TODO Text always the same
     "sisältö; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice
+    "aikataulu ja tehtävät; vaihe 1…6": Attribute.TYPE_SHORT_STRING,  # TODO Choice
+    "sisältö; teksti (automaattinen täyttö?)": Attribute.TYPE_LONG_STRING,  # TODO Generated
+    "sisältö; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,  # TODO Boolean or choice?
 }
 
 
@@ -122,7 +126,8 @@ class AttributeImporter:
         except KeyError as e:
             raise AttributeImporterException(e)
 
-        if sheet["A1"].value != EXPECTED_A1_VALUE:
+        primary_sheet_value = sheet["A1"].value
+        if primary_sheet_value and primary_sheet_value.lower() != EXPECTED_A1_VALUE:
             raise AttributeImporterException(
                 "This does not seem to be a valid attribute sheet."
             )
@@ -141,7 +146,8 @@ class AttributeImporter:
         self.column_index: dict = {}
 
         for index, column in enumerate(header_row):
-            self.column_index[column] = index
+            if column:
+                self.column_index[column.lower()] = index
 
     def _check_if_row_valid(self, row: Sequence) -> bool:
         """Check if the row has all required data.
@@ -177,8 +183,10 @@ class AttributeImporter:
     def _get_attribute_row_identifier(self, row: Sequence) -> str:
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
-    def _update_attributes(self, rows: Iterable[Sequence[str]]):
-        logger.info("\nUpdating attributes...")
+    def _create_attributes(self, rows: Iterable[Sequence[str]]):
+        logger.info("\nCreating attributes...")
+
+        Attribute.objects.all().delete()
 
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
@@ -206,14 +214,7 @@ class AttributeImporter:
                 )
                 value_type = Attribute.TYPE_SHORT_STRING
 
-            overwrite = self.options.get("overwrite")
-
-            if overwrite:
-                method = Attribute.objects.update_or_create
-            else:
-                method = Attribute.objects.get_or_create
-
-            attribute, created = method(
+            attribute, created = Attribute.objects.get_or_create(
                 identifier=identifier,
                 defaults={
                     "name": name,
@@ -225,20 +226,17 @@ class AttributeImporter:
             )
 
             if created:
-                action_str = "Created"
-            else:
-                action_str = "Updated" if overwrite else "Already exists, skipping"
+                logger.info(f"Created {attribute}")
 
-            logger.info(f"{action_str} {attribute}")
+    def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
+        logger.info("\nCreating fieldsets...")
 
-    def _replace_fieldset_links(self, rows: Iterable[Sequence[str]]):
-        logger.info("\nUpdating fieldsets...")
+        FieldSetAttribute.objects.all().delete()
 
         if ATTRIBUTE_FIELDSET not in self.column_index:
             logger.warning(f'Fieldset column "{ATTRIBUTE_FIELDSET}" missing: Skipping')
             return
 
-        FieldSetAttribute.objects.all().delete()
         fieldset_map = defaultdict(list)
 
         # Map out the link that need to be created
@@ -279,8 +277,12 @@ class AttributeImporter:
 
         return filter(lambda x: x is not None, input_phases)
 
-    def _update_sections(self, rows):
-        logger.info("\nUpdating sections...")
+    def _create_sections(self, rows):
+        logger.info("\nReplacing sections...")
+
+        ProjectPhaseSection.objects.filter(
+            phase__project_type=self.project_type
+        ).delete()
 
         for phase in ProjectPhase.objects.filter(project_type=self.project_type):
 
@@ -297,25 +299,12 @@ class AttributeImporter:
                     phase_sections.append(section_phase_name)
 
             for i, phase_section_name in enumerate(phase_sections, start=1):
-                overwrite = self.options.get("overwrite")
-
-                if overwrite:
-                    method = ProjectPhaseSection.objects.update_or_create
-                else:
-                    method = ProjectPhaseSection.objects.get_or_create
-
-                section, created = method(
-                    phase=phase, index=i, defaults={"name": phase_section_name}
+                section = ProjectPhaseSection.objects.create(
+                    phase=phase, index=i, name=phase_section_name
                 )
+                logger.info(f"Created {section}")
 
-                if created:
-                    action_str = "Created"
-                else:
-                    action_str = "Updated" if overwrite else "Already exists, skipping"
-
-                logger.info(f"{action_str} {section}")
-
-    def _replace_attribute_section_links(self, rows):
+    def _create_attribute_section_links(self, rows):
         logger.info("\nReplacing attribute section links...")
 
         ProjectPhaseSectionAttribute.objects.filter(
@@ -363,14 +352,6 @@ class AttributeImporter:
         self.project_type.save()
 
     def _get_project_card_attributes_metadata(self, rows) -> dict:
-        # TODO: Remove when the proper excel file has been defined
-        if not all(
-            value in self.column_index
-            for value in METADATA_FIELDS["project_cards"].values()
-        ):
-            logger.info("No project card support: Skipping")
-            return {}
-
         metadata = {}
         project_card_mapping = {
             key: {} for key in METADATA_FIELDS["project_cards"].keys()
@@ -439,14 +420,14 @@ class AttributeImporter:
 
         data_rows = list(filter(self._check_if_row_valid, rows[1:]))
 
-        self._update_attributes(data_rows)
-        self._replace_fieldset_links(data_rows)
+        self._create_attributes(data_rows)
+        self._create_fieldset_links(data_rows)
 
         # Remove all attributes from further processing that were part of a fieldset
         data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
 
-        self._update_sections(data_rows)
-        self._replace_attribute_section_links(data_rows)
+        self._create_sections(data_rows)
+        self._create_attribute_section_links(data_rows)
         self._update_type_metadata(data_rows)
 
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
