@@ -5,11 +5,20 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
-from projects.models import Project, ProjectPhase, ProjectType, ProjectAttributeFile
+from rest_framework_extensions.mixins import NestedViewSetMixin
+
+from projects.models import (
+    ProjectComment,
+    Project,
+    ProjectPhase,
+    ProjectType,
+    ProjectAttributeFile,
+)
 from projects.models.project import ProjectSubtype
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
+from projects.serializers.comment import CommentSerializer
 from projects.serializers.project import (
     ProjectSerializer,
     ProjectPhaseSerializer,
@@ -89,3 +98,22 @@ class ProjectAttributeFileDownloadView(PrivateStorageDetailView):
         # NOTE: This overrides PRIVATE_STORAGE_AUTH_FUNCTION
         # TODO: Change permission function when user permissions has been implemented
         return has_project_attribute_file_permissions(private_file, self.request)
+
+
+class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
+    queryset = ProjectComment.objects.all()
+    serializer_class = CommentSerializer
+
+    def initial(self, request, *args, **kwargs):
+        super(CommentViewSet, self).initial(request, *args, **kwargs)
+        self.parent_instance = self.get_parent_instance()
+
+    def get_parent_instance(self):
+        qd = self.get_parents_query_dict()
+        project_id = qd.get("project")
+        return Project.objects.filter(pk=project_id).first()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["parent_instance"] = self.parent_instance
+        return context

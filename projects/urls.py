@@ -1,4 +1,5 @@
 from rest_framework import routers
+from rest_framework_extensions.routers import ExtendedSimpleRouter
 
 from projects.views import (
     ProjectViewSet,
@@ -6,13 +7,22 @@ from projects.views import (
     ProjectTypeSchemaViewSet,
     ProjectTypeViewSet,
     ProjectSubtypeViewSet,
+    CommentViewSet,
 )
 
 app_name = "projects"
 
 router = routers.SimpleRouter()
+projects_router = ExtendedSimpleRouter()
+projects = projects_router.register(r"projects", ProjectViewSet, base_name="projects")
+projects.register(
+    r"comments",
+    CommentViewSet,
+    base_name="project-comments",
+    parents_query_lookups=["project"],
+)
 
-router.register(r"projects", ProjectViewSet)
+router.registry.extend(projects_router.registry)
 router.register(r"projecttypes", ProjectTypeViewSet)
 router.register(r"projectsubtypes", ProjectSubtypeViewSet)
 router.register(r"phases", ProjectPhaseViewSet)
