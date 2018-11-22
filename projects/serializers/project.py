@@ -165,9 +165,21 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
+    project_type = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectPhase
-        fields = ["project_type", "name", "color", "color_code", "index"]
+        fields = [
+            "project_type",
+            "project_subtype",
+            "name",
+            "color",
+            "color_code",
+            "index",
+        ]
+
+    def get_project_type(self, project):
+        return project.project_type.pk
 
 
 class ProjectFileSerializer(serializers.ModelSerializer):
