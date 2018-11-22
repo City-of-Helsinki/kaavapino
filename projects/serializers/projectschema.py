@@ -1,5 +1,6 @@
 from collections import namedtuple
 
+from django.db import models
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -237,11 +238,31 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     sections = ProjectSectionSchemaSerializer(many=True)
 
 
+class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
+    def to_representation(self, data):
+        query_params = getattr(self.context["request"], "GET", {})
+        queryset = data.all() if isinstance(data, models.Manager) else data
+        queryset = self.filter_subtypes(queryset, query_params)
+        return super().to_representation(queryset)
+
+    def filter_subtypes(self, queryset, query_params):
+        subtypes = query_params.get("subtypes", None)
+        subtypes = [subtype.strip() for subtype in subtypes.split(",") if subtype]
+
+        if subtypes:
+            queryset = queryset.filter(id__in=subtypes)
+
+        return queryset
+
+
 class ProjectSubTypeSchemaSerializer(serializers.Serializer):
     subtype_name = serializers.CharField(source="name")
     subtype = serializers.IntegerField(source="id")
 
     phases = ProjectPhaseSchemaSerializer(many=True)
+
+    class Meta:
+        list_serializer_class = ProjectSubtypeListFilterSerializer
 
 
 class ProjectTypeSchemaSerializer(serializers.Serializer):
