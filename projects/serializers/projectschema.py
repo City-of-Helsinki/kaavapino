@@ -237,7 +237,14 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     sections = ProjectSectionSchemaSerializer(many=True)
 
 
+class ProjectSubTypeSchemaSerializer(serializers.Serializer):
+    subtype_name = serializers.CharField(source="name")
+    subtype = serializers.IntegerField(source="id")
+
+    phases = ProjectPhaseSchemaSerializer(many=True)
+
+
 class ProjectTypeSchemaSerializer(serializers.Serializer):
+    subtypes = ProjectSubTypeSchemaSerializer(many=True)
     type_name = serializers.CharField(source="name")
     type = serializers.IntegerField(source="id")
-    phases = ProjectPhaseSchemaSerializer(many=True)
