@@ -105,7 +105,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         current_phase = getattr(self.instance, "phase", None)
         current_phase_index = current_phase.index if current_phase else 1
         for phase in ProjectPhase.objects.filter(
-            project_type__name="asemakaava", index__lte=current_phase_index
+            project_subtype__project_type__name="asemakaava",
+            index__lte=current_phase_index,
         ):
             sections_data += self.generate_sections_data(
                 phase=phase, validation=self.should_validate_attributes()
@@ -138,7 +139,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
-            project_type__name="asemakaava"
+            project_subtype__project_type__name="asemakaava"
         ).first()
 
         with transaction.atomic():
@@ -188,7 +189,8 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         # Check if the attribute is part of the project
         project_has_attribute = bool(
             ProjectPhaseSectionAttribute.objects.filter(
-                section__phase__project_type=project.type, attribute=attribute
+                section__phase__project_subtype__project_type=project.type,
+                attribute=attribute,
             ).count()
         )
         if not project_has_attribute:
