@@ -13,7 +13,7 @@ from projects.models import (
 )
 from projects.models.project import ProjectSubtype
 from ..models import Attribute, ProjectPhase, ProjectType
-from ..models.utils import create_identifier, truncate_identifier
+from ..models.utils import create_identifier, truncate_identifier, check_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ PROJECT_PHASE = "syöttövaihe"
 DEFAULT_SHEET_NAME = "Hanketiedot (työversio)"
 
 ATTRIBUTE_NAME = "hanketieto"
+ATTRIBUTE_IDENTIFIER = "hanketieto tunniste"
 ATTRIBUTE_TYPE = "tietotyyppi"
 ATTRIBUTE_REQUIRED = (
     "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
@@ -185,6 +186,17 @@ class AttributeImporter:
         return truncate_identifier(identifier, length=IDENTIFIER_MAX_LENGTH)
 
     def _get_attribute_row_identifier(self, row: Sequence) -> str:
+        predefined_identifier = row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+        if predefined_identifier:
+            if not check_identifier(predefined_identifier):
+                raise ValueError(
+                    f"The identifier '{predefined_identifier}' is not a proper slug value"
+                )
+            return predefined_identifier
+
+        logger.info(
+            f"\nCreating identifier for '{row[self.column_index[ATTRIBUTE_NAME]]}'"
+        )
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
     def _create_attributes(self, rows: Iterable[Sequence[str]]):

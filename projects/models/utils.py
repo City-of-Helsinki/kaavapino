@@ -8,6 +8,10 @@ def create_identifier(text):
     return slugify(text).replace("-", "_")
 
 
+def check_identifier(identifier):
+    return slugify(identifier).replace("-", "_") == identifier
+
+
 def truncate_identifier(identifier: str, length: int = None, hash_len: int = 4):
     """Shorten an identifier to a repeatable mangled version with the given length."""
     if length is None or len(identifier) <= length:
