@@ -331,6 +331,16 @@ class AttributeImporter:
             counter = Counter()
 
             for row in rows:
+                project_size = row[self.column_index[PROJECT_SIZE]]
+                row_subtypes = self.get_subtypes_from_cell(project_size)
+
+                # Filter out attributes that should not be included in the project sub type (size)
+                if (
+                    "kaikki" not in row_subtypes
+                    and subtype.name.lower() not in row_subtypes
+                ):
+                    continue
+
                 identifier = self._get_attribute_row_identifier(row)
                 attribute = Attribute.objects.get(identifier=identifier)
 
