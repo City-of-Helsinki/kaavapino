@@ -13,7 +13,6 @@ from projects.models import (
     Project,
     ProjectPhase,
     ProjectPhaseSection,
-    ProjectType,
     ProjectAttributeFile,
     Attribute,
     ProjectPhaseSectionAttribute,
@@ -141,7 +140,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         validated_data["phase"] = ProjectPhase.objects.filter(
             project_type__name="asemakaava"
         ).first()
-        validated_data["type"] = ProjectType.objects.first()
 
         with transaction.atomic():
             attribute_data = validated_data.pop("attribute_data", {})
