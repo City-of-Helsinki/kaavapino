@@ -165,7 +165,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
-            project_subtype__project_type__name="asemakaava"
+            project_subtype=validated_data["subtype"]
         ).first()
 
         with transaction.atomic():
