@@ -23,6 +23,17 @@ def f_user():
 
 @pytest.fixture()
 @pytest.mark.django_db()
+def f_user2():
+    return get_user_model().objects.create(
+        username="test_2",
+        email="test_2@example.com",
+        first_name="John",
+        last_name="Tester",
+    )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
 def f_short_string_attribute():
     return Attribute.objects.create(
         name="Short string attribute",
@@ -284,3 +295,17 @@ def f_fieldset_attribute(attribute_factory, field_set_attribute_factory):
     )
 
     return fieldset_attribute
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_comment_user1(comment_factory, f_user):
+    comment = comment_factory(user=f_user)
+    return comment
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_comment_user2(comment_factory, f_user2):
+    comment = comment_factory(user=f_user2)
+    return comment
