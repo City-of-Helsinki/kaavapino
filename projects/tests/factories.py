@@ -9,6 +9,7 @@ from projects.models import (
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
+    ProjectComment,
 )
 from projects.models.project import ProjectSubtype
 from users.tests.factories import UserFactory
@@ -98,3 +99,12 @@ class ProjectFactory(factory.DjangoModelFactory):
 
     class Meta:
         model = Project
+
+
+class CommentFactory(factory.DjangoModelFactory):
+    content = factory.Faker("sentence")
+    user = factory.SubFactory(UserFactory)
+    project = factory.SubFactory(ProjectFactory)
+
+    class Meta:
+        model = ProjectComment
