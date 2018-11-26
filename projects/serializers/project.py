@@ -12,7 +12,6 @@ from projects.models import (
     Project,
     ProjectPhase,
     ProjectPhaseSection,
-    ProjectType,
     ProjectAttributeFile,
     Attribute,
     ProjectPhaseSectionAttribute,
@@ -36,6 +35,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
+    type = serializers.SerializerMethodField()
 
     _metadata = serializers.SerializerMethodField()
 
@@ -48,6 +48,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "name",
             "identifier",
             "type",
+            "subtype",
             "attribute_data",
             "phase",
             "geometry",
@@ -61,6 +62,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         self._set_file_attributes(attribute_data, project)
 
         return attribute_data
+
+    def get_type(self, project):
+        return project.type.pk
 
     def _set_file_attributes(self, attribute_data, project):
         request = self.context["request"]
@@ -127,7 +131,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         current_phase = getattr(self.instance, "phase", None)
         current_phase_index = current_phase.index if current_phase else 1
         for phase in ProjectPhase.objects.filter(
-            project_type__name="asemakaava", index__lte=current_phase_index
+            project_subtype__project_type__name="asemakaava",
+            index__lte=current_phase_index,
         ):
             sections_data += self.generate_sections_data(
                 phase=phase, validation=self.should_validate_attributes()
@@ -160,9 +165,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
-            project_type__name="asemakaava"
+            project_subtype__project_type__name="asemakaava"
         ).first()
-        validated_data["type"] = ProjectType.objects.first()
 
         with transaction.atomic():
             attribute_data = validated_data.pop("attribute_data", {})
@@ -187,9 +191,21 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
+    project_type = serializers.SerializerMethodField()
+
     class Meta:
         model = ProjectPhase
-        fields = ["project_type", "name", "color", "color_code", "index"]
+        fields = [
+            "project_type",
+            "project_subtype",
+            "name",
+            "color",
+            "color_code",
+            "index",
+        ]
+
+    def get_project_type(self, project):
+        return project.project_type.pk
 
 
 class ProjectFileSerializer(serializers.ModelSerializer):
@@ -211,7 +227,8 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         # Check if the attribute is part of the project
         project_has_attribute = bool(
             ProjectPhaseSectionAttribute.objects.filter(
-                section__phase__project_type=project.type, attribute=attribute
+                section__phase__project_subtype__project_type=project.type,
+                attribute=attribute,
             ).count()
         )
         if not project_has_attribute:

@@ -5,10 +5,10 @@ from projects.models import ProjectPhase
 
 
 @pytest.mark.django_db()
-def test_project_phases_are_created(f_project_type):
+def test_project_phases_are_created(f_project_type, f_project_subtype):
     ai = AttributeImporter()
     ai.project_type = f_project_type
-    ai.create_phases()
+    ai.create_phases(f_project_subtype)
 
     assert ProjectPhase.objects.all().count() == 6
 

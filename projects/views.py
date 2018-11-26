@@ -6,6 +6,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
 from projects.models import Project, ProjectPhase, ProjectType, ProjectAttributeFile
+from projects.models.project import ProjectSubtype
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
@@ -15,7 +16,10 @@ from projects.serializers.project import (
     ProjectFileSerializer,
 )
 from projects.serializers.projectschema import ProjectTypeSchemaSerializer
-from projects.serializers.projecttype import ProjectTypeSerializer
+from projects.serializers.projecttype import (
+    ProjectTypeSerializer,
+    ProjectSubtypeSerializer,
+)
 
 
 class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -65,6 +69,11 @@ class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
     serializer_class = ProjectTypeSchemaSerializer
+
+
+class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ProjectSubtype.objects.all()
+    serializer_class = ProjectSubtypeSerializer
 
 
 class ProjectAttributeFileDownloadView(PrivateStorageDetailView):

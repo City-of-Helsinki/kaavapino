@@ -10,6 +10,7 @@ from projects.models import (
     AttributeValueChoice,
     Project,
 )
+from projects.models.project import ProjectSubtype
 
 
 @pytest.fixture()
@@ -139,24 +140,30 @@ def f_project_type():
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_project_phase_1(f_project_type):
+def f_project_subtype(f_project_type):
+    return ProjectSubtype.objects.create(name="m", project_type=f_project_type, index=0)
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_project_phase_1(f_project_subtype):
     return ProjectPhase.objects.create(
         name="Käynnistys",
         color="color--tram",
         index=0,
-        project_type=f_project_type,
+        project_subtype=f_project_subtype,
         color_code="#009246",
     )
 
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_project_phase_2(f_project_type):
+def f_project_phase_2(f_project_subtype):
     return ProjectPhase.objects.create(
         name="OAS",
         color="color--summer",
         index=1,
-        project_type=f_project_type,
+        project_subtype=f_project_subtype,
         color_code="#ffc61e",
     )
 
@@ -240,24 +247,24 @@ def f_project_section_attribute_6_file(f_file_attribute, f_project_section_1):
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_project(f_user, f_project_type, f_project_phase_1):
+def f_project(f_user, f_project_subtype, f_project_phase_1):
     return Project.objects.create(
         user=f_user,
         name="Test project",
         identifier="test_project",
-        type=f_project_type,
+        subtype=f_project_subtype,
         phase=f_project_phase_1,
     )
 
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_project_with_attribute_data(f_user, f_project_type, f_project_phase_1):
+def f_project_with_attribute_data(f_user, f_project_subtype, f_project_phase_1):
     return Project.objects.create(
         user=f_user,
         name="Test project",
         identifier="test_project",
-        type=f_project_type,
+        subtype=f_project_subtype,
         phase=f_project_phase_1,
         attribute_data={"test": "test", "test2": "test2"},
     )

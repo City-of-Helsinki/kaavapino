@@ -8,6 +8,7 @@ from projects.models.project import (
     ProjectPhaseLog,
     PhaseAttributeMatrixStructure,
     PhaseAttributeMatrixCell,
+    ProjectSubtype,
 )
 from .exporting import get_document_response
 from .models import (
@@ -115,10 +116,21 @@ class ProjectPhaseInline(SortableInlineAdminMixin, admin.TabularInline):
     extra = 0
 
 
+class ProjectProjectSubtypeInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectSubtype
+    extra = 0
+
+
+@admin.register(ProjectSubtype)
+class ProjectSubtypeAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (ProjectPhaseInline,)
+
+
 @admin.register(ProjectType)
 class ProjectTypeAdmin(admin.ModelAdmin):
     list_display = ("name",)
-    inlines = (ProjectPhaseInline,)
+    inlines = (ProjectProjectSubtypeInline,)
 
 
 @admin.register(DocumentTemplate)
