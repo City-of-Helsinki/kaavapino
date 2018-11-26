@@ -246,7 +246,7 @@ class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
         return super().to_representation(queryset)
 
     def filter_subtypes(self, queryset, query_params):
-        subtypes = query_params.get("subtypes", None)
+        subtypes = query_params.get("subtypes", "")
         subtypes = [subtype.strip() for subtype in subtypes.split(",") if subtype]
 
         if subtypes:
