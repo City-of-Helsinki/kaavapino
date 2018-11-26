@@ -4,6 +4,7 @@ from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
 from django.utils.translation import ugettext_lazy as _
 
+from projects.models import ProjectComment
 from projects.models.project import (
     ProjectPhaseLog,
     PhaseAttributeMatrixStructure,
@@ -207,3 +208,8 @@ class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
                     column=column,
                     structure=structure,
                 )
+
+
+@admin.register(ProjectComment)
+class ProjectComment(admin.ModelAdmin):
+    pass
