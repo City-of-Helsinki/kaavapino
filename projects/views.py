@@ -1,10 +1,10 @@
 from django.db import transaction
+from django.http import Http404
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
-
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.models import (
@@ -15,6 +15,7 @@ from projects.models import (
     ProjectAttributeFile,
 )
 from projects.models.project import ProjectSubtype
+from projects.permissions.comments import CommentPermissions
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
@@ -36,7 +37,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectTypeSerializer
 
 
-class ProjectViewSet(viewsets.ModelViewSet):
+class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     serializer_class = ProjectSerializer
 
@@ -103,6 +104,7 @@ class ProjectAttributeFileDownloadView(PrivateStorageDetailView):
 class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = ProjectComment.objects.all()
     serializer_class = CommentSerializer
+    permission_classes = (CommentPermissions,)
 
     def initial(self, request, *args, **kwargs):
         super(CommentViewSet, self).initial(request, *args, **kwargs)
@@ -111,7 +113,11 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_parent_instance(self):
         qd = self.get_parents_query_dict()
         project_id = qd.get("project")
-        return Project.objects.filter(pk=project_id).first()
+        project = Project.objects.filter(pk=project_id).first()
+
+        if not project:
+            raise Http404
+        return project
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
