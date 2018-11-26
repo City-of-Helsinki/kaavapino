@@ -24,8 +24,13 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
-    queryset = Project.objects.all()
+    queryset = Project.objects.all().select_related("user")
     serializer_class = ProjectSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["action"] = self.action
+        return context
 
     @action(methods=["put"], detail=True, parser_classes=[MultiPartParser])
     def files(self, request, pk=None):
