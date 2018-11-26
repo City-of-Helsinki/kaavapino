@@ -196,6 +196,7 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPhase
         fields = [
+            "id",
             "project_type",
             "project_subtype",
             "name",
