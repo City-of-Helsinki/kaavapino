@@ -137,6 +137,7 @@ class ProjectTypeAdmin(admin.ModelAdmin):
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "file")
+    readonly_fields = ("slug",)
 
 
 @admin.register(ProjectAttributeFile)

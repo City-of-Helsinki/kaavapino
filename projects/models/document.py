@@ -1,5 +1,6 @@
 from django.db import models
 from django.urls import reverse_lazy
+from django.utils.text import slugify
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
 
@@ -13,6 +14,7 @@ class DocumentTemplate(models.Model):
     """
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
+    slug = models.SlugField()
     project_phase = models.ForeignKey(
         ProjectPhase,
         verbose_name=_("project phase"),
@@ -42,3 +44,7 @@ class DocumentTemplate(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        self.slug = slugify(self.name)
+        return super().save(*args, **kwargs)
