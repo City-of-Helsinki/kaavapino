@@ -102,7 +102,7 @@ class ProjectAttributeFileDownloadView(PrivateStorageDetailView):
 
 
 class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = ProjectComment.objects.all()
+    queryset = ProjectComment.objects.all().select_related("user")
     serializer_class = CommentSerializer
     permission_classes = (CommentPermissions,)
 
