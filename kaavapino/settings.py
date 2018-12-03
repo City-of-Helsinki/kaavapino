@@ -29,6 +29,7 @@ env = environ.Env(
     TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX=(str, "SCOPE_PREFIX_UNSET"),
     TOKEN_AUTH_AUTHSERVER_URL=(str, "ISSUER_UNSET"),
     TOKEN_AUTH_REQUIRE_SCOPE_PREFIX=(bool, True),
+    NGINX_X_ACCEL=(bool, False),
 )
 
 env_file = project_root(".env")
@@ -161,6 +162,8 @@ if os.path.exists(local_settings):
 # Private storage
 PRIVATE_STORAGE_ROOT = MEDIA_ROOT
 
-if not DEBUG:
+
+NGINX_X_ACCEL = env.bool("NGINX_X_ACCEL")
+if not DEBUG and NGINX_X_ACCEL:
     PRIVATE_STORAGE_SERVER = "nginx"
     PRIVATE_STORAGE_INTERNAL_URL = "/private-x-accel-redirect/"
