@@ -47,13 +47,15 @@ def create_attribute_field_data(attribute, validation):
     field_arguments["help_text"] = attribute.help_text
 
     # Allow fields to be set to null so that they can be emptied
-    if attribute.value_type not in [Attribute.TYPE_BOOLEAN]:
-        field_arguments["allow_null"] = True
+    field_arguments["allow_null"] = True
 
     field_arguments["required"] = False
     if validation:
         field_arguments["required"] = _is_attribute_required(attribute)
         field_arguments["allow_null"] = False
+
+    if attribute.value_type == Attribute.TYPE_BOOLEAN:
+        field_arguments.pop("allow_null")
 
     return FieldData(field_class, field_arguments)
 
