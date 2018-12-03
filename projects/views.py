@@ -32,6 +32,16 @@ from projects.serializers.projecttype import (
 )
 
 
+class PrivateDownloadViewSetMixin:
+    def get(self, request, *args, **kwargs):
+        if self.slug_url_kwarg and self.url_path_postfix:
+            self.kwargs[
+                self.slug_url_kwarg
+            ] = f"{self.url_path_postfix}/{self.kwargs.get(self.slug_url_kwarg)}"
+
+        return super().get(request, *args, **kwargs)
+
+
 class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
     serializer_class = ProjectTypeSerializer
@@ -86,10 +96,13 @@ class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectSubtypeSerializer
 
 
-class ProjectAttributeFileDownloadView(PrivateStorageDetailView):
+class ProjectAttributeFileDownloadView(
+    PrivateDownloadViewSetMixin, PrivateStorageDetailView
+):
     model = ProjectAttributeFile
     slug_field = "file"
     slug_url_kwarg = "path"
+    url_path_postfix = "projects"
 
     def get_queryset(self):
         # Queryset that is allowed to be downloaded

@@ -1,7 +1,8 @@
 import hashlib
 
-from django.utils.encoding import force_bytes
+from django.utils.encoding import force_bytes, force_text
 from django.utils.text import slugify
+from private_storage.storage.files import PrivateFileSystemStorage
 
 
 def create_identifier(text):
@@ -20,3 +21,30 @@ def truncate_identifier(identifier: str, length: int = None, hash_len: int = 4):
     digest = hashlib.sha1(force_bytes(identifier)).hexdigest()[:hash_len]
 
     return f"{identifier[: length - hash_len]}{digest}"
+
+
+class KaavapinoPrivateStorage(PrivateFileSystemStorage):
+    """
+    Storage class that overwrites files instead of renaming
+
+    Since the system is not used for the purpose of keeping
+    data history nor as a primary storage service, there is
+    no reason to keep any old files laying around or keeping
+    a history of old files.
+    """
+
+    def __init__(self, url_postfix=None, *args, **kwargs):
+        self.url_postfix = url_postfix
+        super().__init__(*args, **kwargs)
+
+    def get_available_name(self, name, max_length=None):
+        self.delete(name)
+        return name
+
+    def url(self, name):
+        # Make sure reverse_lazy() is evaluated, as Python 3 won't do this here.
+        if self.url_postfix:
+            self.base_url = force_text(self.base_url).replace(
+                f"/{self.url_postfix}", ""
+            )
+        return super(PrivateFileSystemStorage, self).url(name)

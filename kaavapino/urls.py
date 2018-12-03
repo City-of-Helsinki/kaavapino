@@ -29,9 +29,10 @@ urlpatterns = [
     path("v1/", include(router.urls)),
     path("accounts/", include("allauth.urls")),
     url(
-        r"{}(?P<path>.*)$".format(MEDIA_URL),
+        r"{}projects/(?P<path>.*)$".format(MEDIA_URL),
         project_views.ProjectAttributeFileDownloadView.as_view(),
-        name="serve_private_file",
+        name="serve_private_project_file",
+    ),
     ),
 ]
 

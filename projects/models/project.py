@@ -4,11 +4,12 @@ from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
-from private_storage.storage.files import PrivateFileSystemStorage
 
+from projects.models.utils import KaavapinoPrivateStorage
 from .attribute import Attribute
 
 
@@ -387,21 +388,6 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
-class OverwriteStorage(PrivateFileSystemStorage):
-    """
-    Storage class that overwrites files instead of renaming
-
-    Since the system is not used for the purpose of keeping
-    data history nor as a primary storage service, there is
-    no reason to keep any old files laying around or keeping
-    a history of old files.
-    """
-
-    def get_available_name(self, name, max_length=None):
-        self.delete(name)
-        return name
-
-
 class ProjectAttributeFile(models.Model):
     """Project attribute value that is an file."""
 
@@ -426,7 +412,10 @@ class ProjectAttributeFile(models.Model):
 
     file = PrivateFileField(
         "File",
-        storage=OverwriteStorage(),
+        storage=KaavapinoPrivateStorage(
+            base_url=reverse_lazy("serve_private_project_file", kwargs={"path": ""}),
+            url_postfix="projects",
+        ),
         upload_subfolder=get_upload_subfolder,
         max_length=255,
     )

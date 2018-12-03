@@ -7,14 +7,16 @@ import projects.models.project
 
 class Migration(migrations.Migration):
 
-    dependencies = [
-        ('projects', '0026_image_to_file_fields'),
-    ]
+    dependencies = [("projects", "0026_image_to_file_fields")]
 
     operations = [
         migrations.AlterField(
             model_name='projectattributefile',
             name='file',
-            field=private_storage.fields.PrivateFileField(storage=projects.models.project.OverwriteStorage(), upload_to='', verbose_name='File'),
+            field=private_storage.fields.PrivateFileField(max_length=255,
+                                                          storage=projects.models.utils.KaavapinoPrivateStorage(
+                                                              base_url='/media/document_templates/',
+                                                              url_postfix='document_templates'), upload_to='',
+                                                          verbose_name='File'),
         ),
     ]

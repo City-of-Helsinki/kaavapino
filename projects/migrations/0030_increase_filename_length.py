@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='projectattributefile',
             name='file',
-            field=private_storage.fields.PrivateFileField(max_length=255, storage=projects.models.project.OverwriteStorage(), upload_to='', verbose_name='File'),
+            field=private_storage.fields.PrivateFileField(max_length=255, storage=projects.models.project.KaavapinoPrivateStorage(base_url='/media/projects/', url_postfix='projects'), upload_to='', verbose_name='File'),
         ),
     ]
