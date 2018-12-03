@@ -13,6 +13,7 @@ from projects.models import (
     ProjectPhase,
     ProjectType,
     ProjectAttributeFile,
+    DocumentTemplate,
 )
 from projects.models.project import ProjectSubtype
 from projects.permissions.comments import CommentPermissions
@@ -136,3 +137,19 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["parent_instance"] = self.parent_instance
         return context
+
+
+class DocumentTemplateDownloadView(
+    PrivateDownloadViewSetMixin, PrivateStorageDetailView
+):
+    model = DocumentTemplate
+    slug_field = "file"
+    slug_url_kwarg = "path"
+    url_path_postfix = "document_templates"
+
+    def get_queryset(self):
+        # Queryset that is allowed to be downloaded
+        return self.model.objects.all()
+
+    def can_access_file(self, private_file):
+        return self.request.user.is_superuser

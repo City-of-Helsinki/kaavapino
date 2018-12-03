@@ -33,6 +33,10 @@ urlpatterns = [
         project_views.ProjectAttributeFileDownloadView.as_view(),
         name="serve_private_project_file",
     ),
+    url(
+        r"{}document_templates/(?P<path>.*)$".format(MEDIA_URL),
+        project_views.DocumentTemplateDownloadView.as_view(),
+        name="serve_private_document_template_file",
     ),
 ]
 
