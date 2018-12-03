@@ -153,10 +153,7 @@ class Attribute(models.Model):
                 else None
             )
         elif self.value_type == Attribute.TYPE_USER:
-            if isinstance(value, str):
-                return value
-            else:
-                return get_user_model().objects.get(id=value)
+            return get_user_model().objects.get(uuid=value)
         elif self.value_type == Attribute.TYPE_FIELDSET:
             return self._get_fieldset_serialization(value, deserialize=True)
         else:
