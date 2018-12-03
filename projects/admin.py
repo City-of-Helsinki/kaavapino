@@ -1,4 +1,5 @@
 from adminsortable2.admin import SortableInlineAdminMixin
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
@@ -134,10 +135,24 @@ class ProjectTypeAdmin(admin.ModelAdmin):
     inlines = (ProjectProjectSubtypeInline,)
 
 
+class PhaseChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return f"{obj.project_subtype.name}: {obj.name}"
+
+
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "file")
     readonly_fields = ("slug",)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "project_phase":
+            return PhaseChoiceField(
+                queryset=ProjectPhase.objects.all().order_by(
+                    "project_subtype__index", "index"
+                )
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(ProjectAttributeFile)
