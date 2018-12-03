@@ -1,12 +1,15 @@
 from django.db import transaction
-from django.http import Http404
+from django.http import Http404, HttpResponse
+from django.utils import timezone
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
+from projects.exporting.document import render_template
 from projects.models import (
     ProjectComment,
     Project,
@@ -16,11 +19,13 @@ from projects.models import (
     DocumentTemplate,
 )
 from projects.models.project import ProjectSubtype
+from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
 from projects.serializers.comment import CommentSerializer
+from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.project import (
     ProjectSerializer,
     ProjectPhaseSerializer,
@@ -137,6 +142,57 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["parent_instance"] = self.parent_instance
         return context
+
+
+class DocumentViewSet(RetrieveModelMixin, ListModelMixin, viewsets.GenericViewSet):
+    queryset = DocumentTemplate.objects.all()
+    permission_classes = (CommentPermissions,)
+    lookup_field = "slug"
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        self.project = self.get_project()
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["project"] = self.project
+        return context
+
+    def get_project(self):
+        project_id = self.kwargs.get("project_pk")
+        project = Project.objects.filter(pk=project_id).first()
+
+        if not project:
+            raise Http404
+        return project
+
+    def retrieve(self, request, *args, **kwargs):
+        filename = request.query_params.get("filename")
+        document_template = self.get_object()
+
+        if filename is None:
+            filename = "{}-{}-{}".format(
+                create_identifier(self.project.name),
+                document_template.name,
+                timezone.now().date(),
+            )
+
+        output = render_template(self.project, document_template)
+        response = HttpResponse(
+            output,
+            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+        response["Content-Disposition"] = "attachment; filename={}.docx".format(
+            filename
+        )
+
+        # Since we are not using DRFs response here, we set a custom CORS control header
+        response["Access-Control-Expose-Headers"] = "content-disposition"
+        return response
+
+    def list(self, request, *args, **kwargs):
+        self.serializer_class = DocumentTemplateSerializer
+        return super().list(request, *args, **kwargs)
 
 
 class DocumentTemplateDownloadView(
