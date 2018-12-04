@@ -53,6 +53,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "phase",
             "geometry",
             "id",
+            "public",
             "_metadata",
         ]
         read_only_fields = ["phase", "type", "created_at", "modified_at"]
@@ -162,6 +163,19 @@ class ProjectSerializer(serializers.ModelSerializer):
             raise ValidationError(errors)
 
         return valid_attributes
+
+    def validate_public(self, public):
+        # Do not validate if this is a new project or
+        # the value did not change.
+        if not self.instance or public == self.instance.public:
+            return public
+
+        request = self.context["request"]
+        user_is_request_user = self.instance.user == request.user
+        if not user_is_request_user and not request.user.is_superuser:
+            raise ValidationError(_("You do not have permissions to change this value"))
+
+        return public
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
