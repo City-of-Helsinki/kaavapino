@@ -17,6 +17,7 @@ from projects.models import (
     ProjectType,
     ProjectAttributeFile,
     DocumentTemplate,
+    Attribute,
 )
 from projects.models.project import ProjectSubtype
 from projects.models.utils import create_identifier
@@ -56,6 +57,51 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     serializer_class = ProjectSerializer
+
+    def get_queryset(self):
+        queryset = self.queryset
+
+        includeds_users = self.request.query_params.get("includes_users", None)
+        users = self.request.query_params.get("users", None)
+        if includeds_users is not None:
+            queryset = self._filter_included_users(includeds_users, queryset)
+        if users is not None:
+            queryset = self._filter_users(users, queryset)
+        return queryset
+
+    def _string_filter_to_list(self, filter_string):
+        return [_filter.strip().lower() for _filter in filter_string.split(",")]
+
+    def _filter_included_users(self, users, queryset):
+        """
+        Filter on all user attributes
+
+        Note: Make sure not to validate the queryset
+        at any time as that will result in really long
+        query time.
+
+        TODO: Support multiple choice fields for
+              users. At the time of implementation
+              no such fields existed.
+        """
+        user_queryset = self._filter_users(users, queryset)
+        users_list = self._string_filter_to_list(users)
+        user_attributes = Attribute.objects.filter(value_type=Attribute.TYPE_USER)
+
+        attribute_data_users = self.queryset.none()
+        for attribute in user_attributes:
+            attribute_filter = {
+                f"attribute_data__{attribute.identifier}__in": users_list
+            }
+            attribute_data_users = attribute_data_users | queryset.filter(
+                **attribute_filter
+            )
+
+        return attribute_data_users | user_queryset
+
+    def _filter_users(self, users, queryset):
+        users_list = self._string_filter_to_list(users)
+        return queryset.filter(user__uuid__in=users_list)
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
