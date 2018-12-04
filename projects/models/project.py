@@ -109,6 +109,8 @@ class Project(models.Model):
 
     geometry = models.MultiPolygonField(null=True, blank=True)
 
+    public = models.BooleanField(default=True)
+
     class Meta:
         verbose_name = _("project")
         verbose_name_plural = _("projects")

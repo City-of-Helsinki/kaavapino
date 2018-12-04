@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.utils import timezone
 from private_storage.views import PrivateStorageDetailView
@@ -59,6 +60,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     serializer_class = ProjectSerializer
 
     def get_queryset(self):
+        user = self.request.user
         queryset = self.queryset
 
         includeds_users = self.request.query_params.get("includes_users", None)
@@ -67,6 +69,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             queryset = self._filter_included_users(includeds_users, queryset)
         if users is not None:
             queryset = self._filter_users(users, queryset)
+
+        queryset = self._filter_private(queryset, user)
         return queryset
 
     def _string_filter_to_list(self, filter_string):
@@ -102,6 +106,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def _filter_users(self, users, queryset):
         users_list = self._string_filter_to_list(users)
         return queryset.filter(user__uuid__in=users_list)
+
+    @staticmethod
+    def _filter_private(queryset, user):
+        if user.is_superuser:
+            return queryset
+
+        return queryset.exclude(~Q(user=user) & Q(public=False))
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
