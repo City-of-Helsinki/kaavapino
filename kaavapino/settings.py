@@ -53,8 +53,8 @@ vars().update(env.email_url())  # EMAIL_BACKEND etc.
 
 STATIC_URL = env.str("STATIC_URL")
 MEDIA_URL = env.str("MEDIA_URL")
-STATIC_ROOT = str(env.path("STATIC_ROOT"))
-MEDIA_ROOT = str(env.path("MEDIA_ROOT"))
+STATIC_ROOT = str(env("STATIC_ROOT"))
+MEDIA_ROOT = str(env("MEDIA_ROOT"))
 
 ROOT_URLCONF = "kaavapino.urls"
 WSGI_APPLICATION = "kaavapino.wsgi.application"
