@@ -191,6 +191,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
 
     def validate_user(self, user):
+        if not self.instance:
+            return user
         return validators.admin_or_read_only(user, "user", self.instance, self.context)
 
     def create(self, validated_data: dict) -> Project:
