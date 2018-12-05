@@ -85,11 +85,13 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "private_storage",
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -167,3 +169,8 @@ NGINX_X_ACCEL = env.bool("NGINX_X_ACCEL")
 if not DEBUG and NGINX_X_ACCEL:
     PRIVATE_STORAGE_SERVER = "nginx"
     PRIVATE_STORAGE_INTERNAL_URL = "/private-x-accel-redirect/"
+
+
+# CORS
+# TODO: Lock down CORS access when things are running in production
+CORS_ORIGIN_ALLOW_ALL = True
