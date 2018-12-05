@@ -17,6 +17,7 @@ FIELD_TYPES = {
     Attribute.TYPE_BOOLEAN: serializers.BooleanField,
     Attribute.TYPE_DATE: serializers.DateField,
     Attribute.TYPE_IMAGE: serializers.ImageField,  # TODO: Figure out file uploads with DRF
+    Attribute.TYPE_FILE: serializers.FileField,
     Attribute.TYPE_USER: serializers.PrimaryKeyRelatedField,
     # TODO Add Attribute.TYPE_GEOMETRY
 }
