@@ -5,7 +5,7 @@ from rest_framework.exceptions import ValidationError
 def admin_or_read_only(value, attribute, instance, context):
     user = context["request"].user
 
-    # No checks if phase has not changed
+    # No checks if value has not changed
     if getattr(instance, attribute, None) == value:
         return value
 
