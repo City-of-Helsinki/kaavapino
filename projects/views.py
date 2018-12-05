@@ -23,6 +23,7 @@ from projects.models import (
 from projects.models.project import ProjectSubtype
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
+from projects.permissions.documents import DocumentPermissions
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
@@ -203,7 +204,7 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
 class DocumentViewSet(RetrieveModelMixin, ListModelMixin, viewsets.GenericViewSet):
     queryset = DocumentTemplate.objects.all()
-    permission_classes = (CommentPermissions,)
+    permission_classes = (DocumentPermissions,)
     lookup_field = "slug"
 
     def initial(self, request, *args, **kwargs):
