@@ -19,4 +19,5 @@ class User(AbstractUser):
         return self.groups.filter(name__in=groups).exists()
 
     def is_administrative_personnel(self):
-        return self.is_in_any_of_groups(GROUPS.ADMINISTRATIVE_PERSONNEL)
+        admin_groups = list(GROUPS.ADMINISTRATIVE_PERSONNEL.values.keys())
+        return self.is_in_any_of_groups(admin_groups)
