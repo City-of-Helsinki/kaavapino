@@ -85,7 +85,7 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "private_storage",
-    'corsheaders',
+    "corsheaders",
 ]
 
 MIDDLEWARE = [

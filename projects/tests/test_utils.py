@@ -1,6 +1,5 @@
 import pytest
 
-from projects.models import Attribute
 from projects.models.utils import truncate_identifier
 from projects.serializers.utils import _is_attribute_required
 
