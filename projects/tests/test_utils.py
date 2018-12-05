@@ -20,12 +20,6 @@ def test_is_attribute_required(f_short_string_attribute):
     required = _is_attribute_required(f_short_string_attribute)
     assert required is False
 
-    # required = True, generated = False, Boolean field
-    f_short_string_attribute.generated = False
-    f_short_string_attribute.value_type = Attribute.TYPE_BOOLEAN
-    required = _is_attribute_required(f_short_string_attribute)
-    assert required is False
-
 
 def test_identifier_truncation():
     identifier = "identifier"
