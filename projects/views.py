@@ -245,6 +245,7 @@ class DocumentViewSet(RetrieveModelMixin, ListModelMixin, viewsets.GenericViewSe
 
         # Since we are not using DRFs response here, we set a custom CORS control header
         response["Access-Control-Expose-Headers"] = "content-disposition"
+        response["Access-Control-Allow-Origin"] = "*"
         return response
 
     def list(self, request, *args, **kwargs):

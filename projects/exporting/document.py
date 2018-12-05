@@ -78,4 +78,5 @@ def get_document_response(project, document_template, filename=None):
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
     response["Content-Disposition"] = "attachment; filename={}.docx".format(filename)
+    response["Access-Control-Allow-Origin"] = "*"
     return response
