@@ -26,6 +26,10 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN pip install -U pip
 
+###############
+# Development #
+###############
+
 FROM base AS test
 
 # Install python dependencies
@@ -38,6 +42,13 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 # Add entrypoint script
 ADD docker-entrypoint.sh /entrypoint/
 RUN chmod +x /entrypoint/docker-entrypoint.sh
+
+ENTRYPOINT ["/entrypoint/docker-entrypoint.sh"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+##############
+# Production #
+##############
 
 FROM base AS deploy
 ADD requirements.txt /code/
