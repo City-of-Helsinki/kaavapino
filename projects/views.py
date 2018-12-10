@@ -20,11 +20,11 @@ from projects.models import (
     Project,
     ProjectPhase,
     ProjectType,
+    ProjectSubtype,
     ProjectAttributeFile,
     DocumentTemplate,
     Attribute,
 )
-from projects.models.project import ProjectSubtype
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
 from projects.permissions.documents import DocumentPermissions

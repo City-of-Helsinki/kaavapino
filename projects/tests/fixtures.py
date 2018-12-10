@@ -4,13 +4,13 @@ from django.contrib.auth import get_user_model
 from projects.models import (
     Attribute,
     ProjectType,
+    ProjectSubtype,
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     AttributeValueChoice,
     Project,
 )
-from projects.models.project import ProjectSubtype
 
 
 @pytest.fixture()

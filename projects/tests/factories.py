@@ -6,12 +6,12 @@ from projects.models import (
     FieldSetAttribute,
     Project,
     ProjectType,
+    ProjectSubtype,
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectComment,
 )
-from projects.models.project import ProjectSubtype
 from users.tests.factories import UserFactory
 
 __all__ = (
