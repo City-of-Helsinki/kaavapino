@@ -1,16 +1,20 @@
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
+from django.shortcuts import redirect
 from django.utils import timezone
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 from rest_framework.parsers import MultiPartParser
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
+from projects.importing import AttributeImporter
 from projects.models import (
     ProjectComment,
     Project,
@@ -268,3 +272,18 @@ class DocumentTemplateDownloadView(
 
     def can_access_file(self, private_file):
         return self.request.user.is_superuser
+
+
+class UploadSpecifications(APIView):
+    parser_classes = (MultiPartParser,)
+    permission_classes = (IsAdminUser,)
+
+    def post(self, request, format=None):
+        if request.FILES and request.FILES["specifications"]:
+            specifications_file = request.FILES["specifications"]
+
+            options = {"filename": specifications_file}
+            attribute_importer = AttributeImporter(options)
+            attribute_importer.run()
+
+        return redirect(".")
