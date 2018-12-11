@@ -87,7 +87,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"
-        return {"users": self._get_users(project, list_view=list_view)}
+        metadata = {"users": self._get_users(project, list_view=list_view)}
+        if not list_view:
+            metadata["updates"] = self._get_updates(project)
+
+        return metadata
 
     @staticmethod
     def _get_users(project, list_view=False):
@@ -106,6 +110,32 @@ class ProjectSerializer(serializers.ModelSerializer):
             users += list(User.objects.filter(uuid__in=user_attribute_ids))
 
         return UserSerializer(users, many=True).data
+
+    @staticmethod
+    def _get_updates(project):
+        # Get the latest attribute updates for distinct attributes
+        actions = (
+            project.target_actions.filter(verb="updated attribute")
+            .order_by(
+                "action_object_content_type", "action_object_object_id", "-timestamp"
+            )
+            .distinct("action_object_content_type", "action_object_object_id")
+            .prefetch_related("actor")
+        )
+
+        updates = {}
+        for _action in actions:
+            attribute_identifier = (
+                _action.data.get("attribute_identifier", None)
+                or _action.action_object.identifier
+            )
+            updates[attribute_identifier] = {
+                "user": _action.actor.uuid,
+                "user_name": _action.actor.get_display_name(),
+                "timestamp": _action.timestamp,
+            }
+
+        return updates
 
     def should_validate_attributes(self):
         validate_field_data = self.context["request"].data.get(
