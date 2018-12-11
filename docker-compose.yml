@@ -17,6 +17,7 @@ services:
       target: "test"
       context: "."
     entrypoint: /entrypoint/docker-entrypoint.sh
+    command: python manage.py runserver 0.0.0.0:8000
     image: kaavapino
     volumes:
       - .:/code
