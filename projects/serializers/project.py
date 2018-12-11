@@ -1,6 +1,7 @@
 import copy
 from typing import List, NamedTuple, Type
 
+from actstream import action
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
@@ -203,6 +204,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             attribute_data = validated_data.pop("attribute_data", {})
             project: Project = super().create(validated_data)
+            self.log_updates_attribute_data(attribute_data, project)
 
             # Update attribute data after saving the initial creation has
             # taken place so that there is no need to rewrite the entire
@@ -216,10 +218,38 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
-        if attribute_data:
-            instance.update_attribute_data(attribute_data)
+        with transaction.atomic():
+            self.log_updates_attribute_data(attribute_data)
+            if attribute_data:
+                instance.update_attribute_data(attribute_data)
 
-        return super(ProjectSerializer, self).update(instance, validated_data)
+            return super(ProjectSerializer, self).update(instance, validated_data)
+
+    def log_updates_attribute_data(self, attribute_data, project=None):
+        project = project or self.instance
+        if not project:
+            raise ValueError("Can't update attribute data log if no project")
+
+        user = self.context["request"].user
+        instance_attribute_date = getattr(self.instance, "attribute_data", {})
+        updated_attribute_identifiers = []
+
+        for identifier, value in attribute_data.items():
+            existing_value = instance_attribute_date.get(identifier, None)
+            if value != existing_value:
+                updated_attribute_identifiers.append(identifier)
+
+        updated_attributes = Attribute.objects.filter(
+            identifier__in=updated_attribute_identifiers
+        )
+        for attribute in updated_attributes:
+            action.send(
+                user,
+                verb="updated attribute",
+                action_object=attribute,
+                target=project,
+                attribute_identifier=attribute.identifier,
+            )
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
