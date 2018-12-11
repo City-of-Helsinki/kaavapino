@@ -1,0 +1,35 @@
+{% extends "admin/index.html" %}
+{% load i18n static %}
+
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        .specification-import {
+            margin-right: -300px;
+        }
+
+        .specification-module {
+            float: right;
+        }
+
+        button.import-button {
+            width: 100%;
+            padding: 5px 0 5px 0;
+            background: #417690;
+        }
+    </style>
+{% endblock %}
+{% block sidebar %}
+    {{ block.super }}
+    <div class="specification-import">
+        <div class="specification-module">
+            <h2>{% trans 'Import specifications' %}</h2>
+            <form action="{% url 'admin_upload_specifications' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="file" name="specifications"/> <br/>
+                <button type="submit" class="import-button button">{% trans 'Import' %}</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}

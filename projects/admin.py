@@ -229,3 +229,6 @@ class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
 @admin.register(ProjectComment)
 class ProjectComment(admin.ModelAdmin):
     pass
+
+
+admin.site.index_template = "admin/kaavapino_index.html"

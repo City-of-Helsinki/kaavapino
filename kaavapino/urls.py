@@ -38,6 +38,11 @@ urlpatterns = [
         project_views.DocumentTemplateDownloadView.as_view(),
         name="serve_private_document_template_file",
     ),
+    url(
+        "admin/upload_specifications",
+        project_views.UploadSpecifications.as_view(),
+        name="admin_upload_specifications",
+    ),
 ]
 
 if settings.DEBUG:
