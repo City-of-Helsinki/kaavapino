@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 echo "Checking for database on host 'db', port 5432"
 until nc -z -v -w30 "db" 5432
@@ -13,5 +12,7 @@ echo "Database found!"
 echo "Applying database migrations"
 python /code/manage.py migrate --noinput
 
-echo "Starting container"
-exec "$@"
+set -e
+# Start server
+echo "Starting server"
+python manage.py runserver 0.0.0.0:8000
