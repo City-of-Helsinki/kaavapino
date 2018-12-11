@@ -9,6 +9,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import raven
 
 import environ
 
@@ -30,6 +31,7 @@ env = environ.Env(
     TOKEN_AUTH_AUTHSERVER_URL=(str, "ISSUER_UNSET"),
     TOKEN_AUTH_REQUIRE_SCOPE_PREFIX=(bool, True),
     NGINX_X_ACCEL=(bool, False),
+    SENTRY_DSN=(str, ""),
 )
 
 env_file = project_root(".env")
@@ -66,6 +68,14 @@ USE_L10N = True
 USE_TZ = True
 
 
+# Raven
+try:
+    version = raven.fetch_git_sha(project_root())
+except Exception:
+    version = None
+
+RAVEN_CONFIG = {"dsn": env.str("SENTRY_DSN"), "release": version}
+
 INSTALLED_APPS = [
     "helusers",
     "helusers.providers.helsinki_oidc",
@@ -87,6 +97,9 @@ INSTALLED_APPS = [
     "private_storage",
     "corsheaders",
 ]
+
+if RAVEN_CONFIG["dsn"]:
+    INSTALLED_APPS += ["raven.contrib.django.raven_compat"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
