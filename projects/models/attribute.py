@@ -20,6 +20,34 @@ validate_identifier = RegexValidator(
 )
 
 
+class AttributeQuerySet(models.QuerySet):
+    def filterable(self):
+        return self.filter(
+            value_type__in=[
+                # Attribute.TYPE_FIELDSET,
+                Attribute.TYPE_INTEGER,
+                Attribute.TYPE_SHORT_STRING,
+                # Attribute.TYPE_LONG_STRING,
+                Attribute.TYPE_BOOLEAN,
+                Attribute.TYPE_DATE,
+                Attribute.TYPE_USER,
+            ]
+        )
+
+    def report_friendly(self):
+        return self.filter(
+            value_type__in=[
+                Attribute.TYPE_FIELDSET,
+                Attribute.TYPE_INTEGER,
+                Attribute.TYPE_SHORT_STRING,
+                Attribute.TYPE_LONG_STRING,
+                Attribute.TYPE_BOOLEAN,
+                Attribute.TYPE_DATE,
+                Attribute.TYPE_USER,
+            ]
+        )
+
+
 class Attribute(models.Model):
     """Defines a single attribute type.
 
@@ -77,6 +105,8 @@ class Attribute(models.Model):
         through_fields=("attribute_source", "attribute_target"),
     )
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
+
+    objects = AttributeQuerySet.as_manager()
 
     class Meta:
         verbose_name = _("attribute")
