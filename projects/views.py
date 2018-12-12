@@ -6,11 +6,11 @@ from django.utils import timezone
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
@@ -206,7 +206,7 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return context
 
 
-class DocumentViewSet(RetrieveModelMixin, ListModelMixin, viewsets.GenericViewSet):
+class DocumentViewSet(ReadOnlyModelViewSet):
     queryset = DocumentTemplate.objects.all()
     permission_classes = (DocumentPermissions,)
     lookup_field = "slug"
