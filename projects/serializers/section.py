@@ -1,4 +1,5 @@
 import collections
+import copy
 
 from rest_framework import serializers
 
@@ -147,7 +148,9 @@ def get_attribute_data(request, project=None) -> dict:
         return {}
 
     # Include any existing project attribute data
-    attribute_data = getattr(project, "attribute_data", {})
+    # If we do not copy here then we will override the instance data
+    # when doing updates.
+    attribute_data = copy.deepcopy(getattr(project, "attribute_data", {}))
 
     # Extract all attribute data that exists in the request
     request_attribute_data = request.data.get("attribute_data", {})
