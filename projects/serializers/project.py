@@ -11,6 +11,7 @@ from rest_framework.serializers import Serializer
 from django.utils.translation import ugettext_lazy as _
 
 from projects import validators
+from projects.actions import verbs
 from projects.models import (
     Project,
     ProjectPhase,
@@ -115,7 +116,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def _get_updates(project):
         # Get the latest attribute updates for distinct attributes
         actions = (
-            project.target_actions.filter(verb="updated attribute")
+            project.target_actions.filter(verb=verbs.UPDATED_ATTRIBUTE)
             .order_by(
                 "action_object_content_type", "action_object_object_id", "-timestamp"
             )
@@ -275,7 +276,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         for attribute in updated_attributes:
             action.send(
                 user,
-                verb="updated attribute",
+                verb=verbs.UPDATED_ATTRIBUTE,
                 action_object=attribute,
                 target=project,
                 attribute_identifier=attribute.identifier,
