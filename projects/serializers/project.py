@@ -160,14 +160,19 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return sections
 
-    def validate_attribute_data(self, attribute_data):
+    def validate(self, attrs):
+        attrs["attribute_data"] = self._validate_attribute_data(attrs.get("attribute_data", None), attrs)
+        return attrs
+
+    def _validate_attribute_data(self, attribute_data, validate_attributes):
         # Get serializers for all sections in all phases
         sections_data = []
         current_phase = getattr(self.instance, "phase", None)
+        subtype = getattr(self.instance, "subtype", None) or validate_attributes.get("phase")
         current_phase_index = current_phase.index if current_phase else 1
         for phase in ProjectPhase.objects.filter(
-            project_subtype__project_type__name="asemakaava",
             index__lte=current_phase_index,
+            project_subtype=subtype
         ):
             sections_data += self.generate_sections_data(
                 phase=phase, validation=self.should_validate_attributes()
