@@ -213,7 +213,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def validate_phase(self, phase):
         user = self.context["request"].user
-        is_responsible = user == self.instance.user
+        is_responsible = user == getattr(self.instance, "user", None)
 
         if is_responsible:
             return phase
