@@ -14,6 +14,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
+from projects.exporting.report import render_report_to_response
 from projects.importing import AttributeImporter
 from projects.models import (
     ProjectComment,
@@ -24,6 +25,7 @@ from projects.models import (
     ProjectAttributeFile,
     DocumentTemplate,
     Attribute,
+    Report,
 )
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
@@ -43,6 +45,7 @@ from projects.serializers.projecttype import (
     ProjectTypeSerializer,
     ProjectSubtypeSerializer,
 )
+from projects.serializers.report import ReportSerializer
 
 
 class PrivateDownloadViewSetMixin:
@@ -287,3 +290,33 @@ class UploadSpecifications(APIView):
             attribute_importer.run()
 
         return redirect(".")
+
+
+class ReportViewSet(ReadOnlyModelViewSet):
+    queryset = Report.objects.all()
+
+    def retrieve(self, request, *args, **kwargs):
+        filename = request.query_params.get("filename")
+        report = self.get_object()
+
+        projects = Project.objects.filter(
+            subtype__project_type=report.project_type, public=True
+        )
+
+        if filename is None:
+            filename = "{}-{}".format(
+                create_identifier(report.name), timezone.now().date()
+            )
+
+        response = HttpResponse(content_type="text/csv; header=present; charset=UTF-8")
+        response["Content-Disposition"] = "attachment; filename={}.csv".format(filename)
+
+        # Since we are not using DRFs response here, we set a custom CORS control header
+        response["Access-Control-Expose-Headers"] = "content-disposition"
+        response["Access-Control-Allow-Origin"] = "*"
+
+        return render_report_to_response(report, projects, response)
+
+    def list(self, request, *args, **kwargs):
+        self.serializer_class = ReportSerializer
+        return super().list(request, *args, **kwargs)

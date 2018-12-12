@@ -1,6 +1,6 @@
 from django.contrib.gis.db import models
-from django.template.defaultfilters import slugify
 from django.utils.translation import ugettext_lazy as _
+from projects.models import Attribute
 
 
 class Report(models.Model):
@@ -22,10 +22,9 @@ class Report(models.Model):
     def __str__(self):
         return f"{self.name}"
 
-    def save(self, *args, **kwargs):
-        self.slug = slugify(self.name)
-        return super().save(*args, **kwargs)
-
+    @property
+    def filters(self):
+        return Attribute.objects.filterable().filter(report_attributes__report=self)
 
 class ReportAttribute(models.Model):
 
@@ -37,7 +36,7 @@ class ReportAttribute(models.Model):
     )
 
     attribute = models.ForeignKey(
-        "Attribute",
+        Attribute,
         verbose_name=_("attribute"),
         related_name="report_attributes",
         on_delete=models.CASCADE,
