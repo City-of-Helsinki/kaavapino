@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     "private_storage",
     "corsheaders",
+    "actstream",
 ]
 
 if RAVEN_CONFIG["dsn"]:
@@ -187,3 +188,9 @@ if not DEBUG and NGINX_X_ACCEL:
 # CORS
 # TODO: Lock down CORS access when things are running in production
 CORS_ORIGIN_ALLOW_ALL = True
+
+# Django Activity Stream
+USE_NATIVE_JSONFIELD = True
+ACTSTREAM_SETTINGS = {"USE_JSONFIELD": True}
+
+

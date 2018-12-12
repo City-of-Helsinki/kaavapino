@@ -202,8 +202,13 @@ class AttributeImporter:
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating attributes...")
 
-        Attribute.objects.all().delete()
+        existing_attribute_ids = set(
+            Attribute.objects.all().values_list("identifier", flat=True)
+        )
 
+        imported_attribute_ids = set()
+        created_attribute_count = 0
+        updated_attribute_count = 0
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
 
@@ -230,7 +235,7 @@ class AttributeImporter:
                 )
                 value_type = Attribute.TYPE_SHORT_STRING
 
-            attribute, created = Attribute.objects.get_or_create(
+            attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
                 defaults={
                     "name": name,
@@ -240,9 +245,26 @@ class AttributeImporter:
                     "required": is_required,
                 },
             )
+            if created:
+                created_attribute_count += 1
+            else:
+                updated_attribute_count += 1
+            imported_attribute_ids.add(identifier)
 
             if created:
                 logger.info(f"Created {attribute}")
+
+        # Remove any attributes that was not imported
+        old_attribute_ids = existing_attribute_ids - imported_attribute_ids
+        logger.info(f"Old Attributes: {old_attribute_ids}")
+        if old_attribute_ids:
+            Attribute.objects.filter(identifier__in=old_attribute_ids).delete()
+
+        return {
+            "created": created_attribute_count,
+            "updated": updated_attribute_count,
+            "deleted": len(old_attribute_ids),
+        }
 
     def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating fieldsets...")
@@ -493,7 +515,7 @@ class AttributeImporter:
         subtypes = self.create_subtypes(data_rows)
         for subtype in subtypes:
             self.create_phases(subtype)
-        self._create_attributes(data_rows)
+        attribute_info = self._create_attributes(data_rows)
         self._create_fieldset_links(data_rows)
 
         # Remove all attributes from further processing that were part of a fieldset
@@ -507,6 +529,9 @@ class AttributeImporter:
         logger.info("Project subtypes {}".format(ProjectSubtype.objects.count()))
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
         logger.info("Attributes {}".format(Attribute.objects.count()))
+        logger.info(f"  Created: {attribute_info['created']}")
+        logger.info(f"  Updated: {attribute_info['updated']}")
+        logger.info(f"  Deleted: {attribute_info['deleted']}")
         logger.info(
             "FieldSets {}".format(
                 Attribute.objects.filter(value_type=Attribute.TYPE_FIELDSET).count()

@@ -6,3 +6,7 @@ class AppConfig(DjangoAppConfig):
 
     def ready(self):
         import projects.signals.handlers  # noqa
+        from actstream import registry
+
+        registry.register(self.get_model("Project"))
+        registry.register(self.get_model("Attribute"))
