@@ -1,7 +1,7 @@
 import logging
 from collections import Counter, defaultdict
 from itertools import filterfalse
-from typing import Iterable, Sequence, List
+from typing import Iterable, Sequence, List, Optional
 
 from django.db import transaction
 from openpyxl import load_workbook
@@ -438,7 +438,11 @@ class AttributeImporter:
             )
         return metadata
 
-    def get_subtypes_from_cell(self, cell_content: str) -> List[str]:
+    def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
+        # If the subtype is missing we assume it is to be included in all subtypes
+        if not cell_content:
+            return ["kaikki"]
+
         if "," in cell_content:
             # Split names and remove whitespace
             return [name.strip().lower() for name in cell_content.split(",")]
