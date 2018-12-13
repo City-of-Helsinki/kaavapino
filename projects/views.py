@@ -15,6 +15,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
+from projects.filters import ProjectFilter
 from projects.importing import AttributeImporter
 from projects.models import (
     ProjectComment,
@@ -295,13 +296,21 @@ class UploadSpecifications(APIView):
 class ReportViewSet(ReadOnlyModelViewSet):
     queryset = Report.objects.all()
 
+    def get_project_queryset(self, report):
+        pf = ProjectFilter(
+            self.request.query_params,
+            queryset=Project.objects.filter(
+                subtype__project_type=report.project_type, public=True
+            ),
+            request=self.request,
+        )
+        return pf.qs
+
     def retrieve(self, request, *args, **kwargs):
         filename = request.query_params.get("filename")
         report = self.get_object()
 
-        projects = Project.objects.filter(
-            subtype__project_type=report.project_type, public=True
-        )
+        projects = self.get_project_queryset(report)
 
         if filename is None:
             filename = "{}-{}".format(

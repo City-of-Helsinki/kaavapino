@@ -4,7 +4,6 @@ from projects.models import Attribute
 
 
 class Report(models.Model):
-
     project_type = models.ForeignKey(
         "ProjectType",
         verbose_name=_("project type"),
@@ -25,6 +24,7 @@ class Report(models.Model):
     @property
     def filters(self):
         return Attribute.objects.filterable().filter(report_attributes__report=self)
+
 
 class ReportAttribute(models.Model):
 
