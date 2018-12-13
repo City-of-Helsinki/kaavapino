@@ -199,6 +199,11 @@ class AttributeImporter:
         )
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
+    def _is_multiple_choice(self, row, value_type):
+        if value_type == Attribute.TYPE_FIELDSET:
+            return True
+        return False
+
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating attributes...")
 
@@ -220,6 +225,8 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
+
+            multiple_choice = self._is_multiple_choice(row, value_type)
 
             try:
                 help_text = row[self.column_index[HELP_TEXT]].strip()
@@ -243,6 +250,7 @@ class AttributeImporter:
                     "help_text": help_text,
                     "public": is_public,
                     "required": is_required,
+                    "multiple_choice": multiple_choice,
                 },
             )
             if created:
