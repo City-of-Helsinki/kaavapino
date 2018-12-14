@@ -12,6 +12,7 @@ class Report(models.Model):
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
+    is_admin_report = models.BooleanField(verbose_name=_("can only be fetched by admin"), default=False)
 
     class Meta:
         verbose_name = _("report")

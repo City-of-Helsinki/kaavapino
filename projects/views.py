@@ -296,6 +296,15 @@ class UploadSpecifications(APIView):
 class ReportViewSet(ReadOnlyModelViewSet):
     queryset = Report.objects.all()
 
+    def get_queryset(self):
+        user = self.request.user
+        queryset = self.queryset
+
+        if not user.is_superuser:
+            queryset = queryset.exclude(is_admin_report=True)
+
+        return queryset
+
     def get_project_queryset(self, report):
         pf = ProjectFilter(
             self.request.query_params,
