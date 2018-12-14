@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "actstream",
     "django_filters",
+    "rest_framework_gis",
 ]
 
 if RAVEN_CONFIG["dsn"]:
