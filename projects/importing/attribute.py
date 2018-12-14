@@ -191,6 +191,7 @@ class AttributeImporter:
     def _get_attribute_row_identifier(self, row: Sequence) -> str:
         predefined_identifier = row[self.column_index[ATTRIBUTE_IDENTIFIER]]
         if predefined_identifier:
+            predefined_identifier = predefined_identifier.strip()
             if not check_identifier(predefined_identifier):
                 raise ValueError(
                     f"The identifier '{predefined_identifier}' is not a proper slug value"
