@@ -173,9 +173,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         subtype = getattr(self.instance, "subtype", None) or validate_attributes.get(
             "phase"
         )
-        current_phase_index = current_phase.index if current_phase else 1
+        should_validate = self.should_validate_attributes()
+        max_phase_index = current_phase.index if current_phase else 1
+        if not should_validate:
+            max_phase_index = (
+                ProjectPhase.objects.filter(project_subtype=subtype)
+                .order_by("-index")
+                .values_list("index", flat=True)
+                .first()
+            ) or max_phase_index
         for phase in ProjectPhase.objects.filter(
-            index__lte=current_phase_index, project_subtype=subtype
+            index__lte=max_phase_index, project_subtype=subtype
         ):
             sections_data += self.generate_sections_data(
                 phase=phase, validation=self.should_validate_attributes()
