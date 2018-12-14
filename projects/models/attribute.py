@@ -152,7 +152,7 @@ class Attribute(models.Model):
         ):
             return str(value) if value else None
         elif self.value_type == Attribute.TYPE_BOOLEAN:
-            return bool(value)
+            return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
             return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
         elif self.value_type == Attribute.TYPE_USER:
