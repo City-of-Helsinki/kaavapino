@@ -84,9 +84,11 @@ VALUE_TYPES = {
     "sisältö; kuva": Attribute.TYPE_IMAGE,
     "aikataulu ja tehtävät; pvm": Attribute.TYPE_DATE,
     "aikataulu ja tehtävät; teksti": Attribute.TYPE_LONG_STRING,
+    "aikataulu ja tehtävät; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,
     "sisältö; laaja teksti": Attribute.TYPE_LONG_STRING,
     "sisältö; vuosiluku": Attribute.TYPE_SHORT_STRING,
     "linkki aineistoon": Attribute.TYPE_LINK,
+    "aineisto liitetään Kaavapinoon": Attribute.TYPE_FILE,
     "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
     "sisältö; numero": Attribute.TYPE_INTEGER,  # TODO Also decimal?
     "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
