@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import Serializer
 
 from django.utils.translation import ugettext_lazy as _
+from rest_framework_gis.fields import GeometryField
 
 from projects import validators
 from projects.actions import verbs
@@ -20,6 +21,7 @@ from projects.models import (
     Attribute,
     ProjectPhaseSectionAttribute,
 )
+from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
@@ -64,6 +66,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_attribute_data(self, project):
         attribute_data = getattr(project, "attribute_data", {})
         self._set_file_attributes(attribute_data, project)
+        self._set_geometry_attributes(attribute_data, project)
 
         return attribute_data
 
@@ -84,6 +87,20 @@ class ProjectSerializer(serializers.ModelSerializer):
             if has_project_attribute_file_permissions(attribute_file, request)
         }
         attribute_data.update(file_attributes)
+
+    @staticmethod
+    def _set_geometry_attributes(attribute_data, project):
+        attribute_geometries = ProjectAttributeMultipolygonGeometry.objects.filter(
+            project=project
+        )
+
+        geometry_attributes = {
+            attribute_geometry.attribute.identifier: GeometryField().to_representation(
+                value=attribute_geometry.geometry
+            )
+            for attribute_geometry in attribute_geometries
+        }
+        attribute_data.update(geometry_attributes)
 
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"

@@ -2,6 +2,7 @@ import collections
 import copy
 
 from rest_framework import serializers
+from rest_framework_gis.fields import GeometryField
 
 from projects.models import Attribute
 from projects.serializers.utils import _is_attribute_required
@@ -21,7 +22,7 @@ FIELD_TYPES = {
     Attribute.TYPE_IMAGE: serializers.ImageField,  # TODO: Figure out file uploads with DRF
     Attribute.TYPE_FILE: serializers.FileField,
     Attribute.TYPE_USER: serializers.PrimaryKeyRelatedField,
-    # TODO Add Attribute.TYPE_GEOMETRY
+    Attribute.TYPE_GEOMETRY: GeometryField,
 }
 
 
