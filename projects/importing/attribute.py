@@ -296,9 +296,7 @@ class AttributeImporter:
                 continue
 
             attr_id = self._get_attribute_row_identifier(row)
-            fieldset_attr_id = self._get_identifier_for_value(fieldset_attr)
-
-            fieldset_map[fieldset_attr_id].append(attr_id)
+            fieldset_map[fieldset_attr].append(attr_id)
 
         # Create the links
         for source_id in fieldset_map:
