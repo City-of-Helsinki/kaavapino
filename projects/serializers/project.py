@@ -55,7 +55,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             "subtype",
             "attribute_data",
             "phase",
-            "geometry",
             "id",
             "public",
             "_metadata",

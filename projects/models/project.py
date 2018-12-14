@@ -107,8 +107,6 @@ class Project(models.Model):
         on_delete=models.PROTECT,
     )
 
-    geometry = models.MultiPolygonField(null=True, blank=True)
-
     public = models.BooleanField(default=True)
 
     class Meta:
@@ -127,7 +125,9 @@ class Project(models.Model):
             deserialized_value = None
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
-                deserialized_value = self.geometry
+                return ProjectAttributeMultipolygonGeometry.objects.filter(
+                    attribute=attribute, project=self
+                ).first()
             elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 try:
                     deserialized_value = ProjectAttributeFile.objects.get(
@@ -145,7 +145,6 @@ class Project(models.Model):
 
     def set_attribute_data(self, data):
         self.attribute_data = {}
-        self.geometry = None
         self.update_attribute_data(data)
 
     def update_attribute_data(self, data):
@@ -167,7 +166,15 @@ class Project(models.Model):
                 continue
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
-                self.geometry = value
+                geometry_query_params = {"attribute": attribute, "project": self}
+                if not value:
+                    ProjectAttributeMultipolygonGeometry.objects.filter(
+                        **geometry_query_params
+                    ).delete()
+                else:
+                    ProjectAttributeMultipolygonGeometry.objects.update_or_create(
+                        **geometry_query_params, defaults={"geometry": value}
+                    )
             elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 if not value:
                     ProjectAttributeFile.objects.filter(
@@ -447,4 +454,20 @@ class PhaseAttributeMatrixCell(models.Model):
     column = models.IntegerField()
     structure = models.ForeignKey(
         PhaseAttributeMatrixStructure, on_delete=models.CASCADE
+    )
+
+
+class ProjectAttributeMultipolygonGeometry(models.Model):
+    geometry = models.MultiPolygonField(null=True, blank=True)
+    attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("attribute"),
+        related_name="geometries",
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("project"),
+        related_name="geometries",
+        on_delete=models.CASCADE,
     )
