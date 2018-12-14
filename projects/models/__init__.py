@@ -9,4 +9,5 @@ from .project import (  # noqa
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectType,
+    ProjectSubtype,
 )
