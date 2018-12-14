@@ -16,7 +16,7 @@ FIELD_TYPES = {
     Attribute.TYPE_LONG_STRING: serializers.CharField,
     Attribute.TYPE_LINK: serializers.URLField,
     Attribute.TYPE_INTEGER: serializers.IntegerField,
-    Attribute.TYPE_BOOLEAN: serializers.BooleanField,
+    Attribute.TYPE_BOOLEAN: serializers.NullBooleanField,
     Attribute.TYPE_DATE: serializers.DateField,
     Attribute.TYPE_IMAGE: serializers.ImageField,  # TODO: Figure out file uploads with DRF
     Attribute.TYPE_FILE: serializers.FileField,
