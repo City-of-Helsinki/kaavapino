@@ -23,6 +23,15 @@ def f_user():
 
 @pytest.fixture()
 @pytest.mark.django_db()
+def f_admin(f_user):
+    f_user.is_superuser = True
+    f_user.is_staff = True
+    f_user.save()
+    return f_user
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
 def f_user2():
     return get_user_model().objects.create(
         username="test_2",

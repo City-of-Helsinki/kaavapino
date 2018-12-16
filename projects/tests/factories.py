@@ -11,6 +11,7 @@ from projects.models import (
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectComment,
+    Report,
 )
 from users.tests.factories import UserFactory
 
@@ -23,6 +24,7 @@ __all__ = (
     "ProjectPhaseSectionFactory",
     "ProjectPhaseSectionAttributeFactory",
     "ProjectFactory",
+    "ReportFactory",
 )
 
 
@@ -96,6 +98,7 @@ class ProjectFactory(factory.DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     subtype = factory.SubFactory(ProjectSubtypeFactory)
     phase = factory.SubFactory(ProjectPhaseFactory)
+    public = True
 
     class Meta:
         model = Project
@@ -108,3 +111,12 @@ class CommentFactory(factory.DjangoModelFactory):
 
     class Meta:
         model = ProjectComment
+
+
+class ReportFactory(factory.DjangoModelFactory):
+    project_type = factory.SubFactory(ProjectTypeFactory)
+    name = fuzzy.FuzzyText()
+    show_name = True
+
+    class Meta:
+        model = Report
