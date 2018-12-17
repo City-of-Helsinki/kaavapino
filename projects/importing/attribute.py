@@ -1,9 +1,11 @@
 import logging
 from collections import Counter, defaultdict
+from enum import Enum
 from itertools import filterfalse
 from typing import Iterable, Sequence, List, Optional
 
 from django.db import transaction
+from django.db.models import ProtectedError
 from openpyxl import load_workbook
 
 from ..models import (
@@ -53,24 +55,134 @@ ATTRIBUTE_PHASE_COLUMNS = [
 
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
-PROJECT_PHASES = [
-    {"name": "Käynnistys", "color": "color--tram", "color_code": "#009246"},  # None
+KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
+
+
+class Phases(Enum):
+    START = "Käynnistys"
+    OAS = "OAS"
+    PROPOSAL = "Ehdotus"
+    REVISED_PROPOSAL = "Tarkistettu ehdotus"
+    KHS = "Kanslia-Khs-Valtuusto"
+    GOING_INTO_EFFECT = "Voimaantulo"
+
+
+PROJECT_PHASES = {
+    Phases.START.value: {
+        "name": Phases.START.value,
+        "color": "color--tram",
+        "color_code": "#009246",
+    },  # None
     # {'name': 'Suunnitteluperiaatteet', 'color': '#009142'},
-    {"name": "OAS", "color": "color--summer", "color_code": "#ffc61e"},  # 01, 03
+    Phases.OAS.value: {
+        "name": Phases.OAS.value,
+        "color": "color--summer",
+        "color_code": "#ffc61e",
+    },  # 01, 03
     # {'name': 'Luonnos', 'color': '#ffd600'},
-    {"name": "Ehdotus", "color": "color--metro", "color_code": "#fd4f00"},  # 02, 04
-    {
-        "name": "Tarkistettu ehdotus",
+    Phases.PROPOSAL.value: {
+        "name": Phases.PROPOSAL.value,
+        "color": "color--metro",
+        "color_code": "#fd4f00",
+    },  # 02, 04
+    Phases.REVISED_PROPOSAL.value: {
+        "name": Phases.REVISED_PROPOSAL.value,
         "color": "color--bus",
         "color_code": "#0000bf",
     },  # 05, 07
-    {
-        "name": "Kanslia-Khs-Valtuusto",
+    Phases.KHS.value: {
+        "name": Phases.KHS.value,
         "color": "color--black",
         "color_code": "#000000",
     },  # 06, 07 <- Kvsto
-    {"name": "Voimaantulo", "color": "color--white", "color_code": "#ffffff"},
-]
+    Phases.GOING_INTO_EFFECT.value: {
+        "name": Phases.GOING_INTO_EFFECT.value,
+        "color": "color--white",
+        "color_code": "#ffffff",
+    },
+}
+
+SUBTYPE_PHASES = {
+    "XS": [
+        Phases.START.value,
+        Phases.OAS.value,
+        Phases.PROPOSAL.value,
+        Phases.REVISED_PROPOSAL.value,
+        Phases.GOING_INTO_EFFECT.value,
+    ],
+    "S": [
+        Phases.START.value,
+        Phases.OAS.value,
+        Phases.PROPOSAL.value,
+        Phases.REVISED_PROPOSAL.value,
+        Phases.GOING_INTO_EFFECT.value,
+    ],
+    "M": [
+        Phases.START.value,
+        Phases.OAS.value,
+        Phases.PROPOSAL.value,
+        Phases.REVISED_PROPOSAL.value,
+        Phases.KHS.value,
+        Phases.GOING_INTO_EFFECT.value,
+    ],
+    "L": [
+        Phases.START.value,
+        Phases.OAS.value,
+        Phases.PROPOSAL.value,
+        Phases.REVISED_PROPOSAL.value,
+        Phases.KHS.value,
+        Phases.GOING_INTO_EFFECT.value,
+    ],
+    "XL": [
+        Phases.START.value,
+        Phases.OAS.value,
+        Phases.PROPOSAL.value,
+        Phases.REVISED_PROPOSAL.value,
+        Phases.KHS.value,
+        Phases.GOING_INTO_EFFECT.value,
+    ],
+}
+
+SUBTYPE_PHASE_METADATA = {
+    "XS": {
+        Phases.START.value: {"default_end_weeks_delta": 8},
+        Phases.OAS.value: {"default_end_weeks_delta": 12},
+        Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
+        Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
+        Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
+    },
+    "S": {
+        Phases.START.value: {"default_end_weeks_delta": 8},
+        Phases.OAS.value: {"default_end_weeks_delta": 12},
+        Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
+        Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
+        Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
+    },
+    "M": {
+        Phases.START.value: {"default_end_weeks_delta": 8},
+        Phases.OAS.value: {"default_end_weeks_delta": 12},
+        Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
+        Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
+        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
+    },
+    "L": {
+        Phases.START.value: {"default_end_weeks_delta": 12},
+        Phases.OAS.value: {"default_end_weeks_delta": 16},
+        Phases.PROPOSAL.value: {"default_end_weeks_delta": 36},
+        Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 14},
+        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
+    },
+    "XL": {
+        Phases.START.value: {"default_end_weeks_delta": 12},
+        Phases.OAS.value: {"default_end_weeks_delta": 16},
+        Phases.PROPOSAL.value: {"default_end_weeks_delta": 36},
+        Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 14},
+        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
+    },
+}
 
 # projektin vuosi <- tarkistetun ehdotuksen lautakuntapvm
 
@@ -454,20 +566,45 @@ class AttributeImporter:
 
     def create_phases(self, subtype: ProjectSubtype):
         logger.info(f"\nCreating phases for {subtype.name}...")
-        current_phases = [obj.name for obj in subtype.phases.order_by("index")]
-        new_phases = [x["name"] for x in PROJECT_PHASES]
-        if current_phases == new_phases:
-            return
+        phase_names = SUBTYPE_PHASES[subtype.name.upper()]
 
-        subtype.phases.all().delete()
-        for i, phase in enumerate(PROJECT_PHASES, start=1):
-            ProjectPhase.objects.create(
-                project_subtype=subtype,
+        created_phase_count = 0
+        updated_phase_count = 0
+        old_phases = [obj.id for obj in subtype.phases.order_by("index")]
+        for i, phase_name in enumerate(phase_names, start=1):
+            phase = PROJECT_PHASES[phase_name]
+            metadata = SUBTYPE_PHASE_METADATA[subtype.name.upper()][phase_name]
+            project_phase, created = ProjectPhase.objects.update_or_create(
                 name=phase["name"],
-                index=i,
-                color=phase["color"],
-                color_code=phase["color_code"],
+                project_subtype=subtype,
+                defaults={
+                    "index": i,
+                    "color": phase["color"],
+                    "color_code": phase["color_code"],
+                    "metadata": metadata,
+                },
             )
+            if project_phase.id in old_phases:
+                old_phases.remove(project_phase.id)
+
+            if created:
+                created_phase_count += 1
+            else:
+                updated_phase_count += 1
+
+        try:
+            ProjectPhase.objects.filter(id__in=old_phases).delete()
+        except ProtectedError:
+            # TODO: Handle removal of Phases when they are in use by Projects
+            #       could for instance be disabled by new projects but visible
+            #       for old ones.
+            pass
+
+        return {
+            "created": created_phase_count,
+            "updated": updated_phase_count,
+            "deleted": len(old_phases),
+        }
 
     def create_subtypes(
         self, rows: Iterable[Sequence[str]]
@@ -529,8 +666,12 @@ class AttributeImporter:
         data_rows = list(filter(self._check_if_row_valid, rows[1:]))
 
         subtypes = self.create_subtypes(data_rows)
+        phase_info = {"created": 0, "updated": 0, "deleted": 0}
         for subtype in subtypes:
-            self.create_phases(subtype)
+            _phase_info = self.create_phases(subtype)
+            phase_info["created"] += _phase_info["created"]
+            phase_info["updated"] += _phase_info["updated"]
+            phase_info["deleted"] += _phase_info["deleted"]
         attribute_info = self._create_attributes(data_rows)
         self._create_fieldset_links(data_rows)
 
@@ -544,6 +685,9 @@ class AttributeImporter:
 
         logger.info("Project subtypes {}".format(ProjectSubtype.objects.count()))
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
+        logger.info(f"  Created: {phase_info['created']}")
+        logger.info(f"  Updated: {phase_info['updated']}")
+        logger.info(f"  Deleted: {phase_info['deleted']}")
         logger.info("Attributes {}".format(Attribute.objects.count()))
         logger.info(f"  Created: {attribute_info['created']}")
         logger.info(f"  Updated: {attribute_info['updated']}")
