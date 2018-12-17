@@ -71,9 +71,8 @@ class TestListingReportTypes:
 class TestFetchingReport:
     client = APIClient()
 
-    def test_normal_user__can_fetch_report(self, f_user, report_factory):
+    def test_normal_user__can_fetch_report(self, f_user, report):
         self.client.force_authenticate(user=f_user)
-        report = report_factory()
         url = reverse("report-detail", kwargs={"pk": report.pk})
 
         response = self.client.get(url)
@@ -101,11 +100,8 @@ class TestFetchingReport:
         assert response.status_code == 404
 
     @pytest.mark.parametrize("project__public", [True])
-    def test_fetching_report__contains_public_projects(
-        self, f_user, report_factory, project
-    ):
+    def test_fetching_report__contains_public_projects(self, f_user, report, project):
         self.client.force_authenticate(user=f_user)
-        report = report_factory()
         url = reverse("report-detail", kwargs={"pk": report.pk})
 
         response = self.client.get(url)
@@ -114,12 +110,26 @@ class TestFetchingReport:
 
     @pytest.mark.parametrize("project__public", [False])
     def test_fetching_report__doesnt_contain_private_projects(
-        self, f_user, report_factory, project
+        self, f_user, report, project
     ):
         self.client.force_authenticate(user=f_user)
-        report = report_factory()
         url = reverse("report-detail", kwargs={"pk": report.pk})
 
         response = self.client.get(url)
 
         assert project.name not in response.content.decode("utf-8")
+
+    def test_fetching_report__should_be_able_to_filter_projects(
+        self, f_user, report, project_factory
+    ):
+        self.client.force_authenticate(user=f_user)
+        project = project_factory(user=f_user)
+        project_filtered = project_factory(user=None)
+        url = reverse("report-detail", kwargs={"pk": report.pk})
+        url = f"{url}?user__uuid={f_user.uuid}"
+
+        response = self.client.get(url)
+        content = response.content.decode("utf-8")
+
+        assert project.name in content
+        assert project_filtered.name not in content
