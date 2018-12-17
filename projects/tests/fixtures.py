@@ -4,13 +4,13 @@ from django.contrib.auth import get_user_model
 from projects.models import (
     Attribute,
     ProjectType,
+    ProjectSubtype,
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     AttributeValueChoice,
     Project,
 )
-from projects.models.project import ProjectSubtype
 
 
 @pytest.fixture()
@@ -19,6 +19,15 @@ def f_user():
     return get_user_model().objects.create(
         username="test", email="test@example.com", first_name="Tim", last_name="Tester"
     )
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_admin(f_user):
+    f_user.is_superuser = True
+    f_user.is_staff = True
+    f_user.save()
+    return f_user
 
 
 @pytest.fixture()

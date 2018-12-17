@@ -5,7 +5,7 @@ from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
 from django.utils.translation import ugettext_lazy as _
 
-from projects.models import ProjectComment
+from projects.models import ProjectComment, Report, ReportAttribute
 from projects.models.project import (
     ProjectPhaseLog,
     PhaseAttributeMatrixStructure,
@@ -224,6 +224,21 @@ class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
                     column=column,
                     structure=structure,
                 )
+
+
+class ReportAttributeInline(admin.TabularInline):
+    model = ReportAttribute
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "attribute":
+            kwargs["queryset"] = Attribute.objects.report_friendly()
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    inlines = (ReportAttributeInline,)
+    list_display = ("name", "project_type")
 
 
 @admin.register(ProjectComment)

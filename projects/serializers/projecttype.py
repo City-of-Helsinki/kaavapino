@@ -1,8 +1,7 @@
 from django.db.models import Case, When
 from rest_framework import serializers
 
-from projects.models import ProjectType, Attribute
-from projects.models.project import ProjectSubtype
+from projects.models import ProjectType, ProjectSubtype, Attribute
 
 
 class ProjectSubtypeSerializer(serializers.ModelSerializer):

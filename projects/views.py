@@ -6,25 +6,28 @@ from django.utils import timezone
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.mixins import RetrieveModelMixin, ListModelMixin
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
+from projects.exporting.report import render_report_to_response
+from projects.filters import ProjectFilter
 from projects.importing import AttributeImporter
 from projects.models import (
     ProjectComment,
     Project,
     ProjectPhase,
     ProjectType,
+    ProjectSubtype,
     ProjectAttributeFile,
     DocumentTemplate,
     Attribute,
+    Report,
 )
-from projects.models.project import ProjectSubtype
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
 from projects.permissions.documents import DocumentPermissions
@@ -43,6 +46,7 @@ from projects.serializers.projecttype import (
     ProjectTypeSerializer,
     ProjectSubtypeSerializer,
 )
+from projects.serializers.report import ReportSerializer
 
 
 class PrivateDownloadViewSetMixin:
@@ -206,7 +210,7 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return context
 
 
-class DocumentViewSet(RetrieveModelMixin, ListModelMixin, viewsets.GenericViewSet):
+class DocumentViewSet(ReadOnlyModelViewSet):
     queryset = DocumentTemplate.objects.all()
     permission_classes = (DocumentPermissions,)
     lookup_field = "slug"
@@ -287,3 +291,50 @@ class UploadSpecifications(APIView):
             attribute_importer.run()
 
         return redirect(".")
+
+
+class ReportViewSet(ReadOnlyModelViewSet):
+    queryset = Report.objects.all()
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = self.queryset
+
+        if not user.is_superuser:
+            queryset = queryset.exclude(is_admin_report=True)
+
+        return queryset
+
+    def get_project_queryset(self, report):
+        pf = ProjectFilter(
+            self.request.query_params,
+            queryset=Project.objects.filter(
+                subtype__project_type=report.project_type, public=True
+            ),
+            request=self.request,
+        )
+        return pf.qs
+
+    def retrieve(self, request, *args, **kwargs):
+        filename = request.query_params.get("filename")
+        report = self.get_object()
+
+        projects = self.get_project_queryset(report)
+
+        if filename is None:
+            filename = "{}-{}".format(
+                create_identifier(report.name), timezone.now().date()
+            )
+
+        response = HttpResponse(content_type="text/csv; header=present; charset=UTF-8")
+        response["Content-Disposition"] = "attachment; filename={}.csv".format(filename)
+
+        # Since we are not using DRFs response here, we set a custom CORS control header
+        response["Access-Control-Expose-Headers"] = "content-disposition"
+        response["Access-Control-Allow-Origin"] = "*"
+
+        return render_report_to_response(report, projects, response)
+
+    def list(self, request, *args, **kwargs):
+        self.serializer_class = ReportSerializer
+        return super().list(request, *args, **kwargs)

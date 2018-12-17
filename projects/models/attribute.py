@@ -1,11 +1,14 @@
 import datetime
 import re
 from collections import Sequence
+from html import escape
 
 from django.contrib.auth import get_user_model
 from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
+
+from users.models import User
 
 DATE_SERIALIZATION_FORMAT = "%Y-%m-%d"
 
@@ -18,6 +21,34 @@ validate_identifier = RegexValidator(
     ),
     "invalid",
 )
+
+
+class AttributeQuerySet(models.QuerySet):
+    def filterable(self):
+        return self.filter(
+            value_type__in=[
+                # Attribute.TYPE_FIELDSET,
+                Attribute.TYPE_INTEGER,
+                Attribute.TYPE_SHORT_STRING,
+                # Attribute.TYPE_LONG_STRING,
+                Attribute.TYPE_BOOLEAN,
+                Attribute.TYPE_DATE,
+                Attribute.TYPE_USER,
+            ]
+        )
+
+    def report_friendly(self):
+        return self.filter(
+            value_type__in=[
+                Attribute.TYPE_FIELDSET,
+                Attribute.TYPE_INTEGER,
+                Attribute.TYPE_SHORT_STRING,
+                Attribute.TYPE_LONG_STRING,
+                Attribute.TYPE_BOOLEAN,
+                Attribute.TYPE_DATE,
+                Attribute.TYPE_USER,
+            ]
+        )
 
 
 class Attribute(models.Model):
@@ -77,6 +108,8 @@ class Attribute(models.Model):
         through_fields=("attribute_source", "attribute_target"),
     )
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
+
+    objects = AttributeQuerySet.as_manager()
 
     class Meta:
         verbose_name = _("attribute")
@@ -180,6 +213,24 @@ class Attribute(models.Model):
             if processed_entity:
                 entities.append(processed_entity)
         return entities
+
+    def _get_single_display_value(self, value):
+        if value is None or self.value_type == Attribute.TYPE_GEOMETRY:
+            return None
+        if self.value_type == Attribute.TYPE_BOOLEAN:
+            return "Kyllä" if value else "Ei"  # TODO
+        elif self.value_type == Attribute.TYPE_DATE:
+            return value.strftime("%d.%m.%Y")
+        elif self.value_type == Attribute.TYPE_USER and isinstance(value, User):
+            return value.get_full_name()
+        else:
+            return escape(str(value))
+
+    def get_attribute_display(self, value):
+        if isinstance(value, list):
+            return [self._get_single_display_value(v) for v in value]
+        else:
+            return self._get_single_display_value(value)
 
 
 class AttributeValueChoice(models.Model):

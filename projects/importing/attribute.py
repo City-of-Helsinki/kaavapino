@@ -6,13 +6,15 @@ from typing import Iterable, Sequence, List
 from django.db import transaction
 from openpyxl import load_workbook
 
-from projects.models import (
+from ..models import (
+    Attribute,
     FieldSetAttribute,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
+    ProjectPhase,
+    ProjectType,
+    ProjectSubtype,
 )
-from projects.models.project import ProjectSubtype
-from ..models import Attribute, ProjectPhase, ProjectType
 from ..models.utils import create_identifier, truncate_identifier, check_identifier
 
 logger = logging.getLogger(__name__)

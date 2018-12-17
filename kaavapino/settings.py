@@ -97,6 +97,7 @@ INSTALLED_APPS = [
     "private_storage",
     "corsheaders",
     "actstream",
+    "django_filters",
 ]
 
 if RAVEN_CONFIG["dsn"]:
