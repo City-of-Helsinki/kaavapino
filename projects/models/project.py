@@ -292,6 +292,14 @@ class ProjectPhase(models.Model):
     )
     index = models.PositiveIntegerField(verbose_name=_("index"))
 
+    metadata = JSONField(
+        verbose_name=_("metadata"),
+        default=dict,
+        blank=True,
+        null=True,
+        encoder=DjangoJSONEncoder,
+    )
+
     class Meta:
         verbose_name = _("project phase")
         verbose_name_plural = _("project phases")
