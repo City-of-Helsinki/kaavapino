@@ -197,6 +197,31 @@ class Project(models.Model):
                     self.attribute_data.pop(identifier, None)
         return True
 
+    def set_default_deadlines(self):
+        phases = self.subtype.phases.all().order_by("index")
+
+        deadlines = []
+
+        now = timezone.now()
+        previous_phase_ends = now
+        for phase in phases:
+            deadline = now
+            weeks_delta = phase.metadata.get("default_end_weeks_delta", None)
+            if weeks_delta:
+                deadline = previous_phase_ends + timezone.timedelta(weeks=weeks_delta)
+            deadlines.append(
+                {
+                    "phase_id": phase.id,
+                    "phase_name": phase.name,
+                    "start": previous_phase_ends,
+                    "deadline": deadline,
+                }
+            )
+            previous_phase_ends = deadline
+
+        self.deadlines = deadlines
+        self.save()
+
     def get_time_line(self):
         """Produce data for a timeline graph for the given project."""
         timeline = [
