@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0035_private_flag'),
+        ('projects', '0037_report_is_admin_report'),
     ]
 
     operations = [

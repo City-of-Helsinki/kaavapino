@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0037_report_is_admin_report'),
+        ('projects', '0039_project_geometries'),
     ]
 
     operations = [

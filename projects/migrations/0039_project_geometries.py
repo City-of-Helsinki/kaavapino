@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0036_add_link_attribute'),
+        ('projects', '0038_add_link_attribute'),
     ]
 
     operations = [
