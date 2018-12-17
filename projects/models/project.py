@@ -99,6 +99,13 @@ class Project(models.Model):
         null=True,
         encoder=DjangoJSONEncoder,
     )
+    deadlines = JSONField(
+        verbose_name=_("deadlines"),
+        default=dict,
+        blank=True,
+        null=True,
+        encoder=DjangoJSONEncoder,
+    )
     phase = models.ForeignKey(
         "ProjectPhase",
         verbose_name=_("phase"),
