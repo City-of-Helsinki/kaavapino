@@ -3,6 +3,7 @@ from typing import List, NamedTuple, Type
 
 from actstream import action
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -36,12 +37,20 @@ class SectionData(NamedTuple):
     serializer_class: Type[Serializer]
 
 
+class ProjectDeadlinesSerializer(serializers.Serializer):
+    phase_id = serializers.IntegerField()
+    phase_name = serializers.CharField(read_only=True)
+    start = serializers.DateTimeField(read_only=True)
+    deadline = serializers.DateTimeField()
+
+
 class ProjectSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
+    deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
 
     _metadata = serializers.SerializerMethodField()
 
@@ -59,6 +68,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "phase",
             "id",
             "public",
+            "deadlines",
             "_metadata",
         ]
         read_only_fields = ["type", "created_at", "modified_at"]
@@ -180,6 +190,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         attrs["attribute_data"] = self._validate_attribute_data(
             attrs.get("attribute_data", None), attrs
         )
+        attrs["deadlines"] = self._validate_deadlines(attrs)
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes):
@@ -259,10 +270,67 @@ class ProjectSerializer(serializers.ModelSerializer):
             return user
         return validators.admin_or_read_only(user, "user", self.instance, self.context)
 
+    def _validate_deadlines(self, attrs):
+        deadlines = attrs["deadlines"]
+        deadlines.sort(key=lambda _deadline: _deadline["phase_id"])
+
+        project = self.instance
+
+        if not project:
+            return deadlines
+
+        phase_ids = []
+        latest_deadline = deadlines[0]["deadline"]
+        for deadline in deadlines:
+            if latest_deadline > deadline["deadline"]:
+                raise ValidationError(
+                    {
+                        "deadlines": _(
+                            'Invalid date "{deadline}", must be after "{latest_deadline}"'.format(
+                                deadline=deadline["deadline"],
+                                latest_deadline=latest_deadline,
+                            )
+                        )
+                    }
+                )
+
+            phase_id = deadline["phase_id"]
+            if phase_id in phase_ids:
+                raise ValidationError(
+                    {
+                        "deadlines": _(
+                            'Multiple pk value "{pk_value}"'.format(pk_value=phase_id)
+                        )
+                    }
+                )
+
+            try:
+                phase = ProjectPhase.objects.get(
+                    pk=phase_id, project_subtype=project.subtype
+                )
+            except ObjectDoesNotExist:
+                raise ValidationError(
+                    {
+                        "deadlines": _(
+                            'Invalid pk "{pk_value}" - object does not exist.'.format(
+                                pk_value=phase_id
+                            )
+                        )
+                    }
+                )
+            deadline["start"] = latest_deadline
+            deadline["phase_name"] = phase.name
+
+            latest_deadline = deadline["deadline"]
+
+        return deadlines
+
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
             project_subtype=validated_data["subtype"]
         ).first()
+
+        deadlines = validated_data.pop("deadlines", [])
 
         with transaction.atomic():
             attribute_data = validated_data.pop("attribute_data", {})
@@ -277,16 +345,26 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
+            if deadlines:
+                project.deadlines = deadlines
+                project.save()
+            else:
+                project.set_default_deadlines()
+
         return project
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
+        deadlines = validated_data.pop("deadlines", [])
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
-            return super(ProjectSerializer, self).update(instance, validated_data)
+            project = super(ProjectSerializer, self).update(instance, validated_data)
+            project.deadlines = deadlines
+            project.save()
+            return project
 
     def log_updates_attribute_data(self, attribute_data, project=None):
         project = project or self.instance
