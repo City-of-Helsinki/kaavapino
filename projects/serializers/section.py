@@ -2,6 +2,7 @@ import collections
 import copy
 
 from rest_framework import serializers
+from rest_framework_gis.fields import GeometryField
 
 from projects.models import Attribute
 from projects.serializers.utils import _is_attribute_required
@@ -14,13 +15,14 @@ from django.contrib.auth import get_user_model
 FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: serializers.CharField,
     Attribute.TYPE_LONG_STRING: serializers.CharField,
+    Attribute.TYPE_LINK: serializers.URLField,
     Attribute.TYPE_INTEGER: serializers.IntegerField,
-    Attribute.TYPE_BOOLEAN: serializers.BooleanField,
+    Attribute.TYPE_BOOLEAN: serializers.NullBooleanField,
     Attribute.TYPE_DATE: serializers.DateField,
     Attribute.TYPE_IMAGE: serializers.ImageField,  # TODO: Figure out file uploads with DRF
     Attribute.TYPE_FILE: serializers.FileField,
     Attribute.TYPE_USER: serializers.PrimaryKeyRelatedField,
-    # TODO Add Attribute.TYPE_GEOMETRY
+    Attribute.TYPE_GEOMETRY: GeometryField,
 }
 
 

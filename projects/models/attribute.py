@@ -69,6 +69,7 @@ class Attribute(models.Model):
     TYPE_GEOMETRY = "geometry"
     TYPE_IMAGE = "image"
     TYPE_FILE = "file"
+    TYPE_LINK = "link"
 
     TYPE_CHOICES = (
         (TYPE_FIELDSET, _("fieldset")),
@@ -81,6 +82,7 @@ class Attribute(models.Model):
         (TYPE_GEOMETRY, _("geometry")),
         (TYPE_IMAGE, _("image")),
         (TYPE_FILE, _("file")),
+        (TYPE_LINK, _("link")),
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
@@ -146,10 +148,11 @@ class Attribute(models.Model):
         elif self.value_type in (
             Attribute.TYPE_SHORT_STRING,
             Attribute.TYPE_LONG_STRING,
+            Attribute.TYPE_LINK,
         ):
             return str(value) if value else None
         elif self.value_type == Attribute.TYPE_BOOLEAN:
-            return bool(value)
+            return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
             return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
         elif self.value_type == Attribute.TYPE_USER:
@@ -177,6 +180,7 @@ class Attribute(models.Model):
             Attribute.TYPE_SHORT_STRING,
             Attribute.TYPE_LONG_STRING,
             Attribute.TYPE_BOOLEAN,
+            Attribute.TYPE_LINK,
         ):
             return value
         elif self.value_type == Attribute.TYPE_DATE:

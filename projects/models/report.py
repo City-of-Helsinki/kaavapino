@@ -12,14 +12,28 @@ class Report(models.Model):
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
-    is_admin_report = models.BooleanField(verbose_name=_("can only be fetched by admin"), default=False)
+    is_admin_report = models.BooleanField(
+        verbose_name=_("can only be fetched by admin"), default=False
+    )
 
-    show_name = models.BooleanField(verbose_name=_("show name on report"), default=False)
-    show_created_at = models.BooleanField(verbose_name=_("show created at on report"), default=False)
-    show_modified_at = models.BooleanField(verbose_name=_("show modified at on report"), default=False)
-    show_user = models.BooleanField(verbose_name=_("show user on report"), default=False)
-    show_phase = models.BooleanField(verbose_name=_("show phase on report"), default=False)
-    show_subtype = models.BooleanField(verbose_name=_("show subtype on report"), default=False)
+    show_name = models.BooleanField(
+        verbose_name=_("show name on report"), default=False
+    )
+    show_created_at = models.BooleanField(
+        verbose_name=_("show created at on report"), default=False
+    )
+    show_modified_at = models.BooleanField(
+        verbose_name=_("show modified at on report"), default=False
+    )
+    show_user = models.BooleanField(
+        verbose_name=_("show user on report"), default=False
+    )
+    show_phase = models.BooleanField(
+        verbose_name=_("show phase on report"), default=False
+    )
+    show_subtype = models.BooleanField(
+        verbose_name=_("show subtype on report"), default=False
+    )
 
     class Meta:
         verbose_name = _("report")

@@ -1,7 +1,7 @@
 import logging
 from collections import Counter, defaultdict
 from itertools import filterfalse
-from typing import Iterable, Sequence, List
+from typing import Iterable, Sequence, List, Optional
 
 from django.db import transaction
 from openpyxl import load_workbook
@@ -84,8 +84,11 @@ VALUE_TYPES = {
     "sisältö; kuva": Attribute.TYPE_IMAGE,
     "aikataulu ja tehtävät; pvm": Attribute.TYPE_DATE,
     "aikataulu ja tehtävät; teksti": Attribute.TYPE_LONG_STRING,
+    "aikataulu ja tehtävät; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,
     "sisältö; laaja teksti": Attribute.TYPE_LONG_STRING,
     "sisältö; vuosiluku": Attribute.TYPE_SHORT_STRING,
+    "linkki aineistoon": Attribute.TYPE_LINK,
+    "aineisto liitetään Kaavapinoon": Attribute.TYPE_FILE,
     "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
     "sisältö; numero": Attribute.TYPE_INTEGER,  # TODO Also decimal?
     "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
@@ -190,6 +193,7 @@ class AttributeImporter:
     def _get_attribute_row_identifier(self, row: Sequence) -> str:
         predefined_identifier = row[self.column_index[ATTRIBUTE_IDENTIFIER]]
         if predefined_identifier:
+            predefined_identifier = predefined_identifier.strip()
             if not check_identifier(predefined_identifier):
                 raise ValueError(
                     f"The identifier '{predefined_identifier}' is not a proper slug value"
@@ -294,9 +298,7 @@ class AttributeImporter:
                 continue
 
             attr_id = self._get_attribute_row_identifier(row)
-            fieldset_attr_id = self._get_identifier_for_value(fieldset_attr)
-
-            fieldset_map[fieldset_attr_id].append(attr_id)
+            fieldset_map[fieldset_attr].append(attr_id)
 
         # Create the links
         for source_id in fieldset_map:
@@ -438,7 +440,11 @@ class AttributeImporter:
             )
         return metadata
 
-    def get_subtypes_from_cell(self, cell_content: str) -> List[str]:
+    def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
+        # If the subtype is missing we assume it is to be included in all subtypes
+        if not cell_content:
+            return ["kaikki"]
+
         if "," in cell_content:
             # Split names and remove whitespace
             return [name.strip().lower() for name in cell_content.split(",")]
