@@ -100,3 +100,26 @@ class TestFetchingReport:
 
         assert response.status_code == 404
 
+    @pytest.mark.parametrize("project__public", [True])
+    def test_fetching_report__contains_public_projects(
+        self, f_user, report_factory, project
+    ):
+        self.client.force_authenticate(user=f_user)
+        report = report_factory()
+        url = reverse("report-detail", kwargs={"pk": report.pk})
+
+        response = self.client.get(url)
+
+        assert project.name in response.content.decode("utf-8")
+
+    @pytest.mark.parametrize("project__public", [False])
+    def test_fetching_report__doesnt_contain_private_projects(
+        self, f_user, report_factory, project
+    ):
+        self.client.force_authenticate(user=f_user)
+        report = report_factory()
+        url = reverse("report-detail", kwargs={"pk": report.pk})
+
+        response = self.client.get(url)
+
+        assert project.name not in response.content.decode("utf-8")
