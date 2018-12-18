@@ -132,9 +132,12 @@ class Project(models.Model):
             deserialized_value = None
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
-                return ProjectAttributeMultipolygonGeometry.objects.filter(
+                geometry = ProjectAttributeMultipolygonGeometry.objects.filter(
                     attribute=attribute, project=self
                 ).first()
+                if not geometry:
+                    continue
+                deserialized_value = geometry.geometry
             elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 try:
                     deserialized_value = ProjectAttributeFile.objects.get(
