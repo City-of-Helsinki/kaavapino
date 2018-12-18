@@ -190,7 +190,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         attrs["attribute_data"] = self._validate_attribute_data(
             attrs.get("attribute_data", None), attrs
         )
-        attrs["deadlines"] = self._validate_deadlines(attrs)
+
+        deadlines = self._validate_deadlines(attrs)
+        if deadlines:
+            attrs["deadlines"] = deadlines
+
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes):
@@ -271,7 +275,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         return validators.admin_or_read_only(user, "user", self.instance, self.context)
 
     def _validate_deadlines(self, attrs):
-        deadlines = attrs["deadlines"]
+        deadlines = attrs.get("deadlines", None)
+        if not deadlines:
+            return None
         deadlines.sort(key=lambda _deadline: _deadline["phase_id"])
 
         project = self.instance
