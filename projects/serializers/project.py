@@ -285,7 +285,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not project:
             return deadlines
 
-        phase_ids = []
+        validated_phase_ids = []
         latest_deadline = deadlines[0]["deadline"]
         for deadline in deadlines:
             if latest_deadline > deadline["deadline"]:
@@ -301,7 +301,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
 
             phase_id = deadline["phase_id"]
-            if phase_id in phase_ids:
+            if phase_id in validated_phase_ids:
                 raise ValidationError(
                     {
                         "deadlines": _(
@@ -328,6 +328,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             deadline["phase_name"] = phase.name
 
             latest_deadline = deadline["deadline"]
+            validated_phase_ids.append(phase_id)
 
         return deadlines
 
