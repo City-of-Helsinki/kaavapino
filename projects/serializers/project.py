@@ -287,6 +287,21 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         validated_phase_ids = []
         latest_deadline = deadlines[0]["deadline"]
+        required_project_phase_ids = list(
+            ProjectPhase.objects.filter(project_subtype=project.subtype)
+            .order_by("id")
+            .values_list("id", flat=True)
+        )
+        attribute_phase_ids = [deadline["phase_id"] for deadline in deadlines]
+        if not required_project_phase_ids == attribute_phase_ids:
+            raise ValidationError(
+                {
+                    "deadlines": _(
+                        "All phases for the sub type needs to be included in the deadlines list"
+                    )
+                }
+            )
+
         for deadline in deadlines:
             if latest_deadline > deadline["deadline"]:
                 raise ValidationError(
