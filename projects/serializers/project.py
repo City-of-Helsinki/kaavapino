@@ -361,14 +361,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
-        deadlines = validated_data.pop("deadlines", [])
+        deadlines = validated_data.pop("deadlines", None)
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
-            project.deadlines = deadlines
+            if deadlines:
+                project.deadlines = deadlines
             project.save()
             return project
 
