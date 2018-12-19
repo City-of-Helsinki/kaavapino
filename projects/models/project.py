@@ -191,6 +191,12 @@ class Project(models.Model):
                         attribute=attribute, project=self
                     ).delete()
                     self.attribute_data.pop(identifier, None)
+            elif attribute.value_type == Attribute.TYPE_FIELDSET:
+                serialized_value = attribute.serialize_value(value)
+                if not serialized_value:
+                    self.attribute_data.pop(identifier, None)
+                else:
+                    self.attribute_data[identifier] = serialized_value
             else:
                 serialized_value = attribute.serialize_value(value)
 
