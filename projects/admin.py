@@ -220,8 +220,14 @@ class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
             super().save_model(request, obj, form, change)
             structure = PhaseAttributeMatrixStructure.objects.get(pk=obj.pk)
 
-            row_limit = len(structure.row_names) - 1 if len(structure.row_names) > 0 else 0
-            column_limit = len(structure.column_names) - 1 if len(structure.column_names) > 0 else 0
+            row_limit = (
+                len(structure.row_names) - 1 if len(structure.row_names) > 0 else 0
+            )
+            column_limit = (
+                len(structure.column_names) - 1
+                if len(structure.column_names) > 0
+                else 0
+            )
 
             # Remove all existing matrix cells
             PhaseAttributeMatrixCell.objects.filter(structure=structure).delete()
