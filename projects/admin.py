@@ -160,9 +160,23 @@ class ProjectAttributeFileAdmin(admin.ModelAdmin):
     pass
 
 
+class PhaseSectionChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return f"{obj.phase.project_subtype.name}: {obj.name}"
+
+
 @admin.register(PhaseAttributeMatrixStructure)
 class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
     change_form_template = "admin/matrix.html"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "section":
+            return PhaseSectionChoiceField(
+                queryset=ProjectPhaseSection.objects.all().order_by(
+                    "phase__project_subtype__index", "index"
+                )
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def render_change_form(
         self, request, context, add=False, change=False, form_url="", obj=None
