@@ -221,11 +221,11 @@ class Attribute(models.Model):
     def _get_single_display_value(self, value):
         if value is None or self.value_type == Attribute.TYPE_GEOMETRY:
             return None
-        if self.value_type == Attribute.TYPE_BOOLEAN:
-            return "Kyllä" if value else "Ei"  # TODO
-        elif self.value_type == Attribute.TYPE_DATE:
+        if isinstance(self.value_type, bool):
+            return "Kyllä" if value else "Ei"
+        elif isinstance(self.value_type, datetime.date):
             return value.strftime("%d.%m.%Y")
-        elif self.value_type == Attribute.TYPE_USER and isinstance(value, User):
+        elif isinstance(value, User):
             return value.get_full_name()
         else:
             return escape(str(value))
