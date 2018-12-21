@@ -232,6 +232,11 @@ class Attribute(models.Model):
 
     def get_attribute_display(self, value):
         if isinstance(value, list):
+            if self.value_type == Attribute.TYPE_FIELDSET:
+                return [
+                    {k: self._get_single_display_value(v) for k, v in item.items()}
+                    for item in value
+                ]
             return [self._get_single_display_value(v) for v in value]
         else:
             return self._get_single_display_value(value)
