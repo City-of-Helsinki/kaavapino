@@ -5,11 +5,11 @@ from actstream import action
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import Prefetch
+from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import Serializer
-
-from django.utils.translation import ugettext_lazy as _
 from rest_framework_gis.fields import GeometryField
 
 from projects import validators
@@ -126,17 +126,49 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if not list_view:
             attributes = Attribute.objects.filter(
-                value_type=Attribute.TYPE_USER
-            ).values_list("identifier", flat=True)
-            user_attribute_ids = []
+                value_type__in=[Attribute.TYPE_USER, Attribute.TYPE_FIELDSET]
+            ).prefetch_related(
+                Prefetch(
+                    "fieldset_attributes",
+                    queryset=Attribute.objects.filter(value_type=Attribute.TYPE_USER),
+                )
+            )
+
+            user_attribute_ids = set()
             for attribute in attributes:
-                user_id = project.attribute_data.get(attribute, None)
-                if user_id:
-                    user_attribute_ids.append(user_id)
+                if attribute.value_type == Attribute.TYPE_FIELDSET:
+                    fieldset_user_identifiers = attribute.fieldset_attributes.all().values_list(
+                        "identifier", flat=True
+                    )
+                    if attribute.identifier in project.attribute_data:
+                        user_attribute_ids |= ProjectSerializer._get_fieldset_attribute_values(
+                            project, attribute, fieldset_user_identifiers
+                        )
+                else:
+                    user_id = project.attribute_data.get(attribute.identifier, None)
+                    if user_id:
+                        user_attribute_ids.add(user_id)
+
+            # Do not include the user of the project
+            if str(project.user.uuid) in user_attribute_ids:
+                user_attribute_ids.remove(str(project.user.uuid))
 
             users += list(User.objects.filter(uuid__in=user_attribute_ids))
 
         return UserSerializer(users, many=True).data
+
+    @staticmethod
+    def _get_fieldset_attribute_values(
+        project, fieldset_attribute, fieldset_identifiers
+    ):
+        values = set()
+        for entry in project.attribute_data[fieldset_attribute.identifier]:
+            for identifier in fieldset_identifiers:
+                value = entry.get(identifier, None)
+                if value:
+                    values.add(value)
+
+        return values
 
     @staticmethod
     def _get_updates(project):
