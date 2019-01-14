@@ -1,4 +1,5 @@
 import datetime
+import itertools
 
 from django.conf import settings
 from django.contrib.gis.db import models
@@ -9,7 +10,7 @@ from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
 
-from projects.models.utils import KaavapinoPrivateStorage
+from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute
 
 
@@ -164,10 +165,17 @@ class Project(models.Model):
         if not data:
             return False
 
-        attributes = {
-            a.identifier: a
-            for a in Attribute.objects.all().prefetch_related("value_choices")
-        }
+        project_attributes = (
+            Attribute.objects.filter(
+                phase_sections__phase__project_subtype__projects=self
+            )
+            .distinct()
+            .prefetch_related("value_choices")
+        )
+
+        generated_attributes = project_attributes.filter(generated=True)
+
+        attributes = {a.identifier: a for a in project_attributes}
 
         for identifier, value in data.items():
             attribute = attributes.get(identifier)
@@ -204,7 +212,35 @@ class Project(models.Model):
                     self.attribute_data[identifier] = serialized_value
                 else:
                     self.attribute_data.pop(identifier, None)
+
+        self.update_generated_values(generated_attributes, self.attribute_data)
+
         return True
+
+    def update_generated_values(self, generated_attributes, attribute_data):
+        for attribute in generated_attributes:
+            calculation_operators = attribute.calculation_operators
+            attribute_values = [
+                self.attribute_data.get(identifier, 0)
+                for identifier in attribute.calculation_attribute_identifiers
+            ]
+
+            calculation_string = "".join(
+                [
+                    str(value) + (operator or "")
+                    for value, operator in itertools.zip_longest(
+                        attribute_values, calculation_operators
+                    )
+                ]
+            )
+
+            try:
+                calculated_value = arithmetic_eval(calculation_string)
+            except (ValueError, KeyError, ZeroDivisionError):
+                # Value errors are thrown for
+                calculated_value = 0
+
+            attribute_data[attribute.identifier] = calculated_value
 
     def set_default_deadlines(self):
         phases = self.subtype.phases.all().order_by("index")
