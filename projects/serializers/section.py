@@ -124,6 +124,10 @@ def create_section_serializer(section, context, project=None, validation=True):
             continue
         attribute = section_attribute.attribute
 
+        # Do not include generated attribute values
+        if attribute.generated:
+            continue
+
         if attribute.value_type == Attribute.TYPE_FIELDSET:
             field_data = create_fieldset_field_data(attribute, validation)
         else:
