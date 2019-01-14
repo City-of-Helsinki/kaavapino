@@ -91,6 +91,9 @@ class Attribute(models.Model):
     )
     public = models.BooleanField(verbose_name=_("public information"), default=False)
     generated = models.BooleanField(verbose_name=_("generated"), default=False)
+    calculations = ArrayField(
+        models.CharField(max_length=255, blank=True), blank=True, null=True
+    )
     required = models.BooleanField(verbose_name=_("required"), default=False)
     multiple_choice = models.BooleanField(
         verbose_name=_("multiple choice"), default=False
@@ -240,6 +243,18 @@ class Attribute(models.Model):
             return [self._get_single_display_value(v) for v in value]
         else:
             return self._get_single_display_value(value)
+
+    @property
+    def calculation_attribute_identifiers(self):
+        if not self.calculations:
+            return []
+        return self.calculations[0::2]
+
+    @property
+    def calculation_operators(self):
+        if not self.calculations:
+            return []
+        return self.calculations[1::2]
 
 
 class AttributeValueChoice(models.Model):
