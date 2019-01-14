@@ -17,6 +17,7 @@ FIELD_TYPES = {
     Attribute.TYPE_LONG_STRING: serializers.CharField,
     Attribute.TYPE_LINK: serializers.URLField,
     Attribute.TYPE_INTEGER: serializers.IntegerField,
+    Attribute.TYPE_DECIMAL: serializers.DecimalField,
     Attribute.TYPE_BOOLEAN: serializers.NullBooleanField,
     Attribute.TYPE_DATE: serializers.DateField,
     Attribute.TYPE_IMAGE: serializers.ImageField,  # TODO: Figure out file uploads with DRF
@@ -47,6 +48,10 @@ def create_attribute_field_data(attribute, validation):
         field_class = serializers.SlugRelatedField
         field_arguments["queryset"] = get_user_model().objects.all()
         field_arguments["slug_field"] = "uuid"
+
+    if attribute.value_type == Attribute.TYPE_DECIMAL:
+        field_arguments["max_digits"] = 20
+        field_arguments["decimal_places"] = 2
 
     field_arguments["help_text"] = attribute.help_text
 

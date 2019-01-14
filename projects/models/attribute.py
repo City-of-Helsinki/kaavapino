@@ -29,6 +29,7 @@ class AttributeQuerySet(models.QuerySet):
             value_type__in=[
                 # Attribute.TYPE_FIELDSET,
                 Attribute.TYPE_INTEGER,
+                Attribute.TYPE_DECIMAL,
                 Attribute.TYPE_SHORT_STRING,
                 # Attribute.TYPE_LONG_STRING,
                 Attribute.TYPE_BOOLEAN,
@@ -42,6 +43,7 @@ class AttributeQuerySet(models.QuerySet):
             value_type__in=[
                 Attribute.TYPE_FIELDSET,
                 Attribute.TYPE_INTEGER,
+                Attribute.TYPE_DECIMAL,
                 Attribute.TYPE_SHORT_STRING,
                 Attribute.TYPE_LONG_STRING,
                 Attribute.TYPE_BOOLEAN,
@@ -61,6 +63,7 @@ class Attribute(models.Model):
 
     TYPE_FIELDSET = "fieldset"
     TYPE_INTEGER = "integer"
+    TYPE_DECIMAL = "decimal"
     TYPE_SHORT_STRING = "short_string"
     TYPE_LONG_STRING = "long_string"
     TYPE_BOOLEAN = "boolean"
@@ -74,6 +77,7 @@ class Attribute(models.Model):
     TYPE_CHOICES = (
         (TYPE_FIELDSET, _("fieldset")),
         (TYPE_INTEGER, _("integer")),
+        (TYPE_DECIMAL, _("decimal")),
         (TYPE_SHORT_STRING, _("short string")),
         (TYPE_LONG_STRING, _("long string")),
         (TYPE_BOOLEAN, _("boolean")),
@@ -148,6 +152,8 @@ class Attribute(models.Model):
                 return value.identifier if value else None
         elif self.value_type == Attribute.TYPE_INTEGER:
             return int(value) if value is not None else None
+        elif self.value_type == Attribute.TYPE_DECIMAL:
+            return float(value) if value is not None else None
         elif self.value_type in (
             Attribute.TYPE_SHORT_STRING,
             Attribute.TYPE_LONG_STRING,
@@ -180,6 +186,7 @@ class Attribute(models.Model):
                 return value_choices.get(identifier=value)
         elif self.value_type in (
             Attribute.TYPE_INTEGER,
+            Attribute.TYPE_DECIMAL,
             Attribute.TYPE_SHORT_STRING,
             Attribute.TYPE_LONG_STRING,
             Attribute.TYPE_BOOLEAN,
