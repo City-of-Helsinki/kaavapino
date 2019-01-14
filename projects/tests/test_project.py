@@ -41,6 +41,8 @@ def test_update_fieldset_attribute_data(
 
     # Setup the data
     ppsa = project_phase_section_attribute_factory(attribute=f_fieldset_attribute)
+    ppsa.section.phase = project.phase
+    ppsa.section.save()
 
     phase = ppsa.section.phase
     project.phase = phase
@@ -72,6 +74,8 @@ def test_get_attribute_data_for_fieldset(
 ):
     # Setup the data
     ppsa = project_phase_section_attribute_factory(attribute=f_fieldset_attribute)
+    ppsa.section.phase = project.phase
+    ppsa.section.save()
 
     phase = ppsa.section.phase
 
