@@ -194,7 +194,7 @@ VALUE_TYPES = {
     "fieldset": Attribute.TYPE_FIELDSET,
     "sisältö; nimi": Attribute.TYPE_SHORT_STRING,
     "tunniste; numerotunniste": Attribute.TYPE_SHORT_STRING,
-    "tunniste; numero": Attribute.TYPE_SHORT_STRING,
+    "tunniste; numero": Attribute.TYPE_DECIMAL,
     "sisältö; teksti": Attribute.TYPE_LONG_STRING,
     "spatiaalinen": Attribute.TYPE_GEOMETRY,
     "sisältö; kuva": Attribute.TYPE_IMAGE,
@@ -205,8 +205,9 @@ VALUE_TYPES = {
     "sisältö; vuosiluku": Attribute.TYPE_SHORT_STRING,
     "linkki aineistoon": Attribute.TYPE_LINK,
     "aineisto liitetään Kaavapinoon": Attribute.TYPE_FILE,
+    "numero, automaattinen": Attribute.TYPE_DECIMAL,
     "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
-    "sisältö; numero": Attribute.TYPE_INTEGER,  # TODO Also decimal?
+    "sisältö; numero": Attribute.TYPE_DECIMAL,  # TODO Also decimal?
     "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
     "aikataulu ja tehtävät; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
     "sisältö; tekstivalikko": Attribute.TYPE_LONG_STRING,  # TODO Choice of values
