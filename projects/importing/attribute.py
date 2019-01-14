@@ -23,6 +23,7 @@ from ..models.utils import create_identifier, truncate_identifier, check_identif
 logger = logging.getLogger(__name__)
 
 IDENTIFIER_MAX_LENGTH = 50
+VALID_ATTRIBUTE_CALCULATION_TYPES = [Attribute.TYPE_DECIMAL, Attribute.TYPE_INTEGER]
 
 PROJECT_SIZE = "kokoluokka"
 PROJECT_PHASE = "syöttövaihe"
@@ -442,6 +443,48 @@ class AttributeImporter:
                 )
                 logger.info(f"Created {fsa}")
 
+    def _validate_generated_attributes(self):
+        """
+        Additional validation for attributes which generates their values
+
+        These check can no be done in the model since the attributes in the
+        calculations might not exist when the attribute is created, however
+        in the importer we want to make sure that the values entered in the
+        XLSX file does actually exist as that should be the case at all times.
+        """
+
+        generated_attributes = Attribute.objects.filter(generated=True)
+
+        for attribute in generated_attributes:
+            calculations = attribute.calculations
+            error = False
+
+            calculation_attributes = Attribute.objects.filter(
+                identifier__in=attribute.calculation_attribute_identifiers
+            )
+            if calculation_attributes.count() != len(
+                attribute.calculation_attribute_identifiers
+            ):
+                logger.warning(
+                    f"Could not find the attributes given in calculation. "
+                    f"({calculation_attributes.count()}/{len(attribute.calculation_attribute_identifiers)})."
+                    f"Error in {attribute.identifier} with calculation {calculations}."
+                )
+                error = True
+
+            if not all(
+                attribute.value_type in VALID_ATTRIBUTE_CALCULATION_TYPES
+                for attribute in calculation_attributes
+            ):
+                logger.warning(
+                    f"Calculation attributes are not valid number attributes. "
+                    f"Error in {attribute.identifier} with calculation {calculations}."
+                )
+                error = True
+
+            if error:
+                raise Exception(f"Could not add attribute {attribute.identifier}")
+
     def _get_attribute_input_phases(self, row):
         input_phases = []
 
@@ -693,6 +736,7 @@ class AttributeImporter:
             phase_info["deleted"] += _phase_info["deleted"]
         attribute_info = self._create_attributes(data_rows)
         self._create_fieldset_links(data_rows)
+        self._validate_generated_attributes()
 
         # Remove all attributes from further processing that were part of a fieldset
         data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
