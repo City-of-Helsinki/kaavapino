@@ -4,6 +4,8 @@ from collections import Sequence
 from html import escape
 
 from django.contrib.auth import get_user_model
+from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
@@ -74,6 +76,8 @@ class Attribute(models.Model):
     TYPE_FILE = "file"
     TYPE_LINK = "link"
 
+    ALLOWED_CALCULATION_OPERATORS = ["+", "-", "*", "/"]
+
     TYPE_CHOICES = (
         (TYPE_FIELDSET, _("fieldset")),
         (TYPE_INTEGER, _("integer")),
@@ -141,6 +145,39 @@ class Attribute(models.Model):
                 raise NotImplementedError(
                     "Currently only one geometry type attribute at a time is supported."
                 )
+
+    def clean(self):
+        # Only allow for uneven arrays
+        if len(self.calculations) % 2 != 1:
+            raise ValidationError(
+                f"Calculations needs to be uneven in length and"
+                f"follow the style '(<attribtute> <operator> <attribute>)*n. "
+                f"Error in {self.identifier} with calculations {self.calculations}."
+            )
+
+        if self.calculations[-1] in self.ALLOWED_CALCULATION_OPERATORS:
+            raise ValidationError(
+                f"Calculation can not end with operator. "
+                f"Error in {self.identifier} with calculations {self.calculations}."
+            )
+
+        if not all(
+            operator in self.ALLOWED_CALCULATION_OPERATORS
+            for operator in self.calculation_operators
+        ):
+            raise ValidationError(
+                f"Calculation operators can only be {self.ALLOWED_CALCULATION_OPERATORS}. "
+                f"Error in {self.identifier} with calculation {self.calculations}."
+            )
+
+        if (
+            len(self.calculation_operators)
+            != len(self.calculation_attribute_identifiers) - 1
+        ):
+            raise ValidationError(
+                f"There must be exactly one more attribute then operators"
+                f"Error in {self.identifier} with calculation {self.calculations}."
+            )
 
     def serialize_value(self, value):
         value_choices = self.value_choices.all()
