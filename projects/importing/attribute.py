@@ -1,4 +1,5 @@
 import logging
+import re
 from collections import Counter, defaultdict
 from enum import Enum
 from itertools import filterfalse
@@ -43,6 +44,8 @@ METADATA_FIELDS = {
         "extended": "laajennettu hankekortti",
     }
 }
+
+CALCULATIONS_COLUMN = "laskelmat"
 
 ATTRIBUTE_FIELDSET = "hanketieto fieldset"
 
@@ -360,6 +363,10 @@ class AttributeImporter:
                 )
                 value_type = Attribute.TYPE_SHORT_STRING
 
+            generated, calculations = self._get_generated_calculations(row)
+            if generated:
+                value_type = Attribute.TYPE_DECIMAL
+
             attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
                 defaults={
@@ -369,6 +376,8 @@ class AttributeImporter:
                     "public": is_public,
                     "required": is_required,
                     "multiple_choice": multiple_choice,
+                    "generated": generated,
+                    "calculations": calculations,
                 },
             )
             if created:
@@ -391,6 +400,16 @@ class AttributeImporter:
             "updated": updated_attribute_count,
             "deleted": len(old_attribute_ids),
         }
+
+    def _get_generated_calculations(self, row):
+        calculations_string = row[self.column_index[CALCULATIONS_COLUMN]]
+        if not calculations_string:
+            return False, None
+
+        # Splits the string when a word or +, -, *, / operators is found
+        calculations = re.findall(r"([\w]+|[\+\-\*/])+", calculations_string)
+
+        return True, calculations
 
     def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating fieldsets...")
