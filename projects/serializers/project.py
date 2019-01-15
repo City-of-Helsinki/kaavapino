@@ -40,7 +40,7 @@ class SectionData(NamedTuple):
 class ProjectDeadlinesSerializer(serializers.Serializer):
     phase_id = serializers.IntegerField()
     phase_name = serializers.CharField(read_only=True)
-    start = serializers.DateTimeField(read_only=True)
+    start = serializers.DateTimeField()
     deadline = serializers.DateTimeField()
 
 
@@ -307,18 +307,33 @@ class ProjectSerializer(serializers.ModelSerializer):
         return validators.admin_or_read_only(user, "user", self.instance, self.context)
 
     def _validate_deadlines(self, attrs):
+        """
+        Validates that deadlines values are correct
+
+        - Only the first start date can be changed
+        - There can be no overlapping deadlines
+        - All phases in a project needs to be set at once
+        - The same phase can not be defined more than one time
+        """
+
         deadlines = attrs.get("deadlines", None)
         if not deadlines:
             return None
+        # Sort the deadlines in-place by phase
         deadlines.sort(key=lambda _deadline: _deadline["phase_id"])
 
         project = self.instance
 
+        # If there is no project then any value sent in will not
+        # matter since the model will set default deadlines values
+        # and override anything sent in
         if not project:
             return deadlines
 
         validated_phase_ids = []
         latest_deadline = deadlines[0]["deadline"]
+
+        # Make sure that all phases are included in the deadlines
         required_project_phase_ids = list(
             ProjectPhase.objects.filter(project_subtype=project.subtype)
             .order_by("id")
@@ -334,7 +349,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 }
             )
 
-        for deadline in deadlines:
+        for idx, deadline in enumerate(deadlines):
             if latest_deadline > deadline["deadline"]:
                 raise ValidationError(
                     {
@@ -371,7 +386,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                         )
                     }
                 )
-            deadline["start"] = latest_deadline
+
+            # Let the first start date be changed by the user
+            # and set the rest of them depending on the previous
+            # deadlines.
+            if idx == 0:
+                deadline["start"] = deadlines[0]["start"]
+            else:
+                deadline["start"] = latest_deadline
             deadline["phase_name"] = phase.name
 
             latest_deadline = deadline["deadline"]
