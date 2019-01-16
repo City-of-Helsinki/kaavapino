@@ -57,7 +57,7 @@ binOps = {
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
     ast.Div: operator.truediv,
-    ast.USub: operator.neg
+    ast.USub: operator.neg,
 }
 
 
