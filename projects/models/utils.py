@@ -75,4 +75,4 @@ def arithmetic_eval(s):
         else:
             raise Exception("Unsupported type {}".format(node))
 
-        return _eval(node.body)
+    return _eval(node.body)
