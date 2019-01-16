@@ -209,23 +209,16 @@ VALUE_TYPES = {
     "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
     "sisältö; numero": Attribute.TYPE_DECIMAL,  # TODO Also decimal?
     "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
-    "aikataulu ja tehtävät; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
     "sisältö; tekstivalikko": Attribute.TYPE_LONG_STRING,  # TODO Choice of values
-    "sisältö; valitaan yksi viidestä": Attribute.TYPE_SHORT_STRING,  # TODO e.g. project size, choice of values
-    "aikataulu ja tehtävät; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice of values
     "resurssit; valintalista käyttäjä": Attribute.TYPE_USER,
     "resurssit; valintalista": Attribute.TYPE_SHORT_STRING,
     "sisältö; luettelo": Attribute.TYPE_LONG_STRING,  # TODO List of things
     "sisältö; pvm": Attribute.TYPE_DATE,  # TODO Might need to contain multiple dates
     "sisältö; osoite": Attribute.TYPE_LONG_STRING,  # TODO Might need to contain multiple addresses
     "sisältö; kaavanumero(t)": Attribute.TYPE_LONG_STRING,  # TODO List of identifiers
-    "sisältö; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
     "talous; teksti": Attribute.TYPE_LONG_STRING,  # TODO List of strings
     "talous; numero (€)": Attribute.TYPE_LONG_STRING,  # TODO Might have multiple values
-    "talous; kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
     "aikataulu ja tehtävät; pvm ja paikka": Attribute.TYPE_LONG_STRING,  # TODO Time and place
-    "sisältö; vakioteksti": Attribute.TYPE_LONG_STRING,  # TODO Text always the same
-    "sisältö; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice
     "aikataulu ja tehtävät; vaihe 1…6": Attribute.TYPE_SHORT_STRING,  # TODO Choice
     "sisältö; teksti (automaattinen täyttö?)": Attribute.TYPE_LONG_STRING,  # TODO Generated
     "sisältö; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,  # TODO Boolean or choice?
