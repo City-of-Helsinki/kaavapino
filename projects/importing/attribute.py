@@ -1,3 +1,4 @@
+import itertools
 import logging
 import re
 from collections import Counter, defaultdict
@@ -11,6 +12,7 @@ from openpyxl import load_workbook
 
 from ..models import (
     Attribute,
+    AttributeValueChoice,
     FieldSetAttribute,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
@@ -33,6 +35,7 @@ DEFAULT_SHEET_NAME = "Hanketiedot (työversio)"
 ATTRIBUTE_NAME = "hanketieto"
 ATTRIBUTE_IDENTIFIER = "hanketieto tunniste"
 ATTRIBUTE_TYPE = "tietotyyppi"
+ATTRIBUTE_CHOICES_SHEET = "vaihtoehtotaulukko"
 ATTRIBUTE_REQUIRED = (
     "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
 )  # kyllä/ei
@@ -234,6 +237,7 @@ class AttributeImporter:
 
     def __init__(self, options=None):
         self.options = options
+        self.workbook = None
 
     def _open_workbook(self, filename):
         try:
@@ -253,6 +257,9 @@ class AttributeImporter:
                 "This does not seem to be a valid attribute sheet."
             )
 
+        return self._rows_for_sheet(sheet)
+
+    def _rows_for_sheet(self, sheet):
         data = []
 
         for row in sheet.iter_rows():
@@ -331,6 +338,7 @@ class AttributeImporter:
         imported_attribute_ids = set()
         created_attribute_count = 0
         updated_attribute_count = 0
+        created_choices_count = 0
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
 
@@ -382,6 +390,9 @@ class AttributeImporter:
                 updated_attribute_count += 1
             imported_attribute_ids.add(identifier)
 
+            if row[self.column_index[ATTRIBUTE_CHOICES_SHEET]]:
+                created_choices_count += self._create_attribute_choices(attribute, row)
+
             if created:
                 logger.info(f"Created {attribute}")
 
@@ -395,6 +406,7 @@ class AttributeImporter:
             "created": created_attribute_count,
             "updated": updated_attribute_count,
             "deleted": len(old_attribute_ids),
+            "choices": created_choices_count,
         }
 
     def _get_generated_calculations(self, row):
@@ -406,6 +418,24 @@ class AttributeImporter:
         calculations = re.findall(r"([\w]+|[\+\-\*/])+", calculations_string)
 
         return True, calculations
+
+    def _create_attribute_choices(self, attribute, row) -> int:
+        choices_sheet = row[self.column_index[ATTRIBUTE_CHOICES_SHEET]]
+        created_choices_count = 0
+        if choices_sheet:
+            choices_rows = self._rows_for_sheet(self.workbook[choices_sheet])
+            choices = list(itertools.chain.from_iterable(choices_rows))
+
+            AttributeValueChoice.objects.filter(attribute=attribute).delete()
+            for idx, choice in enumerate(choices):
+                AttributeValueChoice.objects.create(
+                    attribute=attribute,
+                    index=idx,
+                    value=choice,
+                    identifier=self._get_identifier_for_value(choice),
+                )
+                created_choices_count += 1
+        return created_choices_count
 
     def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating fieldsets...")
@@ -714,8 +744,8 @@ class AttributeImporter:
             f"Importing attributes from file {filename} for project type {self.project_type}..."
         )
 
-        workbook = self._open_workbook(filename)
-        rows = self._extract_data_from_workbook(workbook)
+        self.workbook = self._open_workbook(filename)
+        rows = self._extract_data_from_workbook(self.workbook)
 
         header_row = rows[0]
         self._set_row_indexes(header_row)
@@ -750,6 +780,7 @@ class AttributeImporter:
         logger.info(f"  Created: {attribute_info['created']}")
         logger.info(f"  Updated: {attribute_info['updated']}")
         logger.info(f"  Deleted: {attribute_info['deleted']}")
+        logger.info(f"  Choices: {attribute_info['choices']}")
         logger.info(
             "FieldSets {}".format(
                 Attribute.objects.filter(value_type=Attribute.TYPE_FIELDSET).count()
