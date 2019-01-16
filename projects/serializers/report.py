@@ -4,14 +4,15 @@ from projects.filters import ProjectFilter
 from projects.models import Report
 
 FILTER_TYPE_DEFINITIONS = {
-    "UUIDFilter": "uuid",
-    "UUIDInFilter": "uuid",
-    "NumberFilter": "integer",
-    "NumberInFilter": "integer",
+    "BooleanFilter": "boolean",
     "CharFilter": "string",
     "CharInFilter": "string",
     "DateTimeFilter": "datetime",
     "DateFilter": "date",
+    "NumberFilter": "integer",
+    "NumberInFilter": "integer",
+    "UUIDFilter": "uuid",
+    "UUIDInFilter": "uuid",
 }
 
 

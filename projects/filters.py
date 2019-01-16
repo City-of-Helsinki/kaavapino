@@ -9,6 +9,7 @@ class ProjectFilter(django_filters.FilterSet):
         fields = {
             "id": ["exact", "in"],
             "identifier": ["exact", "in"],
+            "user": ["isnull"],
             "user__uuid": ["exact", "in"],
             "created_at": ["lt", "gt", "date__exact", "date__lte", "date__gte"],
             "modified_at": ["lt", "gt", "date__exact", "date__lte", "date__gte"],
