@@ -221,7 +221,7 @@ class Project(models.Model):
         for attribute in generated_attributes:
             calculation_operators = attribute.calculation_operators
             attribute_values = [
-                self.attribute_data.get(identifier, 0)
+                attribute_data.get(identifier, 0) or 0
                 for identifier in attribute.calculation_attribute_identifiers
             ]
 
