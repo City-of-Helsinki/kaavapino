@@ -3,7 +3,6 @@ from django.contrib.auth import get_user_model
 
 from projects.models import Attribute
 from projects.serializers.projectschema import (
-    VALUE_TYPE_MAP,
     AttributeSchemaSerializer,
     ProjectPhaseSchemaSerializer,
     ProjectSectionSchemaSerializer,
