@@ -207,7 +207,7 @@ VALUE_TYPES = {
     "aineisto liitetään Kaavapinoon": Attribute.TYPE_FILE,
     "numero, automaattinen": Attribute.TYPE_DECIMAL,
     "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
-    "sisältö; numero": Attribute.TYPE_DECIMAL,  # TODO Also decimal?
+    "sisältö; numero": Attribute.TYPE_DECIMAL,
     "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
     "sisältö; tekstivalikko": Attribute.TYPE_LONG_STRING,  # TODO Choice of values
     "resurssit; valintalista käyttäjä": Attribute.TYPE_USER,
@@ -220,7 +220,7 @@ VALUE_TYPES = {
     "talous; numero (€)": Attribute.TYPE_LONG_STRING,  # TODO Might have multiple values
     "aikataulu ja tehtävät; pvm ja paikka": Attribute.TYPE_LONG_STRING,  # TODO Time and place
     "aikataulu ja tehtävät; vaihe 1…6": Attribute.TYPE_SHORT_STRING,  # TODO Choice
-    "sisältö; teksti (automaattinen täyttö?)": Attribute.TYPE_LONG_STRING,  # TODO Generated
+    "sisältö; teksti (automaattinen täyttö?)": Attribute.TYPE_LONG_STRING,
     "sisältö; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,  # TODO Boolean or choice?
 }
 
