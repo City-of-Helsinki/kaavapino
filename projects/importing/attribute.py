@@ -213,7 +213,8 @@ VALUE_TYPES = {
     "sisältö; tekstivalikko": Attribute.TYPE_LONG_STRING,  # TODO Choice of values
     "sisältö; valitaan yksi viidestä": Attribute.TYPE_SHORT_STRING,  # TODO e.g. project size, choice of values
     "aikataulu ja tehtävät; valitaan toinen": Attribute.TYPE_SHORT_STRING,  # TODO Choice of values
-    "resurssit; valintalista Hijatista": Attribute.TYPE_USER,  # TODO User select or responsible unit
+    "resurssit; valintalista käyttäjä": Attribute.TYPE_USER,
+    "resurssit; valintalista": Attribute.TYPE_SHORT_STRING,
     "sisältö; luettelo": Attribute.TYPE_LONG_STRING,  # TODO List of things
     "sisältö; pvm": Attribute.TYPE_DATE,  # TODO Might need to contain multiple dates
     "sisältö; osoite": Attribute.TYPE_LONG_STRING,  # TODO Might need to contain multiple addresses
