@@ -14,9 +14,21 @@ class ProjectTypeMetadataCardAttributeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="identifier")
     label = serializers.CharField(source="name")
     type = serializers.CharField(source="value_type")
+    fieldset_attributes = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_fieldset_attributes(attribute):
+        if attribute.value_type == Attribute.TYPE_FIELDSET:
+            return [
+                ProjectTypeMetadataCardAttributeSerializer(attr).data
+                for attr in attribute.fieldset_attributes.order_by(
+                    "fieldset_attribute_source"
+                )
+            ]
+        return []
 
     class Meta:
-        fields = ["name", "label", "type"]
+        fields = ["name", "label", "type", "fieldset_attributes"]
         model = Attribute
 
 
