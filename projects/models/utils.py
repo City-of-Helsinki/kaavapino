@@ -57,6 +57,7 @@ binOps = {
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
     ast.Div: operator.truediv,
+    ast.USub: operator.neg
 }
 
 
@@ -72,6 +73,8 @@ def arithmetic_eval(s):
             return node.n
         elif isinstance(node, ast.BinOp):
             return binOps[type(node.op)](_eval(node.left), _eval(node.right))
+        elif isinstance(node, ast.UnaryOp):  # <operator> <operand> e.g., -1
+            return binOps[type(node.op)](_eval(node.operand))
         else:
             raise Exception("Unsupported type {}".format(node))
 
