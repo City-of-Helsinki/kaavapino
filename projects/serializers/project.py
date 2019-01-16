@@ -38,10 +38,10 @@ class SectionData(NamedTuple):
 
 
 class ProjectDeadlinesSerializer(serializers.Serializer):
-    phase_id = serializers.IntegerField()
+    phase_id = serializers.IntegerField(required=True)
     phase_name = serializers.CharField(read_only=True)
     start = serializers.DateTimeField()
-    deadline = serializers.DateTimeField()
+    deadline = serializers.DateTimeField(required=True)
 
 
 class ProjectSerializer(serializers.ModelSerializer):
