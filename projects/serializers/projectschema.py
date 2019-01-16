@@ -8,8 +8,6 @@ from projects.models import Attribute
 from projects.models.project import PhaseAttributeMatrixCell
 from projects.serializers.utils import _is_attribute_required
 
-VALUE_TYPE_MAP = {Attribute.TYPE_USER: Attribute.TYPE_SHORT_STRING}
-
 FOREIGN_KEY_TYPE_MODELS = {
     Attribute.TYPE_USER: {
         "model": get_user_model(),
@@ -33,7 +31,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     help_text = serializers.CharField()
     multiple_choice = serializers.BooleanField()
     fieldset_attributes = serializers.SerializerMethodField()
-    type = serializers.SerializerMethodField()
+    type = serializers.CharField(source="value_type")
     required = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()
     generated = serializers.BooleanField(read_only=True)
@@ -52,12 +50,6 @@ class AttributeSchemaSerializer(serializers.Serializer):
     @staticmethod
     def get_required(attribute):
         return _is_attribute_required(attribute)
-
-    @staticmethod
-    def get_type(attribute):
-        value_type = attribute.value_type
-        # Remap values if applicable
-        return VALUE_TYPE_MAP.get(value_type, value_type)
 
     @staticmethod
     def get_choices(attribute):

@@ -12,12 +12,6 @@ from projects.serializers.projectschema import (
 
 @pytest.mark.django_db(transaction=True)
 class TestAttributeSchemaSerializer:
-    def test_get_type(self):
-        for attribute_type, new_attribute_type in VALUE_TYPE_MAP.items():
-            attribute = Attribute(value_type=attribute_type)
-            returned_type = AttributeSchemaSerializer.get_type(attribute)
-            assert returned_type == new_attribute_type
-
     @pytest.mark.parametrize(
         "attribute, instanceof",
         [
