@@ -428,11 +428,12 @@ class AttributeImporter:
 
             AttributeValueChoice.objects.filter(attribute=attribute).delete()
             for idx, choice in enumerate(choices):
+                identifier = self._get_identifier_for_value(str(choice))
                 AttributeValueChoice.objects.create(
                     attribute=attribute,
                     index=idx,
                     value=choice,
-                    identifier=self._get_identifier_for_value(choice),
+                    identifier=identifier,
                 )
                 created_choices_count += 1
         return created_choices_count
