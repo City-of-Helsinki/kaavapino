@@ -224,6 +224,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
 
         deadlines = self._validate_deadlines(attrs)
+        public = self._validate_public(attrs)
+
+        if public:
+            attrs["public"] = public
+
         if deadlines:
             attrs["deadlines"] = deadlines
 
@@ -277,10 +282,19 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return valid_attributes
 
-    def validate_public(self, public):
-        # Do not validate if this is a new project or
-        # the value did not change.
-        if not self.instance or public == self.instance.public:
+    def _validate_public(self, attrs):
+        public = attrs.get("public", True)
+
+        # Do not validate if this is a new project
+        if not public or not self.instance:
+            return public
+
+        # A project is always public if it has exited the starting phase
+        if not self.instance.public and (attrs["phase"] > 1 or self.instance.phase > 1):
+            return True
+
+        # Do not validate if the value is the same as before
+        if public == self.instance.public:
             return public
 
         request = self.context["request"]
