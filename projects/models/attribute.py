@@ -310,7 +310,7 @@ class AttributeValueChoice(models.Model):
         related_name="value_choices",
         on_delete=models.CASCADE,
     )
-    value = models.CharField(max_length=255, verbose_name=_("value"))
+    value = models.TextField(verbose_name=_("value"))
     identifier = models.CharField(
         max_length=150,
         verbose_name=_("identifier"),
