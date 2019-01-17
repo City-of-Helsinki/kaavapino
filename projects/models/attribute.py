@@ -29,11 +29,9 @@ class AttributeQuerySet(models.QuerySet):
     def filterable(self):
         return self.filter(
             value_type__in=[
-                # Attribute.TYPE_FIELDSET,
                 Attribute.TYPE_INTEGER,
                 Attribute.TYPE_DECIMAL,
                 Attribute.TYPE_SHORT_STRING,
-                # Attribute.TYPE_LONG_STRING,
                 Attribute.TYPE_BOOLEAN,
                 Attribute.TYPE_DATE,
                 Attribute.TYPE_USER,
