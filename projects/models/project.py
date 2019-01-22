@@ -499,6 +499,8 @@ class ProjectAttributeFile(models.Model):
         on_delete=models.CASCADE,
     )
 
+    description = models.TextField(verbose_name=_("description"), null=True, blank=True)
+
     def get_upload_subfolder(self):
         project_id = str(self.project.pk)
         if not project_id:

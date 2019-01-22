@@ -515,7 +515,7 @@ class ProjectFileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProjectAttributeFile
-        fields = ["file", "attribute", "project"]
+        fields = ["file", "attribute", "project", "description"]
 
     @staticmethod
     def _validate_attribute(attribute: Attribute, project: Project):
