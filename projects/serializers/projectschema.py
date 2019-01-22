@@ -99,6 +99,7 @@ class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
     relies_on = serializers.CharField(
         source="relies_on.attribute.identifier", allow_null=True
     )
+    priority = serializers.IntegerField(read_only=True)
 
     @staticmethod
     def get_matrix(section_attribute):
