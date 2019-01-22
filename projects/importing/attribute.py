@@ -39,6 +39,13 @@ ATTRIBUTE_CHOICES_SHEET = "vaihtoehtotaulukko"
 ATTRIBUTE_REQUIRED = (
     "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
 )  # kyllä/ei
+ATTRIBUTE_PRIORITY = "tiedon sijainti/merkitys käyttäjälle"
+ATTRIBUTE_SECTION_PRIORITY = {
+    "ensisijainen tieto": 1,
+    "automaattinen täyttö": 1,
+    "lisätieto": 2,
+}
+
 PHASE_SECTION_NAME = "minkä väliotsikon alle kuuluu"
 PUBLIC_ATTRIBUTE = "julkinen tieto"  # kyllä/ei julkinen
 HELP_TEXT = "ohje"
@@ -430,10 +437,7 @@ class AttributeImporter:
             for idx, choice in enumerate(choices):
                 identifier = self._get_identifier_for_value(str(choice))
                 AttributeValueChoice.objects.create(
-                    attribute=attribute,
-                    index=idx,
-                    value=choice,
-                    identifier=identifier,
+                    attribute=attribute, index=idx, value=choice, identifier=identifier
                 )
                 created_choices_count += 1
         return created_choices_count
@@ -567,6 +571,7 @@ class AttributeImporter:
             for row in rows:
                 project_size = row[self.column_index[PROJECT_SIZE]]
                 row_subtypes = self.get_subtypes_from_cell(project_size)
+                priority = self._get_section_attribute_priority(row)
 
                 # Filter out attributes that should not be included in the project sub type (size)
                 if (
@@ -589,7 +594,10 @@ class AttributeImporter:
                 )
 
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(
-                    attribute=attribute, section=section, index=counter[section]
+                    attribute=attribute,
+                    section=section,
+                    index=counter[section],
+                    priority=priority,
                 )
 
                 counter[section] += 1
@@ -601,6 +609,10 @@ class AttributeImporter:
                     f"{section_attribute.index} / "
                     f"{section_attribute.attribute}"
                 )
+
+    def _get_section_attribute_priority(self, row):
+        priority_string = row[self.column_index[ATTRIBUTE_PRIORITY]]
+        return ATTRIBUTE_SECTION_PRIORITY.get(priority_string, 1)
 
     def _update_type_metadata(self, rows):
         metadata = {}
