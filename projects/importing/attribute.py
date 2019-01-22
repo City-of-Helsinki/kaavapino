@@ -37,6 +37,7 @@ ATTRIBUTE_IDENTIFIER = "hanketieto tunniste"
 ATTRIBUTE_TYPE = "tietotyyppi"
 ATTRIBUTE_CHOICES_SHEET = "vaihtoehtotaulukko"
 ATTRIBUTE_UNIT = "mittayksikkö"
+ATTRIBUTE_BROADCAST_CHANGES = "tiedon muuttaminen aiheuttaa ilmoituksen shoutboxiin"
 ATTRIBUTE_REQUIRED = (
     "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
 )  # kyllä/ei
@@ -361,6 +362,10 @@ class AttributeImporter:
 
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
+            broadcast_changes = (
+                row[self.column_index[ATTRIBUTE_BROADCAST_CHANGES]] == "kyllä"
+            )
+
             multiple_choice = self._is_multiple_choice(row, value_type)
 
             try:
@@ -393,6 +398,7 @@ class AttributeImporter:
                     "generated": generated,
                     "calculations": calculations,
                     "unit": unit,
+                    "broadcast_changes": broadcast_changes,
                 },
             )
             if created:
