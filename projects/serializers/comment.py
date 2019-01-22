@@ -20,6 +20,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "created_at",
             "modified_at",
             "content",
+            "generated",
             "_metadata",
         ]
         read_only_fields = [
@@ -28,6 +29,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "user",
             "created_at",
             "modified_at",
+            "generated",
             "_metadata",
         ]
 

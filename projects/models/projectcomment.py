@@ -22,6 +22,8 @@ class ProjectComment(models.Model):
         on_delete=models.PROTECT,
     )
 
+    generated = models.BooleanField(verbose_name=_("generated"), default=False)
+
     created_at = models.DateTimeField(
         verbose_name=_("created at"), auto_now_add=True, editable=False
     )
