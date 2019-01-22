@@ -21,6 +21,7 @@ from projects.models import (
     ProjectAttributeFile,
     Attribute,
     ProjectPhaseSectionAttribute,
+    ProjectComment,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -465,23 +466,60 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         user = self.context["request"].user
         instance_attribute_date = getattr(self.instance, "attribute_data", {})
-        updated_attribute_identifiers = []
+        updated_attribute_values = {}
 
         for identifier, value in attribute_data.items():
             existing_value = instance_attribute_date.get(identifier, None)
             if value != existing_value:
-                updated_attribute_identifiers.append(identifier)
+                updated_attribute_values[identifier] = {
+                    "old": existing_value,
+                    "new": value,
+                }
 
         updated_attributes = Attribute.objects.filter(
-            identifier__in=updated_attribute_identifiers
+            identifier__in=updated_attribute_values.keys()
         )
+
+        geometry_attributes = []
         for attribute in updated_attributes:
-            action.send(
-                user,
-                verb=verbs.UPDATED_ATTRIBUTE,
-                action_object=attribute,
-                target=project,
-                attribute_identifier=attribute.identifier,
+            # Add additional checks for geometries since they are not actually stored
+            # in the attribute_data but in their own model
+            if attribute.value_type == Attribute.TYPE_GEOMETRY:
+                geometry_attributes.append(attribute)
+                continue
+
+            values = updated_attribute_values[attribute.identifier]
+            self._create_updates_log(
+                attribute, project, user, values["new"], values["old"]
+            )
+
+        for geometry_attribute in geometry_attributes:
+            geometry_instance = ProjectAttributeMultipolygonGeometry.objects.filter(
+                project=project, attribute=geometry_attribute
+            ).first()
+            new_geometry = attribute_data[geometry_attribute.identifier]
+            if geometry_instance.geometry != new_geometry:
+                self._create_updates_log(geometry_attribute, project, user, None, None)
+
+    def _create_updates_log(self, attribute, project, user, new_value, old_value):
+        action.send(
+            user,
+            verb=verbs.UPDATED_ATTRIBUTE,
+            action_object=attribute,
+            target=project,
+            attribute_identifier=attribute.identifier,
+        )
+        if attribute.broadcast_changes:
+            if not old_value and not new_value:
+                change_string = ""
+            else:
+                old_value = old_value or "<tyhjä>"
+                new_value = new_value or "<tyhjä>"
+                change_string = f"\n{old_value} -> {new_value}"
+            ProjectComment.objects.create(
+                project=project,
+                generated=True,
+                content=f'{user.get_display_name()} päivitti "{attribute.name}" tietoa.{change_string}',
             )
 
 
