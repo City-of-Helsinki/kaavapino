@@ -17,6 +17,7 @@ from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
 from projects.filters import ProjectFilter
 from projects.importing import AttributeImporter
+from projects.importing.report import ReportTypeCreator
 from projects.models import (
     ProjectComment,
     Project,
@@ -289,6 +290,17 @@ class UploadSpecifications(APIView):
             options = {"filename": specifications_file}
             attribute_importer = AttributeImporter(options)
             attribute_importer.run()
+
+        return redirect(".")
+
+
+class SetupDefaultReports(APIView):
+    parser_classes = (MultiPartParser,)
+    permission_classes = (IsAdminUser,)
+
+    def post(self, request, format=None):
+        report_type_creator = ReportTypeCreator()
+        report_type_creator.run()
 
         return redirect(".")
 

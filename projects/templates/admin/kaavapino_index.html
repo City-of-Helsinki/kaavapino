@@ -5,16 +5,15 @@
 {% block extrastyle %}
     {{ block.super }}
     <style>
-        .specification-import {
+        .extra-action {
             margin-right: -300px;
             float: right;
             clear: right;
-        }
-        .specification-import input {
             max-width: 260px;
+            width: 100%;
         }
 
-        button.import-button {
+        .extra-action button.action {
             width: 100%;
             padding: 5px 0 5px 0;
             background: #417690;
@@ -23,13 +22,22 @@
 {% endblock %}
 {% block sidebar %}
     {{ block.super }}
-    <div class="specification-import">
+    <div class="extra-action">
         <div class="specification-module">
             <h2>{% trans 'Import specifications' %}</h2>
             <form action="{% url 'admin_upload_specifications' %}" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="file" name="specifications"/> <br/>
-                <button type="submit" class="import-button button">{% trans 'Import' %}</button>
+                <button type="submit" class="action button">{% trans 'Import' %}</button>
+            </form>
+        </div>
+    </div>
+    <div class="extra-action">
+        <div class="report-module">
+            <h2>{% trans 'Create default reports' %}</h2>
+            <form action="{% url 'admin_setup_default_reports' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <button type="submit" class="action button">{% trans 'Create' %}</button>
             </form>
         </div>
     </div>
