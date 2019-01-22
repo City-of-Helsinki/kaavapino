@@ -9,6 +9,8 @@ class CommentSerializer(serializers.ModelSerializer):
     _metadata = serializers.SerializerMethodField()
 
     def get__metadata(self, comment):
+        if not comment.user:
+            return {"users": []}
         return {"users": UserSerializer([comment.user], many=True).data}
 
     class Meta:
