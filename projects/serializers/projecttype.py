@@ -2,6 +2,7 @@ from django.db.models import Case, When
 from rest_framework import serializers
 
 from projects.models import ProjectType, ProjectSubtype, Attribute
+from projects.serializers.projectschema import AttributeSchemaSerializer
 
 
 class ProjectSubtypeSerializer(serializers.ModelSerializer):
@@ -18,14 +19,7 @@ class ProjectTypeMetadataCardAttributeSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_fieldset_attributes(attribute):
-        if attribute.value_type == Attribute.TYPE_FIELDSET:
-            return [
-                ProjectTypeMetadataCardAttributeSerializer(attr).data
-                for attr in attribute.fieldset_attributes.order_by(
-                    "fieldset_attribute_source"
-                )
-            ]
-        return []
+        return AttributeSchemaSerializer.get_fieldset_attributes(attribute)
 
     class Meta:
         fields = ["name", "label", "type", "fieldset_attributes"]
