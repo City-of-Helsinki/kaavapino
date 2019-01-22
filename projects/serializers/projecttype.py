@@ -16,13 +16,18 @@ class ProjectTypeMetadataCardAttributeSerializer(serializers.ModelSerializer):
     label = serializers.CharField(source="name")
     type = serializers.CharField(source="value_type")
     fieldset_attributes = serializers.SerializerMethodField()
+    choices = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_choices(attribute):
+        return AttributeSchemaSerializer.get_choices(attribute)
 
     @staticmethod
     def get_fieldset_attributes(attribute):
         return AttributeSchemaSerializer.get_fieldset_attributes(attribute)
 
     class Meta:
-        fields = ["name", "label", "type", "fieldset_attributes"]
+        fields = ["name", "label", "type", "fieldset_attributes", "choices"]
         model = Attribute
 
 
