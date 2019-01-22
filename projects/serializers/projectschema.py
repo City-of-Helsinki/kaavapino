@@ -35,6 +35,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     required = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()
     generated = serializers.BooleanField(read_only=True)
+    unit = serializers.CharField()
 
     @staticmethod
     def get_fieldset_attributes(attribute):

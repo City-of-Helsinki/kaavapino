@@ -95,6 +95,7 @@ class Attribute(models.Model):
     value_type = models.CharField(
         max_length=64, verbose_name=_("value type"), choices=TYPE_CHOICES
     )
+    unit = models.CharField(max_length=255, verbose_name=_("unit"), null=True, blank=True)
     public = models.BooleanField(verbose_name=_("public information"), default=False)
     generated = models.BooleanField(verbose_name=_("generated"), default=False)
     calculations = ArrayField(
