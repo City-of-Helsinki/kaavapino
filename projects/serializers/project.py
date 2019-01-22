@@ -90,9 +90,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         # Add file attributes to the attribute data
         # File values are represented as absolute URLs
         file_attributes = {
-            attribute_file.attribute.identifier: request.build_absolute_uri(
-                attribute_file.file.url
-            )
+            attribute_file.attribute.identifier: {
+                "link": request.build_absolute_uri(attribute_file.file.url),
+                "description": attribute_file.description,
+            }
             for attribute_file in attribute_files
             if has_project_attribute_file_permissions(attribute_file, request)
         }
