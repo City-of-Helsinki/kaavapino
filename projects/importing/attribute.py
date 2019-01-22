@@ -36,6 +36,7 @@ ATTRIBUTE_NAME = "hanketieto"
 ATTRIBUTE_IDENTIFIER = "hanketieto tunniste"
 ATTRIBUTE_TYPE = "tietotyyppi"
 ATTRIBUTE_CHOICES_SHEET = "vaihtoehtotaulukko"
+ATTRIBUTE_UNIT = "mittayksikkö"
 ATTRIBUTE_REQUIRED = (
     "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
 )  # kyllä/ei
@@ -358,6 +359,8 @@ class AttributeImporter:
                 else None
             )
 
+            unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
+
             multiple_choice = self._is_multiple_choice(row, value_type)
 
             try:
@@ -389,6 +392,7 @@ class AttributeImporter:
                     "multiple_choice": multiple_choice,
                     "generated": generated,
                     "calculations": calculations,
+                    "unit": unit,
                 },
             )
             if created:
