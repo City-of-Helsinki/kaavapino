@@ -208,7 +208,10 @@ def f_project_section_2(f_project_phase_2):
 @pytest.mark.django_db()
 def f_project_section_attribute_1(f_short_string_attribute, f_project_section_1):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_short_string_attribute, section=f_project_section_1, index=0
+        attribute=f_short_string_attribute,
+        section=f_project_section_1,
+        index=0,
+        priority=1,
     )
 
 
@@ -216,7 +219,7 @@ def f_project_section_attribute_1(f_short_string_attribute, f_project_section_1)
 @pytest.mark.django_db()
 def f_project_section_attribute_2(f_user_attribute, f_project_section_1):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_user_attribute, section=f_project_section_1, index=1
+        attribute=f_user_attribute, section=f_project_section_1, index=1, priority=1
     )
 
 
@@ -224,7 +227,10 @@ def f_project_section_attribute_2(f_user_attribute, f_project_section_1):
 @pytest.mark.django_db()
 def f_project_section_attribute_3(f_long_string_attribute, f_project_section_2):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_long_string_attribute, section=f_project_section_2, index=2
+        attribute=f_long_string_attribute,
+        section=f_project_section_2,
+        index=2,
+        priority=1,
     )
 
 
@@ -232,7 +238,10 @@ def f_project_section_attribute_3(f_long_string_attribute, f_project_section_2):
 @pytest.mark.django_db()
 def f_project_section_attribute_4(f_short_string_choice_attribute, f_project_section_2):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_short_string_choice_attribute, section=f_project_section_2, index=3
+        attribute=f_short_string_choice_attribute,
+        section=f_project_section_2,
+        index=3,
+        priority=1,
     )
 
 
@@ -240,7 +249,7 @@ def f_project_section_attribute_4(f_short_string_choice_attribute, f_project_sec
 @pytest.mark.django_db()
 def f_project_section_attribute_5(f_boolean_attribute, f_project_section_2):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_boolean_attribute, section=f_project_section_2, index=4
+        attribute=f_boolean_attribute, section=f_project_section_2, index=4, priority=1
     )
 
 
@@ -254,6 +263,7 @@ def f_project_section_attribute_6(
         section=f_project_section_2,
         index=5,
         relies_on=f_project_section_attribute_5,
+        priority=1,
     )
 
 
@@ -261,7 +271,7 @@ def f_project_section_attribute_6(
 @pytest.mark.django_db()
 def f_project_section_attribute_6_file(f_file_attribute, f_project_section_1):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_file_attribute, section=f_project_section_1, index=6
+        attribute=f_file_attribute, section=f_project_section_1, index=6, priority=1,
     )
 
 
