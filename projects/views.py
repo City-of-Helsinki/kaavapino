@@ -4,7 +4,7 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from private_storage.views import PrivateStorageDetailView
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAdminUser
@@ -191,6 +191,8 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = ProjectComment.objects.all().select_related("user")
     serializer_class = CommentSerializer
     permission_classes = (CommentPermissions,)
+    filter_backends = (filters.OrderingFilter,)
+    ordering_fields = ("created_at", "modified_at")
 
     def initial(self, request, *args, **kwargs):
         super(CommentViewSet, self).initial(request, *args, **kwargs)
