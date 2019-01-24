@@ -51,6 +51,7 @@ ATTRIBUTE_SECTION_PRIORITY = {
 PHASE_SECTION_NAME = "minkä väliotsikon alle kuuluu"
 PUBLIC_ATTRIBUTE = "julkinen tieto"  # kyllä/ei julkinen
 HELP_TEXT = "ohje"
+HELP_LINK = "ohjetta tarkentava linkki"
 METADATA_FIELDS = {
     "project_cards": {
         "normal": "normaali hankekortti",
@@ -373,6 +374,11 @@ class AttributeImporter:
             except (IndexError, AttributeError):
                 help_text = ""
 
+            try:
+                help_link = row[self.column_index[HELP_LINK]].strip()
+            except (IndexError, AttributeError):
+                help_link = None
+
             is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
             is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
 
@@ -392,6 +398,7 @@ class AttributeImporter:
                     "name": name,
                     "value_type": value_type,
                     "help_text": help_text,
+                    "help_link": help_link,
                     "public": is_public,
                     "required": is_required,
                     "multiple_choice": multiple_choice,
