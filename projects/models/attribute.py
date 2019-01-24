@@ -122,6 +122,7 @@ class Attribute(models.Model):
         through_fields=("attribute_source", "attribute_target"),
     )
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
+    help_link = models.URLField(verbose_name=_("Help link"), blank=True, null=True)
     broadcast_changes = models.BooleanField(default=False)
 
     objects = AttributeQuerySet.as_manager()
