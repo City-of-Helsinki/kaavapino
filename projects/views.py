@@ -68,6 +68,8 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     serializer_class = ProjectSerializer
+    filter_backends = (filters.OrderingFilter,)
+    ordering_fields = ("name", "identifier", "created_at", "modified_at")
 
     def get_queryset(self):
         user = self.request.user
