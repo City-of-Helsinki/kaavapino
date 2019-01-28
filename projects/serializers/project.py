@@ -498,7 +498,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project=project, attribute=geometry_attribute
             ).first()
             new_geometry = attribute_data[geometry_attribute.identifier]
-            if geometry_instance.geometry != new_geometry:
+            if geometry_instance and geometry_instance.geometry != new_geometry:
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
     def _create_updates_log(self, attribute, project, user, new_value, old_value):
