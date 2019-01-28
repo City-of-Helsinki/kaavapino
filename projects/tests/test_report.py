@@ -18,8 +18,10 @@ class TestListingReportTypes:
         response = self.client.get(url)
 
         assert response.status_code == 200
-        assert len(response.json()) == 2
-        assert any(r["id"] == report.id for r in response.json())
+
+        results = response.json()["results"]
+        assert len(results) == 2
+        assert any(r["id"] == report.id for r in results)
 
     def test_for_admin_user__admin_reports_are_listed(self, f_admin, report_factory):
         self.client.force_authenticate(user=f_admin)
@@ -29,8 +31,9 @@ class TestListingReportTypes:
         response = self.client.get(url)
 
         assert response.status_code == 200
-        assert len(response.json()) == 1
-        assert response.json()[0]["id"] == report.id
+        results = response.json()["results"]
+        assert len(results) == 1
+        assert results[0]["id"] == report.id
 
     def test_for_normal_user__admin_reports_are_not_listed(
         self, f_user, report_factory
@@ -42,7 +45,7 @@ class TestListingReportTypes:
         response = self.client.get(url)
 
         assert response.status_code == 200
-        assert len(response.json()) == 0
+        assert len(response.json()["results"]) == 0
 
     def test_when_fetching_report_types__should_include_available_filters(
         self, f_user, report_factory
@@ -54,7 +57,7 @@ class TestListingReportTypes:
 
         response = self.client.get(url)
 
-        report_definition = response.json()[0]
+        report_definition = response.json()["results"][0]
         user_filter = None
         for f in report_definition["filters"]:
             if f["identifier"] == "user__uuid":

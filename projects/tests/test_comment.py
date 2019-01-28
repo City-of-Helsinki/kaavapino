@@ -70,7 +70,7 @@ class TestComment:
 
         assert response.status_code == status_code
         if response.status_code == 200:
-            assert len(response.data) == count
+            assert len(response.data["results"]) == count
 
     #################
     #    RETRIEVE   #
