@@ -35,6 +35,7 @@ def render_template(project, document_template):
             display_value = Listing(display_value)
 
         attribute_data_display[identifier] = display_value
+        attribute_data_display["kaavahankkeen_nimi"] = project.name
 
     doc.render(attribute_data_display)
     output = io.BytesIO()
