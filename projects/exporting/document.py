@@ -30,7 +30,7 @@ def render_template(project, document_template):
             display_value = attribute.get_attribute_display(value)
 
         if display_value is None or display_value == "":
-            display_value = escape(" < {} >".format(attribute.name))
+            display_value = escape("<{}>".format(attribute.name))
         elif attribute.value_type == Attribute.TYPE_LONG_STRING:
             display_value = Listing(display_value)
 
