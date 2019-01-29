@@ -1,5 +1,5 @@
 from django.utils.translation import ugettext_lazy as _
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied
 
 
 def admin_or_read_only(value, attribute, instance, context):
@@ -12,7 +12,7 @@ def admin_or_read_only(value, attribute, instance, context):
     # Do not allow non admins to change the value
     is_admin = user.is_administrative_personnel()
     if not is_admin:
-        raise ValidationError(
+        raise PermissionDenied(
             _(f"You are not permitted to change the {attribute} of this project")
         )
 
