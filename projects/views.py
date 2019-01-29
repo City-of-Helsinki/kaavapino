@@ -59,6 +59,14 @@ class PrivateDownloadViewSetMixin:
 
         return super().get(request, *args, **kwargs)
 
+    def serve_file(self, private_file):
+        response = super().serve_file(private_file)
+
+        # Add CORS headers to allow downloads from any origin
+        response["Access-Control-Expose-Headers"] = "content-disposition"
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
+
 
 class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
