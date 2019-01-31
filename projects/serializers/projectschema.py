@@ -29,6 +29,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     label = serializers.CharField(source="name")
     name = serializers.CharField(source="identifier")
     help_text = serializers.CharField()
+    help_link = serializers.CharField(read_only=True)
     multiple_choice = serializers.BooleanField()
     fieldset_attributes = serializers.SerializerMethodField()
     type = serializers.CharField(source="value_type")
