@@ -43,4 +43,4 @@ raven==6.10.0
 requests==2.21.0          # via django-allauth, django-helusers, pyjwkest, requests-oauthlib
 requests-oauthlib==1.0.0  # via django-allauth
 six==1.12.0               # via django-environ, docxtpl, pyjwkest
-urllib3==1.24.1           # via requests
+urllib3==1.24.2           # via requests
