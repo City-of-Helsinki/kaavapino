@@ -32,7 +32,7 @@ lxml==4.2.5               # via docxtpl, python-docx
 markupsafe==1.1.0         # via jinja2
 oauthlib==2.1.0           # via requests-oauthlib
 openpyxl==2.5.12
-pillow==5.3.0
+pillow==6.2.0
 psycopg2==2.7.6.1
 pycryptodomex==3.7.2      # via pyjwkest
 pyjwkest==1.4.0           # via drf-oidc-auth
