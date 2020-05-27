@@ -1,0 +1,249 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      name: api
+      port: 80
+      targetPort: 80
+    - protocol: TCP
+      name: socket
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      imagePullSecrets:
+      - name: pipeline-docker-registry
+      containers:
+      - name: api
+        image: ${CICD_REGISTRY}/nginx:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        ports:
+        - containerPort: 80
+      - name: socket
+        env:
+          - name: PRIVATE_KEY_JSON
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PRIVATE_KEY_JSON
+          - name: PUBLIC_KEY_JSON
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PUBLIC_KEY_JSON
+        image: ${CICD_REGISTRY}/socket:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        ports:
+        - containerPort: 8000
+      - name: push-notifications
+        image: ${CICD_REGISTRY}/push-notifications:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        env:
+          - name: PUSH_NOTIFICATIONS_PORT
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PUSH_NOTIFICATIONS_PORT
+          - name: AINO_APIKEY
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: AINO_APIKEY
+          - name: PUSH_NOTIFICATIONS_APIKEY
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PUSH_NOTIFICATIONS_APIKEY
+      - name: php
+        env:
+          - name: PAA_DB_HOSTNAME
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_HOSTNAME
+          - name: PAA_DB_PORT
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_PORT
+          - name: PAA_DB_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_DATABASE
+          - name: PAA_DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_USERNAME
+          - name: PAA_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_PASSWORD
+          - name: PAA_DB_ADMIN_DATABASE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_ADMIN_DATABASE
+          - name: PAA_DB_ADMIN_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_ADMIN_USERNAME
+          - name: PAA_DB_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DB_ADMIN_PASSWORD
+          - name: PAA_DEFAULT_USER_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PAA_DEFAULT_USER_PASSWORD
+          - name: REDIS_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: REDIS_URL
+          - name: SENDGRID_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: SENDGRID_API_KEY
+          - name: FROM_EMAIL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: FROM_EMAIL
+          - name: ERROR_EMAIL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: ERROR_EMAIL
+          - name: BASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: BASE_URL
+          - name: PRIVATE_KEY_JSON
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PRIVATE_KEY_JSON
+          - name: PUBLIC_KEY_JSON
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PUBLIC_KEY_JSON
+          - name: VIS_AGENT_API_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: VIS_AGENT_API_URL
+          - name: LICENSE_PLATES_FILTER
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: LICENSE_PLATES_FILTER
+          - name: CHECKPOINTS_FILTER
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: CHECKPOINTS_FILTER
+          - name: AINO_APIKEY
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: AINO_APIKEY
+          - name: API_ROLE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: API_ROLE
+          - name: API_ROLE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: API_ROLE
+          - name: API_RESEND_RULES
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: API_RESEND_RULES
+          - name: USER_ID_AINO_API_KEY_MAP
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: USER_ID_AINO_API_KEY_MAP
+          - name: NAMESPACE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: NAMESPACE
+          - name: LANGUAGE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: LANGUAGE
+          - name: PORT_CALL_TEMPLATE_GAVLE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PORT_CALL_TEMPLATE_GAVLE
+          - name: PORT_CALL_TEMPLATE_RAUMA
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: PORT_CALL_TEMPLATE_RAUMA
+          - name: RTA_POINT_COORDINATES
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: RTA_POINT_COORDINATES
+          - name: RTA_POINT_LOCATION_NAME
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: RTA_POINT_LOCATION_NAME
+          - name: VIS_SERVICE_INSTANCE_URN
+            valueFrom:
+              secretKeyRef:
+                name: agent-vis
+                key: VIS_SERVICE_INSTANCE_URN
+          - name: VIS_PORT_NAME
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: VIS_PORT_NAME
+          - name: VIS_PORT_UNLOCODE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: TIMESTAMP_CLUSTER_AGENT_API_URL
+          - name: TIMESTAMP_CLUSTER_AGENT_API_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: TIMESTAMP_CLUSTER_AGENT_API_URL
+        image: ${CICD_REGISTRY}/php:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        ports:
+        - containerPort: 9000
