@@ -1,0 +1,41 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: api
+spec:
+  selector:
+    app: api
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      name: api
+      port: 80
+      targetPort: 80
+    - protocol: TCP
+      name: socket
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      imagePullSecrets:
+      - name: pipeline-docker-registry
+      containers:
+      - name: api
+        image: ${CICD_REGISTRY}/api:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        ports:
+        - containerPort: 80
