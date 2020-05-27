@@ -36,6 +36,6 @@ spec:
       - name: pipeline-docker-registry
       containers:
       - name: api
-        image: ${CICD_REGISTRY}/nginx:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        image: ${CICD_REGISTRY}/api:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
         ports:
         - containerPort: 80
