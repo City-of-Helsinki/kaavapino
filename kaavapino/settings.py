@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "helusers",
     "helusers.providers.helsinki_oidc",
     "rest_framework",
+    "rest_framework.authtoken",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.sites",
@@ -89,6 +90,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.gis",
     "adminsortable2",
+    "kaavapino",
     "projects",
     "users",
     "allauth",
@@ -166,6 +168,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "helusers.oidc.ApiTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
