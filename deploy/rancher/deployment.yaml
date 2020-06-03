@@ -36,6 +36,11 @@ spec:
         ports:
         - containerPort: 8000
         env:
+          - name: ALLOWED_HOSTS
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: ALLOWED_HOSTS
           - name: WWW_ROOT
             valueFrom:
               secretKeyRef:
