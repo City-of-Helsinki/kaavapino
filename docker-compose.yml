@@ -23,6 +23,10 @@ services:
     environment:
       - DEBUG=1
       - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
+      - TOKEN_AUTH_ACCEPTED_AUDIENCE=https://api.hel.fi/auth/kaavapinodev
+      - TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX=kaavapinodev
+      - REQUIRE_API_SCOPE_FOR_AUTHENTICATION=False
+      - TOKEN_AUTH_AUTHSERVER_URL=https://api.hel.fi/sso/openid
     ports:
       - "8000:8000"
     depends_on:

@@ -51,3 +51,23 @@ spec:
               secretKeyRef:
                 name: api
                 key: DATABASE_URL
+          - name: TOKEN_AUTH_ACCEPTED_AUDIENCE
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: TOKEN_AUTH_ACCEPTED_AUDIENCE
+          - name: TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX
+          - name: REQUIRE_API_SCOPE_FOR_AUTHENTICATION
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: REQUIRE_API_SCOPE_FOR_AUTHENTICATION
+          - name: TOKEN_AUTH_AUTHSERVER_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: TOKEN_AUTH_AUTHSERVER_URL
