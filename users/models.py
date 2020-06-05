@@ -2,7 +2,6 @@ from django.contrib.auth.models import Group
 from helusers.models import AbstractUser
 from django.db import models
 
-from users.groups import GROUPS
 
 # TODO: hard-coded for the MVP, migrate into a separate model when needed
 # Available privilege levels in ascending order
@@ -27,10 +26,6 @@ class User(AbstractUser):
         if isinstance(groups[0], Group):
             return self.groups.filter(group__in=groups).exists()
         return self.groups.filter(name__in=groups).exists()
-
-    def is_administrative_personnel(self):
-        admin_groups = list(GROUPS.ADMINISTRATIVE_PERSONNEL.values.keys())
-        return self.is_in_any_of_groups(admin_groups)
 
     def get_privilege(self):
         privileges = tuple(p for (p, _) in PRIVILEGE_LEVELS)

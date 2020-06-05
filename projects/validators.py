@@ -10,7 +10,7 @@ def admin_or_read_only(value, attribute, instance, context):
         return value
 
     # Do not allow non admins to change the value
-    is_admin = user.is_administrative_personnel()
+    is_admin = user.has_privilege('admin')
     if not is_admin:
         raise PermissionDenied(
             _(f"You are not permitted to change the {attribute} of this project")
