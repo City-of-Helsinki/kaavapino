@@ -318,8 +318,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
 
     def validate_user(self, user):
+        if not user.has_privilege('create'):
+            raise ValidationError(
+                {"user": _("Selected user does not have the required role")}
+            )
+
         if not self.instance:
             return user
+
         return validators.admin_or_read_only(user, "user", self.instance, self.context)
 
     def _validate_deadlines(self, attrs):
