@@ -92,7 +92,6 @@ INSTALLED_APPS = [
     "adminsortable2",
     "kaavapino",
     "projects",
-    "users",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -101,6 +100,7 @@ INSTALLED_APPS = [
     "actstream",
     "django_filters",
     "rest_framework_gis",
+    "users",
 ]
 
 if RAVEN_CONFIG["dsn"]:

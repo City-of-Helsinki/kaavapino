@@ -6,7 +6,7 @@ class DocumentPermissions(permissions.BasePermission):
         project = view.get_project()
         user = request.user
 
-        if project.user == user or user.is_administrative_personnel():
+        if project.user == user or user.has_privilege('admin'):
             return True
 
         return False

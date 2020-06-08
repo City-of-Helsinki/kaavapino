@@ -3,7 +3,7 @@
 from django.contrib.auth.models import Group
 from django.db import migrations
 
-GROUPS = ["admin", "secretary", "planner"]
+GROUPS = []
 
 
 def add_groups(apps, schema_editor):
