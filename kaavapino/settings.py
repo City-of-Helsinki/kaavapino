@@ -31,6 +31,7 @@ env = environ.Env(
     TOKEN_AUTH_AUTHSERVER_URL=(str, "ISSUER_UNSET"),
     TOKEN_AUTH_REQUIRE_SCOPE_PREFIX=(bool, True),
     NGINX_X_ACCEL=(bool, False),
+    USE_X_FORWARDED_HOST=(bool, False),
     SENTRY_DSN=(str, ""),
 )
 
