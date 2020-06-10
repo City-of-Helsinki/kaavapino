@@ -71,3 +71,8 @@ spec:
               secretKeyRef:
                 name: api
                 key: TOKEN_AUTH_AUTHSERVER_URL
+          - name: USE_X_FORWARDED_HOST
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: USE_X_FORWARDED_HOST
