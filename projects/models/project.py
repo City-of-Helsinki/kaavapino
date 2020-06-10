@@ -77,7 +77,11 @@ class Project(models.Model):
     modified_at = models.DateTimeField(
         verbose_name=_("modified at"), auto_now=True, editable=False
     )
-    name = models.CharField(max_length=255, verbose_name=_("name"))
+    name = models.CharField(
+        verbose_name=_("name"),
+        max_length=255,
+        unique=True,
+    )
     identifier = models.CharField(
         max_length=50,
         verbose_name=_("identifier"),
@@ -112,7 +116,14 @@ class Project(models.Model):
         related_name="projects",
         on_delete=models.PROTECT,
     )
-
+    create_principles = models.BooleanField(
+        verbose_name=_("create principles"),
+        default=False,
+    )
+    create_draft = models.BooleanField(
+        verbose_name=_("create draft"),
+        default=False,
+    )
     public = models.BooleanField(default=True)
 
     class Meta:
@@ -349,6 +360,10 @@ class Project(models.Model):
     @property
     def type(self):
         return self.subtype.project_type
+
+    @property
+    def pinonumero(self):
+        return str(self.pk).zfill(7)
 
 
 class ProjectPhase(models.Model):

@@ -70,6 +70,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "id",
             "public",
             "deadlines",
+            "create_principles",
+            "create_draft",
             "_metadata",
         ]
         read_only_fields = ["type", "created_at", "modified_at"]
