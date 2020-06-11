@@ -33,7 +33,7 @@ env = environ.Env(
     NGINX_X_ACCEL=(bool, False),
     USE_X_FORWARDED_HOST=(bool, False),
     SENTRY_DSN=(str, ""),
-    CSRF_COOKIE_DOMAIN=(str, "")
+    CSRF_COOKIE_DOMAIN=(str, ""),
     CSRF_TRUSTED_ORIGINS=(list, [])
 )
 
