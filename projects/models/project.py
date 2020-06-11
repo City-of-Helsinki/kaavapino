@@ -69,8 +69,6 @@ class Project(models.Model):
         settings.AUTH_USER_MODEL,
         verbose_name=_("user"),
         related_name="projects",
-        null=True,
-        blank=True,
         on_delete=models.PROTECT,
     )
     created_at = models.DateTimeField(
