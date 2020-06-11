@@ -81,3 +81,8 @@ spec:
               secretKeyRef:
                 name: api
                 key: CSRF_COOKIE_DOMAIN
+          - name: CSRF_TRUSTED_ORIGINS
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: CSRF_TRUSTED_ORIGINS

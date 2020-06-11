@@ -34,6 +34,7 @@ env = environ.Env(
     USE_X_FORWARDED_HOST=(bool, False),
     SENTRY_DSN=(str, ""),
     CSRF_COOKIE_DOMAIN=(str, "")
+    CSRF_TRUSTED_ORIGINS=(list, [])
 )
 
 env_file = project_root(".env")
@@ -206,3 +207,4 @@ ACTSTREAM_SETTINGS = {"USE_JSONFIELD": True}
 
 USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST")
 CSRF_COOKIE_DOMAIN = env.str("CSRF_COOKIE_DOMAIN")
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
