@@ -76,3 +76,8 @@ spec:
               secretKeyRef:
                 name: api
                 key: USE_X_FORWARDED_HOST
+          - name: CSRF_COOKIE_DOMAIN
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: CSRF_COOKIE_DOMAIN
