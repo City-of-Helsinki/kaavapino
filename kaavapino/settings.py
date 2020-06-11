@@ -47,7 +47,7 @@ if DEBUG and not SECRET_KEY:
     SECRET_KEY = "xxx"
 
 #ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
-ALLOWED_HOSTS = os.env.get('ALLOWED_HOSTS').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
 
 DATABASES = {"default": env.db()}
 
