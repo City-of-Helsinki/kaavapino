@@ -33,6 +33,7 @@ env = environ.Env(
     NGINX_X_ACCEL=(bool, False),
     USE_X_FORWARDED_HOST=(bool, False),
     SENTRY_DSN=(str, ""),
+    CSRF_COOKIE_DOMAIN=(str, "")
 )
 
 env_file = project_root(".env")
@@ -203,4 +204,5 @@ USE_NATIVE_JSONFIELD = True
 ACTSTREAM_SETTINGS = {"USE_JSONFIELD": True}
 
 
-USE_X_FORWARDED_HOST = env("USE_X_FORWARDED_HOST")
+USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST")
+CSRF_COOKIE_DOMAIN = env.str("CSRF_COOKIE_DOMAIN")
