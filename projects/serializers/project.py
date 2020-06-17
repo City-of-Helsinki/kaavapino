@@ -290,11 +290,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         public = attrs.get("public", True)
 
         # Do not validate if this is a new project
-        if not public or not self.instance:
+        if public is None or not self.instance:
             return public
 
         # A project is always public if it has exited the starting phase
-        if not self.instance.public and (attrs["phase"] > 1 or self.instance.phase > 1):
+        if not self.instance.public and (attrs["phase"].index > 0 or self.instance.phase.index > 0):
             return True
 
         # Do not validate if the value is the same as before
