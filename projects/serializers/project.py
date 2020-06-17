@@ -298,6 +298,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return public
 
+    def validate_phase(self, phase):
+        if self.instance.subtype == phase.project_subtype:
+            return phase
+
+        raise ValidationError(
+            {"phase": _("Invalid phase for current project subtype")}
+        )
+
     def validate_user(self, user):
         if not user.has_privilege('create'):
             raise ValidationError(
