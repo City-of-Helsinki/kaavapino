@@ -367,11 +367,11 @@ class Project(models.Model):
 
 
 class ProjectPhase(models.Model):
-    """Describes a phase of a certain project type."""
+    """Describes a phase of a certain project subtype."""
 
     project_subtype = models.ForeignKey(
         ProjectSubtype,
-        verbose_name=_("project type"),
+        verbose_name=_("project subtype"),
         on_delete=models.CASCADE,
         related_name="phases",
     )
