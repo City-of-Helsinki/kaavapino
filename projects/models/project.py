@@ -51,7 +51,7 @@ class ProjectSubtype(models.Model):
         null=True,
         encoder=DjangoJSONEncoder,
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
     class Meta:
         verbose_name = _("project subtype")
@@ -380,7 +380,7 @@ class ProjectPhase(models.Model):
     color_code = models.CharField(
         max_length=10, verbose_name=_("color code"), blank=True
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
     metadata = JSONField(
         verbose_name=_("metadata"),
@@ -447,7 +447,7 @@ class ProjectPhaseSection(models.Model):
         on_delete=models.CASCADE,
     )
     name = models.CharField(max_length=255, verbose_name=_("name"))
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     attributes = models.ManyToManyField(
         Attribute,
         verbose_name=_("attributes"),
@@ -476,7 +476,7 @@ class ProjectPhaseSectionAttribute(models.Model):
     section = models.ForeignKey(
         ProjectPhaseSection, verbose_name=_("phase section"), on_delete=models.CASCADE
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     priority = models.PositiveIntegerField(verbose_name=_("column index"))
 
     relies_on = models.ForeignKey(
