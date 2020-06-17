@@ -12,7 +12,6 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.serializers import Serializer
 from rest_framework_gis.fields import GeometryField
 
-from projects import validators
 from projects.actions import verbs
 from projects.models import (
     Project,
@@ -297,27 +296,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not self.instance.public and (attrs["phase"].index > 0 or self.instance.phase.index > 0):
             return True
 
-        # Do not validate if the value is the same as before
-        if public == self.instance.public:
-            return public
-
-        request = self.context["request"]
-        user_is_request_user = self.instance.user == request.user
-        if not user_is_request_user and not request.user.is_superuser:
-            raise ValidationError(_("You do not have permissions to change this value"))
-
         return public
-
-    def validate_phase(self, phase):
-        user = self.context["request"].user
-        is_responsible = user == getattr(self.instance, "user", None)
-
-        if is_responsible:
-            return phase
-
-        return validators.admin_or_read_only(
-            phase, "phase", self.instance, self.context
-        )
 
     def validate_user(self, user):
         if not user.has_privilege('create'):
@@ -325,10 +304,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 {"user": _("Selected user does not have the required role")}
             )
 
-        if not self.instance:
-            return user
-
-        return validators.admin_or_read_only(user, "user", self.instance, self.context)
+        return user
 
     def _validate_deadlines(self, attrs):
         """
