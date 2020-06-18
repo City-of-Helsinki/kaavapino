@@ -35,6 +35,7 @@ from projects.permissions.documents import DocumentPermissions
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
+from projects.permissions.projects import ProjectPermissions
 from projects.serializers.comment import CommentSerializer
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.project import (
@@ -76,6 +77,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     serializer_class = ProjectSerializer
+    permission_classes = (ProjectPermissions,)
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ("name", "identifier", "created_at", "modified_at")
 
@@ -139,7 +141,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context["action"] = self.action
         return context
 
-    @action(methods=["put"], detail=True, parser_classes=[MultiPartParser])
+    @action(
+        methods=["put"],
+        detail=True,
+        parser_classes=[MultiPartParser],
+        permission_classes=[ProjectPermissions],
+    )
     def files(self, request, pk=None):
         project = self.get_object()
 

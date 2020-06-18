@@ -51,7 +51,7 @@ class ProjectSubtype(models.Model):
         null=True,
         encoder=DjangoJSONEncoder,
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
     class Meta:
         verbose_name = _("project subtype")
@@ -77,7 +77,11 @@ class Project(models.Model):
     modified_at = models.DateTimeField(
         verbose_name=_("modified at"), auto_now=True, editable=False
     )
-    name = models.CharField(max_length=255, verbose_name=_("name"))
+    name = models.CharField(
+        verbose_name=_("name"),
+        max_length=255,
+        unique=True,
+    )
     identifier = models.CharField(
         max_length=50,
         verbose_name=_("identifier"),
@@ -112,7 +116,14 @@ class Project(models.Model):
         related_name="projects",
         on_delete=models.PROTECT,
     )
-
+    create_principles = models.BooleanField(
+        verbose_name=_("create principles"),
+        default=False,
+    )
+    create_draft = models.BooleanField(
+        verbose_name=_("create draft"),
+        default=False,
+    )
     public = models.BooleanField(default=True)
 
     class Meta:
@@ -350,13 +361,17 @@ class Project(models.Model):
     def type(self):
         return self.subtype.project_type
 
+    @property
+    def pinonumero(self):
+        return str(self.pk).zfill(7)
+
 
 class ProjectPhase(models.Model):
-    """Describes a phase of a certain project type."""
+    """Describes a phase of a certain project subtype."""
 
     project_subtype = models.ForeignKey(
         ProjectSubtype,
-        verbose_name=_("project type"),
+        verbose_name=_("project subtype"),
         on_delete=models.CASCADE,
         related_name="phases",
     )
@@ -365,7 +380,7 @@ class ProjectPhase(models.Model):
     color_code = models.CharField(
         max_length=10, verbose_name=_("color code"), blank=True
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
     metadata = JSONField(
         verbose_name=_("metadata"),
@@ -432,7 +447,7 @@ class ProjectPhaseSection(models.Model):
         on_delete=models.CASCADE,
     )
     name = models.CharField(max_length=255, verbose_name=_("name"))
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     attributes = models.ManyToManyField(
         Attribute,
         verbose_name=_("attributes"),
@@ -461,7 +476,7 @@ class ProjectPhaseSectionAttribute(models.Model):
     section = models.ForeignKey(
         ProjectPhaseSection, verbose_name=_("phase section"), on_delete=models.CASCADE
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     priority = models.PositiveIntegerField(verbose_name=_("column index"))
 
     relies_on = models.ForeignKey(
