@@ -7,10 +7,16 @@ from users.models import User, GroupPrivilege
 
 @receiver(post_save, sender=User)
 def add_admin_group_post_user_creation(sender, instance, created, *args, **kwargs):
-    if created and instance.is_staff:
+    if created and (instance.is_staff or instance.is_superuser):
         admin_group = Group.objects.filter(groupprivilege__privilege_level='admin').first()
-        if admin_group:
-            instance.groups.add(admin_group)
+        if not admin_group:
+            admin_group = Group.objects.get_or_create(name='Administrators')[0]
+            GroupPrivilege.objects.update_or_create(
+                group=admin_group,
+                privilege_level='admin',
+            )
+
+        instance.groups.add(admin_group)
     elif not instance.is_staff and instance.has_privilege('admin'):
         instance.is_staff = True
         instance.save()
