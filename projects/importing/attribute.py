@@ -27,47 +27,38 @@ logger = logging.getLogger(__name__)
 IDENTIFIER_MAX_LENGTH = 50
 VALID_ATTRIBUTE_CALCULATION_TYPES = [Attribute.TYPE_DECIMAL, Attribute.TYPE_INTEGER]
 
-PROJECT_SIZE = "kokoluokka"
-PROJECT_PHASE = "syöttövaihe"
+PROJECT_SIZE = "prosessin kokoluokka, joissa kenttä näkyy"
 
-DEFAULT_SHEET_NAME = "Hanketiedot (työversio)"
+DEFAULT_SHEET_NAME = "Kaavaprojektitiedot"
+CHOICES_SHEET_NAME = "Pudotusvalikot"
 
-ATTRIBUTE_NAME = "hanketieto"
-ATTRIBUTE_IDENTIFIER = "hanketieto tunniste"
-ATTRIBUTE_TYPE = "tietotyyppi"
-ATTRIBUTE_CHOICES_SHEET = "vaihtoehtotaulukko"
+ATTRIBUTE_NAME = "projektitieto"
+ATTRIBUTE_IDENTIFIER = "projektitieto tunniste"
+ATTRIBUTE_TYPE = "kenttätyyppi"
+ATTRIBUTE_CHOICES_REF = "pudotusvalikko/vaihtoehdot"
 ATTRIBUTE_UNIT = "mittayksikkö"
-ATTRIBUTE_BROADCAST_CHANGES = "tiedon muuttaminen aiheuttaa ilmoituksen shoutboxiin"
-ATTRIBUTE_REQUIRED = (
-    "pakollinen tieto (jos ei niin kohdan voi valita poistettavaksi)"
-)  # kyllä/ei
-ATTRIBUTE_PRIORITY = "tiedon sijainti/merkitys käyttäjälle"
-ATTRIBUTE_SECTION_PRIORITY = {
-    "ensisijainen tieto": 1,
-    "automaattinen täyttö": 1,
-    "lisätieto": 2,
-}
+ATTRIBUTE_BROADCAST_CHANGES = "muutos näkyy viestit-ikkunassa"
+ATTRIBUTE_REQUIRED = "pakollinen tieto"  # kyllä/ei
+ATTRIBUTE_MULTIPLE_CHOICE = "tietoa voi olla useita" # kyllä/ei
 
-PHASE_SECTION_NAME = "minkä väliotsikon alle kuuluu"
-PUBLIC_ATTRIBUTE = "julkinen tieto"  # kyllä/ei julkinen
-HELP_TEXT = "ohje"
-HELP_LINK = "ohjetta tarkentava linkki"
-METADATA_FIELDS = {
-    "project_cards": {
-        "normal": "normaali hankekortti",
-        "extended": "laajennettu hankekortti",
-    }
-}
+PHASE_SECTION_NAME = "tietoryhmä"
+PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
+HELP_TEXT = "ohje tiedon syöttäjälle"
+HELP_LINK = "ohjeeseen liittyvä linkki"
 
 CALCULATIONS_COLUMN = "laskelmat"
 
-ATTRIBUTE_FIELDSET = "hanketieto fieldset"
+ATTRIBUTE_FIELDSET = "projektitieto fieldset"
 
 ATTRIBUTE_PHASE_COLUMNS = [
-    "syöttövaihe",
-    "päivitys-vaihe 2",
-    "päivitys-vaihe 3",
-    "päivitys-vaihe 4",
+    "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
 ]
 
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
@@ -77,7 +68,9 @@ KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
 class Phases(Enum):
     START = "Käynnistys"
+    PRINCIPLES = "Suunnitteluperiaatteet"
     OAS = "OAS"
+    DRAFT = "Luonnos"
     PROPOSAL = "Ehdotus"
     REVISED_PROPOSAL = "Tarkistettu ehdotus"
     KHS = "Kanslia-Khs-Valtuusto"
@@ -90,13 +83,19 @@ PROJECT_PHASES = {
         "color": "color--tram",
         "color_code": "#009246",
     },  # None
-    # {'name': 'Suunnitteluperiaatteet', 'color': '#009142'},
+    Phases.PRINCIPLES.value: {
+        "name": Phases.PRINCIPLES.value,
+        "color": '#009142',
+    },
     Phases.OAS.value: {
         "name": Phases.OAS.value,
         "color": "color--summer",
         "color_code": "#ffc61e",
     },  # 01, 03
-    # {'name': 'Luonnos', 'color': '#ffd600'},
+    Phases.DRAFT.value: {
+        "name": Phases.DRAFT.value,
+        "color": '#ffd600',
+    },
     Phases.PROPOSAL.value: {
         "name": Phases.PROPOSAL.value,
         "color": "color--metro",
@@ -201,40 +200,45 @@ SUBTYPE_PHASE_METADATA = {
     },
 }
 
-# projektin vuosi <- tarkistetun ehdotuksen lautakuntapvm
-
 VALUE_TYPES = {
+    "AD-tunnukset": Attribute.TYPE_USER,
+    "automaatinen (teksti), kun valitaan henkilö": Attribute.TYPE_SHORT_STRING,
+    "automaattinen (desimaaliluku), tieto tulee kaavan tietomallista": Attribute.TYPE_DECIMAL,
+    "automaattinen (kokonaisluku), jonka Kaavapino laskee": Attribute.TYPE_INTEGER,
+    "automaattinen (kokonaisluku), kun projekti luodaan": Attribute.TYPE_INTEGER,
+    "automaattinen (kokonaisluku), kun projekti luodaan, kokonaisluku": Attribute.TYPE_INTEGER,
+    "automaattinen (kokonaisluku), tieto tulee Factasta": Attribute.TYPE_INTEGER,
+    "automaattinen (kokonaisluku), tieto tulee kaavan tietomallista": Attribute.TYPE_INTEGER,
+    "automaattinen (pvm)": Attribute.TYPE_DATE,
+    "automaattinen (pvm), mutta päivämäärää voi muuttaa": Attribute.TYPE_DATE,
+    "automaattinen (spatiaalinen), tieto tulee kaavan tietomallista": Attribute.TYPE_GEOMETRY,
+    "automaattinen (teksti), jonka Kaavapino muodostaa": Attribute.TYPE_LONG_STRING,
+    "automaattinen (teksti), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
+    "automaattinen (teksti), kun valitaan vastuuyksikkö": Attribute.TYPE_LONG_STRING,
+    "automaattinen (teksti), tieto tulee Factasta": Attribute.TYPE_LONG_STRING,
+    "automaattinen (valinta)": Attribute.TYPE_LONG_STRING,
+    "automaattinen (valinta), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
+    "Desimaaliluvun syöttö": Attribute.TYPE_DECIMAL,
     "fieldset": Attribute.TYPE_FIELDSET,
-    "sisältö; nimi": Attribute.TYPE_SHORT_STRING,
-    "tunniste; numerotunniste": Attribute.TYPE_SHORT_STRING,
-    "tunniste; numero": Attribute.TYPE_DECIMAL,
-    "sisältö; teksti": Attribute.TYPE_LONG_STRING,
-    "spatiaalinen": Attribute.TYPE_GEOMETRY,
-    "sisältö; kuva": Attribute.TYPE_IMAGE,
-    "aikataulu ja tehtävät; pvm": Attribute.TYPE_DATE,
-    "aikataulu ja tehtävät; teksti": Attribute.TYPE_LONG_STRING,
-    "aikataulu ja tehtävät; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,
-    "sisältö; laaja teksti": Attribute.TYPE_LONG_STRING,
-    "sisältö; vuosiluku": Attribute.TYPE_SHORT_STRING,
-    "linkki aineistoon": Attribute.TYPE_LINK,
-    "aineisto liitetään Kaavapinoon": Attribute.TYPE_FILE,
-    "numero, automaattinen": Attribute.TYPE_DECIMAL,
-    "sisältö; vuosilukuja (1...n)": Attribute.TYPE_LONG_STRING,  # TODO Multiple years
-    "sisältö; numero": Attribute.TYPE_DECIMAL,
-    "sisältö; valitaan kyllä/ei": Attribute.TYPE_BOOLEAN,  # TODO or kyllä/ei/ei asetettu?
-    "sisältö; tekstivalikko": Attribute.TYPE_LONG_STRING,  # TODO Choice of values
-    "resurssit; valintalista käyttäjä": Attribute.TYPE_USER,
-    "resurssit; valintalista": Attribute.TYPE_SHORT_STRING,
-    "sisältö; luettelo": Attribute.TYPE_LONG_STRING,  # TODO List of things
-    "sisältö; pvm": Attribute.TYPE_DATE,  # TODO Might need to contain multiple dates
-    "sisältö; osoite": Attribute.TYPE_LONG_STRING,  # TODO Might need to contain multiple addresses
-    "sisältö; kaavanumero(t)": Attribute.TYPE_LONG_STRING,  # TODO List of identifiers
-    "talous; teksti": Attribute.TYPE_LONG_STRING,  # TODO List of strings
-    "talous; numero (€)": Attribute.TYPE_LONG_STRING,  # TODO Might have multiple values
-    "aikataulu ja tehtävät; pvm ja paikka": Attribute.TYPE_LONG_STRING,  # TODO Time and place
-    "aikataulu ja tehtävät; vaihe 1…6": Attribute.TYPE_SHORT_STRING,  # TODO Choice
-    "sisältö; teksti (automaattinen täyttö?)": Attribute.TYPE_LONG_STRING,
-    "sisältö; kyllä/ei/tieto puuttuu": Attribute.TYPE_BOOLEAN,  # TODO Boolean or choice?
+    "Kokonaisluvun syöttö.": Attribute.TYPE_INTEGER,
+    "Kuvan lataaminen.": Attribute.TYPE_IMAGE,
+    "Kyllä/Ei": Attribute.TYPE_BOOLEAN,
+    "Kyllä/Ei/Tieto puuttuu": Attribute.TYPE_BOOLEAN,
+    "Linkin liittäminen.": Attribute.TYPE_LINK,
+    "Lyhyen tekstin syöttö.": Attribute.TYPE_SHORT_STRING,
+    "Numerosarjan syöttö.": Attribute.TYPE_SHORT_STRING,
+    "Pitkän tekstin syöttö.": Attribute.TYPE_LONG_STRING,
+    "Päivämäärän valinta.": Attribute.TYPE_DATE,
+    "Valinta (1) pudotusvalikosta.": Attribute.TYPE_LONG_STRING,
+    "Valinta (1) valintapainikkeesta.": Attribute.TYPE_LONG_STRING,
+    "Valinta (1-2) painikkeesta.": Attribute.TYPE_LONG_STRING,
+    "Valinta (1-x) pudotusvalikosta.": Attribute.TYPE_LONG_STRING,
+    "Valintaruutu.": Attribute.TYPE_BOOLEAN,
+}
+
+DISPLAY_TYPES = {
+    "Valinta (1) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
+    "Valinta (1-x) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
 }
 
 
@@ -267,12 +271,12 @@ class AttributeImporter:
                 "This does not seem to be a valid attribute sheet."
             )
 
-        return self._rows_for_sheet(sheet)
+        return self._rows_for_sheet(sheet, 1)
 
-    def _rows_for_sheet(self, sheet):
+    def _rows_for_sheet(self, sheet, start=0):
         data = []
 
-        for row in sheet.iter_rows():
+        for row in list(sheet.iter_rows())[start:]:
             if not row[0].value:
                 break
             data.append([col.value for col in row])
@@ -333,11 +337,6 @@ class AttributeImporter:
         )
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
-    def _is_multiple_choice(self, row, value_type):
-        if value_type == Attribute.TYPE_FIELDSET:
-            return True
-        return False
-
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating attributes...")
 
@@ -360,14 +359,18 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
-
+            display = (
+                DISPLAY_TYPES.get(value_type_string.strip(), None)
+                if value_type_string
+                else None
+            )
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
             broadcast_changes = (
                 row[self.column_index[ATTRIBUTE_BROADCAST_CHANGES]] == "kyllä"
             )
 
-            multiple_choice = self._is_multiple_choice(row, value_type)
+            multiple_choice = row[self.column_index[ATTRIBUTE_MULTIPLE_CHOICE]] == "kyllä"
 
             try:
                 help_text = row[self.column_index[HELP_TEXT]].strip()
@@ -397,6 +400,7 @@ class AttributeImporter:
                 defaults={
                     "name": name,
                     "value_type": value_type,
+                    "display": display,
                     "help_text": help_text,
                     "help_link": help_link,
                     "public": is_public,
@@ -414,7 +418,8 @@ class AttributeImporter:
                 updated_attribute_count += 1
             imported_attribute_ids.add(identifier)
 
-            if row[self.column_index[ATTRIBUTE_CHOICES_SHEET]]:
+            choices_ref = row[self.column_index[ATTRIBUTE_CHOICES_REF]]
+            if choices_ref:
                 created_choices_count += self._create_attribute_choices(attribute, row)
 
             if created:
@@ -435,7 +440,7 @@ class AttributeImporter:
 
     def _get_generated_calculations(self, row):
         calculations_string = row[self.column_index[CALCULATIONS_COLUMN]]
-        if not calculations_string:
+        if calculations_string in [None, 'ei']:
             return False, None
 
         # Splits the string when a word or +, -, *, / operators is found
@@ -444,19 +449,31 @@ class AttributeImporter:
         return True, calculations
 
     def _create_attribute_choices(self, attribute, row) -> int:
-        choices_sheet = row[self.column_index[ATTRIBUTE_CHOICES_SHEET]]
         created_choices_count = 0
-        if choices_sheet:
-            choices_rows = self._rows_for_sheet(self.workbook[choices_sheet])
-            choices = list(itertools.chain.from_iterable(choices_rows))
+        choices_rows = self._rows_for_sheet(self.workbook[CHOICES_SHEET_NAME])
+        choices_ref = row[self.column_index[ATTRIBUTE_CHOICES_REF]]
 
-            AttributeValueChoice.objects.filter(attribute=attribute).delete()
-            for idx, choice in enumerate(choices):
-                identifier = self._get_identifier_for_value(str(choice))
-                AttributeValueChoice.objects.create(
-                    attribute=attribute, index=idx, value=choice, identifier=identifier
-                )
-                created_choices_count += 1
+        try:
+            column_index = choices_rows[0].index(choices_ref)
+        except ValueError:
+            choices_rows = choices_ref.split("/")
+            column_index = -1
+
+        for index, choice_row in enumerate(choices_rows):
+            if column_index < 0:
+                choice = choice_row
+            else:
+                choice = choice_row[column_index]
+
+            identifier = self._get_identifier_for_value(str(choice))
+            if not choice:
+                break
+
+            AttributeValueChoice.objects.create(
+                attribute=attribute, index=index, value=choice, identifier=identifier
+            )
+            created_choices_count += 1
+
         return created_choices_count
 
     def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
@@ -535,14 +552,14 @@ class AttributeImporter:
     def _get_attribute_input_phases(self, row):
         input_phases = []
 
-        for column_name in ATTRIBUTE_PHASE_COLUMNS:
+        for index, column_name in enumerate(ATTRIBUTE_PHASE_COLUMNS):
             value = row[self.column_index[column_name]]
-            if value is None:
+            if value in [None, "ei"]:
                 continue
 
             try:
-                value = int(value)
-                input_phases.append(value)
+                value = index
+                input_phases.append(index)
             except ValueError:
                 logger.info(f"Cannot covert {value} into an integer.")
 
@@ -588,7 +605,6 @@ class AttributeImporter:
             for row in rows:
                 project_size = row[self.column_index[PROJECT_SIZE]]
                 row_subtypes = self.get_subtypes_from_cell(project_size)
-                priority = self._get_section_attribute_priority(row)
 
                 # Filter out attributes that should not be included in the project sub type (size)
                 if (
@@ -614,7 +630,6 @@ class AttributeImporter:
                     attribute=attribute,
                     section=section,
                     index=counter[section],
-                    priority=priority,
                 )
 
                 counter[section] += 1
@@ -626,48 +641,6 @@ class AttributeImporter:
                     f"{section_attribute.index} / "
                     f"{section_attribute.attribute}"
                 )
-
-    def _get_section_attribute_priority(self, row):
-        priority_string = row[self.column_index[ATTRIBUTE_PRIORITY]]
-        return ATTRIBUTE_SECTION_PRIORITY.get(priority_string, 1)
-
-    def _update_type_metadata(self, rows):
-        metadata = {}
-        metadata.update(self._get_project_card_attributes_metadata(rows))
-
-        self.project_type.metadata = metadata
-        self.project_type.save()
-
-    def _get_project_card_attributes_metadata(self, rows) -> dict:
-        metadata = {}
-        project_card_mapping = {
-            key: {} for key in METADATA_FIELDS["project_cards"].keys()
-        }
-        for row in rows:
-            identifier = self._get_attribute_row_identifier(row)
-
-            for card_type in project_card_mapping.keys():
-                card_index = row[
-                    self.column_index[METADATA_FIELDS["project_cards"][card_type]]
-                ]
-
-                if not card_index:
-                    continue
-
-                try:
-                    card_index = int(card_index)
-                    project_card_mapping[card_type][identifier] = card_index
-                except ValueError:
-                    logger.info(
-                        f"Metadata: Cannot covert {card_index} into an integer."
-                    )
-
-        for card_type in project_card_mapping.keys():
-            metadata_key = f"{card_type}_project_card_attributes"
-            metadata[metadata_key] = sorted(
-                project_card_mapping[card_type], key=project_card_mapping[card_type].get
-            )
-        return metadata
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes
@@ -799,7 +772,6 @@ class AttributeImporter:
         for subtype in subtypes:
             self._create_sections(data_rows, subtype)
             self._create_attribute_section_links(data_rows, subtype)
-        self._update_type_metadata(data_rows)
 
         logger.info("Project subtypes {}".format(ProjectSubtype.objects.count()))
         logger.info("Phases {}".format(ProjectPhase.objects.count()))

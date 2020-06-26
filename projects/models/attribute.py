@@ -91,9 +91,23 @@ class Attribute(models.Model):
         (TYPE_LINK, _("link")),
     )
 
+    DISPLAY_DROPDOWN = "dropdown"
+
+    DISPLAY_CHOICES = (
+        (None, _("default")),
+        (DISPLAY_DROPDOWN, _("dropdown")),
+    )
+
     name = models.CharField(max_length=255, verbose_name=_("name"))
     value_type = models.CharField(
         max_length=64, verbose_name=_("value type"), choices=TYPE_CHOICES
+    )
+    display = models.CharField(
+        max_length=64,
+        verbose_name=_("display style"),
+        choices=DISPLAY_CHOICES,
+        default=None,
+        null=True,
     )
     unit = models.CharField(
         max_length=255, verbose_name=_("unit"), null=True, blank=True

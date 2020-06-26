@@ -477,7 +477,6 @@ class ProjectPhaseSectionAttribute(models.Model):
         ProjectPhaseSection, verbose_name=_("phase section"), on_delete=models.CASCADE
     )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
-    priority = models.PositiveIntegerField(verbose_name=_("column index"))
 
     relies_on = models.ForeignKey(
         "self",
