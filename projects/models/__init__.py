@@ -3,6 +3,8 @@ from .document import DocumentTemplate  # noqa
 from .project import (  # noqa
     Project,
     ProjectAttributeFile,
+    ProjectFloorAreaSection,
+    ProjectFloorAreaSectionAttribute,
     ProjectPhase,
     ProjectPhaseLog,
     ProjectPhaseSection,

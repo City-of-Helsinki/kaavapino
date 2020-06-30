@@ -366,6 +366,66 @@ class Project(models.Model):
         return str(self.pk).zfill(7)
 
 
+class ProjectFloorAreaSection(models.Model):
+    """Defines a floor area data section."""
+
+    project_subtype = models.ForeignKey(
+        ProjectSubtype,
+        verbose_name=_("project subtype"),
+        on_delete=models.CASCADE,
+        related_name="floor_area_sections",
+    )
+    name = models.CharField(max_length=255, verbose_name=_("name"))
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+    attributes = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("attributes"),
+        related_name="floor_area_sections",
+        through="ProjectFloorAreaSectionAttribute",
+    )
+
+    class Meta:
+        verbose_name = _("project floor area section")
+        verbose_name_plural = _("project floor area sections")
+        ordering = ("index",)
+
+    def __str__(self):
+        return self.name
+
+    def get_attribute_identifiers(self):
+        return [a.identifier for a in self.attributes.all()]
+
+
+class ProjectFloorAreaSectionAttribute(models.Model):
+    """Links an attribute into a project floor area section."""
+
+    attribute = models.ForeignKey(
+        Attribute, verbose_name=_("attribute"), on_delete=models.CASCADE
+    )
+    section = models.ForeignKey(
+        ProjectFloorAreaSection,
+        verbose_name=_("floor area section"),
+        on_delete=models.CASCADE,
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+
+    relies_on = models.ForeignKey(
+        "self",
+        verbose_name=_("relies on"),
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        verbose_name = _("project floor area section attribute")
+        verbose_name_plural = _("project floor area section attributes")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.attribute} {self.section} {self.index}"
+
+
 class ProjectPhase(models.Model):
     """Describes a phase of a certain project subtype."""
 
