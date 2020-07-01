@@ -469,10 +469,16 @@ class AttributeImporter:
             if not choice:
                 break
 
-            AttributeValueChoice.objects.create(
-                attribute=attribute, index=index, value=choice, identifier=identifier
+            _, created = AttributeValueChoice.objects.update_or_create(
+                attribute=attribute,
+                index=index,
+                value=choice,
+                identifier=identifier
             )
-            created_choices_count += 1
+
+            if created:
+                created_choices_count += 1
+
 
         return created_choices_count
 
