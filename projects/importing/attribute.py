@@ -14,6 +14,8 @@ from ..models import (
     Attribute,
     AttributeValueChoice,
     FieldSetAttribute,
+    ProjectFloorAreaSection,
+    ProjectFloorAreaSectionAttribute,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectPhase,
@@ -60,6 +62,8 @@ ATTRIBUTE_PHASE_COLUMNS = [
     "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
     "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
 ]
+
+ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot"
 
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
@@ -596,6 +600,31 @@ class AttributeImporter:
                 )
                 logger.info(f"Created {section}")
 
+    def _create_floor_area_sections(self, rows, subtype: ProjectSubtype):
+        logger.info("\nReplacing floor area sections...")
+
+        ProjectFloorAreaSection.objects \
+            .filter(project_subtype=subtype).delete()
+
+        # Get all distinct section names in appearance order
+        subtype_sections = []
+
+        for row in rows:
+            try:
+                section_name = \
+                    row[self.column_index[ATTRIBUTE_FLOOR_AREA_SECTION]].strip()
+            except AttributeError:
+                continue
+
+            if section_name != "ei" and section_name not in subtype_sections:
+                subtype_sections.append(section_name)
+
+        for i, section_name in enumerate(subtype_sections, start=1):
+            section = ProjectFloorAreaSection.objects.create(
+                project_subtype=subtype, index=i, name=section_name
+            )
+            logger.info(f"Created {section}")
+
     def _create_attribute_section_links(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing attribute section links...")
 
@@ -647,6 +676,61 @@ class AttributeImporter:
                     f"{section_attribute.index} / "
                     f"{section_attribute.attribute}"
                 )
+
+    def _create_floor_area_attribute_section_links(
+        self, rows, subtype: ProjectSubtype
+    ):
+        logger.info("\nReplacing attribute floor area section links...")
+
+        ProjectFloorAreaSectionAttribute.objects.filter(
+            section__project_subtype=subtype
+        ).delete()
+
+        # Index for attribute within a phase section
+        counter = Counter()
+
+        for row in rows:
+            project_size = row[self.column_index[PROJECT_SIZE]]
+            row_subtypes = self.get_subtypes_from_cell(project_size)
+
+            # Filter out attributes that should not be included in the project sub type (size)
+            if (
+                "kaikki" not in row_subtypes
+                and subtype.name.lower() not in row_subtypes
+            ):
+                continue
+
+            identifier = self._get_attribute_row_identifier(row)
+            attribute = Attribute.objects.get(identifier=identifier)
+
+            try:
+                section_name = \
+                    row[self.column_index[ATTRIBUTE_FLOOR_AREA_SECTION]].strip()
+            except AttributeError:
+                continue
+
+            if section_name == "ei":
+                continue
+
+            section = ProjectFloorAreaSection.objects.get(
+                project_subtype=subtype, name=section_name
+            )
+
+            section_attribute = ProjectFloorAreaSectionAttribute.objects.create(
+                attribute=attribute,
+                section=section,
+                index=counter[section],
+            )
+
+            counter[section] += 1
+
+            logger.info(
+                f"Created "
+                f"{section_attribute.section.project_subtype} / "
+                f"{section_attribute.section} / "
+                f"{section_attribute.index} / "
+                f"{section_attribute.attribute}"
+            )
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes
@@ -778,6 +862,9 @@ class AttributeImporter:
         for subtype in subtypes:
             self._create_sections(data_rows, subtype)
             self._create_attribute_section_links(data_rows, subtype)
+
+            self._create_floor_area_sections(data_rows, subtype)
+            self._create_floor_area_attribute_section_links(data_rows, subtype)
 
         logger.info("Project subtypes {}".format(ProjectSubtype.objects.count()))
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
