@@ -390,7 +390,7 @@ class ProjectFloorAreaSection(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.project_subtype.name})"
 
     def get_attribute_identifiers(self):
         return [a.identifier for a in self.attributes.all()]
@@ -456,7 +456,7 @@ class ProjectPhase(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.project_subtype.name})"
 
     @property
     def project_type(self):
@@ -521,7 +521,7 @@ class ProjectPhaseSection(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.phase.name}, {self.phase.project_subtype.name})"
 
     def get_attribute_identifiers(self):
         return [a.identifier for a in self.attributes.all()]
