@@ -87,7 +87,6 @@ class ProjectPhaseSectionAttributeFactory(factory.DjangoModelFactory):
     attribute = factory.SubFactory(AttributeFactory)
     section = factory.SubFactory(ProjectPhaseSectionFactory)
     index = factory.Sequence(int)
-    priority = 1
 
     class Meta:
         model = ProjectPhaseSectionAttribute

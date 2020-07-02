@@ -123,11 +123,11 @@ class TestFetchingReport:
         assert project.name not in response.content.decode("utf-8")
 
     def test_fetching_report__should_be_able_to_filter_projects(
-        self, f_user, report, project_factory
+        self, f_user, f_user2, report, project_factory
     ):
         self.client.force_authenticate(user=f_user)
         project = project_factory(user=f_user)
-        project_filtered = project_factory(user=None)
+        project_filtered = project_factory(user=f_user2)
         url = reverse("report-detail", kwargs={"pk": report.pk})
         url = f"{url}?user__uuid={f_user.uuid}"
 
