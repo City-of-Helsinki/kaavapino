@@ -1,10 +1,12 @@
+import pytz
+from datetime import datetime
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from private_storage.views import PrivateStorageDetailView
-from rest_framework import viewsets, filters
+from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAdminUser
@@ -20,6 +22,7 @@ from projects.importing import AttributeImporter
 from projects.importing.report import ReportTypeCreator
 from projects.models import (
     ProjectComment,
+    LastReadTimestamp,
     Project,
     ProjectPhase,
     ProjectType,
@@ -36,7 +39,10 @@ from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
 from projects.permissions.projects import ProjectPermissions
-from projects.serializers.comment import CommentSerializer
+from projects.serializers.comment import (
+    CommentSerializer,
+    LastReadTimestampSerializer,
+)
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.project import (
     ProjectSerializer,
@@ -228,6 +234,40 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["parent_instance"] = self.parent_instance
         return context
+
+    @action(methods=["get"], detail=False)
+    def unread(self, request, *args, **kwargs):
+        try:
+            timestamp = LastReadTimestamp.objects.get(
+                project=self.parent_instance, user=request.user
+            ).timestamp
+        except LastReadTimestamp.DoesNotExist:
+            timestamp = datetime.now(pytz.utc)
+
+        unread = ProjectComment.objects \
+            .filter(created_at__gt=timestamp, project=self.parent_instance) \
+            .select_related("user")
+        page = self.paginate_queryset(unread)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(unread, many=True)
+        return Response(serializer.data)
+
+    @action(methods=["post"], detail=False)
+    def mark_as_read(self, request, *args, **kwargs):
+        serializer = LastReadTimestampSerializer(data=request.data, many=False)
+        if serializer.is_valid():
+            timestamp, _ = LastReadTimestamp.objects.update_or_create(
+                project=self.parent_instance,
+                user=request.user,
+                timestamp=serializer.data['timestamp']
+            )
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class DocumentViewSet(ReadOnlyModelViewSet):
