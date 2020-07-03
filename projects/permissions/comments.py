@@ -7,5 +7,8 @@ class CommentPermissions(permissions.BasePermission):
         if request.method in permissions.SAFE_METHODS:
             return True
 
+        if request.method == 'POST':
+            return is_owner or request.user.has_privilege('create')
+
         # Must be owner to modify
         return obj.user == request.user
