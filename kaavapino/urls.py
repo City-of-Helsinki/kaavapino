@@ -7,6 +7,7 @@ from rest_framework import routers
 
 from projects import views as project_views
 from projects.urls import router as projects_router
+from sitecontent.urls import router as sitecontent_router
 from users.urls import router as users_router
 
 admin.autodiscover()
@@ -14,6 +15,7 @@ admin.autodiscover()
 
 router = routers.DefaultRouter()
 router.registry.extend(projects_router.registry)
+router.registry.extend(sitecontent_router.registry)
 router.registry.extend(users_router.registry)
 
 # Media URL in the settings is usually set to a value that starts with a backslash,
