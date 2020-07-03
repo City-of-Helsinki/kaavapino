@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     "adminsortable2",
     "kaavapino",
     "projects",
+    "sitecontent",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
