@@ -10,5 +10,5 @@ from .project import (  # noqa
     ProjectType,
     ProjectSubtype,
 )
-from .projectcomment import ProjectComment  # noqa
+from .projectcomment import ProjectComment, LastReadTimestamp  # noqa
 from .report import Report, ReportAttribute  # noqa

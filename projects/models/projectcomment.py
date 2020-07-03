@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.utils.translation import ugettext_lazy as _
@@ -40,3 +41,28 @@ class ProjectComment(models.Model):
 
     def __str__(self):
         return f"Comment {self.project} {self.created_at}"
+
+
+class LastReadTimestamp(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name=_("user"),
+        null=False,
+        on_delete=models.CASCADE,
+    )
+
+    project = models.ForeignKey(
+        "Project",
+        verbose_name=_("project"),
+        null=False,
+        on_delete=models.CASCADE,
+    )
+
+    timestamp = models.DateTimeField(
+        verbose_name=_("timestamp"), default=datetime.now
+    )
+
+    class Meta:
+        verbose_name = _("last read timestamp")
+        verbose_name_plural = _("last read timestamps")
+        unique_together = ("user", "project")
