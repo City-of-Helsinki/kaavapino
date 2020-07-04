@@ -195,6 +195,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "user": _action.actor.uuid,
                 "user_name": _action.actor.get_display_name(),
                 "timestamp": _action.timestamp,
+                "new_value": _action.data.get("new_value", None),
+                "old_value": _action.data.get("old_value", None),
             }
 
         return updates
@@ -502,6 +504,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             action_object=attribute,
             target=project,
             attribute_identifier=attribute.identifier,
+            old_value=old_value,
+            new_value=new_value,
         )
         if attribute.broadcast_changes:
             if not old_value and not new_value:
