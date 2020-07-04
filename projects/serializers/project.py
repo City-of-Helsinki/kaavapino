@@ -298,6 +298,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         return public
 
     def validate_phase(self, phase):
+        def _get_next_phase(phase):
+            return phase.project_subtype.phases.get(pk=phase.index + 1)
+
+        # TODO hard-coded for now
+        if phase.name == "Suunnitteluperiaatteet" and not self.instance.create_principles:
+            phase = _get_next_phase(phase)
+
+        if phase.name == "Luonnos" and not self.instance.create_draft:
+            phase = _get_next_phase(phase)
+
         if not self.instance:
             return phase
 
