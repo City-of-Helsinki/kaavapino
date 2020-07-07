@@ -244,7 +244,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         sections_data = []
         current_phase = getattr(self.instance, "phase", None)
         subtype = getattr(self.instance, "subtype", None) or \
-            validate_attributes.get("phase").project_subtype
+            validate_attributes.get("subtype")
+            # TODO: check if this subtype should be an attribute of phase object instead
+            #validate_attributes.get("phase").project_subtype
         should_validate = self.should_validate_attributes()
         max_phase_index = current_phase.index if current_phase else 1
         if not should_validate:
