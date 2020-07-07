@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from projects.models import ProjectComment
+from projects.models import ProjectComment, LastReadTimestamp
 from users.serializers import UserSerializer
 
 
@@ -33,6 +33,27 @@ class CommentSerializer(serializers.ModelSerializer):
             "modified_at",
             "generated",
             "_metadata",
+        ]
+
+    def create(self, validated_data: dict) -> ProjectComment:
+        validated_data["user"] = self.context["request"].user
+        validated_data["project"] = self.context.get("parent_instance")
+        return super().create(validated_data)
+
+
+class LastReadTimestampSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(read_only=True, slug_field="uuid")
+
+    class Meta:
+        model = LastReadTimestamp
+        fields = [
+            "project",
+            "user",
+            "timestamp",
+        ]
+        read_only_fields = [
+            "project",
+            "user",
         ]
 
     def create(self, validated_data: dict) -> ProjectComment:
