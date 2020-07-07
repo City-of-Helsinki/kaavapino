@@ -234,6 +234,32 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     sections = ProjectSectionSchemaSerializer(many=True)
 
 
+class ProjectFloorAreaSchemaSerializer(serializers.Serializer):
+    title = serializers.CharField(source="name")
+    fields = serializers.SerializerMethodField("_get_fields")
+
+    def _get_fields(self, section):
+        print(section)
+        section_attributes = list(section.projectfloorareasectionattribute_set.all())
+
+        # Create a list of serialized fields
+        data = []
+        for section_attribute in section_attributes:
+            data.append(self._serialize_section_attribute(section_attribute))
+
+        return data
+
+    @staticmethod
+    def _serialize_section_attribute(section_attribute):
+        serialized_attribute = ProjectSectionAttributeSchemaSerializer(
+            section_attribute
+        ).data
+        serialized_attribute.update(
+            AttributeSchemaSerializer(section_attribute.attribute).data
+        )
+        return serialized_attribute
+
+
 class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
     def to_representation(self, data):
         query_params = getattr(self.context["request"], "GET", {})
@@ -256,6 +282,7 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
     subtype = serializers.IntegerField(source="id")
 
     phases = ProjectPhaseSchemaSerializer(many=True)
+    floor_area_sections = ProjectFloorAreaSchemaSerializer(many=True)
 
     class Meta:
         list_serializer_class = ProjectSubtypeListFilterSerializer

@@ -19,6 +19,8 @@ from .models import (
     DocumentTemplate,
     Project,
     ProjectAttributeFile,
+    ProjectFloorAreaSection,
+    ProjectFloorAreaSectionAttribute,
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
@@ -267,6 +269,18 @@ class ReportAttributeInline(admin.TabularInline):
 class ReportAdmin(admin.ModelAdmin):
     inlines = (ReportAttributeInline,)
     list_display = ("name", "project_type")
+
+
+class ProjectFloorAreaSectionAttributeInline(
+    admin.TabularInline
+):
+    model = ProjectFloorAreaSectionAttribute
+    extra = 0
+
+
+@admin.register(ProjectFloorAreaSection)
+class ProjectFloorAreaSectionAdmin(admin.ModelAdmin):
+    inlines = (ProjectFloorAreaSectionAttributeInline,)
 
 
 @admin.register(ProjectComment)
