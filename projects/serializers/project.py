@@ -51,6 +51,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
+    public = serializers.NullBooleanField(required=False)
     archived = serializers.NullBooleanField(required=False, read_only=True)
 
     _metadata = serializers.SerializerMethodField()
