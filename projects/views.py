@@ -46,6 +46,7 @@ from projects.serializers.comment import (
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.project import (
     ProjectSerializer,
+    AdminProjectSerializer,
     ProjectPhaseSerializer,
     ProjectFileSerializer,
 )
@@ -82,10 +83,17 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
-    serializer_class = ProjectSerializer
     permission_classes = (ProjectPermissions,)
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ("name", "identifier", "created_at", "modified_at")
+
+    def get_serializer_class(self):
+        user = self.request.user
+
+        if user.has_privilege('admin'):
+            return AdminProjectSerializer
+
+        return ProjectSerializer
 
     def get_queryset(self):
         user = self.request.user

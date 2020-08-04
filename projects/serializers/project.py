@@ -51,7 +51,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
-    archived = serializers.NullBooleanField(required=False)
+    archived = serializers.NullBooleanField(required=False, read_only=True)
 
     _metadata = serializers.SerializerMethodField()
 
@@ -541,6 +541,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                 generated=True,
                 content=f'{user.get_display_name()} päivitti "{attribute.name}" tietoa.{change_string}',
             )
+
+
+class AdminProjectSerializer(ProjectSerializer):
+    archived = serializers.NullBooleanField(required=False)
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
