@@ -51,6 +51,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
+    archived = serializers.NullBooleanField(required=False)
 
     _metadata = serializers.SerializerMethodField()
 
@@ -225,6 +226,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def validate(self, attrs):
+        archived = attrs.get('archived')
+        was_archived = self.instance and self.instance.archived
+
+        if archived is not False and was_archived:
+            raise ValidationError(
+                {"phase": _("Archived projects cannot be edited")}
+            )
+
         attrs["attribute_data"] = self._validate_attribute_data(
             attrs.get("attribute_data", None), attrs
         )
