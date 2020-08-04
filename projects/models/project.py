@@ -125,6 +125,7 @@ class Project(models.Model):
         default=False,
     )
     public = models.BooleanField(default=True)
+    archived = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = _("project")

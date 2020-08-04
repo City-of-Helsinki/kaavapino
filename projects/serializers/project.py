@@ -68,6 +68,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "phase",
             "id",
             "public",
+            "archived",
             "deadlines",
             "create_principles",
             "create_draft",
