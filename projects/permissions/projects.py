@@ -9,6 +9,8 @@ class ProjectPermissions(permissions.BasePermission):
             if not obj.public:
                 return is_owner or request.user.has_privilege('admin')
             return request.user.has_privilege('browse')
+        elif request.method == 'PUT':
+            return request.user.has_privilege('edit')
         elif request.method == 'POST':
             return request.user.has_privilege('create')
         else:
