@@ -322,14 +322,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         if phase.name == "Luonnos" and not self.instance.create_draft:
             phase = _get_next_phase(phase)
 
-        if not self.instance:
-            return phase
-
-        if self.instance.subtype == phase.project_subtype:
+        elif phase.project_subtype.pk == int(self.get_initial()["subtype"]):
             return phase
 
         raise ValidationError(
-            {"phase": _("Invalid phase for current project subtype")}
+            {"phase": _("Invalid phase for project subtype")}
         )
 
     def validate_user(self, user):
