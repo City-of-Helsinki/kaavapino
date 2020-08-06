@@ -35,6 +35,7 @@ class AttributeQuerySet(models.QuerySet):
                 Attribute.TYPE_BOOLEAN,
                 Attribute.TYPE_DATE,
                 Attribute.TYPE_USER,
+                Attribute.TYPE_CHOICE,
             ]
         )
 
@@ -49,6 +50,7 @@ class AttributeQuerySet(models.QuerySet):
                 Attribute.TYPE_BOOLEAN,
                 Attribute.TYPE_DATE,
                 Attribute.TYPE_USER,
+                Attribute.TYPE_CHOICE,
             ]
         )
 
@@ -73,6 +75,7 @@ class Attribute(models.Model):
     TYPE_IMAGE = "image"
     TYPE_FILE = "file"
     TYPE_LINK = "link"
+    TYPE_CHOICE = "choice"
 
     ALLOWED_CALCULATION_OPERATORS = ["+", "-", "*", "/"]
 
@@ -89,6 +92,7 @@ class Attribute(models.Model):
         (TYPE_IMAGE, _("image")),
         (TYPE_FILE, _("file")),
         (TYPE_LINK, _("link")),
+        (TYPE_CHOICE, _("choice")),
     )
 
     DISPLAY_DROPDOWN = "dropdown"

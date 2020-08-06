@@ -505,6 +505,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                 continue
 
             values = updated_attribute_values[attribute.identifier]
+
+            if attribute.value_type == Attribute.TYPE_CHOICE:
+                values["new"] = values["new"].identifier
+
             self._create_updates_log(
                 attribute, project, user, values["new"], values["old"]
             )

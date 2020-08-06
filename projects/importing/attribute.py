@@ -233,10 +233,10 @@ VALUE_TYPES = {
     "Numerosarjan syöttö.": Attribute.TYPE_SHORT_STRING,
     "Pitkän tekstin syöttö.": Attribute.TYPE_LONG_STRING,
     "Päivämäärän valinta.": Attribute.TYPE_DATE,
-    "Valinta (1) pudotusvalikosta.": Attribute.TYPE_LONG_STRING,
-    "Valinta (1) valintapainikkeesta.": Attribute.TYPE_LONG_STRING,
-    "Valinta (1-2) painikkeesta.": Attribute.TYPE_LONG_STRING,
-    "Valinta (1-x) pudotusvalikosta.": Attribute.TYPE_LONG_STRING,
+    "Valinta (1) pudotusvalikosta.": Attribute.TYPE_CHOICE,
+    "Valinta (1) valintapainikkeesta.": Attribute.TYPE_CHOICE,
+    "Valinta (1-2) painikkeesta.": Attribute.TYPE_CHOICE,
+    "Valinta (1-x) pudotusvalikosta.": Attribute.TYPE_CHOICE,
     "Valintaruutu.": Attribute.TYPE_BOOLEAN,
 }
 
