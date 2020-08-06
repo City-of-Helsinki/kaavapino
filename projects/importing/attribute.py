@@ -466,6 +466,8 @@ class AttributeImporter:
         for index, choice_row in enumerate(choices_rows):
             if column_index < 0:
                 choice = choice_row
+            elif index == 0:
+                continue
             else:
                 choice = choice_row[column_index]
 
