@@ -51,6 +51,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
+    public = serializers.NullBooleanField(required=False)
     archived = serializers.NullBooleanField(required=False, read_only=True)
 
     _metadata = serializers.SerializerMethodField()
@@ -322,14 +323,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         if phase.name == "Luonnos" and not self.instance.create_draft:
             phase = _get_next_phase(phase)
 
-        if not self.instance:
-            return phase
-
-        if self.instance.subtype == phase.project_subtype:
+        elif phase.project_subtype.pk == int(self.get_initial()["subtype"]):
             return phase
 
         raise ValidationError(
-            {"phase": _("Invalid phase for current project subtype")}
+            {"phase": _("Invalid phase for project subtype")}
         )
 
     def validate_user(self, user):
@@ -507,6 +505,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                 continue
 
             values = updated_attribute_values[attribute.identifier]
+
+            if attribute.value_type == Attribute.TYPE_CHOICE:
+                values["new"] = values["new"].identifier
+
             self._create_updates_log(
                 attribute, project, user, values["new"], values["old"]
             )

@@ -271,7 +271,7 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             timestamp, _ = LastReadTimestamp.objects.update_or_create(
                 project=self.parent_instance,
                 user=request.user,
-                timestamp=serializer.data['timestamp']
+                defaults={"timestamp": serializer.data["timestamp"]}
             )
             return Response(serializer.data)
 
