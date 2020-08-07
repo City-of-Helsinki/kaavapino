@@ -5,6 +5,8 @@ from .project import (  # noqa
     ProjectAttributeFile,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
+    ProjectFloorAreaSectionAttributeMatrixStructure,
+    ProjectFloorAreaSectionAttributeMatrixCell,
     ProjectPhase,
     ProjectPhaseLog,
     ProjectPhaseSection,

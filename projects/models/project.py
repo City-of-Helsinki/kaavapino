@@ -14,6 +14,22 @@ from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute
 
 
+class BaseAttributeMatrixStructure(models.Model):
+    column_names = ArrayField(models.CharField(max_length=255))
+    row_names = ArrayField(models.CharField(max_length=255))
+
+    class Meta:
+        abstract = True
+
+
+class BaseAttributeMatrixCell(models.Model):
+    row = models.IntegerField()
+    column = models.IntegerField()
+
+    class Meta:
+        abstract = True
+
+
 class ProjectType(models.Model):
     """Types of projects that the system supports e.g. asemakaava/city plan."""
 
@@ -428,6 +444,27 @@ class ProjectFloorAreaSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.index}"
 
 
+class ProjectFloorAreaSectionAttributeMatrixStructure(BaseAttributeMatrixStructure):
+    section = models.ForeignKey(
+        ProjectFloorAreaSection, verbose_name=_("phase section"), on_delete=models.CASCADE
+    )
+
+    def __str__(self):
+        return f"{self.section} ({len(self.row_names)}x{len(self.column_names)})"
+
+
+class ProjectFloorAreaSectionAttributeMatrixCell(BaseAttributeMatrixCell):
+    attribute = models.ForeignKey(
+        ProjectFloorAreaSectionAttribute, on_delete=models.CASCADE
+    )
+    structure = models.ForeignKey(
+        ProjectFloorAreaSectionAttributeMatrixStructure, on_delete=models.CASCADE
+    )
+
+    def __str__(self):
+        return f"{self.structure} {self.attribute} ({self.row}, {self.column})"
+
+
 class ProjectPhase(models.Model):
     """Describes a phase of a certain project subtype."""
 
@@ -599,24 +636,25 @@ class ProjectAttributeFile(models.Model):
         return f"{self.project} {self.attribute}"
 
 
-class PhaseAttributeMatrixStructure(models.Model):
-    column_names = ArrayField(models.CharField(max_length=255))
-    row_names = ArrayField(models.CharField(max_length=255))
-
+class PhaseAttributeMatrixStructure(BaseAttributeMatrixStructure):
     section = models.ForeignKey(
         ProjectPhaseSection, verbose_name=_("phase section"), on_delete=models.CASCADE
     )
 
+    def __str__(self):
+        return f"{self.section} ({len(self.row_names)}x{len(self.column_names)})"
 
-class PhaseAttributeMatrixCell(models.Model):
+
+class PhaseAttributeMatrixCell(BaseAttributeMatrixCell):
     attribute = models.ForeignKey(
         ProjectPhaseSectionAttribute, on_delete=models.CASCADE
     )
-    row = models.IntegerField()
-    column = models.IntegerField()
     structure = models.ForeignKey(
         PhaseAttributeMatrixStructure, on_delete=models.CASCADE
     )
+
+    def __str__(self):
+        return f"{self.structure} {self.attribute} ({self.row}, {self.column})"
 
 
 class ProjectAttributeMultipolygonGeometry(models.Model):
