@@ -51,7 +51,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
-    public = serializers.NullBooleanField(required=False)
+    public = serializers.NullBooleanField(required=False, read_only=True)
     archived = serializers.NullBooleanField(required=False, read_only=True)
     onhold = serializers.NullBooleanField(required=False, read_only=True)
 
@@ -85,6 +85,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         request = self.context.get('request', None)
 
         if not self.instance or request.user.uuid == self.instance.user.uuid:
+            fields["public"] = serializers.NullBooleanField(required=False)
             fields["onhold"] = serializers.NullBooleanField(required=False)
 
         return fields
@@ -562,6 +563,7 @@ class AdminProjectSerializer(ProjectSerializer):
         request = self.context.get('request', None)
 
         fields["archived"] = serializers.NullBooleanField(required=False)
+        fields["public"] = serializers.NullBooleanField(required=False)
         fields["onhold"] = serializers.NullBooleanField(required=False)
 
         return fields
