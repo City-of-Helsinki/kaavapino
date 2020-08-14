@@ -192,10 +192,14 @@ class Project(models.Model):
         if not data:
             return False
 
+        phase_section_attrs = Attribute.objects.filter(
+            phase_sections__phase__project_subtype__projects=self
+        )
+        floor_area_section_attrs = Attribute.objects.filter(
+            floor_area_sections__project_subtype__projects=self
+        )
         project_attributes = (
-            Attribute.objects.filter(
-                phase_sections__phase__project_subtype__projects=self
-            )
+            (phase_section_attrs | floor_area_section_attrs)
             .distinct()
             .prefetch_related("value_choices")
         )

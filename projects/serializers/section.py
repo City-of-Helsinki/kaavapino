@@ -4,7 +4,11 @@ import copy
 from rest_framework import serializers
 from rest_framework_gis.fields import GeometryField
 
-from projects.models import Attribute
+from projects.models import (
+    Attribute,
+    ProjectFloorAreaSection,
+    ProjectPhaseSection,
+)
 from projects.serializers.utils import _is_attribute_required
 
 from collections import namedtuple
@@ -99,7 +103,8 @@ def create_fieldset_field_data(attribute, validation):
 
 def create_section_serializer(section, context, project=None, validation=True):
     """
-    Dynamically create a serializer for a ProjectPhaseSection instance
+    Dynamically create a serializer for a ProjectPhaseSection or
+    ProjectFloorAreaSection instance
 
     Since a attribute of a section can be dynamically defined, there is
     no way of knowing which fields should be in the serializer before
@@ -118,8 +123,15 @@ def create_section_serializer(section, context, project=None, validation=True):
     if not request:
         return None
 
+    if isinstance(section, ProjectPhaseSection):
+        section_attributes = section.projectphasesectionattribute_set.order_by("index")
+    elif isinstance(section, ProjectFloorAreaSection):
+        section_attributes = section.projectfloorareasectionattribute_set.order_by("index")
+    else:
+        return None
+
     serializer_fields = {}
-    for section_attribute in section.projectphasesectionattribute_set.order_by("index"):
+    for section_attribute in section_attributes:
         if not is_relevant_attribute(section_attribute, attribute_data):
             continue
         attribute = section_attribute.attribute

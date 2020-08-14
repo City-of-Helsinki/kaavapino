@@ -15,8 +15,10 @@ from rest_framework_gis.fields import GeometryField
 from projects.actions import verbs
 from projects.models import (
     Project,
+    ProjectSubtype,
     ProjectPhase,
     ProjectPhaseSection,
+    ProjectFloorAreaSection,
     ProjectAttributeFile,
     Attribute,
     ProjectPhaseSectionAttribute,
@@ -242,6 +244,22 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return sections
 
+    def generate_floor_area_sections_data(
+        self, floor_area_sections, validation: bool = True
+    ) -> List[SectionData]:
+        sections = []
+        for section in floor_area_sections.order_by("index"):
+            serializer_class = create_section_serializer(
+                section,
+                context=self.context,
+                project=self.instance,
+                validation=validation,
+            )
+            section_data = SectionData(section, serializer_class)
+            sections.append(section_data)
+
+        return sections
+
     def validate(self, attrs):
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
@@ -289,6 +307,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             sections_data += self.generate_sections_data(
                 phase=phase, validation=self.should_validate_attributes()
             )
+
+        sections_data += self.generate_floor_area_sections_data(
+            floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
+            validation=self.should_validate_attributes()
+        )
 
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
