@@ -51,8 +51,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
-    public = serializers.NullBooleanField(required=False)
+    public = serializers.NullBooleanField(required=False, read_only=True)
     archived = serializers.NullBooleanField(required=False, read_only=True)
+    onhold = serializers.NullBooleanField(required=False, read_only=True)
 
     _metadata = serializers.SerializerMethodField()
 
@@ -71,12 +72,23 @@ class ProjectSerializer(serializers.ModelSerializer):
             "id",
             "public",
             "archived",
+            "onhold",
             "deadlines",
             "create_principles",
             "create_draft",
             "_metadata",
         ]
         read_only_fields = ["type", "created_at", "modified_at"]
+
+    def get_fields(self):
+        fields = super(ProjectSerializer, self).get_fields()
+        request = self.context.get('request', None)
+
+        if not self.instance or request.user.uuid == self.instance.user.uuid:
+            fields["public"] = serializers.NullBooleanField(required=False)
+            fields["onhold"] = serializers.NullBooleanField(required=False)
+
+        return fields
 
     def get_attribute_data(self, project):
         attribute_data = getattr(project, "attribute_data", {})
@@ -546,7 +558,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class AdminProjectSerializer(ProjectSerializer):
-    archived = serializers.NullBooleanField(required=False)
+    def get_fields(self):
+        fields = super(AdminProjectSerializer, self).get_fields()
+        request = self.context.get('request', None)
+
+        fields["archived"] = serializers.NullBooleanField(required=False)
+        fields["public"] = serializers.NullBooleanField(required=False)
+        fields["onhold"] = serializers.NullBooleanField(required=False)
+
+        return fields
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
