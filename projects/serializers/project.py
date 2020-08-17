@@ -84,9 +84,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         fields = super(ProjectSerializer, self).get_fields()
         request = self.context.get('request', None)
 
-        if not self.instance or request.user.uuid == self.instance.user.uuid:
-            fields["public"] = serializers.NullBooleanField(required=False)
-            fields["onhold"] = serializers.NullBooleanField(required=False)
+        try:
+            if request.user.uuid == self.instance.user.uuid:
+                fields["public"] = serializers.NullBooleanField(required=False)
+                fields["onhold"] = serializers.NullBooleanField(required=False)
+        except AttributeError:
+            pass
 
         return fields
 
