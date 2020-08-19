@@ -231,7 +231,7 @@ VALUE_TYPES = {
     "Linkin liittäminen.": Attribute.TYPE_LINK,
     "Lyhyen tekstin syöttö.": Attribute.TYPE_SHORT_STRING,
     "Numerosarjan syöttö.": Attribute.TYPE_SHORT_STRING,
-    "Pitkän tekstin syöttö.": Attribute.TYPE_LONG_STRING,
+    "Pitkän tekstin syöttö.": Attribute.TYPE_RICH_TEXT,
     "Päivämäärän valinta.": Attribute.TYPE_DATE,
     "Valinta (1) pudotusvalikosta.": Attribute.TYPE_CHOICE,
     "Valinta (1) valintapainikkeesta.": Attribute.TYPE_CHOICE,
