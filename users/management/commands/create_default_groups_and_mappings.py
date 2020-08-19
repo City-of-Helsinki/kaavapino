@@ -4,9 +4,9 @@ from helusers.models import ADGroup, ADGroupMapping
 from users.models import Group, GroupPrivilege
 
 GROUPS = [
-    ("sg_KYMP_ORG", "browse", "Selaajat"),
-    ("sg_KYMP_ORG_MAKA", "edit", "Asiantuntijat"),
-    ("sg_KYMP_ORG_MAKA_ASKA", "create", "Vastuuhenkilöt"),
+    ("helsinki1\sg_kymp_org", "browse", "Selaajat"),
+    ("helsinki1\sg_kymp_org_maka", "edit", "Asiantuntijat"),
+    ("helsinki1\sg_kymp_org_maka_aska", "create", "Vastuuhenkilöt"),
     (None, "admin", "Pääkäyttäjät"),
 ]
 
