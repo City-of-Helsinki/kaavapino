@@ -1117,6 +1117,7 @@ class AttributeImporter:
         ordered_subtypes = []
         for index, subtype_name in enumerate(ordered_subtype_names):
             project_subtype, created = ProjectSubtype.objects.update_or_create(
+                pk=index+1,
                 project_type=self.project_type,
                 name=subtype_name.upper(),
                 defaults={"index": index},
