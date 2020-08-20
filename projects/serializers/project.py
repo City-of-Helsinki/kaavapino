@@ -65,6 +65,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "modified_at",
             "name",
             "identifier",
+            "pinonumero",
             "type",
             "subtype",
             "attribute_data",
