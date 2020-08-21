@@ -229,7 +229,7 @@ VALUE_TYPES = {
     "Kyllä/Ei": Attribute.TYPE_BOOLEAN,
     "Kyllä/Ei/Tieto puuttuu": Attribute.TYPE_BOOLEAN,
     "Linkin liittäminen.": Attribute.TYPE_LINK,
-    "Lyhyen tekstin syöttö.": Attribute.TYPE_SHORT_STRING,
+    "Lyhyen tekstin syöttö.": Attribute.TYPE_RICH_TEXT_SHORT,
     "Numerosarjan syöttö.": Attribute.TYPE_SHORT_STRING,
     "Pitkän tekstin syöttö.": Attribute.TYPE_RICH_TEXT,
     "Päivämäärän valinta.": Attribute.TYPE_DATE,

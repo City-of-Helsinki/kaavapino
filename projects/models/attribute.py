@@ -48,6 +48,7 @@ class AttributeQuerySet(models.QuerySet):
                 Attribute.TYPE_SHORT_STRING,
                 Attribute.TYPE_LONG_STRING,
                 Attribute.TYPE_RICH_TEXT,
+                Attribute.TYPE_RICH_TEXT_SHORT,
                 Attribute.TYPE_BOOLEAN,
                 Attribute.TYPE_DATE,
                 Attribute.TYPE_USER,
@@ -70,6 +71,7 @@ class Attribute(models.Model):
     TYPE_SHORT_STRING = "short_string"
     TYPE_LONG_STRING = "long_string"
     TYPE_RICH_TEXT = "rich_text"
+    TYPE_RICH_TEXT_SHORT = "rich_text_short"
     TYPE_BOOLEAN = "boolean"
     TYPE_DATE = "date"
     TYPE_USER = "user"
@@ -88,6 +90,7 @@ class Attribute(models.Model):
         (TYPE_SHORT_STRING, _("short string")),
         (TYPE_LONG_STRING, _("long string")),
         (TYPE_RICH_TEXT, _("rich text")),
+        (TYPE_RICH_TEXT, _("short rich text")),
         (TYPE_BOOLEAN, _("boolean")),
         (TYPE_DATE, _("date")),
         (TYPE_USER, _("user")),
@@ -221,7 +224,10 @@ class Attribute(models.Model):
             Attribute.TYPE_LINK,
         ):
             return str(value) if value else None
-        if self.value_type == Attribute.TYPE_RICH_TEXT:
+        elif self.value_type in (
+            Attribute.TYPE_RICH_TEXT,
+            Attribute.TYPE_RICH_TEXT_SHORT,
+        ):
             return value
         elif self.value_type == Attribute.TYPE_BOOLEAN:
             return bool(value) if value is not None else None
@@ -256,7 +262,10 @@ class Attribute(models.Model):
             Attribute.TYPE_LINK,
         ):
             return value
-        elif self.value_type == Attribute.TYPE_RICH_TEXT:
+        elif self.value_type in (
+            Attribute.TYPE_RICH_TEXT,
+            Attribute.TYPE_RICH_TEXT_SHORT,
+        ):
             return value
         elif self.value_type == Attribute.TYPE_DATE:
             return (

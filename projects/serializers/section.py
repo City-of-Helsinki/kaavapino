@@ -16,6 +16,7 @@ FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: serializers.CharField,
     Attribute.TYPE_LONG_STRING: serializers.CharField,
     Attribute.TYPE_RICH_TEXT: serializers.JSONField,
+    Attribute.TYPE_RICH_TEXT_SHORT: serializers.JSONField,
     Attribute.TYPE_LINK: serializers.URLField,
     Attribute.TYPE_INTEGER: serializers.IntegerField,
     Attribute.TYPE_DECIMAL: serializers.DecimalField,
