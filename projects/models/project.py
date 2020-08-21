@@ -364,7 +364,7 @@ class Project(models.Model):
         return self.subtype.project_type
 
     @property
-    def pinonumero(self):
+    def pino_number(self):
         return str(self.pk).zfill(7)
 
 
