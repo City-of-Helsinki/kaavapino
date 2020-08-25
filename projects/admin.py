@@ -10,6 +10,8 @@ from projects.models.project import (
     ProjectPhaseLog,
     PhaseAttributeMatrixStructure,
     PhaseAttributeMatrixCell,
+    ProjectFloorAreaSectionAttributeMatrixStructure,
+    ProjectFloorAreaSectionAttributeMatrixCell,
     ProjectSubtype,
 )
 from .exporting import get_document_response
@@ -167,8 +169,16 @@ class PhaseSectionChoiceField(forms.ModelChoiceField):
         return f"{obj.phase.project_subtype.name}: {obj.name}"
 
 
+class ProjectFloorAreaSectionChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return f"{obj.project_subtype.name}: {obj.name}"
+
+
+# class BaseMatrixStructureAdmin(admin.Model):
+
 @admin.register(PhaseAttributeMatrixStructure)
 class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
+# class PhaseAttributeMatrixStructureAdmin(BaseMatrixStructureAdmin):
     change_form_template = "admin/matrix.html"
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -249,6 +259,95 @@ class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
                     continue
 
                 PhaseAttributeMatrixCell.objects.create(
+                    attribute=section_attribute,
+                    row=row,
+                    column=column,
+                    structure=structure,
+                )
+
+
+@admin.register(ProjectFloorAreaSectionAttributeMatrixStructure)
+class ProjectFloorAreaSectionAttributeMatrixStructureAdmin(admin.ModelAdmin):
+    change_form_template = "admin/matrix.html"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "section":
+            return ProjectFloorAreaSectionChoiceField(
+                queryset=ProjectFloorAreaSection.objects.all().order_by(
+                    "project_subtype__index", "index"
+                )
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def render_change_form(
+        self, request, context, add=False, change=False, form_url="", obj=None
+    ):
+        cell_rows = []
+        if obj:
+            x_range = range(len(obj.column_names))
+            y_range = range(len(obj.row_names))
+
+            # Fill matrix with None values
+            cell_rows = [[None for x in x_range] for y in y_range]
+
+            # Fill in the phase attributes that exists
+            for cell in obj.projectfloorareasectionattributematrixcell_set.all():
+                cell_rows[cell.row][cell.column] = cell
+
+            # Create select dropdown choices
+            attribute_choices = {None: "-"}
+            section_attributes = ProjectFloorAreaSectionAttribute.objects.filter(
+                section=obj.section
+            )
+            for section_attribute in section_attributes:
+                attribute_choices[
+                    section_attribute.pk
+                ] = section_attribute.attribute.name
+            context["attribute_choices"] = attribute_choices
+
+        context["cells"] = cell_rows
+        return super().render_change_form(request, context, add, change, form_url, obj)
+
+    def save_model(self, request, obj, form, change):
+        post_data = request.POST
+        attribute_values = {
+            field: data
+            for field, data in post_data.items()
+            if "attribute_matrix" in field and data not in ["None", None]
+        }
+
+        with transaction.atomic():
+            # Save the structure object
+            super().save_model(request, obj, form, change)
+            structure = ProjectFloorAreaSectionAttributeMatrixStructure.objects.get(pk=obj.pk)
+
+            row_limit = (
+                len(structure.row_names) - 1 if len(structure.row_names) > 0 else 0
+            )
+            column_limit = (
+                len(structure.column_names) - 1
+                if len(structure.column_names) > 0
+                else 0
+            )
+
+            # Remove all existing matrix cells
+            ProjectFloorAreaSectionAttributeMatrixCell.objects.filter(structure=structure).delete()
+
+            # Add the cell data to the structure
+            for field, data in attribute_values.items():
+                section_attribute = ProjectFloorAreaSectionAttribute.objects.filter(
+                    pk=int(data)
+                ).first()
+                if not section_attribute:
+                    continue
+                row, column = field.split("-")[1:]
+                row = int(row)
+                column = int(column)
+
+                if row > row_limit or column > column_limit:
+                    continue
+
+                ProjectFloorAreaSectionAttributeMatrixCell.objects.create(
                     attribute=section_attribute,
                     row=row,
                     column=column,

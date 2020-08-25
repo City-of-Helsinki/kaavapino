@@ -16,6 +16,8 @@ from ..models import (
     FieldSetAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
+    ProjectFloorAreaSectionAttributeMatrixCell,
+    ProjectFloorAreaSectionAttributeMatrixStructure,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectPhase,
@@ -63,8 +65,9 @@ ATTRIBUTE_PHASE_COLUMNS = [
     "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
 ]
 
-ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot"
-
+ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
+ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
+ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
 KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
@@ -723,6 +726,47 @@ class AttributeImporter:
                 section=section,
                 index=counter[section],
             )
+
+            # Create matrices
+            try:
+                row_names = \
+                    row[self.column_index[ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW]].strip()
+
+                cell_names = \
+                    row[self.column_index[ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL]].strip()
+
+                if row_names != "ei" and cell_names != "ei":
+                    row_names = row_names.split("\n")
+                    cell_names = cell_names.split("\n")
+
+                    structure, _ = ProjectFloorAreaSectionAttributeMatrixStructure \
+                        .objects.get_or_create(
+                            section=section,
+                            defaults={
+                                'column_names': [],
+                                'row_names': [],
+                            }
+                        )
+
+                    for row_name in row_names:
+                        if row_name not in structure.row_names:
+                            structure.row_names.append(row_name)
+                            structure.save()
+
+                        for cell_name in cell_names:
+                            if cell_name not in structure.column_names:
+                                structure.column_names.append(cell_name)
+                                structure.save()
+
+                            ProjectFloorAreaSectionAttributeMatrixCell.objects.get_or_create(
+                                row=structure.row_names.index(row_name),
+                                column=structure.column_names.index(cell_name),
+                                structure=structure,
+                                attribute=section_attribute,
+                            )
+
+            except AttributeError:
+                pass
 
             counter[section] += 1
 

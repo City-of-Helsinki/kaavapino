@@ -5,7 +5,10 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from projects.models import Attribute
-from projects.models.project import PhaseAttributeMatrixCell
+from projects.models.project import (
+    PhaseAttributeMatrixCell,
+    ProjectFloorAreaSectionAttributeMatrixCell,
+)
 from projects.serializers.utils import _is_attribute_required
 
 FOREIGN_KEY_TYPE_MODELS = {
@@ -116,26 +119,12 @@ class ProjectSectionAttributeMatrixSchemaSerializer(serializers.Serializer):
         return "matrix"
 
 
-class ProjectSectionSchemaSerializer(serializers.Serializer):
-    title = serializers.CharField(source="name")
-    fields = serializers.SerializerMethodField("_get_fields")
-
-    def _get_fields(self, section):
-        section_attributes = list(section.projectphasesectionattribute_set.all())
-        self._create_matrix_fields(section_attributes)
-
-        # Create a list of serialized fields
-        data = []
-        for section_attribute in section_attributes:
-            data.append(self._serialize_section_attribute(section_attribute))
-
-        return data
-
-    def _create_matrix_fields(self, section_attributes):
+class BaseMatrixableSchemaSerializer(serializers.Serializer):
+    def _create_matrix_fields(self, cell_class, section_attributes):
         matrices = {}
         removal_indices = []
 
-        cells = PhaseAttributeMatrixCell.objects.filter(
+        cells = cell_class.objects.filter(
             attribute__in=section_attributes
         )
         cell_attribute_map = {cell.attribute_id: cell for cell in cells}
@@ -226,21 +215,13 @@ class ProjectSectionSchemaSerializer(serializers.Serializer):
         )
 
 
-class ProjectPhaseSchemaSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    title = serializers.CharField(source="name")
-    color = serializers.CharField()
-    color_code = serializers.CharField()
-    sections = ProjectSectionSchemaSerializer(many=True)
-
-
-class ProjectFloorAreaSchemaSerializer(serializers.Serializer):
+class ProjectSectionSchemaSerializer(BaseMatrixableSchemaSerializer):
     title = serializers.CharField(source="name")
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):
-        print(section)
-        section_attributes = list(section.projectfloorareasectionattribute_set.all())
+        section_attributes = list(section.projectphasesectionattribute_set.all())
+        self._create_matrix_fields(PhaseAttributeMatrixCell, section_attributes)
 
         # Create a list of serialized fields
         data = []
@@ -249,15 +230,32 @@ class ProjectFloorAreaSchemaSerializer(serializers.Serializer):
 
         return data
 
-    @staticmethod
-    def _serialize_section_attribute(section_attribute):
-        serialized_attribute = ProjectSectionAttributeSchemaSerializer(
-            section_attribute
-        ).data
-        serialized_attribute.update(
-            AttributeSchemaSerializer(section_attribute.attribute).data
+
+class ProjectPhaseSchemaSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField(source="name")
+    color = serializers.CharField()
+    color_code = serializers.CharField()
+    sections = ProjectSectionSchemaSerializer(many=True)
+
+
+class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
+    title = serializers.CharField(source="name")
+    fields = serializers.SerializerMethodField("_get_fields")
+
+    def _get_fields(self, section):
+        section_attributes = list(section.projectfloorareasectionattribute_set.all())
+        self._create_matrix_fields(
+            ProjectFloorAreaSectionAttributeMatrixCell,
+            section_attributes
         )
-        return serialized_attribute
+
+        # Create a list of serialized fields
+        data = []
+        for section_attribute in section_attributes:
+            data.append(self._serialize_section_attribute(section_attribute))
+
+        return data
 
 
 class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
