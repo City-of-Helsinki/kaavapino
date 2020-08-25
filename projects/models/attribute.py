@@ -90,7 +90,7 @@ class Attribute(models.Model):
         (TYPE_SHORT_STRING, _("short string")),
         (TYPE_LONG_STRING, _("long string")),
         (TYPE_RICH_TEXT, _("rich text")),
-        (TYPE_RICH_TEXT, _("short rich text")),
+        (TYPE_RICH_TEXT_SHORT, _("short rich text")),
         (TYPE_BOOLEAN, _("boolean")),
         (TYPE_DATE, _("date")),
         (TYPE_USER, _("user")),
