@@ -4,7 +4,8 @@ from collections import Sequence
 from html import escape
 
 from django.contrib.auth import get_user_model
-from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.fields import ArrayField, JSONField
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, transaction
@@ -119,13 +120,23 @@ class Attribute(models.Model):
         default=None,
         null=True,
     )
+    visibility_condition = ArrayField(
+        models.TextField(blank=True),
+        verbose_name=_("visibility condition"),
+        null=True,
+        blank=True,
+    )
     unit = models.CharField(
         max_length=255, verbose_name=_("unit"), null=True, blank=True
     )
     public = models.BooleanField(verbose_name=_("public information"), default=False)
+    searchable = models.BooleanField(verbose_name=_("searchable field"), default=False)
     generated = models.BooleanField(verbose_name=_("generated"), default=False)
     calculations = ArrayField(
         models.CharField(max_length=255, blank=True), blank=True, null=True
+    )
+    related_fields = ArrayField(
+        models.TextField(blank=True), blank=True, null=True
     )
     required = models.BooleanField(verbose_name=_("required"), default=False)
     multiple_choice = models.BooleanField(
@@ -148,6 +159,15 @@ class Attribute(models.Model):
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
     help_link = models.URLField(verbose_name=_("Help link"), blank=True, null=True)
     broadcast_changes = models.BooleanField(default=False)
+    autofill_readonly = models.BooleanField(verbose_name=_("read-only autofill field"), null=True)
+    autofill_rule = JSONField(
+        verbose_name=_("autofill rule"),
+        default=dict,
+        blank=True,
+        null=True,
+        encoder=DjangoJSONEncoder,
+    )
+    updates_autofill = models.BooleanField(verbose_name=_("updates related autofill fields"), default=False)
 
     objects = AttributeQuerySet.as_manager()
 

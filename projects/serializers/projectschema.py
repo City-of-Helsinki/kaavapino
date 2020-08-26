@@ -29,6 +29,12 @@ class AttributeChoiceSchemaSerializer(serializers.Serializer):
     value = serializers.CharField()
 
 
+class AutofillRuleSerializer(serializers.Serializer):
+    condition = serializers.CharField()
+    then_branch = serializers.CharField()
+    else_branch = serializers.CharField()
+
+
 class AttributeSchemaSerializer(serializers.Serializer):
     label = serializers.CharField(source="name")
     name = serializers.CharField(source="identifier")
@@ -42,6 +48,13 @@ class AttributeSchemaSerializer(serializers.Serializer):
     choices = serializers.SerializerMethodField()
     generated = serializers.BooleanField(read_only=True)
     unit = serializers.CharField()
+    calculations = serializers.ListField(child=serializers.CharField())
+    visibility_condition = serializers.ListField(child=serializers.CharField())
+    autofill_rule = serializers.ListField(child=AutofillRuleSerializer())
+    autofill_readonly = serializers.BooleanField()
+    updates_autofill = serializers.BooleanField()
+    related_fields = serializers.ListField(child=serializers.CharField())
+    searchable = serializers.BooleanField()
 
     def get_fieldset_attributes(self, attribute):
         try:
