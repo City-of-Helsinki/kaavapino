@@ -10,7 +10,7 @@ class ProjectPermissions(permissions.BasePermission):
 
         if request.method in permissions.SAFE_METHODS:
             return request.user.has_privilege('browse')
-        elif request.method == 'PUT':
+        elif request.method in ['PUT', 'PATCH']:
             return request.user.has_privilege('edit')
         elif request.method == 'POST':
             return request.user.has_privilege('create')
