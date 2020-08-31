@@ -207,9 +207,12 @@ class Attribute(models.Model):
             )
 
     def serialize_value(self, value):
-        value_choices = self.value_choices.all()
+        if self.value_type == Attribute.TYPE_CHOICE:
+            value_choices = self.value_choices.all()
+        else:
+            value_choices = None
 
-        if value_choices.exists():
+        if value_choices and value_choices.exists():
             if self.multiple_choice:
                 return [v.identifier for v in value]
             else:
@@ -247,9 +250,12 @@ class Attribute(models.Model):
             raise Exception('Cannot serialize attribute type "%s".' % self.value_type)
 
     def deserialize_value(self, value):
-        value_choices = self.value_choices.all()
+        if self.value_type == Attribute.TYPE_CHOICE:
+            value_choices = self.value_choices.all()
+        else:
+            value_choices = None
 
-        if value_choices.exists():
+        if value_choices and value_choices.exists():
             if self.multiple_choice:
                 return [v for v in value_choices.filter(identifier__in=value)]
             else:

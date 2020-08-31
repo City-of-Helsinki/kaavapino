@@ -42,8 +42,8 @@ def create_attribute_field_data(attribute, validation):
     field_arguments = {}
     field_class = FIELD_TYPES.get(attribute.value_type, None)
 
-    choices = attribute.value_choices.all()
-    if choices:
+    if attribute.value_type == Attribute.TYPE_CHOICE:
+        choices = attribute.value_choices.all()
         field_class = serializers.SlugRelatedField
         field_arguments["queryset"] = choices
         field_arguments["slug_field"] = "identifier"
