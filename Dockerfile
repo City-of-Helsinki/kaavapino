@@ -45,5 +45,6 @@ ADD deploy/requirements.txt ./deploy/requirements.txt
 RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 
 COPY . .
+COPY deploy/mime.types /etc/
 
 CMD deploy/server.sh

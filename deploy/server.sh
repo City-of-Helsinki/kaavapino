@@ -4,13 +4,12 @@ echo "NOTICE: Get static files for serving"
 ./manage.py collectstatic --no-input
 
 # Apply database migrations
+# TODO: run migrations only within one instance
 echo "Applying database migrations"
 python ./manage.py migrate --noinput
 
 # Have gzipped versions ready for direct serving by uwsgi
 gzip --keep --best --force --recursive /code/static/
 
-if test "$1" = "start_production"; then
-    echo "Starting production"
-    exec uwsgi --ini /code/deploy/uwsgi.ini
-fi
+echo "Starting uwsgi..."
+exec uwsgi --ini /code/deploy/uwsgi.ini --wsgi-file deploy/wsgi.py --check-static $WWW_ROOT
