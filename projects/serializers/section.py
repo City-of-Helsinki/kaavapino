@@ -30,6 +30,7 @@ FIELD_TYPES = {
     Attribute.TYPE_FILE: serializers.FileField,
     Attribute.TYPE_USER: serializers.PrimaryKeyRelatedField,
     Attribute.TYPE_GEOMETRY: GeometryField,
+    Attribute.TYPE_CHOICE: serializers.CharField,
 }
 
 
