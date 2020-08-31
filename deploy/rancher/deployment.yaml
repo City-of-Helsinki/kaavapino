@@ -30,9 +30,16 @@ spec:
     spec:
       imagePullSecrets:
       - name: pipeline-docker-registry
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: media-data
       containers:
       - name: api
         image: ${CICD_REGISTRY}/api:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        volumeMounts:
+        - mountPath: "/code/media"
+          name: media
         ports:
         - containerPort: 8000
         env:
