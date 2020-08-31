@@ -8,7 +8,7 @@ stages:
 - name: Publish image
   steps:
   - publishImageConfig:
-      dockerfilePath: ./Dockerfile
+      dockerfilePath: ./Dockerfile.production
       buildContext: .
       tag: api:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
 - name: Deploy
