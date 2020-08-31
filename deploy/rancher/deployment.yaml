@@ -24,10 +24,7 @@ spec:
     matchLabels:
       app: api
   strategy:
-    rollingUpdate:
-      maxSurge: 0
-      maxUnavailable: 25%
-    type: RollingUpdate
+    type: Recreate
   template:
     metadata:
       labels:
