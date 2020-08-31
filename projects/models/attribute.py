@@ -222,6 +222,7 @@ class Attribute(models.Model):
             Attribute.TYPE_SHORT_STRING,
             Attribute.TYPE_LONG_STRING,
             Attribute.TYPE_LINK,
+            Attribute.TYPE_CHOICE,
         ):
             return str(value) if value else None
         elif self.value_type in (
@@ -260,6 +261,7 @@ class Attribute(models.Model):
             Attribute.TYPE_LONG_STRING,
             Attribute.TYPE_BOOLEAN,
             Attribute.TYPE_LINK,
+            Attribute.TYPE_CHOICE,
         ):
             return value
         elif self.value_type in (
