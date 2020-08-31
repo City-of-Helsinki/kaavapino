@@ -33,6 +33,8 @@ spec:
       containers:
       - name: api
         image: ${CICD_REGISTRY}/api:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        command: ["/code/deploy/server.sh"]
+        args: ["uwsgi", "--ini", "/code/deploy/uwsgi.ini"]
         ports:
         - containerPort: 8000
         env:
