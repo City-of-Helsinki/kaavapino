@@ -7,6 +7,7 @@ from projects.views import (
     ProjectTypeSchemaViewSet,
     ProjectTypeViewSet,
     ProjectSubtypeViewSet,
+    FieldCommentViewSet,
     CommentViewSet,
     DocumentViewSet,
     ReportViewSet,
@@ -17,6 +18,12 @@ app_name = "projects"
 router = routers.SimpleRouter()
 projects_router = ExtendedSimpleRouter()
 projects = projects_router.register(r"projects", ProjectViewSet, base_name="projects")
+projects.register(
+    r"comments/fields",
+    FieldCommentViewSet,
+    base_name="project-field-comments",
+    parents_query_lookups=["project"],
+)
 projects.register(
     r"comments",
     CommentViewSet,
