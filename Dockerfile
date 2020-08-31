@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y \
     binutils \
     libproj-dev \
     gdal-bin \
-    netcat
+    netcat \
+    vim
 
 # Upgrade pip
 RUN pip install -U pip
