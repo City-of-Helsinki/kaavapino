@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
-# import socket
 import raven
 
 import environ
@@ -19,7 +18,7 @@ project_root = environ.Path(__file__) - 2
 env = environ.Env(
     DEBUG=(bool, True),
     SECRET_KEY=(str, ""),
-    ALLOWED_HOSTS=(list, ["api", "192.168.1.90", "0.0.0.0", "localhost", "127.0.0.1"]),
+    ALLOWED_HOSTS=(list, []),
     DATABASE_URL=(str, "postgis://kaavapino:kaavapino@localhost/kaavapino"),
     CACHE_URL=(str, "locmemcache://"),
     EMAIL_URL=(str, "consolemail://"),
@@ -27,9 +26,9 @@ env = environ.Env(
     STATIC_ROOT=(environ.Path, project_root("static")),
     MEDIA_URL=(str, "/media/"),
     STATIC_URL=(str, "/static/"),
-    TOKEN_AUTH_ACCEPTED_AUDIENCE=(str, "https://api.hel.fi/auth/kaavapinodev"),
-    TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX=(str, "kaavapinodev"),
-    TOKEN_AUTH_AUTHSERVER_URL=(str, "https://api.hel.fi/sso"),
+    TOKEN_AUTH_ACCEPTED_AUDIENCE=(str, "AUDIENCE_UNSET"),
+    TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX=(str, "SCOPE_PREFIX_UNSET"),
+    TOKEN_AUTH_AUTHSERVER_URL=(str, "ISSUER_UNSET"),
     TOKEN_AUTH_REQUIRE_SCOPE_PREFIX=(bool, True),
     NGINX_X_ACCEL=(bool, False),
     USE_X_FORWARDED_HOST=(bool, False),
@@ -37,11 +36,6 @@ env = environ.Env(
     CSRF_COOKIE_DOMAIN=(str, ""),
     CSRF_TRUSTED_ORIGINS=(list, [])
 )
-
-JWT_AUTH = {
-    'JWT_AUDIENCE': 'https://hel.ninja/kaavapino-api-dev',
-    'JWT_SECRET_KEY': '82eeb3e71bee346c5c692435fd5ba26189dd0975ad26b7fe4affffa5',
-}
 
 env_file = project_root(".env")
 
@@ -54,8 +48,8 @@ SECRET_KEY = env.str("SECRET_KEY")
 if DEBUG and not SECRET_KEY:
     SECRET_KEY = "xxx"
 
-ALLOWED_HOSTS = ["api", "192.168.1.90", "0.0.0.0", "localhost", "127.0.0.1"]
-# ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
+#ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
 
 DATABASES = {"default": env.db()}
 
@@ -112,14 +106,12 @@ INSTALLED_APPS = [
     "django_filters",
     "rest_framework_gis",
     "users",
-    # "debug_toolbar",
 ]
 
 if RAVEN_CONFIG["dsn"]:
     INSTALLED_APPS += ["raven.contrib.django.raven_compat"]
 
 MIDDLEWARE = [
-    # "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -148,13 +140,9 @@ TEMPLATES = [
 
 # Social auth
 #
-SITE_ID = 42
+SITE_ID = 1
 AUTH_USER_MODEL = "users.User"
 SOCIALACCOUNT_PROVIDERS = {"helsinki_oidc": {"VERIFIED_EMAIL": True}}
-AUTHENTICATION_BACKENDS = (
-    # "helusers.tunnistamo_oidc.TunnistamoOIDCAuth",
-    "django.contrib.auth.backends.ModelBackend",
-)
 LOGIN_REDIRECT_URL = "/"
 ACCOUNT_LOGOUT_ON_GET = True
 SOCIALACCOUNT_ADAPTER = "helusers.adapter.SocialAccountAdapter"
@@ -220,14 +208,4 @@ ACTSTREAM_SETTINGS = {"USE_JSONFIELD": True}
 
 USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST")
 CSRF_COOKIE_DOMAIN = env.str("CSRF_COOKIE_DOMAIN")
-# CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
-
-# DEBUG = True
-
-# if DEBUG:
-#     INTERNAL_IPS = type(str('c'), (), {'__contains__': lambda *a: True})()
-
-# def show_toolbar(request):
-#     return True
-
-# SHOW_TOOLBAR_CALLBACK = show_toolbar
+CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
