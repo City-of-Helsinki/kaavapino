@@ -346,7 +346,12 @@ class ProjectSerializer(serializers.ModelSerializer):
             return public
 
         # A project is always public if it has exited the starting phase
-        if not self.instance.public and (attrs["phase"].index > 0 or self.instance.phase.index > 0):
+        try:
+            phase_index = attrs["phase"]
+        except KeyError:
+            phase_index = self.instance.phase.index
+
+        if not self.instance.public and (phase_index > 0):
             return True
 
         return public
