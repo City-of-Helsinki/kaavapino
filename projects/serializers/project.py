@@ -369,10 +369,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if phase.project_subtype.pk == subtype_id:
             return phase
-
-        raise ValidationError(
-            {"phase": _("Invalid phase for project subtype")}
-        )
+        # Try to find a corresponding phase for current subtype
+        else:
+            try:
+                return ProjectPhase.objects.get(name=phase.name, project_subtype__pk=subtype_id)
+            except ProjectPhase.DoesNotExist:
+                raise ValidationError(
+                    {"phase": _("Invalid phase for project subtype")}
+                )
 
     def validate_user(self, user):
         if not user.has_privilege('create'):
