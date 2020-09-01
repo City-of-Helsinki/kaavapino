@@ -110,3 +110,13 @@ same context so that the variables defined in the settings are available.
 ## Importing attributes
 
 * Run `python manage.py import_attributes <attribute excel file> [--sheet sheet name] [--overwrite]`
+
+## Deploy staging
+
+Install kubectl locally. Check version to deploy and run:
+
+```
+#> pwd
+... kaavapino/api/deploy/rancher
+#> ./deploy_staging_api.sh <version> run
+```
