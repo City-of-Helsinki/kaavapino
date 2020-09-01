@@ -362,7 +362,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         if phase.name == "Luonnos" and not self.instance.create_draft:
             phase = _get_next_phase(phase)
 
-        elif phase.project_subtype.pk == int(self.get_initial()["subtype"]):
+        try:
+            subtype_id = int(self.get_initial()["subtype"])
+        except KeyError:
+            subtype_id = self.instance.subtype.pk
+
+        if phase.project_subtype.pk == subtype_id:
             return phase
 
         raise ValidationError(
