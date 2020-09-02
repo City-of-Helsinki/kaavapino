@@ -367,12 +367,21 @@ class ProjectSerializer(serializers.ModelSerializer):
         if phase.name == "Luonnos" and not self.instance.create_draft:
             phase = _get_next_phase(phase)
 
-        elif phase.project_subtype.pk == int(self.get_initial()["subtype"]):
-            return phase
+        try:
+            subtype_id = int(self.get_initial()["subtype"])
+        except KeyError:
+            subtype_id = self.instance.subtype.pk
 
-        raise ValidationError(
-            {"phase": _("Invalid phase for project subtype")}
-        )
+        if phase.project_subtype.pk == subtype_id:
+            return phase
+        # Try to find a corresponding phase for current subtype
+        else:
+            try:
+                return ProjectPhase.objects.get(name=phase.name, project_subtype__pk=subtype_id)
+            except ProjectPhase.DoesNotExist:
+                raise ValidationError(
+                    {"phase": _("Invalid phase for project subtype")}
+                )
 
     def validate_user(self, user):
         if not user.has_privilege('create'):
