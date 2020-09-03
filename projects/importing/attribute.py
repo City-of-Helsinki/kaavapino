@@ -75,12 +75,12 @@ KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
 class Phases(Enum):
     START = "Käynnistys"
-    PRINCIPLES = "Suunnitteluperiaatteet"
+    PRINCIPLES = "Periaatteet"
     OAS = "OAS"
     DRAFT = "Luonnos"
     PROPOSAL = "Ehdotus"
     REVISED_PROPOSAL = "Tarkistettu ehdotus"
-    KHS = "Kanslia-Khs-Valtuusto"
+    APPROVAL = "Hyväksyminen"
     GOING_INTO_EFFECT = "Voimaantulo"
 
 
@@ -115,8 +115,8 @@ PROJECT_PHASES = {
         "color": "#0000bf",
         "color_code": "#0000bf",
     },  # 05, 07
-    Phases.KHS.value: {
-        "name": Phases.KHS.value,
+    Phases.APPROVAL.value: {
+        "name": Phases.APPROVAL.value,
         "color": "#bd9650",
         "color_code": "#bd9650",
     },  # 06, 07 <- Kvsto
@@ -147,7 +147,7 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
-        Phases.KHS.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "L": [
@@ -155,7 +155,7 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
-        Phases.KHS.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "XL": [
@@ -165,7 +165,7 @@ SUBTYPE_PHASES = {
         Phases.DRAFT.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
-        Phases.KHS.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
 }
@@ -190,7 +190,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 12},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
-        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "L": {
@@ -198,7 +198,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 16},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 36},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 14},
-        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "XL": {
@@ -208,7 +208,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.DRAFT.value: {"default_end_weeks_delta": 0},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 36},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 14},
-        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
 }
