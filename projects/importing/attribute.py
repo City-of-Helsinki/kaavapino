@@ -54,25 +54,6 @@ CALCULATIONS_COLUMN = "laskelmat"
 
 ATTRIBUTE_FIELDSET = "projektitieto fieldset"
 
-ATTRIBUTE_PHASE_COLUMNS = [
-    "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-]
-
-ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
-ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
-ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
-EXPECTED_A1_VALUE = ATTRIBUTE_NAME
-
-KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
-
-
 class Phases(Enum):
     START = "Käynnistys"
     PRINCIPLES = "Periaatteet"
@@ -82,6 +63,25 @@ class Phases(Enum):
     REVISED_PROPOSAL = "Tarkistettu ehdotus"
     APPROVAL = "Hyväksyminen"
     GOING_INTO_EFFECT = "Voimaantulo"
+
+
+ATTRIBUTE_PHASE_COLUMNS = {
+    Phases.START: "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.PRINCIPLES: "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.OAS: "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.DRAFT: "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.PROPOSAL: " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.REVISED_PROPOSAL: "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.APPROVAL: "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.GOING_INTO_EFFECT: "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+}
+
+ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
+ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
+ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
+EXPECTED_A1_VALUE = ATTRIBUTE_NAME
+
+KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
 
 PROJECT_PHASES = {
@@ -573,16 +573,12 @@ class AttributeImporter:
     def _get_attribute_input_phases(self, row):
         input_phases = []
 
-        for index, column_name in enumerate(ATTRIBUTE_PHASE_COLUMNS):
-            value = row[self.column_index[column_name]]
+        for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():
+            value = row[self.column_index[column]]
             if value in [None, "ei"]:
                 continue
 
-            try:
-                value = index
-                input_phases.append(index)
-            except ValueError:
-                logger.info(f"Cannot covert {value} into an integer.")
+            input_phases.append(phase.value)
 
         return filter(lambda x: x is not None, input_phases)
 
@@ -600,7 +596,7 @@ class AttributeImporter:
                 section_phase_name = row[self.column_index[PHASE_SECTION_NAME]].strip()
 
                 if (
-                    phase.index in self._get_attribute_input_phases(row)
+                    phase.name in self._get_attribute_input_phases(row)
                     and section_phase_name not in phase_sections
                 ):
                     phase_sections.append(section_phase_name)
@@ -662,7 +658,7 @@ class AttributeImporter:
                 identifier = self._get_attribute_row_identifier(row)
                 attribute = Attribute.objects.get(identifier=identifier)
 
-                if phase.index not in self._get_attribute_input_phases(row):
+                if phase.name not in self._get_attribute_input_phases(row):
                     # Attribute doesn't appear in this phase
                     continue
 
