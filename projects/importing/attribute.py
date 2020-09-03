@@ -87,41 +87,43 @@ class Phases(Enum):
 PROJECT_PHASES = {
     Phases.START.value: {
         "name": Phases.START.value,
-        "color": "color--tram",
-        "color_code": "#009246",
+        "color": "#02d7a7",
+        "color_code": "#02d7a7",
     },  # None
     Phases.PRINCIPLES.value: {
         "name": Phases.PRINCIPLES.value,
         "color": '#009142',
+        "color_code": '#009142',
     },
     Phases.OAS.value: {
         "name": Phases.OAS.value,
-        "color": "color--summer",
+        "color": "#ffc61e",
         "color_code": "#ffc61e",
     },  # 01, 03
     Phases.DRAFT.value: {
         "name": Phases.DRAFT.value,
         "color": '#ffd600',
+        "color_code": '#ffd600',
     },
     Phases.PROPOSAL.value: {
         "name": Phases.PROPOSAL.value,
-        "color": "color--metro",
+        "color": "#fd4f00",
         "color_code": "#fd4f00",
     },  # 02, 04
     Phases.REVISED_PROPOSAL.value: {
         "name": Phases.REVISED_PROPOSAL.value,
-        "color": "color--bus",
+        "color": "#0000bf",
         "color_code": "#0000bf",
     },  # 05, 07
     Phases.KHS.value: {
         "name": Phases.KHS.value,
-        "color": "color--black",
-        "color_code": "#000000",
+        "color": "#bd9650",
+        "color_code": "#bd9650",
     },  # 06, 07 <- Kvsto
     Phases.GOING_INTO_EFFECT.value: {
         "name": Phases.GOING_INTO_EFFECT.value,
-        "color": "color--white",
-        "color_code": "#ffffff",
+        "color": "#9ec8eb",
+        "color_code": "#9ec8eb",
     },
 }
 
@@ -158,7 +160,9 @@ SUBTYPE_PHASES = {
     ],
     "XL": [
         Phases.START.value,
+        Phases.PRINCIPLES.value,
         Phases.OAS.value,
+        Phases.DRAFT.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
         Phases.KHS.value,
@@ -199,7 +203,9 @@ SUBTYPE_PHASE_METADATA = {
     },
     "XL": {
         Phases.START.value: {"default_end_weeks_delta": 12},
+        Phases.PRINCIPLES.value: {"default_end_weeks_delta": 0},
         Phases.OAS.value: {"default_end_weeks_delta": 16},
+        Phases.DRAFT.value: {"default_end_weeks_delta": 0},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 36},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 14},
         Phases.KHS.value: {"default_end_weeks_delta": 12},
