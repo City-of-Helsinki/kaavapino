@@ -11,7 +11,7 @@ from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
 
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
-from .attribute import Attribute
+from .attribute import Attribute, FieldSetAttribute
 
 
 class BaseAttributeMatrixStructure(models.Model):
@@ -596,6 +596,17 @@ class ProjectPhaseSectionAttribute(models.Model):
 
     def __str__(self):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
+
+
+class ProjectPhaseFieldSetAttributeIndex(models.Model):
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+    phase = models.ForeignKey(
+        ProjectPhase, on_delete=models.CASCADE
+    )
+    attribute = models.ForeignKey(
+        FieldSetAttribute, on_delete=models.CASCADE
+    )
+    unique_together = ("attribute", "phase")
 
 
 class ProjectAttributeFile(models.Model):

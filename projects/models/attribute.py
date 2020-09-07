@@ -382,12 +382,16 @@ class FieldSetAttribute(models.Model):
     attribute_target = models.ForeignKey(
         Attribute, on_delete=models.CASCADE, related_name="fieldset_attribute_target"
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+    phase_indices = models.ManyToManyField(
+        "ProjectPhase",
+        symmetrical=False,
+        related_name="fieldsets",
+        through="ProjectPhaseFieldSetAttributeIndex",
+    )
 
     class Meta:
         verbose_name = _("fieldset attribute")
         verbose_name_plural = _("fieldset attributes")
-        ordering = ("index",)
 
     def __str__(self):
         return f"{self.attribute_source} -> {self.attribute_target}"
