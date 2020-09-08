@@ -488,8 +488,10 @@ class AttributeImporter:
             _, created = AttributeValueChoice.objects.update_or_create(
                 attribute=attribute,
                 index=index,
-                value=choice,
-                identifier=identifier
+                defaults={
+                    'value': choice,
+                    'identifier': identifier,
+                }
             )
 
             if created:
