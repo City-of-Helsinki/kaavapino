@@ -11,6 +11,7 @@ from .project import (  # noqa
     ProjectPhaseLog,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
+    ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
 )

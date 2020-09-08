@@ -21,6 +21,7 @@ from ..models import (
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectPhase,
+    ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
 )
@@ -54,25 +55,6 @@ CALCULATIONS_COLUMN = "laskelmat"
 
 ATTRIBUTE_FIELDSET = "projektitieto fieldset"
 
-ATTRIBUTE_PHASE_COLUMNS = [
-    "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-]
-
-ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
-ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
-ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
-EXPECTED_A1_VALUE = ATTRIBUTE_NAME
-
-KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
-
-
 class Phases(Enum):
     START = "Käynnistys"
     PRINCIPLES = "Periaatteet"
@@ -82,6 +64,25 @@ class Phases(Enum):
     REVISED_PROPOSAL = "Tarkistettu ehdotus"
     APPROVAL = "Hyväksyminen"
     GOING_INTO_EFFECT = "Voimaantulo"
+
+
+ATTRIBUTE_PHASE_COLUMNS = {
+    Phases.START: "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.PRINCIPLES: "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.OAS: "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.DRAFT: "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.PROPOSAL: " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.REVISED_PROPOSAL: "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.APPROVAL: "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.GOING_INTO_EFFECT: "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+}
+
+ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
+ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
+ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
+EXPECTED_A1_VALUE = ATTRIBUTE_NAME
+
+KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
 
 PROJECT_PHASES = {
@@ -497,7 +498,7 @@ class AttributeImporter:
 
         return created_choices_count
 
-    def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
+    def _create_fieldset_links(self, subtype, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating fieldsets...")
 
         FieldSetAttribute.objects.all().delete()
@@ -507,6 +508,7 @@ class AttributeImporter:
             return
 
         fieldset_map = defaultdict(list)
+        phases = ProjectPhase.objects.filter(project_subtype=subtype)
 
         # Map out the link that need to be created
         for row in rows:
@@ -514,18 +516,34 @@ class AttributeImporter:
             if not fieldset_attr:
                 continue
 
+            phase_indices = []
+            for phase in phases:
+                location = self._get_attribute_locations(row, phase.name)
+                if location is None:
+                    continue
+
+                index = location["child_field_location"]
+                if index is not None:
+                    phase_indices.append((phase, index))
+
             attr_id = self._get_attribute_row_identifier(row)
-            fieldset_map[fieldset_attr].append(attr_id)
+            fieldset_map[fieldset_attr].append((attr_id, phase_indices))
 
         # Create the links
         for source_id in fieldset_map:
             source = Attribute.objects.get(identifier=source_id)
 
-            for index, target_id in enumerate(fieldset_map[source_id], start=1):
+            for target_id, phase_indices in fieldset_map[source_id]:
                 target = Attribute.objects.get(identifier=target_id)
                 fsa = FieldSetAttribute.objects.create(
-                    attribute_source=source, attribute_target=target, index=index
+                    attribute_source=source, attribute_target=target
                 )
+                for phase, index in phase_indices:
+                    ProjectPhaseFieldSetAttributeIndex.objects.create(
+                        index=index,
+                        phase=phase,
+                        attribute=fsa,
+                    )
                 logger.info(f"Created {fsa}")
 
     def _validate_generated_attributes(self):
@@ -573,18 +591,39 @@ class AttributeImporter:
     def _get_attribute_input_phases(self, row):
         input_phases = []
 
-        for index, column_name in enumerate(ATTRIBUTE_PHASE_COLUMNS):
-            value = row[self.column_index[column_name]]
+        for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():
+            value = row[self.column_index[column]]
             if value in [None, "ei"]:
                 continue
 
-            try:
-                value = index
-                input_phases.append(index)
-            except ValueError:
-                logger.info(f"Cannot covert {value} into an integer.")
+            input_phases.append(phase.value)
 
         return filter(lambda x: x is not None, input_phases)
+
+    def _get_attribute_locations(self, row, phase_name):
+        for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():
+            if phase.value == phase_name:
+                value = row[self.column_index[column]]
+                try:
+                    [label, location] = value.split(";")
+                    locations = [
+                        # location format is section.field(set).field
+                        # where : acts as optional decimal separator
+                        int(float(".".join(loc.split(':')))*10000)
+                        for loc in location.split(".")
+                    ] + [None]
+
+                except ValueError as asd:
+                    return None
+
+                return {
+                    "label": label,
+                    "section_location": locations[0],
+                    "field_location": locations[1],
+                    "child_field_location": locations[2],
+                }
+
+        return None
 
     def _create_sections(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing sections...")
@@ -593,21 +632,21 @@ class AttributeImporter:
 
         for phase in ProjectPhase.objects.filter(project_subtype=subtype):
 
-            # Get all distinct section names in appearance order
-            phase_sections = []
+            phase_sections = set()
 
             for row in rows:
-                section_phase_name = row[self.column_index[PHASE_SECTION_NAME]].strip()
+                try:
+                    location = self._get_attribute_locations(row, phase.name)
+                    section_phase_name = location["label"]
+                    index = location["section_location"]
+                except TypeError:
+                    continue
 
-                if (
-                    phase.index in self._get_attribute_input_phases(row)
-                    and section_phase_name not in phase_sections
-                ):
-                    phase_sections.append(section_phase_name)
+                phase_sections.add((section_phase_name, index))
 
-            for i, phase_section_name in enumerate(phase_sections, start=1):
+            for phase_section_name, index in phase_sections:
                 section = ProjectPhaseSection.objects.create(
-                    phase=phase, index=i, name=phase_section_name
+                    phase=phase, index=index, name=phase_section_name
                 )
                 logger.info(f"Created {section}")
 
@@ -661,12 +700,18 @@ class AttributeImporter:
 
                 identifier = self._get_attribute_row_identifier(row)
                 attribute = Attribute.objects.get(identifier=identifier)
+                locations = self._get_attribute_locations(row, phase.name)
 
-                if phase.index not in self._get_attribute_input_phases(row):
+                if locations is None:
                     # Attribute doesn't appear in this phase
                     continue
 
-                section_phase_name = row[self.column_index[PHASE_SECTION_NAME]].strip()
+                section_phase_name = locations["label"]
+
+                if self._row_part_of_fieldset(row):
+                    attribute_index = locations["child_field_location"]
+                else:
+                    attribute_index = locations["field_location"]
 
                 section = ProjectPhaseSection.objects.get(
                     phase=phase, name=section_phase_name
@@ -675,7 +720,7 @@ class AttributeImporter:
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(
                     attribute=attribute,
                     section=section,
-                    index=counter[section],
+                    index=attribute_index,
                 )
 
                 counter[section] += 1
@@ -898,14 +943,15 @@ class AttributeImporter:
         data_rows = list(filter(self._check_if_row_valid, rows[1:]))
 
         subtypes = self.create_subtypes(data_rows)
+        attribute_info = self._create_attributes(data_rows)
         phase_info = {"created": 0, "updated": 0, "deleted": 0}
         for subtype in subtypes:
             _phase_info = self.create_phases(subtype)
             phase_info["created"] += _phase_info["created"]
             phase_info["updated"] += _phase_info["updated"]
             phase_info["deleted"] += _phase_info["deleted"]
-        attribute_info = self._create_attributes(data_rows)
-        self._create_fieldset_links(data_rows)
+            self._create_fieldset_links(subtype, data_rows)
+
         self._validate_generated_attributes()
 
         # Remove all attributes from further processing that were part of a fieldset
