@@ -651,12 +651,18 @@ class ProjectFileSerializer(serializers.ModelSerializer):
     @staticmethod
     def _validate_attribute(attribute: Attribute, project: Project):
         # Check if the attribute is part of the project
-        project_has_attribute = bool(
-            ProjectPhaseSectionAttribute.objects.filter(
+        try:
+            # Field belongs to a fieldset
+            project_has_attribute = bool(ProjectPhaseSectionAttribute.objects.filter(
+                section__phase__project_subtype__project_type=project.type,
+                attribute=attribute.fieldset_attribute_target.get().attribute_source,
+            ).count)
+        except ObjectDoesNotExist:
+            project_has_attribute = bool(ProjectPhaseSectionAttribute.objects.filter(
                 section__phase__project_subtype__project_type=project.type,
                 attribute=attribute,
-            ).count()
-        )
+            ).count())
+
         if not project_has_attribute:
             # Using the same error message as SlugRelatedField
             raise ValidationError(_("Object with {slug_name}={value} does not exist."))
