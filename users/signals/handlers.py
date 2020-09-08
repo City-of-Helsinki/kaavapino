@@ -1,5 +1,5 @@
 from django.contrib.auth.models import Group
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 
 from users.models import User, GroupPrivilege
@@ -22,4 +22,19 @@ def add_admin_group_post_user_creation(sender, instance, created, *args, **kwarg
         instance.save()
     elif instance.is_staff and not instance.has_privilege('admin'):
         instance.is_staff = False
+        instance.save()
+
+@receiver(m2m_changed, sender=User.additional_groups.through)
+def handle_additional_groups(sender, instance, action, pk_set, **kwargs):
+    if action == "post_add":
+        group_pks = set([group.pk for group in instance.groups.all()])
+        for pk in pk_set:
+            if pk not in group_pks:
+                combined_groups = instance.groups.all() | instance.additional_groups.all()
+                instance.groups.set(combined_groups)
+                instance.save()
+                break
+
+    if action == "post_remove":
+        instance.groups.set(instance.groups.exclude(pk__in=pk_set))
         instance.save()
