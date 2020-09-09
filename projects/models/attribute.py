@@ -220,7 +220,7 @@ class Attribute(models.Model):
         elif self.value_type == Attribute.TYPE_INTEGER:
             return int(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DECIMAL:
-            return float(value) if value is not None else None
+            return str(value) if value is not None else None
         elif self.value_type in (
             Attribute.TYPE_SHORT_STRING,
             Attribute.TYPE_LONG_STRING,

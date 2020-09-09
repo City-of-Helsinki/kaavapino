@@ -580,6 +580,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
     def _create_updates_log(self, attribute, project, user, new_value, old_value):
+        if attribute.value_type == Attribute.TYPE_DECIMAL:
+            new_value = str(new_value)
+
         action.send(
             user,
             verb=verbs.UPDATED_ATTRIBUTE,
