@@ -236,6 +236,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     title = serializers.CharField(source="name")
     color = serializers.CharField()
     color_code = serializers.CharField()
+    list_prefix = serializers.CharField()
     sections = ProjectSectionSchemaSerializer(many=True)
 
 
