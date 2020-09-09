@@ -627,6 +627,7 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
             "name",
             "color",
             "color_code",
+            "list_prefix",
             "index",
         ]
 

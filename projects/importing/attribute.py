@@ -90,41 +90,49 @@ PROJECT_PHASES = {
         "name": Phases.START.value,
         "color": "#02d7a7",
         "color_code": "#02d7a7",
+        "list_prefix": "1",
     },  # None
     Phases.PRINCIPLES.value: {
         "name": Phases.PRINCIPLES.value,
         "color": '#009142',
         "color_code": '#009142',
+        "list_prefix": "XL",
     },
     Phases.OAS.value: {
         "name": Phases.OAS.value,
         "color": "#ffc61e",
         "color_code": "#ffc61e",
+        "list_prefix": "2",
     },  # 01, 03
     Phases.DRAFT.value: {
         "name": Phases.DRAFT.value,
         "color": '#ffd600',
         "color_code": '#ffd600',
+        "list_prefix": "XL",
     },
     Phases.PROPOSAL.value: {
         "name": Phases.PROPOSAL.value,
         "color": "#fd4f00",
         "color_code": "#fd4f00",
+        "list_prefix": "3",
     },  # 02, 04
     Phases.REVISED_PROPOSAL.value: {
         "name": Phases.REVISED_PROPOSAL.value,
         "color": "#0000bf",
         "color_code": "#0000bf",
+        "list_prefix": "4",
     },  # 05, 07
     Phases.APPROVAL.value: {
         "name": Phases.APPROVAL.value,
         "color": "#bd9650",
         "color_code": "#bd9650",
+        "list_prefix": "5",
     },  # 06, 07 <- Kvsto
     Phases.GOING_INTO_EFFECT.value: {
         "name": Phases.GOING_INTO_EFFECT.value,
         "color": "#9ec8eb",
         "color_code": "#9ec8eb",
+        "list_prefix": "6",
     },
 }
 
@@ -860,7 +868,9 @@ class AttributeImporter:
                     "index": i,
                     "color": phase["color"],
                     "color_code": phase["color_code"],
+                    "list_prefix": phase["list_prefix"],
                     "metadata": metadata,
+
                 },
             )
             if project_phase.id in old_phases:

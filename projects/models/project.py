@@ -483,6 +483,9 @@ class ProjectPhase(models.Model):
     color_code = models.CharField(
         max_length=10, verbose_name=_("color code"), blank=True
     )
+    list_prefix = models.CharField(
+        max_length=2, verbose_name=_("list prefix"), blank=True, null=True
+    )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
     metadata = JSONField(
