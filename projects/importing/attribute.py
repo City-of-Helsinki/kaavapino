@@ -511,8 +511,6 @@ class AttributeImporter:
     def _create_fieldset_links(self, subtype, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating fieldsets...")
 
-        FieldSetAttribute.objects.all().delete()
-
         if ATTRIBUTE_FIELDSET not in self.column_index:
             logger.warning(f'Fieldset column "{ATTRIBUTE_FIELDSET}" missing: Skipping')
             return
@@ -532,7 +530,11 @@ class AttributeImporter:
                 if location is None:
                     continue
 
-                index = location["child_field_location"]
+                try:
+                    index = location["child_locations"][-1]
+                except IndexError:
+                    index = None
+
                 if index is not None:
                     phase_indices.append((phase, index))
 
@@ -545,7 +547,7 @@ class AttributeImporter:
 
             for target_id, phase_indices in fieldset_map[source_id]:
                 target = Attribute.objects.get(identifier=target_id)
-                fsa = FieldSetAttribute.objects.create(
+                fsa, _ = FieldSetAttribute.objects.get_or_create(
                     attribute_source=source, attribute_target=target
                 )
                 for phase, index in phase_indices:
@@ -621,7 +623,7 @@ class AttributeImporter:
                         # where : acts as optional decimal separator
                         int(float(".".join(loc.split(':')))*10000)
                         for loc in location.split(".")
-                    ] + [None]
+                    ]
 
                 except ValueError as asd:
                     return None
@@ -630,7 +632,7 @@ class AttributeImporter:
                     "label": label,
                     "section_location": locations[0],
                     "field_location": locations[1],
-                    "child_field_location": locations[2],
+                    "child_locations": locations[2:],
                 }
 
         return None
@@ -719,7 +721,10 @@ class AttributeImporter:
                 section_phase_name = locations["label"]
 
                 if self._row_part_of_fieldset(row):
-                    attribute_index = locations["child_field_location"]
+                    try:
+                        attribute_index = locations["child_field_locations"][-1]
+                    except IndexError:
+                        attribute_index = 0
                 else:
                     attribute_index = locations["field_location"]
 
@@ -957,6 +962,8 @@ class AttributeImporter:
         subtypes = self.create_subtypes(data_rows)
         attribute_info = self._create_attributes(data_rows)
         phase_info = {"created": 0, "updated": 0, "deleted": 0}
+        # Reset Fieldset relations
+        FieldSetAttribute.objects.all().delete()
         for subtype in subtypes:
             _phase_info = self.create_phases(subtype)
             phase_info["created"] += _phase_info["created"]
