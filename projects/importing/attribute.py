@@ -53,6 +53,7 @@ ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY = "sääntö: kenttä näkyy vain toiseen 
 ATTRIBUTE_RULE_AUTOFILL = "sääntö: tieto muodostuu toiseen kenttään merkityn tiedon perusteella automaattisesti"
 ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunutta tietoa muokata "
 ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin täytettyyn tietokenttään"
+ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
 
 PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
@@ -522,6 +523,10 @@ class AttributeImporter:
                 "kyllä",
                 "fieldset voi toistua",
             ]
+            try:
+                character_limit = int(row[self.column_index[ATTRIBUTE_CHARACTER_LIMIT]])
+            except (TypeError, ValueError):
+                character_limit = None
 
             try:
                 help_text = row[self.column_index[HELP_TEXT]].strip()
@@ -582,6 +587,7 @@ class AttributeImporter:
                     "searchable": is_searchable,
                     "multiple_choice": multiple_choice,
                     "data_retention_plan": data_retention_plan,
+                    "character_limit": character_limit,
                     "generated": generated,
                     "calculations": calculations,
                     "related_fields": related_fields,
