@@ -474,7 +474,10 @@ class AttributeImporter:
                 defaults=data_retention_plan,
             )
 
-            multiple_choice = row[self.column_index[ATTRIBUTE_MULTIPLE_CHOICE]] == "kyllä"
+            multiple_choice = row[self.column_index[ATTRIBUTE_MULTIPLE_CHOICE]] in [
+                "kyllä",
+                "fieldset voi toistua",
+            ]
 
             try:
                 help_text = row[self.column_index[HELP_TEXT]].strip()
