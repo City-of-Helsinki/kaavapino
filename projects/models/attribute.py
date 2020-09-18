@@ -1,6 +1,6 @@
 import datetime
 import re
-from collections import Sequence
+from collections import Sequence, OrderedDict
 from html import escape
 
 from django.contrib.auth import get_user_model
@@ -362,24 +362,33 @@ class Attribute(models.Model):
 
     def _get_fieldset_serialization(self, value: Sequence, deserialize: bool = False):
         """Recursively go through the fields in the fieldset and (de)serialize them."""
-        if not isinstance(value, Sequence):
+
+        if isinstance(value, OrderedDict):
+            value = [value]
+        elif not isinstance(value, Sequence):
             return None
 
         entities = []
         fieldset_attributes = self.fieldset_attributes.all()
-        for entity in value:
-            processed_entity = {}
-            for attr in fieldset_attributes:
-                if attr.identifier in entity:
-                    if deserialize:
-                        processed_value = attr.deserialize_value(
-                            entity[attr.identifier]
-                        )
+
+        for listitem in value:
+            for key, val in listitem.items():
+                processed_entity = {}
+                for attr in fieldset_attributes:
+                    if attr.identifier == key:
+                        if deserialize:
+                            processed_value = attr.deserialize_value(
+                                key
+                            )
+                        else:
+                            processed_value = attr.serialize_value(val)
+                        processed_entity[attr.identifier] = processed_value
                     else:
-                        processed_value = attr.serialize_value(entity[attr.identifier])
-                    processed_entity[attr.identifier] = processed_value
-            if processed_entity:
-                entities.append(processed_entity)
+                        continue
+
+                if processed_entity:
+                    entities.append(processed_entity)
+
         return entities
 
     def _get_single_display_value(self, value):
