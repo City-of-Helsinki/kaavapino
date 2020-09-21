@@ -392,8 +392,12 @@ class ProjectSerializer(serializers.ModelSerializer):
             try:
                 return ProjectPhase.objects.get(name=phase.name, project_subtype__pk=subtype_id)
             except ProjectPhase.DoesNotExist:
+                pass
+            try:
+                return ProjectPhase.objects.get(index=phase.index, project_subtype__pk=subtype_id)
+            except ProjectPhase.DoesNotExist:
                 raise ValidationError(
-                    {"phase": _("Invalid phase for project subtype")}
+                    {"phase": _("Invalid phase for project subtype, no substitute found")}
                 )
 
     def validate_user(self, user):
