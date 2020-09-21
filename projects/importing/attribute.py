@@ -142,6 +142,7 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "S": [
@@ -149,6 +150,7 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "M": [
