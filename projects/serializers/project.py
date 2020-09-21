@@ -357,20 +357,33 @@ class ProjectSerializer(serializers.ModelSerializer):
         return public
 
     def validate_phase(self, phase):
-        def _get_next_phase(phase):
-            return phase.project_subtype.phases.get(pk=phase.index + 1)
-
-        # TODO hard-coded for now
-        if phase.name == "Suunnitteluperiaatteet" and not self.instance.create_principles:
-            phase = _get_next_phase(phase)
-
-        if phase.name == "Luonnos" and not self.instance.create_draft:
-            phase = _get_next_phase(phase)
-
         try:
             subtype_id = int(self.get_initial()["subtype"])
         except KeyError:
             subtype_id = self.instance.subtype.pk
+
+        def _get_relative_phase(phase, offset):
+            return phase.project_subtype.phases.get(index=phase.index + offset)
+
+        offset = None
+
+        # TODO hard-coded for now
+        if phase.name == "Suunnitteluperiaatteet":
+            if phase.project_subtype.pk == subtype_id:
+                if not self.instance.create_principles:
+                    offset = 1
+            else:
+                offset = -1
+
+        if phase.name == "Luonnos":
+            if phase.project_subtype.pk == subtype_id:
+                if not self.instance.create_draft:
+                    offset = 1
+            else:
+                offset = -2
+
+        if offset:
+            phase = _get_relative_phase(phase, offset)
 
         if phase.project_subtype.pk == subtype_id:
             return phase
