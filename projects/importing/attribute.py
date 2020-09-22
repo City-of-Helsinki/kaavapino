@@ -187,6 +187,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 12},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "S": {
@@ -194,6 +195,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 12},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "M": {
