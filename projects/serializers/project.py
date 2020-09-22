@@ -273,7 +273,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("attribute_data", None), attrs
         )
 
-        if attrs.get("subtype"):
+        if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
 
         deadlines = self._validate_deadlines(attrs)
