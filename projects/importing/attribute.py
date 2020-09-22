@@ -45,6 +45,12 @@ ATTRIBUTE_UNIT = "mittayksikkö"
 ATTRIBUTE_BROADCAST_CHANGES = "muutos näkyy viestit-ikkunassa"
 ATTRIBUTE_REQUIRED = "pakollinen tieto"  # kyllä/ei
 ATTRIBUTE_MULTIPLE_CHOICE = "tietoa voi olla useita" # kyllä/ei
+ATTRIBUTE_SEARCHABLE = "tietoa käytetään hakutietona (hakuruudussa) projektit-näkymässä"
+ATTRIBUTE_RELATED_FIELDS = "mihin tietoon kytkeytyy"
+ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY = "sääntö: kenttä näkyy vain toiseen kenttään tehdyn valinnan perusteella"
+ATTRIBUTE_RULE_AUTOFILL = "sääntö: tieto muodostuu toiseen kenttään merkityn tiedon perusteella automaattisesti"
+ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunutta tietoa muokata "
+ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin täytettyyn tietokenttään"
 
 PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
@@ -360,6 +366,43 @@ class AttributeImporter:
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
+        def parse_autofill_rule(rule):
+            if rule == "ei":
+                return None
+
+            try:
+                values = re.findall("\{% if .*? %\}\s*(.*?)\s*\{% endif %\}", rule)
+                conditions = re.findall("\{% if (.*?) %\}\s*.*?\s*\{% endif %\}", rule)
+
+                parsed = []
+
+                for (val, cond) in zip(values, conditions):
+                    if val == "kyllä":
+                        val = "true"
+                    elif val == "ei":
+                        val = "false"
+
+                    parsed.append({
+                        "condition": cond,
+                        "then_branch": val,
+                        # TODO not needed for now
+                        "else_branch": None,
+                    })
+
+                return parsed
+
+            except Exception:
+                return None
+
+        def parse_autofill_readonly(rule):
+            if rule == "kyllä" or \
+                (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
+                return False
+            elif rule == "ei":
+                return True
+
+            return None
+
         logger.info("\nCreating attributes...")
 
         existing_attribute_ids = set(
@@ -386,6 +429,14 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
+            try:
+                visibility_condition = re.findall(
+                    "\{% if\s*(.*?)\s*%\}",
+                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]]
+                )
+            except TypeError:
+                visibility_condition = []
+
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
             broadcast_changes = (
@@ -406,6 +457,28 @@ class AttributeImporter:
 
             is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
             is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
+            is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
+
+            # autofill
+
+            related_fields = re.findall(
+                '\{\{(.*?)\}\}',
+                row[self.column_index[ATTRIBUTE_RELATED_FIELDS]] or ''
+            )
+            try:
+                autofill_rule = parse_autofill_rule(
+                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]]
+                )
+                autofill_readonly = parse_autofill_readonly(
+                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL_READONLY]]
+                )
+            except TypeError:
+                autofill_rule = None
+                autofill_readonly = None
+
+
+            updates_autofill = row[self.column_index[ATTRIBUTE_RULE_UPDATE_AUTOFILL]] == "kyllä"
+
 
             if not value_type:
                 logger.warning(
@@ -423,15 +496,21 @@ class AttributeImporter:
                     "name": name,
                     "value_type": value_type,
                     "display": display,
+                    "visibility_condition": visibility_condition,
                     "help_text": help_text,
                     "help_link": help_link,
                     "public": is_public,
                     "required": is_required,
+                    "searchable": is_searchable,
                     "multiple_choice": multiple_choice,
                     "generated": generated,
                     "calculations": calculations,
+                    "related_fields": related_fields,
                     "unit": unit,
                     "broadcast_changes": broadcast_changes,
+                    "autofill_rule": autofill_rule,
+                    "autofill_readonly": autofill_readonly,
+                    "updates_autofill": updates_autofill,
                 },
             )
             if created:
