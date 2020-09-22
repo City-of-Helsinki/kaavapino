@@ -611,6 +611,9 @@ class ProjectPhaseFieldSetAttributeIndex(models.Model):
     )
     unique_together = ("attribute", "phase")
 
+    def __str__(self):
+        return f"{self.attribute} {self.phase} {self.index}"
+
 
 class ProjectAttributeFile(models.Model):
     """Project attribute value that is an file."""

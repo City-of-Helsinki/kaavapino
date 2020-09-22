@@ -4,10 +4,11 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from projects.models import Attribute
+from projects.models import Attribute, FieldSetAttribute
 from projects.models.project import (
     PhaseAttributeMatrixCell,
     ProjectFloorAreaSectionAttributeMatrixCell,
+    ProjectPhaseFieldSetAttributeIndex,
 )
 from projects.serializers.utils import _is_attribute_required
 
@@ -35,22 +36,44 @@ class AttributeSchemaSerializer(serializers.Serializer):
     help_link = serializers.CharField(read_only=True)
     multiple_choice = serializers.BooleanField()
     fieldset_attributes = serializers.SerializerMethodField()
+    fieldset_index = serializers.SerializerMethodField("get_fieldset_index")
     type = serializers.CharField(source="value_type")
     required = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()
     generated = serializers.BooleanField(read_only=True)
     unit = serializers.CharField()
 
-    @staticmethod
-    def get_fieldset_attributes(attribute):
+    def get_fieldset_attributes(self, attribute):
+        try:
+            context = self.context
+        except AttributeError:
+            context = {}
+
+        def take_index(attribute):
+            try:
+                return attribute.fieldset_index
+            except AttributeError:
+                return 0
+
         if attribute.value_type == Attribute.TYPE_FIELDSET:
-            return [
-                AttributeSchemaSerializer(attr).data
-                for attr in attribute.fieldset_attributes.order_by(
-                    "fieldset_attribute_source"
-                )
-            ]
+            return sorted([
+                AttributeSchemaSerializer(attr, context=context).data
+                for attr in attribute.fieldset_attributes.all()
+            ], key=take_index)
         return []
+
+    def get_fieldset_index(self, attribute):
+        if FieldSetAttribute.objects.filter(attribute_target=attribute).count() <= 0:
+            return None
+
+        try:
+            fieldset = FieldSetAttribute.objects.get(attribute_target=attribute)
+            return ProjectPhaseFieldSetAttributeIndex.objects.get(
+                phase=self.context["phase"],
+                attribute=fieldset,
+            ).index
+        except Exception:
+            return None
 
     @staticmethod
     def get_required(attribute):
@@ -183,7 +206,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attribute
         ).data
         serialized_attribute.update(
-            AttributeSchemaSerializer(section_attribute.attribute).data
+            AttributeSchemaSerializer(section_attribute.attribute, context={"phase": section_attribute.section.phase}).data
         )
         return serialized_attribute
 
