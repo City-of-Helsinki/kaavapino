@@ -8,23 +8,11 @@ from django.contrib.auth.models import Group
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
 
 from users.models import User
-
-DATE_SERIALIZATION_FORMAT = "%Y-%m-%d"
-
-identifier_re = re.compile(r"^[\w]+\Z")
-
-validate_identifier = RegexValidator(
-    identifier_re,
-    _(
-        "Enter a valid 'identifier' consisting of Unicode letters, numbers or underscores."
-    ),
-    "invalid",
-)
+from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 
 
 class AttributeQuerySet(models.QuerySet):
