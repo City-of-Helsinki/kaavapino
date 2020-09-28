@@ -37,12 +37,12 @@ class Deadline(models.Model):
         max_length=64, verbose_name=_("deadline type"), choices=TYPE_CHOICES
     )
     date_type = models.ForeignKey(
-        DateType,
+        "DateType",
         verbose_name=_("date type"),
         on_delete=models.CASCADE,
     )
     phase = models.ForeignKey(
-        ProjectPhase,
+        "ProjectPhase",
         verbose_name=_("phase"),
         related_name="schedule",
         on_delete=models.CASCADE,
@@ -69,8 +69,10 @@ class DateType(models.Model):
         symmetrical=False,
         verbose_name=_("base type")
     )
-    exclude_dates = ArrayField(models.DateField(), verbose_name=_("dates to exclude"))
-    exclude_weeks = ArrayField(
-        models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(53)]),
-        verbose_name=_("weeks to exclude"),
+    business_days_only = models.BooleanField(
+        default=True, verbose_name=_("do not include holidays and weekends")
+    )
+    dates = ArrayField(models.DateField(), verbose_name=_("dates"))
+    exclude_selected = models.BooleanField(
+        default=False, verbose_name=_("exclude selected dates")
     )
