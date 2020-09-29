@@ -411,6 +411,11 @@ class AttributeImporter:
             branches = []
 
             for (then, condition) in zip(thens, conditions):
+                if then == "kyllä":
+                    then = True
+                elif then == "ei":
+                    then = False
+
                 new_branches = [
                     {
                         "condition": parse_condition(condition_or),
@@ -460,12 +465,12 @@ class AttributeImporter:
             )
             ifs = re.findall(
                 "\{% if\s*(.*?)\s*%\}",
-                row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]] or ""
+                row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
             )
             conditions = []
 
             for if_condition in ifs:
-                conditions += re.split("\s(or)+\s", if_condition)
+                conditions += re.split("\s+or\s+", if_condition)
 
             visibility_conditions = [
                 parse_condition(condition)
