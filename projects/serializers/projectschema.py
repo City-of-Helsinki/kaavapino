@@ -29,8 +29,15 @@ class AttributeChoiceSchemaSerializer(serializers.Serializer):
     value = serializers.CharField()
 
 
+class ConditionSerializer(serializers.Serializer):
+    variable = serializers.CharField()
+    operator = serializers.CharField()
+    comparison_value = serializers.CharField()
+    comparison_value_type = serializers.CharField()
+
+
 class AutofillRuleSerializer(serializers.Serializer):
-    condition = serializers.CharField()
+    condition = ConditionSerializer()
     then_branch = serializers.CharField()
     else_branch = serializers.CharField()
 
@@ -49,7 +56,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     generated = serializers.BooleanField(read_only=True)
     unit = serializers.CharField()
     calculations = serializers.ListField(child=serializers.CharField())
-    visibility_condition = serializers.ListField(child=serializers.CharField())
+    visibility_conditions = serializers.ListField(child=ConditionSerializer())
     autofill_rule = serializers.ListField(child=AutofillRuleSerializer())
     autofill_readonly = serializers.BooleanField()
     updates_autofill = serializers.BooleanField()

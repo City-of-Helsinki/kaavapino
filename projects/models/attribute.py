@@ -120,8 +120,13 @@ class Attribute(models.Model):
         default=None,
         null=True,
     )
-    visibility_condition = ArrayField(
-        models.TextField(blank=True),
+    visibility_conditions = ArrayField(
+        JSONField(
+            default=dict,
+            blank=True,
+            null=True,
+            encoder=DjangoJSONEncoder,
+        ),
         verbose_name=_("visibility condition"),
         null=True,
         blank=True,

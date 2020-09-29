@@ -403,6 +403,41 @@ class AttributeImporter:
 
             return None
 
+        def parse_condition(condition):
+            condition = re.split("\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
+
+            if len(condition) == 1:
+                negate = condition[0][0] == "!"
+                condition = [
+                    condition[0][1:] if negate else condition[0],
+                    "!=" if negate else "==",
+                    True,
+                ]
+                value = condition[2]
+                value_type = "boolean"
+
+            else:
+                value = condition[2]
+                if value[0] == '[' and value[-1] == ']':
+                    try:
+                        [int(i) for i in re.split(',\s+', value[1:-1])]
+                        value_type = 'list<number>'
+                    except ValueError:
+                        value_type = 'list<string>'
+                else:
+                    try:
+                        int(value)
+                        value_type = 'number'
+                    except ValueError:
+                        value_type = 'string'
+
+            return {
+                "variable": condition[0],
+                "operator": condition[1],
+                "comparison_value": value,
+                "comparison_value_type": value_type,
+            }
+
         logger.info("\nCreating attributes...")
 
         existing_attribute_ids = set(
@@ -429,13 +464,19 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
-            try:
-                visibility_condition = re.findall(
-                    "\{% if\s*(.*?)\s*%\}",
-                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]]
-                )
-            except TypeError:
-                visibility_condition = []
+            ifs = re.findall(
+                "\{% if\s*(.*?)\s*%\}",
+                row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]] or ""
+            )
+            conditions = []
+
+            for if_condition in ifs:
+                conditions += re.split("\s(or)+\s", if_condition)
+
+            visibility_conditions = [
+                parse_condition(condition)
+                for condition in conditions
+            ]
 
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
@@ -496,7 +537,7 @@ class AttributeImporter:
                     "name": name,
                     "value_type": value_type,
                     "display": display,
-                    "visibility_condition": visibility_condition,
+                    "visibility_conditions": visibility_conditions,
                     "help_text": help_text,
                     "help_link": help_link,
                     "public": is_public,
