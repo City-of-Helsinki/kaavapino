@@ -366,43 +366,6 @@ class AttributeImporter:
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
-        def parse_autofill_rule(rule):
-            if rule == "ei":
-                return None
-
-            try:
-                values = re.findall("\{% if .*? %\}\s*(.*?)\s*\{% endif %\}", rule)
-                conditions = re.findall("\{% if (.*?) %\}\s*.*?\s*\{% endif %\}", rule)
-
-                parsed = []
-
-                for (val, cond) in zip(values, conditions):
-                    if val == "kyllä":
-                        val = "true"
-                    elif val == "ei":
-                        val = "false"
-
-                    parsed.append({
-                        "condition": cond,
-                        "then_branch": val,
-                        # TODO not needed for now
-                        "else_branch": None,
-                    })
-
-                return parsed
-
-            except Exception:
-                return None
-
-        def parse_autofill_readonly(rule):
-            if rule == "kyllä" or \
-                (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
-                return False
-            elif rule == "ei":
-                return True
-
-            return None
-
         def parse_condition(condition):
             condition = re.split("\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
 
@@ -437,6 +400,37 @@ class AttributeImporter:
                 "comparison_value": value,
                 "comparison_value_type": value_type,
             }
+
+        def parse_autofill_rule(rule):
+            if rule == "ei":
+                return None
+
+            thens = re.findall("\{% if .*? %\}\s*(.*?)\s*\{% endif %\}", rule)
+            conditions = re.findall("\{% if (.*?) %\}\s*.*?\s*\{% endif %\}", rule)
+
+            branches = []
+
+            for (then, condition) in zip(thens, conditions):
+                new_branches = [
+                    {
+                        "condition": parse_condition(condition_or),
+                        "then_branch": then,
+                        "else_branch": None
+                    }
+                    for condition_or in re.split("\s(or)+\s", condition)
+                ]
+                branches += new_branches
+
+            return branches
+
+        def parse_autofill_readonly(rule):
+            if rule == "kyllä" or \
+                (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
+                return False
+            elif rule == "ei":
+                return True
+
+            return None
 
         logger.info("\nCreating attributes...")
 
