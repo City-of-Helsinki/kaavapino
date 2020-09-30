@@ -18,6 +18,7 @@ from .exporting import get_document_response
 from .models import (
     Attribute,
     AttributeValueChoice,
+    DataRetentionPlan,
     DocumentTemplate,
     Project,
     ProjectAttributeFile,
@@ -38,7 +39,14 @@ class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(Attribute)
 class AttributeAdmin(admin.ModelAdmin):
-    list_display = ("name", "value_type", "identifier", "required", "public")
+    list_display = (
+        "name",
+        "value_type",
+        "identifier",
+        "required",
+        "public",
+        "data_retention_plan",
+    )
     inlines = (AttributeValueChoiceInline,)
     prepopulated_fields = {"identifier": ("name",)}
 
@@ -384,6 +392,11 @@ class ProjectFloorAreaSectionAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectComment)
 class ProjectComment(admin.ModelAdmin):
+    pass
+
+
+@admin.register(DataRetentionPlan)
+class DataRetentionPlanAdmin(admin.ModelAdmin):
     pass
 
 

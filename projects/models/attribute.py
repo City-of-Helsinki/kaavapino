@@ -57,6 +57,51 @@ class AttributeQuerySet(models.QuerySet):
             ]
         )
 
+class DataRetentionPlan(models.Model):
+    """Defines a data retention plan for an attribute"""
+
+    TYPE_PERMANENT = "permanent"
+    TYPE_PROCESSING = "processing"
+    TYPE_CUSTOM = "custom"
+
+    TYPE_CHOICES = (
+        (TYPE_PERMANENT, _("permanent")),
+        (TYPE_PROCESSING, _("while processing")),
+        (TYPE_CUSTOM, _("custom duration after archival")),
+    )
+
+    UNIT_YEARS = "years"
+    UNIT_MONTHS = "months"
+    UNIT_DAYS = "days"
+
+    UNIT_CHOICES = (
+        (UNIT_YEARS, _("years")),
+        (UNIT_MONTHS, _("months")),
+        (UNIT_DAYS, _("days")),
+    )
+
+    label = models.CharField(max_length=255, verbose_name=_("label"), unique=True)
+    plan_type = models.CharField(
+        max_length=10,
+        verbose_name=_("plan type"),
+        choices=TYPE_CHOICES,
+    )
+    custom_time = models.PositiveIntegerField(
+        verbose_name=_("custom time"),
+        null=True,
+        blank=True,
+    )
+    custom_time_unit = models.CharField(
+        max_length=6,
+        verbose_name=_("unit for custom time"),
+        choices=UNIT_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    def __str__(self):
+        return self.label
+
 
 class Attribute(models.Model):
     """Defines a single attribute type.
@@ -132,6 +177,13 @@ class Attribute(models.Model):
     public = models.BooleanField(verbose_name=_("public information"), default=False)
     searchable = models.BooleanField(verbose_name=_("searchable field"), default=False)
     generated = models.BooleanField(verbose_name=_("generated"), default=False)
+    data_retention_plan = models.ForeignKey(
+        "DataRetentionPlan",
+        verbose_name=_("data retention plan"),
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+    )
     calculations = ArrayField(
         models.CharField(max_length=255, blank=True), blank=True, null=True
     )

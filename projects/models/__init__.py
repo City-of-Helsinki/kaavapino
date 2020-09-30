@@ -1,4 +1,9 @@
-from .attribute import Attribute, AttributeValueChoice, FieldSetAttribute  # noqa
+from .attribute import (  # noqa
+    Attribute,
+    AttributeValueChoice,
+    DataRetentionPlan,
+    FieldSetAttribute,
+)
 from .document import DocumentTemplate  # noqa
 from .project import (  # noqa
     Project,

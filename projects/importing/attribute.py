@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 from ..models import (
     Attribute,
     AttributeValueChoice,
+    DataRetentionPlan,
     FieldSetAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
@@ -44,6 +45,7 @@ ATTRIBUTE_CHOICES_REF = "pudotusvalikko/vaihtoehdot"
 ATTRIBUTE_UNIT = "mittayksikkö"
 ATTRIBUTE_BROADCAST_CHANGES = "muutos näkyy viestit-ikkunassa"
 ATTRIBUTE_REQUIRED = "pakollinen tieto"  # kyllä/ei
+ATTRIBUTE_DATA_RETENTION = "tiedon säilytysaika"
 ATTRIBUTE_MULTIPLE_CHOICE = "tietoa voi olla useita" # kyllä/ei
 ATTRIBUTE_SEARCHABLE = "tietoa käytetään hakutietona (hakuruudussa) projektit-näkymässä"
 ATTRIBUTE_RELATED_FIELDS = "mihin tietoon kytkeytyy"
@@ -90,6 +92,23 @@ EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
 KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
+DATA_RETENTION_PLANS = {
+    "tieto tallennetaan pysyvästi": {
+        "label": "tieto tallennetaan pysyvästi",
+        "plan_type": "permanent",
+    },
+    "prosessinaikainen": {
+        "label": "prosessinaikainen",
+        "plan_type": "processing",
+    },
+    "tieto poistuu 6 kk kuluttua, kun projekti on arkistoitu": {
+        "label": "6 kk arkistoinnista",
+        "plan_type": "custom",
+        "custom_time": 6,
+        "custom_time_unit": "month",
+    },
+}
+DEFAULT_DATA_RETENTION_PLAN = DATA_RETENTION_PLANS["tieto tallennetaan pysyvästi"]
 
 PROJECT_PHASES = {
     Phases.START.value: {
@@ -443,6 +462,18 @@ class AttributeImporter:
                 row[self.column_index[ATTRIBUTE_BROADCAST_CHANGES]] == "kyllä"
             )
 
+            try:
+                data_retention_plan = DATA_RETENTION_PLANS[
+                    row[self.column_index[ATTRIBUTE_DATA_RETENTION]]
+                ]
+            except KeyError:
+                data_retention_plan = DEFAULT_DATA_RETENTION_PLAN
+
+            data_retention_plan, _ = DataRetentionPlan.objects.update_or_create(
+                label=data_retention_plan["label"],
+                defaults=data_retention_plan,
+            )
+
             multiple_choice = row[self.column_index[ATTRIBUTE_MULTIPLE_CHOICE]] == "kyllä"
 
             try:
@@ -503,6 +534,7 @@ class AttributeImporter:
                     "required": is_required,
                     "searchable": is_searchable,
                     "multiple_choice": multiple_choice,
+                    "data_retention_plan": data_retention_plan,
                     "generated": generated,
                     "calculations": calculations,
                     "related_fields": related_fields,
