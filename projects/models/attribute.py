@@ -164,6 +164,7 @@ class Attribute(models.Model):
         choices=DISPLAY_CHOICES,
         default=None,
         null=True,
+        blank=True,
     )
     visibility_conditions = ArrayField(
         JSONField(
@@ -255,6 +256,9 @@ class Attribute(models.Model):
                 )
 
     def clean(self):
+        if not len(self.calculations):
+            return
+
         # Only allow for uneven arrays
         if len(self.calculations) % 2 != 1:
             raise ValidationError(
