@@ -110,6 +110,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     updates_autofill = serializers.BooleanField()
     related_fields = serializers.ListField(child=serializers.CharField())
     searchable = serializers.BooleanField()
+    highlight_group = serializers.CharField()
 
     def get_fieldset_attributes(self, attribute):
         try:

@@ -4,6 +4,7 @@ from collections import Sequence, OrderedDict
 from html import escape
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import ValidationError
@@ -230,6 +231,13 @@ class Attribute(models.Model):
         encoder=DjangoJSONEncoder,
     )
     updates_autofill = models.BooleanField(verbose_name=_("updates related autofill fields"), default=False)
+    highlight_group = models.ForeignKey(
+        Group,
+        verbose_name=_("highlight field for group"),
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
 
     objects = AttributeQuerySet.as_manager()
 
