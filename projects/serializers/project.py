@@ -4,6 +4,7 @@ from typing import List, NamedTuple, Type
 from actstream import action
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
 from django.db.models import Prefetch
 from django.utils.translation import ugettext_lazy as _
@@ -580,8 +581,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
     def _create_updates_log(self, attribute, project, user, new_value, old_value):
-        if attribute.value_type == Attribute.TYPE_DECIMAL:
-            new_value = str(new_value)
+        try:
+            json.dumps(new_value)
+        except TypeError:
+            # Decimals and dates cause TypeError later
+            new_value = json.loads(json.dumps(new_value, default=str))
 
         action.send(
             user,
