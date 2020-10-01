@@ -24,6 +24,7 @@ class FooterLink(models.Model):
     def __str__(self):
         return self.link_text
 
+
 class FooterSection(models.Model):
     title = models.CharField(max_length=255, verbose_name=_("title"))
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
