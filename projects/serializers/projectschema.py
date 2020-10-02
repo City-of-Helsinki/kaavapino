@@ -1,3 +1,4 @@
+import re
 from collections import namedtuple
 
 from django.db import models
@@ -32,8 +33,26 @@ class AttributeChoiceSchemaSerializer(serializers.Serializer):
 class ConditionSerializer(serializers.Serializer):
     variable = serializers.CharField()
     operator = serializers.CharField()
-    comparison_value = serializers.CharField()
+    comparison_value = serializers.SerializerMethodField()
     comparison_value_type = serializers.CharField()
+
+    def get_comparison_value(self, obj):
+        value = obj['comparison_value']
+        value_type = obj['comparison_value_type']
+
+        if value_type[0:4] == "list":
+            return_list = re.split(',\s+', value[1:-1])
+
+            if value_type[5:-1] == "string":
+                return_list = [
+                    string.strip("\"")
+                    for string in return_list
+                ]
+
+            return return_list
+
+        else:
+            return value
 
 
 class AutofillRuleSerializer(serializers.Serializer):
