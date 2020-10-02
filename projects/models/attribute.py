@@ -372,8 +372,8 @@ class Attribute(models.Model):
         fieldset_attributes = self.fieldset_attributes.all()
 
         for listitem in value:
+            processed_entity = {}
             for key, val in listitem.items():
-                processed_entity = {}
                 for attr in fieldset_attributes:
                     if attr.identifier == key:
                         if deserialize:
@@ -386,8 +386,8 @@ class Attribute(models.Model):
                     else:
                         continue
 
-                if processed_entity:
-                    entities.append(processed_entity)
+            if processed_entity:
+                entities.append(processed_entity)
 
         return entities
 
