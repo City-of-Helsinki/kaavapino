@@ -389,33 +389,67 @@ class AttributeImporter:
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
+        def parse_condition(condition):
+            condition = re.split("\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
+
+            if len(condition) == 1:
+                negate = condition[0][0] == "!"
+                condition = [
+                    condition[0][1:] if negate else condition[0],
+                    "!=" if negate else "==",
+                    True,
+                ]
+                value = condition[2]
+                value_type = "boolean"
+
+            else:
+                value = condition[2]
+                if value[0] == '[' and value[-1] == ']':
+                    try:
+                        [int(i) for i in re.split(',\s+', value[1:-1])]
+                        value_type = 'list<number>'
+                    except ValueError:
+                        value_type = 'list<string>'
+                else:
+                    try:
+                        int(value)
+                        value_type = 'number'
+                    except ValueError:
+                        value_type = 'string'
+
+            return {
+                "variable": condition[0],
+                "operator": condition[1],
+                "comparison_value": value,
+                "comparison_value_type": value_type,
+            }
+
         def parse_autofill_rule(rule):
             if rule == "ei":
                 return None
 
-            try:
-                values = re.findall("\{% if .*? %\}\s*(.*?)\s*\{% endif %\}", rule)
-                conditions = re.findall("\{% if (.*?) %\}\s*.*?\s*\{% endif %\}", rule)
+            thens = re.findall("\{% if .*? %\}\s*(.*?)\s*\{% endif %\}", rule)
+            conditions = re.findall("\{% if (.*?) %\}\s*.*?\s*\{% endif %\}", rule)
 
-                parsed = []
+            branches = []
 
-                for (val, cond) in zip(values, conditions):
-                    if val == "kyllä":
-                        val = "true"
-                    elif val == "ei":
-                        val = "false"
+            for (then, condition) in zip(thens, conditions):
+                if then == "kyllä":
+                    then = True
+                elif then == "ei":
+                    then = False
 
-                    parsed.append({
-                        "condition": cond,
-                        "then_branch": val,
-                        # TODO not needed for now
-                        "else_branch": None,
-                    })
+                new_branches = [
+                    {
+                        "condition": parse_condition(condition_or),
+                        "then_branch": then,
+                        "else_branch": None
+                    }
+                    for condition_or in re.split("\s(or)+\s", condition)
+                ]
+                branches += new_branches
 
-                return parsed
-
-            except Exception:
-                return None
+            return branches
 
         def parse_autofill_readonly(rule):
             if rule == "kyllä" or \
@@ -452,13 +486,19 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
-            try:
-                visibility_condition = re.findall(
-                    "\{% if\s*(.*?)\s*%\}",
-                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]]
-                )
-            except TypeError:
-                visibility_condition = []
+            ifs = re.findall(
+                "\{% if\s*(.*?)\s*%\}",
+                row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
+            )
+            conditions = []
+
+            for if_condition in ifs:
+                conditions += re.split("\s+or\s+", if_condition)
+
+            visibility_conditions = [
+                parse_condition(condition)
+                for condition in conditions
+            ]
 
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
@@ -534,7 +574,7 @@ class AttributeImporter:
                     "name": name,
                     "value_type": value_type,
                     "display": display,
-                    "visibility_condition": visibility_condition,
+                    "visibility_conditions": visibility_conditions,
                     "help_text": help_text,
                     "help_link": help_link,
                     "public": is_public,

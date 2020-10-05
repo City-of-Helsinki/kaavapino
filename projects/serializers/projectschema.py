@@ -1,3 +1,4 @@
+import re
 from collections import namedtuple
 
 from django.db import models
@@ -29,8 +30,42 @@ class AttributeChoiceSchemaSerializer(serializers.Serializer):
     value = serializers.CharField()
 
 
+class ConditionSerializer(serializers.Serializer):
+    variable = serializers.CharField()
+    operator = serializers.CharField()
+    comparison_value = serializers.SerializerMethodField()
+    comparison_value_type = serializers.CharField()
+
+    def get_comparison_value(self, obj):
+        value = obj['comparison_value']
+        value_type = obj['comparison_value_type']
+
+        if value_type[0:4] == "list":
+            return_list = re.split(',\s+', value[1:-1])
+
+            if value_type[5:-1] == "string":
+                return_list = [
+                    string.strip("\"")
+                    for string in return_list
+                ]
+            elif value_type[5:-1] == "number":
+                return_list = [
+                    int(number)
+                    for number in return_list
+                ]
+
+            return return_list
+        elif not isinstance(value, bool):
+            try:
+                return int(value)
+            except ValueError:
+                return value
+        else:
+            return value
+
+
 class AutofillRuleSerializer(serializers.Serializer):
-    condition = serializers.CharField()
+    condition = ConditionSerializer()
     then_branch = serializers.CharField()
     else_branch = serializers.CharField()
 
@@ -49,7 +84,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     generated = serializers.BooleanField(read_only=True)
     unit = serializers.CharField()
     calculations = serializers.ListField(child=serializers.CharField())
-    visibility_condition = serializers.ListField(child=serializers.CharField())
+    visibility_conditions = serializers.ListField(child=ConditionSerializer())
     autofill_rule = serializers.ListField(child=AutofillRuleSerializer())
     autofill_readonly = serializers.BooleanField()
     updates_autofill = serializers.BooleanField()

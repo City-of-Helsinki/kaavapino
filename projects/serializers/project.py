@@ -101,6 +101,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         attribute_data = getattr(project, "attribute_data", {})
         self._set_file_attributes(attribute_data, project)
         self._set_geometry_attributes(attribute_data, project)
+        attribute_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
+        attribute_data['luonnosvaihe_luotu'] = project.create_draft
+        attribute_data['periaatevaihe_luotu'] = project.create_principles
 
         return attribute_data
 
