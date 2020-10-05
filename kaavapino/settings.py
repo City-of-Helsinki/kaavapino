@@ -66,6 +66,9 @@ ROOT_URLCONF = "kaavapino.urls"
 WSGI_APPLICATION = "kaavapino.wsgi.application"
 
 LANGUAGE_CODE = "fi"
+LOCALE_PATHS = (
+    str(project_root.path('kaavapino').path('locale')),
+)
 TIME_ZONE = "Europe/Helsinki"
 USE_I18N = True
 USE_L10N = True
