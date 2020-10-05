@@ -48,9 +48,18 @@ class ConditionSerializer(serializers.Serializer):
                     string.strip("\"")
                     for string in return_list
                 ]
+            elif value_type[5:-1] == "number":
+                return_list = [
+                    int(number)
+                    for number in return_list
+                ]
 
             return return_list
-
+        elif not isinstance(value, bool):
+            try:
+                return int(value)
+            except ValueError:
+                return value
         else:
             return value
 
