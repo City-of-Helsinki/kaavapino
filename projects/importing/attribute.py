@@ -428,8 +428,8 @@ class AttributeImporter:
             if rule == "ei":
                 return None
 
-            thens = re.findall("\{% if .*? %\}\s*(.*?)\s*\{% endif %\}", rule)
-            conditions = re.findall("\{% if (.*?) %\}\s*.*?\s*\{% endif %\}", rule)
+            thens = re.findall("\{%+\sif.*?%\}\s*(.*?)\s*\{% endif %\}", rule)
+            conditions = re.findall("\{%\s*if\s*(.*?)\s*%\}.*?\{%\s*endif\s*%\}", rule)
 
             branches = []
 
@@ -487,7 +487,7 @@ class AttributeImporter:
                 else None
             )
             ifs = re.findall(
-                "\{% if\s*(.*?)\s*%\}",
+                "\{%\s*if\s*(.*?)\s*%\}",
                 row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
             )
             conditions = []

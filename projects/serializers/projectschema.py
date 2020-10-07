@@ -5,7 +5,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from projects.models import Attribute, FieldSetAttribute
+from projects.models import Attribute, AttributeValueChoice, FieldSetAttribute
 from projects.models.project import (
     PhaseAttributeMatrixCell,
     ProjectFloorAreaSectionAttributeMatrixCell,
@@ -37,13 +37,27 @@ class ConditionSerializer(serializers.Serializer):
     comparison_value_type = serializers.CharField()
 
     def get_comparison_value(self, obj):
+        try:
+            attribute = Attribute.objects.get(identifier=obj['variable'])
+        except Attribute.DoesNotExist:
+            attribute = None
+
         value = obj['comparison_value']
         value_type = obj['comparison_value_type']
 
         if value_type[0:4] == "list":
             return_list = re.split(',\s+', value[1:-1])
 
-            if value_type[5:-1] == "string":
+            if attribute and attribute.value_type == "choice":
+                for index, choice in enumerate(return_list):
+                    choice = choice.strip("\"")
+                    try:
+                        return_list[index] = \
+                           attribute.value_choices.get(value=choice).identifier
+                    except AttributeValueChoice.DoesNotExist:
+                        return_list[index] = choice
+
+            elif value_type[5:-1] == "string":
                 return_list = [
                     string.strip("\"")
                     for string in return_list
@@ -55,6 +69,11 @@ class ConditionSerializer(serializers.Serializer):
                 ]
 
             return return_list
+        elif attribute and attribute.value_type == "choice":
+            try:
+                return attribute.value_choices.get(value=value).identifier
+            except AttributeValueChoice.DoesNotExist:
+                return value
         elif not isinstance(value, bool):
             try:
                 return int(value)
