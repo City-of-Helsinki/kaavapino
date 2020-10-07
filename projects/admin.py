@@ -46,6 +46,7 @@ class AttributeAdmin(admin.ModelAdmin):
         "required",
         "public",
         "data_retention_plan",
+        "highlight_group",
     )
     inlines = (AttributeValueChoiceInline,)
     prepopulated_fields = {"identifier": ("name",)}

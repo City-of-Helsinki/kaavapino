@@ -6,6 +6,7 @@ from enum import Enum
 from itertools import filterfalse
 from typing import Iterable, Sequence, List, Optional
 
+from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import ProtectedError
 from openpyxl import load_workbook
@@ -54,6 +55,7 @@ ATTRIBUTE_RULE_AUTOFILL = "sääntö: tieto muodostuu toiseen kenttään merkity
 ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunutta tietoa muokata "
 ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin täytettyyn tietokenttään"
 ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
+ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 
 PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
@@ -90,6 +92,17 @@ ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pä�
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
+
+try:
+    HIGHLIGHT_GROUPS = {
+        "Asiantuntijan kenttä": Group.objects.get(name="Asiantuntijat"),
+        "Pääkäyttäjän kenttä": Group.objects.get(name="Pääkäyttäjät"),
+    }
+except Group.DoesNotExist:
+    raise Group.DoesNotExist(
+        "Default group(s) not found, try running create_default_groups_and_mappings management command first"
+    )
+
 
 KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
@@ -542,6 +555,13 @@ class AttributeImporter:
             is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
             is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
 
+            try:
+                highlight_group = HIGHLIGHT_GROUPS[
+                    row[self.column_index[ATTRIBUTE_HIGHLIGHT_GROUP]]
+                ]
+            except KeyError:
+                highlight_group = None
+
             # autofill
 
             related_fields = re.findall(
@@ -596,6 +616,7 @@ class AttributeImporter:
                     "autofill_rule": autofill_rule,
                     "autofill_readonly": autofill_readonly,
                     "updates_autofill": updates_autofill,
+                    "highlight_group": highlight_group,
                 },
             )
             if created:
