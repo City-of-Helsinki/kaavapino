@@ -487,7 +487,7 @@ class AttributeImporter:
                 else None
             )
             ifs = re.findall(
-                "\{%+\sif\s*(.*?)\s*%+\s\}",
+                "\{%\s*if\s*(.*?)\s*%\}",
                 row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
             )
             conditions = []
