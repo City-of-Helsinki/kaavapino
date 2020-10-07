@@ -95,6 +95,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     help_text = serializers.CharField()
     help_link = serializers.CharField(read_only=True)
     multiple_choice = serializers.BooleanField()
+    character_limit = serializers.IntegerField()
     fieldset_attributes = serializers.SerializerMethodField()
     fieldset_index = serializers.SerializerMethodField("get_fieldset_index")
     type = serializers.CharField(source="value_type")

@@ -1,7 +1,9 @@
 import collections
 import copy
 
+from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from rest_framework_gis.fields import GeometryField
 
 from projects.models import (
@@ -41,6 +43,30 @@ def create_attribute_field_data(attribute, validation):
     """Create data for initializing attribute field serializer."""
     field_arguments = {}
     field_class = FIELD_TYPES.get(attribute.value_type, None)
+
+    def get_rich_text_validator(attribute):
+        def validate(value):
+            try:
+                total_length = 0
+
+                for item in value["ops"]:
+                    total_length += len(item["insert"])
+
+                if attribute.character_limit and total_length > attribute.character_limit:
+                    raise ValidationError(
+                        {attribute.identifier: _("Character limit exceeded")}
+                    )
+
+                return value
+
+            except (KeyError, TypeError):
+                raise ValidationError(
+                    {attribute.identifier: _("Incorrect rich text formatting")}
+                )
+
+        return validate
+
+    field_arguments["validators"] = [get_rich_text_validator(attribute)]
 
     if attribute.value_type == Attribute.TYPE_CHOICE:
         choices = attribute.value_choices.all()

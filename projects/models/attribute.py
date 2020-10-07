@@ -199,6 +199,10 @@ class Attribute(models.Model):
     multiple_choice = models.BooleanField(
         verbose_name=_("multiple choice"), default=False
     )
+    character_limit = models.PositiveIntegerField(
+        verbose_name=_("character limit"),
+        null=True,
+    )
     identifier = models.CharField(
         max_length=50,
         verbose_name=_("identifier"),
