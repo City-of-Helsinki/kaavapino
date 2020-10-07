@@ -69,6 +69,11 @@ class ConditionSerializer(serializers.Serializer):
                 ]
 
             return return_list
+        elif attribute and attribute.value_type == "choice":
+            try:
+                return attribute.value_choices.get(value=value).identifier
+            except AttributeValueChoice.DoesNotExist:
+                return value
         elif not isinstance(value, bool):
             try:
                 return int(value)
