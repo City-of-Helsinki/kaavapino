@@ -9,6 +9,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
+from PIL import Image
 
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute, FieldSetAttribute
@@ -648,6 +649,19 @@ class ProjectAttributeFile(models.Model):
         upload_subfolder=get_upload_subfolder,
         max_length=255,
     )
+
+    def save(self, *args, **kwargs):
+        super(ProjectAttributeFile, self).save(*args, **kwargs)
+        # portrait a4 paper @ 200dpi
+        paper_size_in_pixels = (1654, 2339)
+        try:
+            # resize to 200dpi print size
+            image = Image.open(self.file.path)
+            image.thumbnail(paper_size_in_pixels, Image.ANTIALIAS)
+            image.save(self.file.path, quality=100, optimize=True)
+        except IOError:
+            # not an image
+            pass
 
     class Meta:
         verbose_name = _("project attribute file")
