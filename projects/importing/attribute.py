@@ -93,16 +93,10 @@ ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
-try:
-    HIGHLIGHT_GROUPS = {
-        "Asiantuntijan kenttä": Group.objects.get(name="Asiantuntijat"),
-        "Pääkäyttäjän kenttä": Group.objects.get(name="Pääkäyttäjät"),
-    }
-except Group.DoesNotExist:
-    raise Group.DoesNotExist(
-        "Default group(s) not found, try running create_default_groups_and_mappings management command first"
-    )
-
+HIGHLIGHT_GROUPS = {
+    "Asiantuntijan kenttä": "Asiantuntijat",
+    "Pääkäyttäjän kenttä": "Pääkäyttäjät",
+}
 
 KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
@@ -556,9 +550,13 @@ class AttributeImporter:
             is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
 
             try:
-                highlight_group = HIGHLIGHT_GROUPS[
+                Group.objects.get(name=HIGHLIGHT_GROUPS[
                     row[self.column_index[ATTRIBUTE_HIGHLIGHT_GROUP]]
-                ]
+                ])
+            except Group.DoesNotExist:
+                raise Group.DoesNotExist(
+                    "Default group(s) not found, try running create_default_groups_and_mappings management command first"
+                )
             except KeyError:
                 highlight_group = None
 
