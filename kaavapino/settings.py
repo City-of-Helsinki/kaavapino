@@ -50,6 +50,10 @@ if DEBUG and not SECRET_KEY:
 
 #ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
+JWT_AUTH = {
+    'JWT_AUDIENCE': os.environ.get('JWT_AUDIENCE'),
+    'JWT_SECRET_KEY': os.environ.get('JWT_SECRET_KEY'),
+}
 
 DATABASES = {"default": env.db()}
 
