@@ -66,7 +66,8 @@ def create_attribute_field_data(attribute, validation):
 
         return validate
 
-    field_arguments["validators"] = [get_rich_text_validator(attribute)]
+    if attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+        field_arguments["validators"] = [get_rich_text_validator(attribute)]
 
     if attribute.value_type == Attribute.TYPE_CHOICE:
         choices = attribute.value_choices.all()
