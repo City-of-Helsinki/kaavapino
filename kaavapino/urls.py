@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.conf.urls import url
 from django.conf.urls.static import static
-from django.contrib import admin
+from helusers.admin_site import admin
 from django.urls import path, include
 from rest_framework import routers
 
@@ -28,8 +28,9 @@ MEDIA_URL = (
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path('pysocial/', include('social_django.urls', namespace='social')),
+    path('helauth/', include('helusers.urls')),
     path("v1/", include(router.urls)),
-    path("accounts/", include("allauth.urls")),
     url(
         r"{}projects/(?P<path>.*)$".format(MEDIA_URL),
         project_views.ProjectAttributeFileDownloadView.as_view(),
