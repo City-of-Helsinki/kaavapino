@@ -238,6 +238,8 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    # attributes which are linked to static Project fields
+    static_property = models.CharField(max_length=255, blank=True, null=True)
 
     objects = AttributeQuerySet.as_manager()
 

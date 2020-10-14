@@ -58,6 +58,14 @@ ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin
 ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
 ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 
+# Attribute object mappings for static Project fields
+STATIC_ATTRIBUTES_MAPPING = {
+     "vastuuhenkilö": "user",
+     "luodaanko_nakyvaksi": "public",
+     "pinonumero": "pino_number",
+     "projektin_nimi": "name",
+}
+
 PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
 HELP_TEXT = "ohje tiedon syöttäjälle"
@@ -549,6 +557,9 @@ class AttributeImporter:
             is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
             is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
             is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
+            static_property = STATIC_ATTRIBUTES_MAPPING.get(
+                row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
 
             try:
                 highlight_group = Group.objects.get(name=HIGHLIGHT_GROUPS[
@@ -616,6 +627,7 @@ class AttributeImporter:
                     "autofill_readonly": autofill_readonly,
                     "updates_autofill": updates_autofill,
                     "highlight_group": highlight_group,
+                    "static_property": static_property,
                 },
             )
             if created:

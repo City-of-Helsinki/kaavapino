@@ -101,9 +101,22 @@ class ProjectSerializer(serializers.ModelSerializer):
         attribute_data = getattr(project, "attribute_data", {})
         self._set_file_attributes(attribute_data, project)
         self._set_geometry_attributes(attribute_data, project)
+
         attribute_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
         attribute_data['luonnosvaihe_luotu'] = project.create_draft
         attribute_data['periaatevaihe_luotu'] = project.create_principles
+
+        static_properties = [
+            "user", "name", "public", "pino_number"
+        ]
+
+        for static_property in static_properties:
+            try:
+                identifier = \
+                    Attribute.objects.get(static_property=static_property).identifier
+                attribute_data[identifier] = getattr(project, static_property)
+            except Attribute.DoesNotExist:
+                continue
 
         return attribute_data
 
