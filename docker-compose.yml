@@ -29,6 +29,9 @@ services:
       - TOKEN_AUTH_AUTHSERVER_URL=https://api.hel.fi/sso/openid
       - ALLOWED_HOSTS=localhost
       - CSRF_TRUSTED_ORIGINS=
+      - SOCIAL_AUTH_TUNNISTAMO_KEY=
+      - SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT=
+      - SOCIAL_AUTH_TUNNISTAMO_SECRET=
     ports:
       - "8000:8000"
     depends_on:

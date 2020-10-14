@@ -95,3 +95,18 @@ spec:
               secretKeyRef:
                 name: api
                 key: CSRF_TRUSTED_ORIGINS
+          - name: SOCIAL_AUTH_TUNNISTAMO_KEY
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: SOCIAL_AUTH_TUNNISTAMO_KEY
+          - name: SOCIAL_AUTH_TUNNISTAMO_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: SOCIAL_AUTH_TUNNISTAMO_SECRET
+          - name: SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT
