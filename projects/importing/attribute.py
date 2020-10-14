@@ -6,6 +6,7 @@ from enum import Enum
 from itertools import filterfalse
 from typing import Iterable, Sequence, List, Optional
 
+from django.db.utils import IntegrityError
 from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import ProtectedError
@@ -550,7 +551,7 @@ class AttributeImporter:
             is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
 
             try:
-                Group.objects.get(name=HIGHLIGHT_GROUPS[
+                highlight_group = Group.objects.get(name=HIGHLIGHT_GROUPS[
                     row[self.column_index[ATTRIBUTE_HIGHLIGHT_GROUP]]
                 ])
             except Group.DoesNotExist:
@@ -654,6 +655,8 @@ class AttributeImporter:
         return True, calculations
 
     def _create_attribute_choices(self, attribute, row) -> int:
+        AttributeValueChoice.objects.filter(attribute=attribute).delete()
+
         created_choices_count = 0
         choices_rows = self._rows_for_sheet(self.workbook[CHOICES_SHEET_NAME])
         choices_ref = row[self.column_index[ATTRIBUTE_CHOICES_REF]]
@@ -676,14 +679,17 @@ class AttributeImporter:
             if not choice:
                 break
 
-            _, created = AttributeValueChoice.objects.update_or_create(
-                attribute=attribute,
-                index=index,
-                defaults={
-                    'value': choice,
-                    'identifier': identifier,
-                }
-            )
+            try:
+                _, created = AttributeValueChoice.objects.update_or_create(
+                    attribute=attribute,
+                    identifier=identifier,
+                    defaults={
+                        "index": index,
+                        "value": choice,
+                    }
+                )
+            except IntegrityError:
+                logger.warning(f'Duplicate choice "{value} ({identifier})" for {attribute}, ignoring row')
 
             if created:
                 created_choices_count += 1
