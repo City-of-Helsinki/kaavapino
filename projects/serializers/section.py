@@ -78,9 +78,6 @@ def create_attribute_field_data(attribute, validation):
         if attribute.multiple_choice:
             field_arguments["many"] = True
 
-    if attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-        field_arguments["binary"] = True
-
     if attribute.value_type == Attribute.TYPE_USER:
         field_class = serializers.SlugRelatedField
         field_arguments["queryset"] = get_user_model().objects.all()
