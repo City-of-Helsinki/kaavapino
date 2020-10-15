@@ -3,6 +3,8 @@ from django.urls import reverse_lazy
 from django.utils.text import slugify
 from django.utils.translation import ugettext_lazy as _
 
+from projects.models import Attribute
+
 
 class FooterLink(models.Model):
     link_text = models.CharField(max_length=255, verbose_name=_("link text"))
@@ -36,3 +38,13 @@ class FooterSection(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class ListViewAttributeColumn(models.Model):
+    """Defines custom ordering of attribute columns in project list view"""
+    index = models.PositiveIntegerField(default=0)
+    attribute = models.OneToOneField( \
+        Attribute, primary_key=True, on_delete=models.CASCADE)
+
+    class Meta(object):
+        ordering = ("index",)
