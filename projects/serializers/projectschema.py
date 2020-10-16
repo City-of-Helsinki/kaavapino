@@ -111,6 +111,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     related_fields = serializers.ListField(child=serializers.CharField())
     searchable = serializers.BooleanField()
     highlight_group = serializers.CharField()
+    display = serializers.CharField()
 
     def get_fieldset_attributes(self, attribute):
         try:
