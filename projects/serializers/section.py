@@ -47,6 +47,7 @@ def create_attribute_field_data(attribute, validation, project):
 
     def get_rich_text_validator(attribute):
         def validate(value):
+            error_msg = attribute.error_message or _("Character limit exceeded")
             try:
                 total_length = 0
 
@@ -55,7 +56,7 @@ def create_attribute_field_data(attribute, validation, project):
 
                 if attribute.character_limit and total_length > attribute.character_limit:
                     raise ValidationError(
-                        {attribute.identifier: _("Character limit exceeded")}
+                        {attribute.identifier: error_msg}
                     )
 
                 return value
@@ -70,9 +71,10 @@ def create_attribute_field_data(attribute, validation, project):
     def get_unique_validator(attribute):
         def validate(value):
             column = f"attribute_data__{attribute.identifier}"
+            error_msg = attribute.error_message or _("Value must be unique")
             if Project.objects.filter(**{column: value}).exclude(pk=project.pk).count() > 0:
                 raise ValidationError(
-                    {attribute.identifier: _("Value must be unique")}
+                    {attribute.identifier: error_msg}
                 )
 
         return validate

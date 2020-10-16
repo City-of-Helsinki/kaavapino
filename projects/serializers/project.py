@@ -305,6 +305,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes):
+        if not attribute_data:
+            return {}
         # Get serializers for all sections in all phases
         sections_data = []
         current_phase = getattr(self.instance, "phase", None)
@@ -348,7 +350,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
-            if not serializer.is_valid():
+            if not serializer.is_valid(raise_exception=True):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
 
