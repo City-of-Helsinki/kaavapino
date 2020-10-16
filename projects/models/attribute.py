@@ -205,6 +205,15 @@ class Attribute(models.Model):
         verbose_name=_("character limit"),
         null=True,
     )
+    unique = models.BooleanField(
+        verbose_name=_("unique"),
+        default=False,
+    )
+    error_message = models.TextField(
+        verbose_name=_("error message"),
+        null=True,
+        blank=True,
+    )
     identifier = models.CharField(
         max_length=50,
         verbose_name=_("identifier"),
