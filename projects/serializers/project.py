@@ -101,9 +101,22 @@ class ProjectSerializer(serializers.ModelSerializer):
         attribute_data = getattr(project, "attribute_data", {})
         self._set_file_attributes(attribute_data, project)
         self._set_geometry_attributes(attribute_data, project)
+
         attribute_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
         attribute_data['luonnosvaihe_luotu'] = project.create_draft
         attribute_data['periaatevaihe_luotu'] = project.create_principles
+
+        static_properties = [
+            "user", "name", "public", "pino_number"
+        ]
+
+        for static_property in static_properties:
+            try:
+                identifier = \
+                    Attribute.objects.get(static_property=static_property).identifier
+                attribute_data[identifier] = getattr(project, static_property)
+            except Attribute.DoesNotExist:
+                continue
 
         return attribute_data
 
@@ -292,6 +305,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes):
+        if not attribute_data:
+            return {}
         # Get serializers for all sections in all phases
         sections_data = []
         current_phase = getattr(self.instance, "phase", None)
@@ -335,7 +350,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
-            if not serializer.is_valid():
+            if not serializer.is_valid(raise_exception=True):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
 

@@ -205,6 +205,15 @@ class Attribute(models.Model):
         verbose_name=_("character limit"),
         null=True,
     )
+    unique = models.BooleanField(
+        verbose_name=_("unique"),
+        default=False,
+    )
+    error_message = models.TextField(
+        verbose_name=_("error message"),
+        null=True,
+        blank=True,
+    )
     identifier = models.CharField(
         max_length=50,
         verbose_name=_("identifier"),
@@ -238,6 +247,8 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    # attributes which are linked to static Project fields
+    static_property = models.CharField(max_length=255, blank=True, null=True)
 
     objects = AttributeQuerySet.as_manager()
 

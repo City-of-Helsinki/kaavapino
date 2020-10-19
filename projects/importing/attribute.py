@@ -57,6 +57,20 @@ ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunut
 ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin täytettyyn tietokenttään"
 ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
 ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
+ATTRIBUTE_ERROR = "virhetilanne"
+# TODO: ask for a dedicated column for uniqueness at some point
+ATTRIBUTE_ERROR_UNIQUE = [
+    "Virhe. Nimi on jo käytössä",
+    "Virhe. Diaarinumero on jo toisen projektin käytössä. Samalle diaarínumerolle ei voi luoda uutta projektia.",
+]
+
+# Attribute object mappings for static Project fields
+STATIC_ATTRIBUTES_MAPPING = {
+     "vastuuhenkilö": "user",
+     "luodaanko_nakyvaksi": "public",
+     "pinonumero": "pino_number",
+     "projektin_nimi": "name",
+}
 
 PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
@@ -549,6 +563,12 @@ class AttributeImporter:
             is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
             is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
             is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
+            # TODO: ask for a dedicated column for uniqueness at some point
+            is_unique = row[self.column_index[ATTRIBUTE_ERROR]] in ATTRIBUTE_ERROR_UNIQUE
+            error_message = row[self.column_index[ATTRIBUTE_ERROR]]
+            static_property = STATIC_ATTRIBUTES_MAPPING.get(
+                row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
 
             try:
                 highlight_group = Group.objects.get(name=HIGHLIGHT_GROUPS[
@@ -607,6 +627,8 @@ class AttributeImporter:
                     "multiple_choice": multiple_choice,
                     "data_retention_plan": data_retention_plan,
                     "character_limit": character_limit,
+                    "unique": is_unique,
+                    "error_message": error_message,
                     "generated": generated,
                     "calculations": calculations,
                     "related_fields": related_fields,
@@ -616,6 +638,7 @@ class AttributeImporter:
                     "autofill_readonly": autofill_readonly,
                     "updates_autofill": updates_autofill,
                     "highlight_group": highlight_group,
+                    "static_property": static_property,
                 },
             )
             if created:
