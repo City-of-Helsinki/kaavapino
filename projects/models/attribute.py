@@ -322,7 +322,13 @@ class Attribute(models.Model):
             else:
                 return value.identifier if value else None
         elif self.value_type == Attribute.TYPE_INTEGER:
-            return int(value) if value is not None else None
+            if self.multiple_choice:
+                return [
+                    int(v) if v is not None else None
+                    for v in value
+                ]
+            else:
+                return int(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DECIMAL:
             return str(value) if value is not None else None
         elif self.value_type in (
@@ -331,23 +337,50 @@ class Attribute(models.Model):
             Attribute.TYPE_LINK,
             Attribute.TYPE_CHOICE,
         ):
-            return str(value) if value else None
+            if self.multiple_choice:
+                return [
+                    str(v) if v else None
+                    for v in value
+                ]
+            else:
+                return str(value) if value else None
         elif self.value_type in (
             Attribute.TYPE_RICH_TEXT,
             Attribute.TYPE_RICH_TEXT_SHORT,
         ):
-            return value
+            if self.multiple_choice:
+                return [v for v in value]
+            else:
+                return value
         elif self.value_type == Attribute.TYPE_BOOLEAN:
-            return bool(value) if value is not None else None
+            if self.multiple_choice:
+                return [
+                    bool(v) if v is not None else None
+                    for v in value
+                ]
+            else:
+                return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
-            return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
+            if self.multiple_choice:
+                return [
+                    v.strftime(DATE_SERIALIZATION_FORMAT) if v else None
+                    for v in value
+                ]
+            else:
+                return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
         elif self.value_type == Attribute.TYPE_USER:
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).
             if isinstance(value, get_user_model()):
-                return value.uuid
+                if self.multiple_choice:
+                    return [v.uuid for v in value]
+                else:
+                    return value.uuid
             else:
-                return value or None
+                if self.multiple_choice:
+                    return [v or None for v in value]
+                else:
+                    return value or None
         elif self.value_type == Attribute.TYPE_FIELDSET:
             return self._get_fieldset_serialization(value)
         else:
