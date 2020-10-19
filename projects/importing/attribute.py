@@ -308,11 +308,13 @@ VALUE_TYPES = {
     "Valinta (1-2) painikkeesta.": Attribute.TYPE_CHOICE,
     "Valinta (1-x) pudotusvalikosta.": Attribute.TYPE_CHOICE,
     "Valintaruutu.": Attribute.TYPE_BOOLEAN,
+    "Vuoden valinta pudotusvalikosta": Attribute.TYPE_INTEGER,
 }
 
 DISPLAY_TYPES = {
     "Valinta (1) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
     "Valinta (1-x) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
+    "Vuoden valinta pudotusvalikosta": Attribute.DISPLAY_DROPDOWN,
 }
 
 
