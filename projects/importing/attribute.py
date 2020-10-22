@@ -453,6 +453,8 @@ class AttributeImporter:
             if rule == "ei":
                 return None
 
+            # TODO: make a more general implementation for including fields if cases become more complex
+            variables = re.findall("^\{\{(.*)\}\}", rule)
             thens = re.findall("\{%+\sif.*?%\}\s*(.*?)\s*\{% endif %\}", rule)
             conditions = re.findall("\{%\s*if\s*(.*?)\s*%\}.*?\{%\s*endif\s*%\}", rule)
 
@@ -466,6 +468,7 @@ class AttributeImporter:
 
                 new_branches = [
                     {
+                        "variables": variables,
                         "condition": parse_condition(condition_or),
                         "then_branch": then,
                         "else_branch": None

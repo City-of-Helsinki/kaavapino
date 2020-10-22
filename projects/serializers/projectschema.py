@@ -87,6 +87,7 @@ class AutofillRuleSerializer(serializers.Serializer):
     condition = ConditionSerializer()
     then_branch = serializers.CharField()
     else_branch = serializers.CharField()
+    variables = serializers.ListField(child=serializers.CharField())
 
 
 class AttributeSchemaSerializer(serializers.Serializer):
