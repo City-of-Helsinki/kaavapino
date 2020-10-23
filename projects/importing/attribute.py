@@ -652,6 +652,9 @@ class AttributeImporter:
             choices_ref = row[self.column_index[ATTRIBUTE_CHOICES_REF]]
             if choices_ref:
                 created_choices_count += self._create_attribute_choices(attribute, row)
+            else:
+                AttributeValueChoice.objects.filter(attribute=attribute).delete()
+
 
             if created:
                 logger.info(f"Created {attribute}")
