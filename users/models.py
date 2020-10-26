@@ -1,6 +1,7 @@
 from django.contrib.auth.models import Group
 from helusers.models import AbstractUser
 from django.db import models
+from django.utils.translation import ugettext_lazy as _
 
 
 # TODO: hard-coded for the MVP, migrate into a separate model when needed
@@ -14,6 +15,13 @@ PRIVILEGE_LEVELS = (
 )
 
 class User(AbstractUser):
+    additional_groups = models.ManyToManyField(
+        Group,
+        verbose_name=_("additional groups"),
+        related_name="additional_users",
+        blank=True,
+    )
+
     def is_in_group(self, group):
         if isinstance(group, Group):
             return self.groups.filter(group=group).exists()

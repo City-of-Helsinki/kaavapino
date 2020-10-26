@@ -1,10 +1,12 @@
 import datetime
 import re
-from collections import Sequence
+from collections import Sequence, OrderedDict
 from html import escape
 
 from django.contrib.auth import get_user_model
-from django.contrib.postgres.fields import ArrayField
+from django.contrib.auth.models import Group
+from django.contrib.postgres.fields import ArrayField, JSONField
+from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, transaction
@@ -55,6 +57,51 @@ class AttributeQuerySet(models.QuerySet):
                 Attribute.TYPE_CHOICE,
             ]
         )
+
+class DataRetentionPlan(models.Model):
+    """Defines a data retention plan for an attribute"""
+
+    TYPE_PERMANENT = "permanent"
+    TYPE_PROCESSING = "processing"
+    TYPE_CUSTOM = "custom"
+
+    TYPE_CHOICES = (
+        (TYPE_PERMANENT, _("permanent")),
+        (TYPE_PROCESSING, _("while processing")),
+        (TYPE_CUSTOM, _("custom duration after archival")),
+    )
+
+    UNIT_YEARS = "years"
+    UNIT_MONTHS = "months"
+    UNIT_DAYS = "days"
+
+    UNIT_CHOICES = (
+        (UNIT_YEARS, _("years")),
+        (UNIT_MONTHS, _("months")),
+        (UNIT_DAYS, _("days")),
+    )
+
+    label = models.CharField(max_length=255, verbose_name=_("label"), unique=True)
+    plan_type = models.CharField(
+        max_length=10,
+        verbose_name=_("plan type"),
+        choices=TYPE_CHOICES,
+    )
+    custom_time = models.PositiveIntegerField(
+        verbose_name=_("custom time"),
+        null=True,
+        blank=True,
+    )
+    custom_time_unit = models.CharField(
+        max_length=6,
+        verbose_name=_("unit for custom time"),
+        choices=UNIT_CHOICES,
+        null=True,
+        blank=True,
+    )
+
+    def __str__(self):
+        return self.label
 
 
 class Attribute(models.Model):
@@ -118,18 +165,54 @@ class Attribute(models.Model):
         choices=DISPLAY_CHOICES,
         default=None,
         null=True,
+        blank=True,
+    )
+    visibility_conditions = ArrayField(
+        JSONField(
+            default=dict,
+            blank=True,
+            null=True,
+            encoder=DjangoJSONEncoder,
+        ),
+        verbose_name=_("visibility condition"),
+        null=True,
+        blank=True,
     )
     unit = models.CharField(
         max_length=255, verbose_name=_("unit"), null=True, blank=True
     )
     public = models.BooleanField(verbose_name=_("public information"), default=False)
+    searchable = models.BooleanField(verbose_name=_("searchable field"), default=False)
     generated = models.BooleanField(verbose_name=_("generated"), default=False)
+    data_retention_plan = models.ForeignKey(
+        "DataRetentionPlan",
+        verbose_name=_("data retention plan"),
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+    )
     calculations = ArrayField(
         models.CharField(max_length=255, blank=True), blank=True, null=True
+    )
+    related_fields = ArrayField(
+        models.TextField(blank=True), blank=True, null=True
     )
     required = models.BooleanField(verbose_name=_("required"), default=False)
     multiple_choice = models.BooleanField(
         verbose_name=_("multiple choice"), default=False
+    )
+    character_limit = models.PositiveIntegerField(
+        verbose_name=_("character limit"),
+        null=True,
+    )
+    unique = models.BooleanField(
+        verbose_name=_("unique"),
+        default=False,
+    )
+    error_message = models.TextField(
+        verbose_name=_("error message"),
+        null=True,
+        blank=True,
     )
     identifier = models.CharField(
         max_length=50,
@@ -148,6 +231,24 @@ class Attribute(models.Model):
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
     help_link = models.URLField(verbose_name=_("Help link"), blank=True, null=True)
     broadcast_changes = models.BooleanField(default=False)
+    autofill_readonly = models.BooleanField(verbose_name=_("read-only autofill field"), null=True)
+    autofill_rule = JSONField(
+        verbose_name=_("autofill rule"),
+        default=dict,
+        blank=True,
+        null=True,
+        encoder=DjangoJSONEncoder,
+    )
+    updates_autofill = models.BooleanField(verbose_name=_("updates related autofill fields"), default=False)
+    highlight_group = models.ForeignKey(
+        Group,
+        verbose_name=_("highlight field for group"),
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
+    # attributes which are linked to static Project fields
+    static_property = models.CharField(max_length=255, blank=True, null=True)
 
     objects = AttributeQuerySet.as_manager()
 
@@ -174,6 +275,9 @@ class Attribute(models.Model):
                 )
 
     def clean(self):
+        if not len(self.calculations):
+            return
+
         # Only allow for uneven arrays
         if len(self.calculations) % 2 != 1:
             raise ValidationError(
@@ -218,32 +322,65 @@ class Attribute(models.Model):
             else:
                 return value.identifier if value else None
         elif self.value_type == Attribute.TYPE_INTEGER:
-            return int(value) if value is not None else None
+            if self.multiple_choice:
+                return [
+                    int(v) if v is not None else None
+                    for v in value
+                ]
+            else:
+                return int(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DECIMAL:
-            return float(value) if value is not None else None
+            return str(value) if value is not None else None
         elif self.value_type in (
             Attribute.TYPE_SHORT_STRING,
             Attribute.TYPE_LONG_STRING,
             Attribute.TYPE_LINK,
             Attribute.TYPE_CHOICE,
         ):
-            return str(value) if value else None
+            if self.multiple_choice:
+                return [
+                    str(v) if v else None
+                    for v in value
+                ]
+            else:
+                return str(value) if value else None
         elif self.value_type in (
             Attribute.TYPE_RICH_TEXT,
             Attribute.TYPE_RICH_TEXT_SHORT,
         ):
-            return value
+            if self.multiple_choice:
+                return [v for v in value]
+            else:
+                return value
         elif self.value_type == Attribute.TYPE_BOOLEAN:
-            return bool(value) if value is not None else None
+            if self.multiple_choice:
+                return [
+                    bool(v) if v is not None else None
+                    for v in value
+                ]
+            else:
+                return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
-            return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
+            if self.multiple_choice:
+                return [
+                    v.strftime(DATE_SERIALIZATION_FORMAT) if v else None
+                    for v in value
+                ]
+            else:
+                return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
         elif self.value_type == Attribute.TYPE_USER:
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).
             if isinstance(value, get_user_model()):
-                return value.uuid
+                if self.multiple_choice:
+                    return [v.uuid for v in value]
+                else:
+                    return value.uuid
             else:
-                return value or None
+                if self.multiple_choice:
+                    return [v or None for v in value]
+                else:
+                    return value or None
         elif self.value_type == Attribute.TYPE_FIELDSET:
             return self._get_fieldset_serialization(value)
         else:
@@ -290,24 +427,33 @@ class Attribute(models.Model):
 
     def _get_fieldset_serialization(self, value: Sequence, deserialize: bool = False):
         """Recursively go through the fields in the fieldset and (de)serialize them."""
-        if not isinstance(value, Sequence):
+
+        if isinstance(value, OrderedDict):
+            value = [value]
+        elif not isinstance(value, Sequence):
             return None
 
         entities = []
         fieldset_attributes = self.fieldset_attributes.all()
-        for entity in value:
+
+        for listitem in value:
             processed_entity = {}
-            for attr in fieldset_attributes:
-                if attr.identifier in entity:
-                    if deserialize:
-                        processed_value = attr.deserialize_value(
-                            entity[attr.identifier]
-                        )
+            for key, val in listitem.items():
+                for attr in fieldset_attributes:
+                    if attr.identifier == key:
+                        if deserialize:
+                            processed_value = attr.deserialize_value(
+                                key
+                            )
+                        else:
+                            processed_value = attr.serialize_value(val)
+                        processed_entity[attr.identifier] = processed_value
                     else:
-                        processed_value = attr.serialize_value(entity[attr.identifier])
-                    processed_entity[attr.identifier] = processed_value
+                        continue
+
             if processed_entity:
                 entities.append(processed_entity)
+
         return entities
 
     def _get_single_display_value(self, value):
@@ -382,12 +528,16 @@ class FieldSetAttribute(models.Model):
     attribute_target = models.ForeignKey(
         Attribute, on_delete=models.CASCADE, related_name="fieldset_attribute_target"
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+    phase_indices = models.ManyToManyField(
+        "ProjectPhase",
+        symmetrical=False,
+        related_name="fieldsets",
+        through="ProjectPhaseFieldSetAttributeIndex",
+    )
 
     class Meta:
         verbose_name = _("fieldset attribute")
         verbose_name_plural = _("fieldset attributes")
-        ordering = ("index",)
 
     def __str__(self):
         return f"{self.attribute_source} -> {self.attribute_target}"

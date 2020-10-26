@@ -21,6 +21,7 @@ from projects.filters import ProjectFilter
 from projects.importing import AttributeImporter
 from projects.importing.report import ReportTypeCreator
 from projects.models import (
+    FieldComment,
     ProjectComment,
     LastReadTimestamp,
     Project,
@@ -41,6 +42,7 @@ from projects.permissions.media_file_permissions import (
 from projects.permissions.projects import ProjectPermissions
 from projects.serializers.comment import (
     CommentSerializer,
+    FieldCommentSerializer,
     LastReadTimestampSerializer,
 )
 from projects.serializers.document import DocumentTemplateSerializer
@@ -216,6 +218,47 @@ class ProjectAttributeFileDownloadView(
         # NOTE: This overrides PRIVATE_STORAGE_AUTH_FUNCTION
         # TODO: Change permission function when user permissions has been implemented
         return has_project_attribute_file_permissions(private_file, self.request)
+
+
+class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
+    queryset = FieldComment.objects.all().select_related("user")
+    serializer_class = FieldCommentSerializer
+    permission_classes = (CommentPermissions,)
+    filter_backends = (filters.OrderingFilter,)
+    ordering_fields = ("created_at", "modified_at")
+
+    def initial(self, request, *args, **kwargs):
+        super(FieldCommentViewSet, self).initial(request, *args, **kwargs)
+        self.parent_instance = self.get_parent_instance()
+
+    def get_parent_instance(self):
+        qd = self.get_parents_query_dict()
+        project_id = qd.get("project")
+        project = Project.objects.filter(pk=project_id).first()
+
+        if not project:
+            raise Http404
+        return project
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["parent_instance"] = self.parent_instance
+        return context
+
+    @action(methods=["get"], detail=False, url_path=r"field/(?P<field_identifier>\w+)", url_name="project-field-comments")
+    def field_comments(self, request, *args, **kwargs):
+        identifier = kwargs.get("field_identifier", "")
+        comments = FieldComment.objects \
+            .filter(field__identifier=identifier) \
+            .select_related("user")
+        page = self.paginate_queryset(comments)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(comments, many=True)
+        return Response(serializer.data)
 
 
 class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):

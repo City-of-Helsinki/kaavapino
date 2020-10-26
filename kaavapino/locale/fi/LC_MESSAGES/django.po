@@ -1,0 +1,593 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-10-05 14:23+0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: projects/admin.py:64
+msgid "Please select only one project."
+msgstr "Valitse vain yksi projekti"
+
+#: projects/admin.py:69
+msgid "Create document {}"
+msgstr "Luo dokumentti {}"
+
+#: projects/exporting/report.py:19 projects/models/attribute.py:157
+#: projects/models/document.py:16 projects/models/project.py:36
+#: projects/models/project.py:62 projects/models/project.py:97
+#: projects/models/project.py:400 projects/models/project.py:481
+#: projects/models/project.py:555 projects/models/report.py:14
+msgid "name"
+msgstr "nimi"
+
+#: projects/exporting/report.py:21 projects/models/project.py:91
+#: projects/models/project.py:534 projects/models/projectcomment.py:29
+#: projects/models/projectcomment.py:74
+msgid "created at"
+msgstr "luotu"
+
+#: projects/exporting/report.py:23 projects/models/project.py:94
+#: projects/models/projectcomment.py:32 projects/models/projectcomment.py:77
+msgid "modified at"
+msgstr "muokattu"
+
+#: projects/exporting/report.py:25 projects/models/attribute.py:142
+#: projects/models/project.py:86 projects/models/project.py:529
+#: projects/models/projectcomment.py:19 projects/models/projectcomment.py:65
+#: projects/models/projectcomment.py:94
+msgid "user"
+msgstr "käyttäjä"
+
+#: projects/exporting/report.py:27 projects/models/project.py:130
+#: projects/models/project.py:523 projects/models/project.py:551
+msgid "phase"
+msgstr "vaihe"
+
+#: projects/exporting/report.py:29 projects/models/project.py:110
+msgid "subtype"
+msgstr "kokoluokka"
+
+#: projects/models/attribute.py:23
+msgid ""
+"Enter a valid 'identifier' consisting of Unicode letters, numbers or "
+"underscores."
+msgstr ""
+
+#: projects/models/attribute.py:68
+msgid "permanent"
+msgstr "tallennetaan pysyvästi"
+
+#: projects/models/attribute.py:69
+msgid "while processing"
+msgstr "prosessinaikainen"
+
+#: projects/models/attribute.py:70
+msgid "custom duration after archival"
+msgstr "määriteltävä ajanjakso arkistoinnin jälkeen"
+
+#: projects/models/attribute.py:78
+msgid "years"
+msgstr "vuotta"
+
+#: projects/models/attribute.py:79
+msgid "months"
+msgstr "kuukautta"
+
+#: projects/models/attribute.py:80
+msgid "days"
+msgstr "päivää"
+
+#: projects/models/attribute.py:83
+msgid "label"
+msgstr "nimike"
+
+#: projects/models/attribute.py:86
+msgid "plan type"
+msgstr "säilytyssuunnitelman tyyppi"
+
+#: projects/models/attribute.py:90
+msgid "custom time"
+msgstr "määritelty ajanjakso"
+
+#: projects/models/attribute.py:96
+msgid "unit for custom time"
+msgstr "ajanjakson yksikkö"
+
+#: projects/models/attribute.py:133
+msgid "fieldset"
+msgstr "kenttäryhmä"
+
+#: projects/models/attribute.py:134
+msgid "integer"
+msgstr "kokonaisluku"
+
+#: projects/models/attribute.py:135
+msgid "decimal"
+msgstr "desimaaliluku"
+
+#: projects/models/attribute.py:136
+msgid "short string"
+msgstr "lyhyt teksti"
+
+#: projects/models/attribute.py:137
+msgid "long string"
+msgstr "pitkä teksti"
+
+#: projects/models/attribute.py:138
+msgid "rich text"
+msgstr "pitkä muotoiltu teksti"
+
+#: projects/models/attribute.py:139
+msgid "short rich text"
+msgstr "lyhyt muotoiltu teksti"
+
+#: projects/models/attribute.py:140
+msgid "boolean"
+msgstr "totuusarvo"
+
+#: projects/models/attribute.py:141
+msgid "date"
+msgstr "päivämäärä"
+
+#: projects/models/attribute.py:143
+msgid "geometry"
+msgstr "rajaus"
+
+#: projects/models/attribute.py:144
+msgid "image"
+msgstr "kuva"
+
+#: projects/models/attribute.py:145
+msgid "file"
+msgstr "tiedosto"
+
+#: projects/models/attribute.py:146
+msgid "link"
+msgstr "linkki"
+
+#: projects/models/attribute.py:147
+msgid "choice"
+msgstr "valinta"
+
+#: projects/models/attribute.py:153
+msgid "default"
+msgstr "oletus"
+
+#: projects/models/attribute.py:154
+msgid "dropdown"
+msgstr "pudotusvalikko"
+
+#: projects/models/attribute.py:159
+msgid "value type"
+msgstr "arvon tyyppi"
+
+#: projects/models/attribute.py:163
+msgid "display style"
+msgstr "näyttötyyli"
+
+#: projects/models/attribute.py:175
+msgid "visibility condition"
+msgstr "ehto näkyvyydelle"
+
+#: projects/models/attribute.py:180
+msgid "unit"
+msgstr "yksikkö"
+
+#: projects/models/attribute.py:182
+msgid "public information"
+msgstr "julkinen tieto"
+
+#: projects/models/attribute.py:183
+msgid "searchable field"
+msgstr "hakukenttä"
+
+#: projects/models/attribute.py:184 projects/models/projectcomment.py:26
+#: projects/models/projectcomment.py:71
+msgid "generated"
+msgstr "automaattisesti generoitu"
+
+#: projects/models/attribute.py:187
+msgid "data retention plan"
+msgstr "datan säilytysaika"
+
+#: projects/models/attribute.py:198
+msgid "required"
+msgstr "pakollinen"
+
+#: projects/models/attribute.py:200
+msgid "multiple choice"
+msgstr "monivalinta"
+
+#: projects/models/attribute.py:204 projects/models/attribute.py:447
+#: projects/models/project.py:103
+msgid "identifier"
+msgstr "tunniste"
+
+#: projects/models/attribute.py:216
+msgid "Help text"
+msgstr "ohjeteksti"
+
+#: projects/models/attribute.py:217
+msgid "Help link"
+msgstr "ohjelinkki"
+
+#: projects/models/attribute.py:219
+msgid "read-only autofill field"
+msgstr "automaattisesti täytettynä vain luku"
+
+#: projects/models/attribute.py:221
+msgid "autofill rule"
+msgstr "automaattisen täytön sääntö"
+
+#: projects/models/attribute.py:227
+msgid "updates related autofill fields"
+msgstr "päivittää kenttään liittyvät automaattisesti kentät"
+
+#: projects/models/attribute.py:232 projects/models/attribute.py:440
+#: projects/models/project.py:425 projects/models/project.py:580
+#: projects/models/project.py:623 projects/models/project.py:685
+#: projects/models/report.py:62
+msgid "attribute"
+msgstr "kenttä"
+
+#: projects/models/attribute.py:233 projects/models/project.py:404
+#: projects/models/project.py:559
+msgid "attributes"
+msgstr "kentät"
+
+#: projects/models/attribute.py:444
+msgid "value"
+msgstr "arvo"
+
+#: projects/models/attribute.py:451 projects/models/project.py:70
+#: projects/models/project.py:401 projects/models/project.py:432
+#: projects/models/project.py:489 projects/models/project.py:556
+#: projects/models/project.py:585 projects/models/project.py:605
+#: sitecontent/models.py:10 sitecontent/models.py:29
+msgid "index"
+msgstr "indeksi"
+
+#: projects/models/attribute.py:454
+msgid "attribute value choice"
+msgstr "kentän vaihtoehto"
+
+#: projects/models/attribute.py:455
+msgid "attribute value choices"
+msgstr "kentän vaihtoehdot"
+
+#: projects/models/attribute.py:479
+msgid "fieldset attribute"
+msgstr "kenttäryhmän kenttä"
+
+#: projects/models/attribute.py:480
+msgid "fieldset attributes"
+msgstr "kenttäryhmän kentät"
+
+#: projects/models/document.py:20 projects/models/project.py:500
+msgid "project phase"
+msgstr "projektin vaihe"
+
+#: projects/models/document.py:42
+msgid "document template"
+msgstr "dokumenttipohja"
+
+#: projects/models/document.py:43
+msgid "document templates"
+msgstr "dokumenttipohjat"
+
+#: projects/models/project.py:38 projects/models/project.py:64
+#: projects/models/project.py:492
+msgid "metadata"
+msgstr "metadata"
+
+#: projects/models/project.py:46 projects/models/project.py:57
+#: projects/models/report.py:9
+msgid "project type"
+msgstr "projektin tyyppi"
+
+#: projects/models/project.py:47
+msgid "project types"
+msgstr "projektin tyypit"
+
+#: projects/models/project.py:73 projects/models/project.py:396
+#: projects/models/project.py:477
+msgid "project subtype"
+msgstr "projektin kokoluokka"
+
+#: projects/models/project.py:74
+msgid "project subtypes"
+msgstr "projektin kokoluokat"
+
+#: projects/models/project.py:115
+msgid "attribute data"
+msgstr "kentän data"
+
+#: projects/models/project.py:122
+msgid "deadlines"
+msgstr "määräajat"
+
+#: projects/models/project.py:136
+msgid "create principles"
+msgstr "luo periaatteet"
+
+#: projects/models/project.py:140
+msgid "create draft"
+msgstr "luo luonnos"
+
+#: projects/models/project.py:148 projects/models/project.py:517
+#: projects/models/project.py:629 projects/models/project.py:691
+#: projects/models/projectcomment.py:12 projects/models/projectcomment.py:51
+#: projects/models/projectcomment.py:101
+msgid "project"
+msgstr "projekti"
+
+#: projects/models/project.py:149
+msgid "projects"
+msgstr "projektit"
+
+#: projects/models/project.py:410
+msgid "project floor area section"
+msgstr "projektin kerrosalatietojen osio"
+
+#: projects/models/project.py:411
+msgid "project floor area sections"
+msgstr "projektin kerrosalatietojen osiot"
+
+#: projects/models/project.py:429
+msgid "floor area section"
+msgstr "kerrosalatietojen osio"
+
+#: projects/models/project.py:436 projects/models/project.py:589
+msgid "relies on"
+msgstr "riippuvainen"
+
+#: projects/models/project.py:443
+msgid "project floor area section attribute"
+msgstr "projektin kerrosalatieto-osion kenttä"
+
+#: projects/models/project.py:444
+msgid "project floor area section attributes"
+msgstr "projektin kerrosalatieto-osion kentät"
+
+#: projects/models/project.py:453 projects/models/project.py:583
+#: projects/models/project.py:662
+msgid "phase section"
+msgstr "vaiheen osio"
+
+#: projects/models/project.py:482
+msgid "color"
+msgstr "väri"
+
+#: projects/models/project.py:484
+msgid "color code"
+msgstr "värikoodi"
+
+#: projects/models/project.py:487
+msgid "list prefix"
+msgstr "listaetuliite"
+
+#: projects/models/project.py:501
+msgid "project phases"
+msgstr "projektin vaiheet"
+
+#: projects/models/project.py:538
+msgid "project phase log entry"
+msgstr "projektivaiheen lokikirjaus"
+
+#: projects/models/project.py:539
+msgid "project phase log entries"
+msgstr "projektivaiheen lokikirjaukset"
+
+#: projects/models/project.py:565
+msgid "project phase section"
+msgstr "projektivaiheen osio"
+
+#: projects/models/project.py:566
+msgid "project phase sections"
+msgstr "projektivaiheen osiot"
+
+#: projects/models/project.py:596
+msgid "project phase section attribute"
+msgstr "projektivaiheosion kenttä"
+
+#: projects/models/project.py:597
+msgid "project phase section attributes"
+msgstr "projektivaiheosion kentät"
+
+#: projects/models/project.py:634
+msgid "description"
+msgstr "kuvaus"
+
+#: projects/models/project.py:653
+msgid "project attribute file"
+msgstr "projektikentän tiedosto"
+
+#: projects/models/project.py:654
+msgid "project attribute files"
+msgstr "projektikentän tiedostot"
+
+#: projects/models/projectcomment.py:35 projects/models/projectcomment.py:80
+msgid "content"
+msgstr "sisältö"
+
+#: projects/models/projectcomment.py:38
+msgid "project comment"
+msgstr "projektikommentti"
+
+#: projects/models/projectcomment.py:39
+msgid "project comments"
+msgstr "projektikommentit"
+
+#: projects/models/projectcomment.py:58
+msgid "field"
+msgstr "kenttä"
+
+#: projects/models/projectcomment.py:83
+msgid "field comment"
+msgstr "kenttäkommentti"
+
+#: projects/models/projectcomment.py:84
+msgid "field comments"
+msgstr "kenttäkommentit"
+
+#: projects/models/projectcomment.py:107
+msgid "timestamp"
+msgstr "aikaleima"
+
+#: projects/models/projectcomment.py:111
+msgid "last read timestamp"
+msgstr "viimeksi luettu"
+
+#: projects/models/projectcomment.py:112
+msgid "last read timestamps"
+msgstr "viimeksi luettu"
+
+#: projects/models/report.py:16
+msgid "can only be fetched by admin"
+msgstr "vain pääkäyttäjän haettavissa"
+
+#: projects/models/report.py:20
+msgid "show name on report"
+msgstr "näytä nimi raportissa"
+
+#: projects/models/report.py:23
+msgid "show created at on report"
+msgstr "näytä luontiaika raportissa"
+
+#: projects/models/report.py:26
+msgid "show modified at on report"
+msgstr "näytä muokkausaika raportissa"
+
+#: projects/models/report.py:29
+msgid "show user on report"
+msgstr "näytä käyttäjä raportissa"
+
+#: projects/models/report.py:32
+msgid "show phase on report"
+msgstr "näytä vaihe raportissa"
+
+#: projects/models/report.py:35
+msgid "show subtype on report"
+msgstr "näytä kokoluokka raportissa"
+
+#: projects/models/report.py:39 projects/models/report.py:55
+msgid "report"
+msgstr "raportti"
+
+#: projects/models/report.py:40
+msgid "reports"
+msgstr "raportit"
+
+#: projects/models/report.py:68
+msgid "report attribute"
+msgstr "raportin kenttä"
+
+#: projects/models/report.py:69
+msgid "report attributes"
+msgstr "raportin kentät"
+
+#: projects/serializers/project.py:273
+msgid "Archived projects cannot be edited"
+msgstr "Arkistoitua projektia ei voi muokata"
+
+#: projects/serializers/project.py:413
+msgid "Invalid phase for project subtype, no substitute found"
+msgstr "Epäkelpo vaihe projektin kokoluokalle, vastaavaa vaihetta ei löydy"
+
+#: projects/serializers/project.py:428
+msgid "Selected user does not have the required role"
+msgstr "Valitulla käyttäjällä ei ole vaadittua roolia"
+
+#: projects/serializers/project.py:471
+msgid "All phases for the sub type needs to be included in the deadlines list"
+msgstr "Kaikkien kokoluokan vaiheiden sisällyttävä määräaikalistaan"
+
+#: projects/serializers/project.py:481
+#, python-brace-format
+msgid "Invalid date \"{deadline}\", must be after \"{latest_deadline}\""
+msgstr "Epäkelpo päivämäärä \"{deadline}\", oltava ajankohdan \"{latest_deadline}\" jälkeen"
+
+#: projects/serializers/project.py:494
+#, python-brace-format
+msgid "Multiple pk value \"{pk_value}\""
+msgstr "Useita pääavainarvoja \"{pk_value}\""
+
+#: projects/serializers/project.py:507
+#, python-brace-format
+msgid "Invalid pk value \"{pk_value}\" - object does not exist."
+msgstr "Epäkelpo pääavainarvo \"{pk_value}\" - kohdetta ei ole."
+
+#: projects/serializers/project.py:714
+#, python-brace-format
+msgid "Object with {slug_name}={value} does not exist."
+msgstr "Kohdetta jonka {slug_name}={value} ei ole."
+
+#: projects/templates/admin/kaavapino_index.html:27
+msgid "Import specifications"
+msgstr ""
+
+#: projects/templates/admin/kaavapino_index.html:31
+msgid "Import"
+msgstr ""
+
+#: projects/templates/admin/kaavapino_index.html:37
+msgid "Create default reports"
+msgstr ""
+
+#: projects/templates/admin/kaavapino_index.html:40
+msgid "Create"
+msgstr ""
+
+#: sitecontent/apps.py:6
+msgid "site content"
+msgstr "sivuston sisältö"
+
+#: sitecontent/models.py:8
+msgid "link text"
+msgstr "linkin teksti"
+
+#: sitecontent/models.py:9
+msgid "url"
+msgstr "url"
+
+#: sitecontent/models.py:13
+msgid "section"
+msgstr "osio"
+
+#: sitecontent/models.py:14
+msgid "links"
+msgstr "linkit"
+
+#: sitecontent/models.py:20 sitecontent/models.py:21
+msgid "footer link"
+msgstr "alatunnisteen linkki"
+
+#: sitecontent/models.py:28
+msgid "title"
+msgstr "otsikko"
+
+#: sitecontent/models.py:32
+msgid "footer section"
+msgstr "alatunnisteen osio"
+
+#: sitecontent/models.py:33
+msgid "footer sections"
+msgstr "alatunnisteen osiot"
+
+#: users/models.py:20
+msgid "additional groups"
+msgstr "lisätyt ryhmät"

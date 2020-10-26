@@ -4,6 +4,7 @@ from typing import List, NamedTuple, Type
 from actstream import action
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
 from django.db.models import Prefetch
 from django.utils.translation import ugettext_lazy as _
@@ -100,6 +101,22 @@ class ProjectSerializer(serializers.ModelSerializer):
         attribute_data = getattr(project, "attribute_data", {})
         self._set_file_attributes(attribute_data, project)
         self._set_geometry_attributes(attribute_data, project)
+
+        attribute_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
+        attribute_data['luonnosvaihe_luotu'] = project.create_draft
+        attribute_data['periaatevaihe_luotu'] = project.create_principles
+
+        static_properties = [
+            "user", "name", "public", "pino_number"
+        ]
+
+        for static_property in static_properties:
+            try:
+                identifier = \
+                    Attribute.objects.get(static_property=static_property).identifier
+                attribute_data[identifier] = getattr(project, static_property)
+            except Attribute.DoesNotExist:
+                continue
 
         return attribute_data
 
@@ -273,6 +290,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("attribute_data", None), attrs
         )
 
+        if attrs.get("subtype") and self.instance is not None:
+            attrs["phase"] = self._validate_phase(attrs)
+
         deadlines = self._validate_deadlines(attrs)
         public = self._validate_public(attrs)
 
@@ -285,6 +305,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes):
+        if not attribute_data:
+            return {}
         # Get serializers for all sections in all phases
         sections_data = []
         current_phase = getattr(self.instance, "phase", None)
@@ -328,7 +350,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
-            if not serializer.is_valid():
+            if not serializer.is_valid(raise_exception=True):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
 
@@ -346,28 +368,69 @@ class ProjectSerializer(serializers.ModelSerializer):
             return public
 
         # A project is always public if it has exited the starting phase
-        if not self.instance.public and (attrs["phase"].index > 0 or self.instance.phase.index > 0):
+        try:
+            phase_index = attrs["phase"]
+        except KeyError:
+            phase_index = self.instance.phase.index
+
+        if not self.instance.public and (phase_index > 0):
             return True
 
         return public
 
-    def validate_phase(self, phase):
-        def _get_next_phase(phase):
-            return phase.project_subtype.phases.get(pk=phase.index + 1)
+    def validate_phase(self, phase, subtype_id=None):
+        if not subtype_id:
+            try:
+                subtype_id = int(self.get_initial()["subtype"])
+            except KeyError:
+                subtype_id = self.instance.subtype.pk
+
+        def _get_relative_phase(phase, offset):
+            return phase.project_subtype.phases.get(index=phase.index + offset)
+
+        offset = None
 
         # TODO hard-coded for now
-        if phase.name == "Suunnitteluperiaatteet" and not self.instance.create_principles:
-            phase = _get_next_phase(phase)
+        if phase.name == "Suunnitteluperiaatteet":
+            if phase.project_subtype.pk == subtype_id:
+                if not self.instance.create_principles:
+                    offset = 1
+            else:
+                offset = -1
 
-        if phase.name == "Luonnos" and not self.instance.create_draft:
-            phase = _get_next_phase(phase)
+        if phase.name == "Luonnos":
+            if phase.project_subtype.pk == subtype_id:
+                if not self.instance.create_draft:
+                    offset = 1
+            else:
+                offset = -2
 
-        elif phase.project_subtype.pk == int(self.get_initial()["subtype"]):
+        if offset:
+            phase = _get_relative_phase(phase, offset)
+
+        if phase.project_subtype.pk == subtype_id:
             return phase
+        # Try to find a corresponding phase for current subtype
+        else:
+            try:
+                return ProjectPhase.objects.get(name=phase.name, project_subtype__pk=subtype_id)
+            except ProjectPhase.DoesNotExist:
+                pass
+            try:
+                return ProjectPhase.objects.get(index=phase.index, project_subtype__pk=subtype_id)
+            except ProjectPhase.DoesNotExist:
+                raise ValidationError(
+                    {"phase": _("Invalid phase for project subtype, no substitute found")}
+                )
 
-        raise ValidationError(
-            {"phase": _("Invalid phase for project subtype")}
-        )
+    def _validate_phase(self, attrs):
+        try:
+            return attrs["phase"]
+        except KeyError:
+            return self.validate_phase(
+                ProjectPhase.objects.get(pk=self.instance.phase.pk),
+                subtype_id=attrs["subtype"].id
+            )
 
     def validate_user(self, user):
         if not user.has_privilege('create'):
@@ -566,6 +629,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
     def _create_updates_log(self, attribute, project, user, new_value, old_value):
+        try:
+            json.dumps(new_value)
+        except TypeError:
+            # Decimals and dates cause TypeError later
+            new_value = json.loads(json.dumps(new_value, default=str))
+
         action.send(
             user,
             verb=verbs.UPDATED_ATTRIBUTE,
@@ -613,6 +682,7 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
             "name",
             "color",
             "color_code",
+            "list_prefix",
             "index",
         ]
 
@@ -637,12 +707,18 @@ class ProjectFileSerializer(serializers.ModelSerializer):
     @staticmethod
     def _validate_attribute(attribute: Attribute, project: Project):
         # Check if the attribute is part of the project
-        project_has_attribute = bool(
-            ProjectPhaseSectionAttribute.objects.filter(
+        try:
+            # Field belongs to a fieldset
+            project_has_attribute = bool(ProjectPhaseSectionAttribute.objects.filter(
+                section__phase__project_subtype__project_type=project.type,
+                attribute=attribute.fieldset_attribute_target.get().attribute_source,
+            ).count)
+        except ObjectDoesNotExist:
+            project_has_attribute = bool(ProjectPhaseSectionAttribute.objects.filter(
                 section__phase__project_subtype__project_type=project.type,
                 attribute=attribute,
-            ).count()
-        )
+            ).count())
+
         if not project_has_attribute:
             # Using the same error message as SlugRelatedField
             raise ValidationError(_("Object with {slug_name}={value} does not exist."))

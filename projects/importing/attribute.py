@@ -6,6 +6,8 @@ from enum import Enum
 from itertools import filterfalse
 from typing import Iterable, Sequence, List, Optional
 
+from django.db.utils import IntegrityError
+from django.contrib.auth.models import Group
 from django.db import transaction
 from django.db.models import ProtectedError
 from openpyxl import load_workbook
@@ -13,6 +15,7 @@ from openpyxl import load_workbook
 from ..models import (
     Attribute,
     AttributeValueChoice,
+    DataRetentionPlan,
     FieldSetAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
@@ -21,6 +24,7 @@ from ..models import (
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectPhase,
+    ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
 )
@@ -43,7 +47,30 @@ ATTRIBUTE_CHOICES_REF = "pudotusvalikko/vaihtoehdot"
 ATTRIBUTE_UNIT = "mittayksikkö"
 ATTRIBUTE_BROADCAST_CHANGES = "muutos näkyy viestit-ikkunassa"
 ATTRIBUTE_REQUIRED = "pakollinen tieto"  # kyllä/ei
+ATTRIBUTE_DATA_RETENTION = "tiedon säilytysaika"
 ATTRIBUTE_MULTIPLE_CHOICE = "tietoa voi olla useita" # kyllä/ei
+ATTRIBUTE_SEARCHABLE = "tietoa käytetään hakutietona (hakuruudussa) projektit-näkymässä"
+ATTRIBUTE_RELATED_FIELDS = "mihin tietoon kytkeytyy"
+ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY = "sääntö: kenttä näkyy vain toiseen kenttään tehdyn valinnan perusteella"
+ATTRIBUTE_RULE_AUTOFILL = "sääntö: tieto muodostuu toiseen kenttään merkityn tiedon perusteella automaattisesti"
+ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunutta tietoa muokata "
+ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin täytettyyn tietokenttään"
+ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
+ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
+ATTRIBUTE_ERROR = "virhetilanne"
+# TODO: ask for a dedicated column for uniqueness at some point
+ATTRIBUTE_ERROR_UNIQUE = [
+    "Virhe. Nimi on jo käytössä",
+    "Virhe. Diaarinumero on jo toisen projektin käytössä. Samalle diaarínumerolle ei voi luoda uutta projektia.",
+]
+
+# Attribute object mappings for static Project fields
+STATIC_ATTRIBUTES_MAPPING = {
+     "vastuuhenkilö": "user",
+     "luodaanko_nakyvaksi": "public",
+     "pinonumero": "pino_number",
+     "projektin_nimi": "name",
+}
 
 PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
@@ -54,74 +81,106 @@ CALCULATIONS_COLUMN = "laskelmat"
 
 ATTRIBUTE_FIELDSET = "projektitieto fieldset"
 
-ATTRIBUTE_PHASE_COLUMNS = [
-    "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-]
+class Phases(Enum):
+    START = "Käynnistys"
+    PRINCIPLES = "Periaatteet"
+    OAS = "OAS"
+    DRAFT = "Luonnos"
+    PROPOSAL = "Ehdotus"
+    REVISED_PROPOSAL = "Tarkistettu ehdotus"
+    APPROVAL = "Hyväksyminen"
+    GOING_INTO_EFFECT = "Voimaantulo"
+
+
+ATTRIBUTE_PHASE_COLUMNS = {
+    Phases.START: "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.PRINCIPLES: "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.OAS: "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.DRAFT: "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.PROPOSAL: " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.REVISED_PROPOSAL: "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.APPROVAL: "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.GOING_INTO_EFFECT: "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+}
 
 ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
 
+HIGHLIGHT_GROUPS = {
+    "Asiantuntijan kenttä": "Asiantuntijat",
+    "Pääkäyttäjän kenttä": "Pääkäyttäjät",
+}
+
 KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 
-
-class Phases(Enum):
-    START = "Käynnistys"
-    PRINCIPLES = "Suunnitteluperiaatteet"
-    OAS = "OAS"
-    DRAFT = "Luonnos"
-    PROPOSAL = "Ehdotus"
-    REVISED_PROPOSAL = "Tarkistettu ehdotus"
-    KHS = "Kanslia-Khs-Valtuusto"
-    GOING_INTO_EFFECT = "Voimaantulo"
-
+DATA_RETENTION_PLANS = {
+    "tieto tallennetaan pysyvästi": {
+        "label": "tieto tallennetaan pysyvästi",
+        "plan_type": "permanent",
+    },
+    "prosessinaikainen": {
+        "label": "prosessinaikainen",
+        "plan_type": "processing",
+    },
+    "tieto poistuu 6 kk kuluttua, kun projekti on arkistoitu": {
+        "label": "6 kk arkistoinnista",
+        "plan_type": "custom",
+        "custom_time": 6,
+        "custom_time_unit": "month",
+    },
+}
+DEFAULT_DATA_RETENTION_PLAN = DATA_RETENTION_PLANS["tieto tallennetaan pysyvästi"]
 
 PROJECT_PHASES = {
     Phases.START.value: {
         "name": Phases.START.value,
-        "color": "color--tram",
-        "color_code": "#009246",
+        "color": "#02d7a7",
+        "color_code": "#02d7a7",
+        "list_prefix": "1",
     },  # None
     Phases.PRINCIPLES.value: {
         "name": Phases.PRINCIPLES.value,
         "color": '#009142',
+        "color_code": '#009142',
+        "list_prefix": "XL",
     },
     Phases.OAS.value: {
         "name": Phases.OAS.value,
-        "color": "color--summer",
+        "color": "#ffc61e",
         "color_code": "#ffc61e",
+        "list_prefix": "2",
     },  # 01, 03
     Phases.DRAFT.value: {
         "name": Phases.DRAFT.value,
         "color": '#ffd600',
+        "color_code": '#ffd600',
+        "list_prefix": "XL",
     },
     Phases.PROPOSAL.value: {
         "name": Phases.PROPOSAL.value,
-        "color": "color--metro",
+        "color": "#fd4f00",
         "color_code": "#fd4f00",
+        "list_prefix": "3",
     },  # 02, 04
     Phases.REVISED_PROPOSAL.value: {
         "name": Phases.REVISED_PROPOSAL.value,
-        "color": "color--bus",
+        "color": "#0000bf",
         "color_code": "#0000bf",
+        "list_prefix": "4",
     },  # 05, 07
-    Phases.KHS.value: {
-        "name": Phases.KHS.value,
-        "color": "color--black",
-        "color_code": "#000000",
+    Phases.APPROVAL.value: {
+        "name": Phases.APPROVAL.value,
+        "color": "#bd9650",
+        "color_code": "#bd9650",
+        "list_prefix": "5",
     },  # 06, 07 <- Kvsto
     Phases.GOING_INTO_EFFECT.value: {
         "name": Phases.GOING_INTO_EFFECT.value,
-        "color": "color--white",
-        "color_code": "#ffffff",
+        "color": "#9ec8eb",
+        "color_code": "#9ec8eb",
+        "list_prefix": "6",
     },
 }
 
@@ -131,6 +190,7 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "S": [
@@ -138,6 +198,7 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "M": [
@@ -145,7 +206,7 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
-        Phases.KHS.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "L": [
@@ -153,15 +214,17 @@ SUBTYPE_PHASES = {
         Phases.OAS.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
-        Phases.KHS.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
     "XL": [
         Phases.START.value,
+        Phases.PRINCIPLES.value,
         Phases.OAS.value,
+        Phases.DRAFT.value,
         Phases.PROPOSAL.value,
         Phases.REVISED_PROPOSAL.value,
-        Phases.KHS.value,
+        Phases.APPROVAL.value,
         Phases.GOING_INTO_EFFECT.value,
     ],
 }
@@ -172,6 +235,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 12},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "S": {
@@ -179,6 +243,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 12},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "M": {
@@ -186,7 +251,7 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 12},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 24},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 10},
-        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "L": {
@@ -194,15 +259,17 @@ SUBTYPE_PHASE_METADATA = {
         Phases.OAS.value: {"default_end_weeks_delta": 16},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 36},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 14},
-        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
     "XL": {
         Phases.START.value: {"default_end_weeks_delta": 12},
+        Phases.PRINCIPLES.value: {"default_end_weeks_delta": 0},
         Phases.OAS.value: {"default_end_weeks_delta": 16},
+        Phases.DRAFT.value: {"default_end_weeks_delta": 0},
         Phases.PROPOSAL.value: {"default_end_weeks_delta": 36},
         Phases.REVISED_PROPOSAL.value: {"default_end_weeks_delta": 14},
-        Phases.KHS.value: {"default_end_weeks_delta": 12},
+        Phases.APPROVAL.value: {"default_end_weeks_delta": 12},
         Phases.GOING_INTO_EFFECT.value: {"default_end_weeks_delta": 6},
     },
 }
@@ -241,11 +308,13 @@ VALUE_TYPES = {
     "Valinta (1-2) painikkeesta.": Attribute.TYPE_CHOICE,
     "Valinta (1-x) pudotusvalikosta.": Attribute.TYPE_CHOICE,
     "Valintaruutu.": Attribute.TYPE_BOOLEAN,
+    "Vuoden valinta pudotusvalikosta": Attribute.TYPE_INTEGER,
 }
 
 DISPLAY_TYPES = {
     "Valinta (1) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
     "Valinta (1-x) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
+    "Vuoden valinta pudotusvalikosta": Attribute.DISPLAY_DROPDOWN,
 }
 
 
@@ -345,6 +414,80 @@ class AttributeImporter:
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
+        def parse_condition(condition):
+            condition = re.split("\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
+
+            if len(condition) == 1:
+                negate = condition[0][0] == "!"
+                condition = [
+                    condition[0][1:] if negate else condition[0],
+                    "!=" if negate else "==",
+                    True,
+                ]
+                value = condition[2]
+                value_type = "boolean"
+
+            else:
+                value = condition[2]
+                if value[0] == '[' and value[-1] == ']':
+                    try:
+                        [int(i) for i in re.split(',\s+', value[1:-1])]
+                        value_type = 'list<number>'
+                    except ValueError:
+                        value_type = 'list<string>'
+                else:
+                    try:
+                        int(value)
+                        value_type = 'number'
+                    except ValueError:
+                        value_type = 'string'
+
+            return {
+                "variable": condition[0],
+                "operator": condition[1],
+                "comparison_value": value,
+                "comparison_value_type": value_type,
+            }
+
+        def parse_autofill_rule(rule):
+            if rule == "ei":
+                return None
+
+            # TODO: make a more general implementation for including fields if cases become more complex
+            variables = re.findall("^\{\{(.*)\}\}", rule)
+            thens = re.findall("\{%+\sif.*?%\}\s*(.*?)\s*\{% endif %\}", rule)
+            conditions = re.findall("\{%\s*if\s*(.*?)\s*%\}.*?\{%\s*endif\s*%\}", rule)
+
+            branches = []
+
+            for (then, condition) in zip(thens, conditions):
+                if then == "kyllä":
+                    then = True
+                elif then == "ei":
+                    then = False
+
+                new_branches = [
+                    {
+                        "variables": variables,
+                        "condition": parse_condition(condition_or),
+                        "then_branch": then,
+                        "else_branch": None
+                    }
+                    for condition_or in re.split("\s(or)+\s", condition)
+                ]
+                branches += new_branches
+
+            return branches
+
+        def parse_autofill_readonly(rule):
+            if rule == "kyllä" or \
+                (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
+                return False
+            elif rule == "ei":
+                return True
+
+            return None
+
         logger.info("\nCreating attributes...")
 
         existing_attribute_ids = set(
@@ -371,13 +514,46 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
+            ifs = re.findall(
+                "\{%\s*if\s*(.*?)\s*%\}",
+                row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
+            )
+            conditions = []
+
+            for if_condition in ifs:
+                conditions += re.split("\s+or\s+", if_condition)
+
+            visibility_conditions = [
+                parse_condition(condition)
+                for condition in conditions
+            ]
+
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
             broadcast_changes = (
                 row[self.column_index[ATTRIBUTE_BROADCAST_CHANGES]] == "kyllä"
             )
 
-            multiple_choice = row[self.column_index[ATTRIBUTE_MULTIPLE_CHOICE]] == "kyllä"
+            try:
+                data_retention_plan = DATA_RETENTION_PLANS[
+                    row[self.column_index[ATTRIBUTE_DATA_RETENTION]]
+                ]
+            except KeyError:
+                data_retention_plan = DEFAULT_DATA_RETENTION_PLAN
+
+            data_retention_plan, _ = DataRetentionPlan.objects.update_or_create(
+                label=data_retention_plan["label"],
+                defaults=data_retention_plan,
+            )
+
+            multiple_choice = row[self.column_index[ATTRIBUTE_MULTIPLE_CHOICE]] in [
+                "kyllä",
+                "fieldset voi toistua",
+            ]
+            try:
+                character_limit = int(row[self.column_index[ATTRIBUTE_CHARACTER_LIMIT]])
+            except (TypeError, ValueError):
+                character_limit = None
 
             try:
                 help_text = row[self.column_index[HELP_TEXT]].strip()
@@ -391,6 +567,45 @@ class AttributeImporter:
 
             is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
             is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
+            is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
+            # TODO: ask for a dedicated column for uniqueness at some point
+            is_unique = row[self.column_index[ATTRIBUTE_ERROR]] in ATTRIBUTE_ERROR_UNIQUE
+            error_message = row[self.column_index[ATTRIBUTE_ERROR]]
+            static_property = STATIC_ATTRIBUTES_MAPPING.get(
+                row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
+
+            try:
+                highlight_group = Group.objects.get(name=HIGHLIGHT_GROUPS[
+                    row[self.column_index[ATTRIBUTE_HIGHLIGHT_GROUP]]
+                ])
+            except Group.DoesNotExist:
+                raise Group.DoesNotExist(
+                    "Default group(s) not found, try running create_default_groups_and_mappings management command first"
+                )
+            except KeyError:
+                highlight_group = None
+
+            # autofill
+
+            related_fields = re.findall(
+                '\{\{(.*?)\}\}',
+                row[self.column_index[ATTRIBUTE_RELATED_FIELDS]] or ''
+            )
+            try:
+                autofill_rule = parse_autofill_rule(
+                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]]
+                )
+                autofill_readonly = parse_autofill_readonly(
+                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL_READONLY]]
+                )
+            except TypeError:
+                autofill_rule = None
+                autofill_readonly = None
+
+
+            updates_autofill = row[self.column_index[ATTRIBUTE_RULE_UPDATE_AUTOFILL]] == "kyllä"
+
 
             if not value_type:
                 logger.warning(
@@ -408,15 +623,27 @@ class AttributeImporter:
                     "name": name,
                     "value_type": value_type,
                     "display": display,
+                    "visibility_conditions": visibility_conditions,
                     "help_text": help_text,
                     "help_link": help_link,
                     "public": is_public,
                     "required": is_required,
+                    "searchable": is_searchable,
                     "multiple_choice": multiple_choice,
+                    "data_retention_plan": data_retention_plan,
+                    "character_limit": character_limit,
+                    "unique": is_unique,
+                    "error_message": error_message,
                     "generated": generated,
                     "calculations": calculations,
+                    "related_fields": related_fields,
                     "unit": unit,
                     "broadcast_changes": broadcast_changes,
+                    "autofill_rule": autofill_rule,
+                    "autofill_readonly": autofill_readonly,
+                    "updates_autofill": updates_autofill,
+                    "highlight_group": highlight_group,
+                    "static_property": static_property,
                 },
             )
             if created:
@@ -456,6 +683,8 @@ class AttributeImporter:
         return True, calculations
 
     def _create_attribute_choices(self, attribute, row) -> int:
+        AttributeValueChoice.objects.filter(attribute=attribute).delete()
+
         created_choices_count = 0
         choices_rows = self._rows_for_sheet(self.workbook[CHOICES_SHEET_NAME])
         choices_ref = row[self.column_index[ATTRIBUTE_CHOICES_REF]]
@@ -478,12 +707,17 @@ class AttributeImporter:
             if not choice:
                 break
 
-            _, created = AttributeValueChoice.objects.update_or_create(
-                attribute=attribute,
-                index=index,
-                value=choice,
-                identifier=identifier
-            )
+            try:
+                _, created = AttributeValueChoice.objects.update_or_create(
+                    attribute=attribute,
+                    identifier=identifier,
+                    defaults={
+                        "index": index,
+                        "value": choice,
+                    }
+                )
+            except IntegrityError:
+                logger.warning(f'Duplicate choice "{value} ({identifier})" for {attribute}, ignoring row')
 
             if created:
                 created_choices_count += 1
@@ -491,16 +725,15 @@ class AttributeImporter:
 
         return created_choices_count
 
-    def _create_fieldset_links(self, rows: Iterable[Sequence[str]]):
+    def _create_fieldset_links(self, subtype, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating fieldsets...")
-
-        FieldSetAttribute.objects.all().delete()
 
         if ATTRIBUTE_FIELDSET not in self.column_index:
             logger.warning(f'Fieldset column "{ATTRIBUTE_FIELDSET}" missing: Skipping')
             return
 
         fieldset_map = defaultdict(list)
+        phases = ProjectPhase.objects.filter(project_subtype=subtype)
 
         # Map out the link that need to be created
         for row in rows:
@@ -508,18 +741,38 @@ class AttributeImporter:
             if not fieldset_attr:
                 continue
 
+            phase_indices = []
+            for phase in phases:
+                location = self._get_attribute_locations(row, phase.name)
+                if location is None:
+                    continue
+
+                try:
+                    index = location["child_locations"][-1]
+                except IndexError:
+                    index = None
+
+                if index is not None:
+                    phase_indices.append((phase, index))
+
             attr_id = self._get_attribute_row_identifier(row)
-            fieldset_map[fieldset_attr].append(attr_id)
+            fieldset_map[fieldset_attr].append((attr_id, phase_indices))
 
         # Create the links
         for source_id in fieldset_map:
             source = Attribute.objects.get(identifier=source_id)
 
-            for index, target_id in enumerate(fieldset_map[source_id], start=1):
+            for target_id, phase_indices in fieldset_map[source_id]:
                 target = Attribute.objects.get(identifier=target_id)
-                fsa = FieldSetAttribute.objects.create(
-                    attribute_source=source, attribute_target=target, index=index
+                fsa, _ = FieldSetAttribute.objects.get_or_create(
+                    attribute_source=source, attribute_target=target
                 )
+                for phase, index in phase_indices:
+                    ProjectPhaseFieldSetAttributeIndex.objects.create(
+                        index=index,
+                        phase=phase,
+                        attribute=fsa,
+                    )
                 logger.info(f"Created {fsa}")
 
     def _validate_generated_attributes(self):
@@ -567,18 +820,39 @@ class AttributeImporter:
     def _get_attribute_input_phases(self, row):
         input_phases = []
 
-        for index, column_name in enumerate(ATTRIBUTE_PHASE_COLUMNS):
-            value = row[self.column_index[column_name]]
+        for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():
+            value = row[self.column_index[column]]
             if value in [None, "ei"]:
                 continue
 
-            try:
-                value = index
-                input_phases.append(index)
-            except ValueError:
-                logger.info(f"Cannot covert {value} into an integer.")
+            input_phases.append(phase.value)
 
         return filter(lambda x: x is not None, input_phases)
+
+    def _get_attribute_locations(self, row, phase_name):
+        for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():
+            if phase.value == phase_name:
+                value = row[self.column_index[column]]
+                try:
+                    [label, location] = value.split(";")
+                    locations = [
+                        # location format is section.field(set).field
+                        # where : acts as optional decimal separator
+                        int(float(".".join(loc.split(':')))*10000)
+                        for loc in location.split(".")
+                    ]
+
+                except ValueError as asd:
+                    return None
+
+                return {
+                    "label": label,
+                    "section_location": locations[0],
+                    "field_location": locations[1],
+                    "child_locations": locations[2:],
+                }
+
+        return None
 
     def _create_sections(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing sections...")
@@ -587,21 +861,21 @@ class AttributeImporter:
 
         for phase in ProjectPhase.objects.filter(project_subtype=subtype):
 
-            # Get all distinct section names in appearance order
-            phase_sections = []
+            phase_sections = set()
 
             for row in rows:
-                section_phase_name = row[self.column_index[PHASE_SECTION_NAME]].strip()
+                try:
+                    location = self._get_attribute_locations(row, phase.name)
+                    section_phase_name = location["label"]
+                    index = location["section_location"]
+                except TypeError:
+                    continue
 
-                if (
-                    phase.index in self._get_attribute_input_phases(row)
-                    and section_phase_name not in phase_sections
-                ):
-                    phase_sections.append(section_phase_name)
+                phase_sections.add((section_phase_name, index))
 
-            for i, phase_section_name in enumerate(phase_sections, start=1):
+            for phase_section_name, index in phase_sections:
                 section = ProjectPhaseSection.objects.create(
-                    phase=phase, index=i, name=phase_section_name
+                    phase=phase, index=index, name=phase_section_name
                 )
                 logger.info(f"Created {section}")
 
@@ -655,12 +929,21 @@ class AttributeImporter:
 
                 identifier = self._get_attribute_row_identifier(row)
                 attribute = Attribute.objects.get(identifier=identifier)
+                locations = self._get_attribute_locations(row, phase.name)
 
-                if phase.index not in self._get_attribute_input_phases(row):
+                if locations is None:
                     # Attribute doesn't appear in this phase
                     continue
 
-                section_phase_name = row[self.column_index[PHASE_SECTION_NAME]].strip()
+                section_phase_name = locations["label"]
+
+                if self._row_part_of_fieldset(row):
+                    try:
+                        attribute_index = locations["child_field_locations"][-1]
+                    except IndexError:
+                        attribute_index = 0
+                else:
+                    attribute_index = locations["field_location"]
 
                 section = ProjectPhaseSection.objects.get(
                     phase=phase, name=section_phase_name
@@ -669,7 +952,7 @@ class AttributeImporter:
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(
                     attribute=attribute,
                     section=section,
-                    index=counter[section],
+                    index=attribute_index,
                 )
 
                 counter[section] += 1
@@ -807,7 +1090,9 @@ class AttributeImporter:
                     "index": i,
                     "color": phase["color"],
                     "color_code": phase["color_code"],
+                    "list_prefix": phase["list_prefix"],
                     "metadata": metadata,
+
                 },
             )
             if project_phase.id in old_phases:
@@ -866,6 +1151,7 @@ class AttributeImporter:
         ordered_subtypes = []
         for index, subtype_name in enumerate(ordered_subtype_names):
             project_subtype, created = ProjectSubtype.objects.update_or_create(
+                pk=index+1,
                 project_type=self.project_type,
                 name=subtype_name.upper(),
                 defaults={"index": index},
@@ -892,14 +1178,17 @@ class AttributeImporter:
         data_rows = list(filter(self._check_if_row_valid, rows[1:]))
 
         subtypes = self.create_subtypes(data_rows)
+        attribute_info = self._create_attributes(data_rows)
         phase_info = {"created": 0, "updated": 0, "deleted": 0}
+        # Reset Fieldset relations
+        FieldSetAttribute.objects.all().delete()
         for subtype in subtypes:
             _phase_info = self.create_phases(subtype)
             phase_info["created"] += _phase_info["created"]
             phase_info["updated"] += _phase_info["updated"]
             phase_info["deleted"] += _phase_info["deleted"]
-        attribute_info = self._create_attributes(data_rows)
-        self._create_fieldset_links(data_rows)
+            self._create_fieldset_links(subtype, data_rows)
+
         self._validate_generated_attributes()
 
         # Remove all attributes from further processing that were part of a fieldset

@@ -9,9 +9,10 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
+from PIL import Image
 
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
-from .attribute import Attribute
+from .attribute import Attribute, FieldSetAttribute
 
 
 class BaseAttributeMatrixStructure(models.Model):
@@ -483,6 +484,9 @@ class ProjectPhase(models.Model):
     color_code = models.CharField(
         max_length=10, verbose_name=_("color code"), blank=True
     )
+    list_prefix = models.CharField(
+        max_length=2, verbose_name=_("list prefix"), blank=True, null=True
+    )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
     metadata = JSONField(
@@ -598,6 +602,20 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
+class ProjectPhaseFieldSetAttributeIndex(models.Model):
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+    phase = models.ForeignKey(
+        ProjectPhase, on_delete=models.CASCADE
+    )
+    attribute = models.ForeignKey(
+        FieldSetAttribute, on_delete=models.CASCADE
+    )
+    unique_together = ("attribute", "phase")
+
+    def __str__(self):
+        return f"{self.attribute} {self.phase} {self.index}"
+
+
 class ProjectAttributeFile(models.Model):
     """Project attribute value that is an file."""
 
@@ -631,6 +649,19 @@ class ProjectAttributeFile(models.Model):
         upload_subfolder=get_upload_subfolder,
         max_length=255,
     )
+
+    def save(self, *args, **kwargs):
+        super(ProjectAttributeFile, self).save(*args, **kwargs)
+        # portrait a4 paper @ 200dpi
+        paper_size_in_pixels = (1654, 2339)
+        try:
+            # resize to 200dpi print size
+            image = Image.open(self.file.path)
+            image.thumbnail(paper_size_in_pixels, Image.ANTIALIAS)
+            image.save(self.file.path, quality=100, optimize=True)
+        except IOError:
+            # not an image
+            pass
 
     class Meta:
         verbose_name = _("project attribute file")

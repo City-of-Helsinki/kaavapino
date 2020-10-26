@@ -34,8 +34,17 @@ env = environ.Env(
     USE_X_FORWARDED_HOST=(bool, False),
     SENTRY_DSN=(str, ""),
     CSRF_COOKIE_DOMAIN=(str, ""),
-    CSRF_TRUSTED_ORIGINS=(list, [])
+    CSRF_TRUSTED_ORIGINS=(list, []),
+    SOCIAL_AUTH_TUNNISTAMO_SECRET=(str, "SECRET_UNSET"),
+    SOCIAL_AUTH_TUNNISTAMO_KEY=(str, "KEY_UNSET"),
+    SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT=(str, "OIDC_ENDPOINT_UNSET"),
 )
+
+SOCIAL_AUTH_TUNNISTAMO_SECRET = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_SECRET")
+SOCIAL_AUTH_TUNNISTAMO_KEY = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_KEY")
+SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT")
+
+SOCIAL_AUTH_TUNNISTAMO_AUTH_EXTRA_ARGUMENTS = {'ui_locales': 'fi'}
 
 env_file = project_root(".env")
 
@@ -50,6 +59,10 @@ if DEBUG and not SECRET_KEY:
 
 #ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
+JWT_AUTH = {
+    'JWT_AUDIENCE': os.environ.get('JWT_AUDIENCE'),
+    'JWT_SECRET_KEY': os.environ.get('JWT_SECRET_KEY'),
+}
 
 DATABASES = {"default": env.db()}
 
@@ -66,6 +79,9 @@ ROOT_URLCONF = "kaavapino.urls"
 WSGI_APPLICATION = "kaavapino.wsgi.application"
 
 LANGUAGE_CODE = "fi"
+LOCALE_PATHS = (
+    str(project_root.path('kaavapino').path('locale')),
+)
 TIME_ZONE = "Europe/Helsinki"
 USE_I18N = True
 USE_L10N = True
@@ -81,11 +97,10 @@ except Exception:
 RAVEN_CONFIG = {"dsn": env.str("SENTRY_DSN"), "release": version}
 
 INSTALLED_APPS = [
-    "helusers",
-    "helusers.providers.helsinki_oidc",
+    "helusers.apps.HelusersConfig",
+    "helusers.apps.HelusersAdminConfig",
     "rest_framework",
     "rest_framework.authtoken",
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.sites",
     "django.contrib.contenttypes",
@@ -97,6 +112,7 @@ INSTALLED_APPS = [
     "kaavapino",
     "projects",
     "sitecontent",
+    "social_django",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
@@ -129,6 +145,7 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                'helusers.context_processors.settings',
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
@@ -143,7 +160,12 @@ TEMPLATES = [
 SITE_ID = 1
 AUTH_USER_MODEL = "users.User"
 SOCIALACCOUNT_PROVIDERS = {"helsinki_oidc": {"VERIFIED_EMAIL": True}}
-LOGIN_REDIRECT_URL = "/"
+AUTHENTICATION_BACKENDS = [
+    'helusers.tunnistamo_oidc.TunnistamoOIDCAuth',
+    'django.contrib.auth.backends.ModelBackend',
+]
+LOGIN_REDIRECT_URL = "/admin/"
+LOGOUT_REDIRECT_URL = "/admin/"
 ACCOUNT_LOGOUT_ON_GET = True
 SOCIALACCOUNT_ADAPTER = "helusers.adapter.SocialAccountAdapter"
 SOCIALACCOUNT_QUERY_EMAIL = True
@@ -159,6 +181,7 @@ OIDC_API_TOKEN_AUTH = {
     "ISSUER": env.str("TOKEN_AUTH_AUTHSERVER_URL"),
 }
 
+SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
 
 if DEBUG:
     LOGGING = {

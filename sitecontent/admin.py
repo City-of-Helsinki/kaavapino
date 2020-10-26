@@ -1,6 +1,6 @@
-from adminsortable2.admin import SortableInlineAdminMixin
+from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin
 from django.contrib import admin
-from sitecontent.models import FooterSection, FooterLink
+from sitecontent.models import FooterSection, FooterLink, ListViewAttributeColumn
 
 
 class FooterLinkInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -10,3 +10,7 @@ class FooterLinkInline(SortableInlineAdminMixin, admin.TabularInline):
 @admin.register(FooterSection)
 class FooterSectionAdmin(admin.ModelAdmin):
     inlines = (FooterLinkInline,)
+
+@admin.register(ListViewAttributeColumn)
+class ListViewAttributeColumnAdmin(SortableAdminMixin, admin.ModelAdmin):
+    list_display = ('attribute',)

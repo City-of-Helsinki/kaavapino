@@ -1,13 +1,15 @@
+import re
 from collections import namedtuple
 
 from django.db import models
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from projects.models import Attribute
+from projects.models import Attribute, AttributeValueChoice, FieldSetAttribute
 from projects.models.project import (
     PhaseAttributeMatrixCell,
     ProjectFloorAreaSectionAttributeMatrixCell,
+    ProjectPhaseFieldSetAttributeIndex,
 )
 from projects.serializers.utils import _is_attribute_required
 
@@ -28,29 +30,121 @@ class AttributeChoiceSchemaSerializer(serializers.Serializer):
     value = serializers.CharField()
 
 
+class ConditionSerializer(serializers.Serializer):
+    variable = serializers.CharField()
+    operator = serializers.CharField()
+    comparison_value = serializers.SerializerMethodField()
+    comparison_value_type = serializers.CharField()
+
+    def get_comparison_value(self, obj):
+        try:
+            attribute = Attribute.objects.get(identifier=obj['variable'])
+        except Attribute.DoesNotExist:
+            attribute = None
+
+        value = obj['comparison_value']
+        value_type = obj['comparison_value_type']
+
+        if value_type[0:4] == "list":
+            return_list = re.split(',\s+', value[1:-1])
+
+            if attribute and attribute.value_type == "choice":
+                for index, choice in enumerate(return_list):
+                    choice = choice.strip("\"")
+                    try:
+                        return_list[index] = \
+                           attribute.value_choices.get(value=choice).identifier
+                    except AttributeValueChoice.DoesNotExist:
+                        return_list[index] = choice
+
+            elif value_type[5:-1] == "string":
+                return_list = [
+                    string.strip("\"")
+                    for string in return_list
+                ]
+            elif value_type[5:-1] == "number":
+                return_list = [
+                    int(number)
+                    for number in return_list
+                ]
+
+            return return_list
+        elif attribute and attribute.value_type == "choice":
+            try:
+                return attribute.value_choices.get(value=value).identifier
+            except AttributeValueChoice.DoesNotExist:
+                return value
+        elif not isinstance(value, bool):
+            try:
+                return int(value)
+            except ValueError:
+                return value
+        else:
+            return value
+
+
+class AutofillRuleSerializer(serializers.Serializer):
+    condition = ConditionSerializer()
+    then_branch = serializers.CharField()
+    else_branch = serializers.CharField()
+    variables = serializers.ListField(child=serializers.CharField())
+
+
 class AttributeSchemaSerializer(serializers.Serializer):
     label = serializers.CharField(source="name")
     name = serializers.CharField(source="identifier")
     help_text = serializers.CharField()
     help_link = serializers.CharField(read_only=True)
     multiple_choice = serializers.BooleanField()
+    character_limit = serializers.IntegerField()
     fieldset_attributes = serializers.SerializerMethodField()
+    fieldset_index = serializers.SerializerMethodField("get_fieldset_index")
     type = serializers.CharField(source="value_type")
     required = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()
     generated = serializers.BooleanField(read_only=True)
     unit = serializers.CharField()
+    calculations = serializers.ListField(child=serializers.CharField())
+    visibility_conditions = serializers.ListField(child=ConditionSerializer())
+    autofill_rule = serializers.ListField(child=AutofillRuleSerializer())
+    autofill_readonly = serializers.BooleanField()
+    updates_autofill = serializers.BooleanField()
+    related_fields = serializers.ListField(child=serializers.CharField())
+    searchable = serializers.BooleanField()
+    highlight_group = serializers.CharField()
+    display = serializers.CharField()
 
-    @staticmethod
-    def get_fieldset_attributes(attribute):
+    def get_fieldset_attributes(self, attribute):
+        try:
+            context = self.context
+        except AttributeError:
+            context = {}
+
+        def take_index(attribute):
+            try:
+                return attribute.fieldset_index
+            except AttributeError:
+                return 0
+
         if attribute.value_type == Attribute.TYPE_FIELDSET:
-            return [
-                AttributeSchemaSerializer(attr).data
-                for attr in attribute.fieldset_attributes.order_by(
-                    "fieldset_attribute_source"
-                )
-            ]
+            return sorted([
+                AttributeSchemaSerializer(attr, context=context).data
+                for attr in attribute.fieldset_attributes.all()
+            ], key=take_index)
         return []
+
+    def get_fieldset_index(self, attribute):
+        if FieldSetAttribute.objects.filter(attribute_target=attribute).count() <= 0:
+            return None
+
+        try:
+            fieldset = FieldSetAttribute.objects.get(attribute_target=attribute)
+            return ProjectPhaseFieldSetAttributeIndex.objects.get(
+                phase=self.context["phase"],
+                attribute=fieldset,
+            ).index
+        except Exception:
+            return None
 
     @staticmethod
     def get_required(attribute):
@@ -183,7 +277,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attribute
         ).data
         serialized_attribute.update(
-            AttributeSchemaSerializer(section_attribute.attribute).data
+            AttributeSchemaSerializer(section_attribute.attribute, context={"phase": section_attribute.section.phase}).data
         )
         return serialized_attribute
 
@@ -236,6 +330,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     title = serializers.CharField(source="name")
     color = serializers.CharField()
     color_code = serializers.CharField()
+    list_prefix = serializers.CharField()
     sections = ProjectSectionSchemaSerializer(many=True)
 
 

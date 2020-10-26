@@ -1,11 +1,14 @@
 import collections
 import copy
 
+from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 from rest_framework_gis.fields import GeometryField
 
 from projects.models import (
     Attribute,
+    Project,
     ProjectFloorAreaSection,
     ProjectPhaseSection,
 )
@@ -37,10 +40,52 @@ FIELD_TYPES = {
 FieldData = namedtuple("FieldData", ["field_class", "field_arguments"])
 
 
-def create_attribute_field_data(attribute, validation):
+def create_attribute_field_data(attribute, validation, project):
     """Create data for initializing attribute field serializer."""
     field_arguments = {}
     field_class = FIELD_TYPES.get(attribute.value_type, None)
+
+    def get_rich_text_validator(attribute):
+        def validate(value):
+            error_msg = attribute.error_message or _("Character limit exceeded")
+            try:
+                total_length = 0
+
+                for item in value["ops"]:
+                    total_length += len(item["insert"])
+
+                if attribute.character_limit and total_length > attribute.character_limit:
+                    raise ValidationError(
+                        {attribute.identifier: error_msg}
+                    )
+
+                return value
+
+            except (KeyError, TypeError):
+                raise ValidationError(
+                    {attribute.identifier: _("Incorrect rich text formatting")}
+                )
+
+        return validate
+
+    def get_unique_validator(attribute):
+        def validate(value):
+            column = f"attribute_data__{attribute.identifier}"
+            error_msg = attribute.error_message or _("Value must be unique")
+            if Project.objects.filter(**{column: value}).exclude(pk=project.pk).count() > 0:
+                raise ValidationError(
+                    {attribute.identifier: error_msg}
+                )
+
+        return validate
+
+    field_arguments["validators"] = []
+
+    if attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+        field_arguments["validators"] += [get_rich_text_validator(attribute)]
+
+    if attribute.unique:
+        field_arguments["validators"] += [get_unique_validator(attribute)]
 
     if attribute.value_type == Attribute.TYPE_CHOICE:
         choices = attribute.value_choices.all()
@@ -73,10 +118,14 @@ def create_attribute_field_data(attribute, validation):
     if attribute.value_type == Attribute.TYPE_BOOLEAN:
         field_arguments.pop("allow_null")
 
+    if attribute.multiple_choice and attribute.value_type != Attribute.TYPE_CHOICE:
+        field_arguments["child"] = field_class()
+        field_class = serializers.ListField
+
     return FieldData(field_class, field_arguments)
 
 
-def create_fieldset_field_data(attribute, validation):
+def create_fieldset_field_data(attribute, validation, project):
     """Dynamically create a serializer for a fieldset type Attribute instance."""
     serializer_fields = {}
     field_arguments = {}
@@ -85,7 +134,7 @@ def create_fieldset_field_data(attribute, validation):
         field_arguments["many"] = True
 
     for attr in attribute.fieldset_attributes.order_by("fieldset_attribute_source"):
-        field_data = create_attribute_field_data(attr, validation)
+        field_data = create_attribute_field_data(attr, validation, project)
         if not field_data.field_class:
             # TODO: Handle this by failing instead of continuing
             continue
@@ -144,9 +193,9 @@ def create_section_serializer(section, context, project=None, validation=True):
             continue
 
         if attribute.value_type == Attribute.TYPE_FIELDSET:
-            field_data = create_fieldset_field_data(attribute, validation)
+            field_data = create_fieldset_field_data(attribute, validation, project)
         else:
-            field_data = create_attribute_field_data(attribute, validation)
+            field_data = create_attribute_field_data(attribute, validation, project)
 
             if not field_data.field_class:
                 # TODO: Handle this by failing instead of continuing
