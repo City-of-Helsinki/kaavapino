@@ -1,5 +1,6 @@
 import pytz
 from datetime import datetime
+from django.contrib.postgres.search import SearchVector
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -102,11 +103,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         queryset = self.queryset
 
         includeds_users = self.request.query_params.get("includes_users", None)
+        search = self.request.query_params.get("search", None)
         users = self.request.query_params.get("users", None)
         if includeds_users is not None:
             queryset = self._filter_included_users(includeds_users, queryset)
         if users is not None:
             queryset = self._filter_users(users, queryset)
+        if search is not None:
+            print(search)
+            queryset = self._search(search, queryset)
 
         queryset = self._filter_private(queryset, user)
         return queryset
@@ -144,6 +149,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def _filter_users(self, users, queryset):
         users_list = self._string_filter_to_list(users)
         return queryset.filter(user__uuid__in=users_list)
+
+    def _search(self, search, queryset):
+        search_fields = [
+            attr.static_property or f"attribute_data__{attr.identifier}"
+            for attr in Attribute.objects.filter(searchable=True)
+        ]
+        return queryset \
+            .annotate(search=SearchVector(*search_fields)) \
+            .filter(search=search)
 
     @staticmethod
     def _filter_private(queryset, user):

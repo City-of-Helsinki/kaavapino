@@ -106,6 +106,11 @@ class Project(models.Model):
         blank=True,
         null=True,
     )
+    pino_number = models.CharField(
+        max_length=7,
+        verbose_name=_("pino number"),
+        unique=True,
+    )
     subtype = models.ForeignKey(
         ProjectSubtype,
         verbose_name=_("subtype"),
@@ -384,9 +389,9 @@ class Project(models.Model):
     def type(self):
         return self.subtype.project_type
 
-    @property
-    def pino_number(self):
-        return str(self.pk).zfill(7)
+    def save(self, *args, **kwargs):
+        self.pino_number = str(self.pk).zfill(7)
+        super(ProjectAttributeFile, self).save(*args, **kwargs)
 
 
 class ProjectFloorAreaSection(models.Model):
