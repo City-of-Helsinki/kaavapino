@@ -391,7 +391,7 @@ class Project(models.Model):
 
     def save(self, *args, **kwargs):
         self.pino_number = str(self.pk).zfill(7)
-        super(ProjectAttributeFile, self).save(*args, **kwargs)
+        super(Project, self).save(*args, **kwargs)
 
 
 class ProjectFloorAreaSection(models.Model):
