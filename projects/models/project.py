@@ -110,6 +110,8 @@ class Project(models.Model):
         max_length=7,
         verbose_name=_("pino number"),
         unique=True,
+        blank=True,
+        null=True,
     )
     subtype = models.ForeignKey(
         ProjectSubtype,
