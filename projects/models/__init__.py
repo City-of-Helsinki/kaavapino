@@ -4,6 +4,11 @@ from .attribute import (  # noqa
     DataRetentionPlan,
     FieldSetAttribute,
 )
+from .deadline import (  # noqa
+    Deadline,
+    DateType,
+    AutomaticDate,
+)
 from .document import DocumentTemplate  # noqa
 from .project import (  # noqa
     Project,
