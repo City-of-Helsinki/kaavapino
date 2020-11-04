@@ -1,4 +1,5 @@
 import datetime
+from calendar import isleap
 from workalendar.core import MON, TUE, WED, THU, FRI, SAT, SUN
 from workalendar.europe import Finland
 
@@ -119,12 +120,52 @@ class DateType(models.Model):
     )
 
     def get_dates(self, year):
-        return_dates = dates
+        listed_dates = [date for date in self.dates]
 
-        for automatic_date in automatic_dates:
-            return_dates += automatic_date.calculate(self.business_days_only, year)
+        for automatic_date in self.automatic_dates.all():
+            listed_dates += automatic_date.calculate(
+                self.business_days_only, year
+            )
 
-        return return_dates
+        if self.exclude_selected:
+            return [
+                datetime.date(year, 1, 1) + datetime.timedelta(days=i)
+                for i in range((366 if isleap(+year) else 365))
+                if date + datetime.timedelta(days=i) not in listed_dates
+            ]
+        else:
+            return listed_dates
+
+    def valid_days_from(self, orig_date, days):
+        year = orig_date.year
+        dates = sorted(self.get_dates(year))
+
+        if days < 0:
+            dates = [date for date in dates if date >= orig_date]
+            dates.reverse()
+            print(dates)
+        else:
+            dates = [date for date in dates if date <= orig_date]
+
+        # Handle the case where there aren't enough days left in the year
+        while abs(days) >= len(dates):
+            if days < 0:
+                days += len(dates)
+                year -= 1
+            else:
+                days -= len(dates)
+                year += 1
+
+            # Give up after ten years
+            if abs(year - orig_date.year) >= 10:
+                return None
+
+            dates = sorted(self.get_dates(year))
+
+            if days < 0:
+                dates.reverse()
+
+        return dates[abs(days)]
 
 
 class AutomaticDate(models.Model):
