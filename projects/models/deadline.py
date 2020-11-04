@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import ugettext_lazy as _
 
 from users.models import PRIVILEGE_LEVELS
+from . import Attribute
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 
 
@@ -42,7 +43,11 @@ class Deadline(models.Model):
     date_type = models.ForeignKey(
         "DateType",
         verbose_name=_("date type"),
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
+    )
+    condition_attribute = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("attribute condition"),
     )
     phase = models.ForeignKey(
         "ProjectPhase",
@@ -50,11 +55,41 @@ class Deadline(models.Model):
         related_name="schedule",
         on_delete=models.CASCADE,
     )
-    outdated_warning = models.BooleanField(verbose_name=_("show warning when out of date"))
+    initial_calculation = models.ForeignKey(
+        "DateCalculation",
+        verbose_name=_("initial calculation"),
+        related_name="calculates_deadlines",
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+    )
+    update_calculation = models.ForeignKey(
+        "DateCalculation",
+        verbose_name=_("update calculation"),
+        related_name="updates_deadlines",
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+    )
+    error_out_of_date = models.TextField(
+        verbose_name=_("error message for past due date"),
+        null=True,
+        blank=True,
+    )
+    error_min_distance_previous = models.TextField(
+        verbose_name=_("error message for minimum distance to previous date not met"),
+        null=True,
+        blank=True,
+    )
+    warning_min_distance_next = models.TextField(
+        verbose_name=_("warning message for minimum distance to next date not met"),
+        null=True,
+        blank=True,
+    )
 
     @property
     def editable(self):
-        if not edit_privilege:
+        if not self.edit_privilege:
             return False
 
         return True
@@ -269,3 +304,7 @@ class AutomaticDate(models.Model):
                 last day before holiday, \
                 first day after holiday"
             ))
+
+
+class DateCalculation(models.Model):
+    pass
