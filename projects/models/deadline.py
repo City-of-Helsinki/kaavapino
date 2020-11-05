@@ -27,7 +27,11 @@ class Deadline(models.Model):
         (TYPE_MILESTONE, _("milestone")),
     )
 
-    abbreviation = models.CharField(max_length=255, verbose_name=_("abbreviation"))
+    abbreviation = models.CharField(
+        max_length=255,
+        verbose_name=_("abbreviation"),
+        unique=True,
+    )
     identifier = models.CharField(
         max_length=50,
         verbose_name=_("identifier"),
@@ -49,6 +53,7 @@ class Deadline(models.Model):
     condition_attribute = models.ManyToManyField(
         Attribute,
         verbose_name=_("attribute condition"),
+        blank=True,
     )
     phase = models.ForeignKey(
         "ProjectPhase",
@@ -56,21 +61,25 @@ class Deadline(models.Model):
         related_name="schedule",
         on_delete=models.CASCADE,
     )
-    initial_calculation = models.ForeignKey(
+    initial_calculation = models.ManyToManyField(
         "DateCalculation",
         verbose_name=_("initial calculation"),
         related_name="calculates_deadlines",
-        blank=True,
-        null=True,
-        on_delete=models.PROTECT,
     )
-    update_calculation = models.ForeignKey(
+    update_calculation = models.ManyToManyField(
         "DateCalculation",
         verbose_name=_("update calculation"),
         related_name="updates_deadlines",
-        blank=True,
-        null=True,
+    )
+    distance_reference_deadline = models.ForeignKey(
+        "Deadline",
+        related_name="distance_reference_to",
+        verbose_name=_("reference deadline for minimum distance"),
         on_delete=models.PROTECT,
+    )
+    min_distance = models.IntegerField(
+        default=0,
+        verbose_name=_("minimum distance from reference deadline"),
     )
     error_past_due = models.TextField(
         verbose_name=_("error message for past due date"),
@@ -102,18 +111,27 @@ class Deadline(models.Model):
 class DateType(models.Model):
     """Defines a pool of dates to calculate deadlines"""
 
+    identifier = models.CharField(
+        max_length=255,
+        db_index=True,
+        unique=True,
+        validators=[validate_identifier],
+    )
     name = models.CharField(max_length=255)
     base_datetype = models.ManyToManyField(
         "self",
         symmetrical=False,
-        verbose_name=_("base type")
+        verbose_name=_("base type"),
+        blank=True,
     )
     business_days_only = models.BooleanField(
         default=True, verbose_name=_("do not include holidays and weekends")
     )
     dates = ArrayField(models.DateField(), verbose_name=_("dates"))
     automatic_dates = models.ManyToManyField(
-        "AutomaticDate", verbose_name=_("automatic dates")
+        "AutomaticDate",
+        verbose_name=_("automatic dates"),
+        blank=True,
     )
     exclude_selected = models.BooleanField(
         default=False, verbose_name=_("exclude selected dates")
@@ -193,10 +211,11 @@ class AutomaticDate(models.Model):
 
     def validate_date(date):
         validation_error = ValidationError(_("Invalid date(s): input date in dd.mm. format"))
-        date = str.split(date, ".")
 
         try:
             [day, month] = str.split(date, ".")[:2]
+            day = int(day)
+            month = int(month)
         except (IndexError, ValueError):
             raise validation_error
 

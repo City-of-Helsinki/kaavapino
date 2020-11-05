@@ -24,6 +24,7 @@ from .project import (  # noqa
     ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
+    ProjectDeadline,
 )
 from .projectcomment import (  # noqa
     ProjectComment,
