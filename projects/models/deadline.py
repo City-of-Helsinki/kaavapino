@@ -72,7 +72,7 @@ class Deadline(models.Model):
         null=True,
         on_delete=models.PROTECT,
     )
-    error_out_of_date = models.TextField(
+    error_past_due = models.TextField(
         verbose_name=_("error message for past due date"),
         null=True,
         blank=True,
