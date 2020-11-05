@@ -13,6 +13,7 @@ from PIL import Image
 
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute, FieldSetAttribute
+from .deadline import Deadline
 
 
 class BaseAttributeMatrixStructure(models.Model):
@@ -126,12 +127,11 @@ class Project(models.Model):
         null=True,
         encoder=DjangoJSONEncoder,
     )
-    deadlines = JSONField(
+    deadlines = models.ManyToManyField(
+        "Deadline",
         verbose_name=_("deadlines"),
-        default=dict,
-        blank=True,
-        null=True,
-        encoder=DjangoJSONEncoder,
+        related_name="project",
+        through="ProjectDeadline",
     )
     phase = models.ForeignKey(
         "ProjectPhase",
@@ -714,4 +714,25 @@ class ProjectAttributeMultipolygonGeometry(models.Model):
         verbose_name=_("project"),
         related_name="geometries",
         on_delete=models.CASCADE,
+    )
+
+
+class ProjectDeadline(models.Model):
+    deadline = models.ForeignKey(
+        Deadline,
+        verbose_name=_("deadline"),
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    date = models.DateField(
+        verbose_name=_("deadline date"),
+
+    )
+    confirmed = models.BooleanField(
+        verbose_name=_("confirmed"),
+        default=False,
     )
