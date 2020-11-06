@@ -119,7 +119,8 @@ def create_attribute_field_data(attribute, validation, project):
         field_arguments.pop("allow_null")
 
     if attribute.multiple_choice and attribute.value_type != Attribute.TYPE_CHOICE:
-        field_arguments["child"] = field_class()
+        if field_class:
+            field_arguments["child"] = field_class()
         field_class = serializers.ListField
 
     return FieldData(field_class, field_arguments)
