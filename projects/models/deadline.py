@@ -368,3 +368,97 @@ class AutomaticDate(models.Model):
 
 class DateCalculation(models.Model):
     pass
+    base_date_attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("relies on date from attribute"),
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+    )
+    base_date_deadline = models.ForeignKey(
+        Deadline,
+        verbose_name=_("relies on date from deadline"),
+        blank=True,
+        null=True,
+        on_delete=models.PROTECT,
+    )
+    constant = models.IntegerField(
+        verbose_name=_("days to add"),
+        blank=True,
+        null=True,
+    )
+
+    def calculate(self, project):
+        if self.base_date_attribute:
+            date = project.attribute_data.get(self.base_date_attribute, None)
+        else:
+            date = project.deadlines.get(self.base_date_deadline, None)
+
+        if date is None:
+            return None
+
+        date += datetime.timedelta(days=constant)
+
+        for attribute in self.attributes:
+            try:
+                date += datetime.timedelta(
+                    days=project.attribute_data.get(attribute.identifier, 0)
+                )
+            except TypeError:
+                pass
+
+        return date
+
+    def clean(self):
+        if self.base_date_attribute and self.base_date_deadline:
+            raise ValidationError(_(
+                "You can only set one date as the base date, an attribute or another deadline"
+            ))
+        elif not (self.base_date_attribute or self.base_date_deadline):
+            raise ValidationError(_(
+                "You need to set an attribute or another deadline as the base date"
+            ))
+
+    def __str__(self):
+        return f"{base_date_attribute or base_date_deadline} {str.join(self.items, ' ')}"
+
+
+class DateCalculationAttribute(models.Model):
+    attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("relies on date from attribute"),
+        on_delete=models.PROTECT,
+    )
+    calculation = models.ForeignKey(
+        DateCalculation,
+        verbose_name=_("calculation"),
+        related_name="attributes",
+        on_delete=models.CASCADE,
+    )
+    subtract = models.BooleanField(
+        default=False,
+        verbose_name=_("subtract"),
+    )
+
+    def __str__(self):
+        return f"{'-' if self.subtract else '-'} {self.attribute}"
+
+
+class DeadlineDateCalculation(models.Model):
+    deadline = models.ForeignKey(
+        Deadline,
+        verbose_name=_("deadline"),
+        on_delete=models.CASCADE,
+    )
+    datecalculation = models.ForeignKey(
+        DateCalculation,
+        verbose_name=_("date calculation"),
+        on_delete=models.CASCADE,
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
+
+    class Meta:
+        ordering = ("index",)
