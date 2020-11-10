@@ -151,8 +151,23 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return queryset.filter(user__uuid__in=users_list)
 
     def _search(self, search, queryset):
+        def search_field_for_attribute(attr):
+            if attr.static_property:
+                return attr.static_property
+            elif not attr.fieldset_attribute_target.count():
+                return f"attribute_data__{attr.identifier}"
+            else:
+                fieldset_path = [attr.identifier]
+                while attr.fieldset_attribute_target.count():
+                    attr = attr.fieldset_attribute_target.get().attribute_source
+                    fieldset_path.append(attr.identifier)
+
+                fieldset_path.reverse()
+                field_string = "__".join(fieldset_path)
+                return f"attribute_data__{field_string}"
+
         search_fields = [
-            attr.static_property or f"attribute_data__{attr.identifier}"
+            search_field_for_attribute(attr)
             for attr in Attribute.objects.filter(searchable=True)
         ]
         return queryset \
