@@ -61,14 +61,14 @@ class Deadline(models.Model):
         related_name="schedule",
         on_delete=models.CASCADE,
     )
-    initial_calculation = models.ManyToManyField(
-        "DateCalculation",
-        verbose_name=_("initial calculation"),
-        related_name="calculates_deadlines",
+    initial_calculations = models.ManyToManyField(
+        "DeadlineDateCalculation",
+        verbose_name=_("initial calculations"),
+        related_name="generates_deadlines",
     )
-    update_calculation = models.ManyToManyField(
-        "DateCalculation",
-        verbose_name=_("update calculation"),
+    update_calculations = models.ManyToManyField(
+        "DeadlineDateCalculation",
+        verbose_name=_("update calculations"),
         related_name="updates_deadlines",
     )
     distance_reference_deadline = models.ForeignKey(
@@ -103,6 +103,34 @@ class Deadline(models.Model):
             return False
 
         return True
+
+    @property
+    def automatic(self):
+        return bool(self.update_calculations.count())
+
+    def _calculate(self, project, calculations):
+        def condition_result(calculation):
+            if not calculation.conditions:
+                return True
+
+            for condition in calculation.conditions:
+                if project.attribute_data.get(condition):
+                    return True
+
+            return False
+
+        # Use first calculation whose condition is met
+        for calculation in calculations:
+            if condition_result(calculation):
+                return calculation.calculate(project)
+
+        return None
+
+    def calculate_initial(self, project):
+        self._calculate(project, self.initial_calculations)
+
+    def calculate_updated(self, project):
+        self._calculate(project, self.update_calculations)
 
     def __str__(self):
         return f"{self.phase} {self.deadline_type} {self.abbreviation}"
@@ -184,6 +212,9 @@ class DateType(models.Model):
                 dates.reverse()
 
         return dates[abs(days)]
+
+    def is_valid_date(self, date):
+        return date in self.get_dates(date.year)
 
 
 class AutomaticDate(models.Model):
@@ -390,14 +421,19 @@ class DateCalculation(models.Model):
 
     def calculate(self, project):
         if self.base_date_attribute:
-            date = project.attribute_data.get(self.base_date_attribute, None)
+            date = project.attribute_data.get(
+                self.base_date_attribute,
+                project.created_at.date(),
+            )
+        elif self.base_date_deadline:
+            date = project.deadlines.get(
+                self.base_date_deadline,
+                project.created_at.date(),
+            )
         else:
-            date = project.deadlines.get(self.base_date_deadline, None)
+            date = project.created_at.date()
 
-        if date is None:
-            return None
-
-        date += datetime.timedelta(days=constant)
+        date += datetime.timedelta(days=self.constant)
 
         for attribute in self.attributes:
             try:
@@ -414,13 +450,10 @@ class DateCalculation(models.Model):
             raise ValidationError(_(
                 "You can only set one date as the base date, an attribute or another deadline"
             ))
-        elif not (self.base_date_attribute or self.base_date_deadline):
-            raise ValidationError(_(
-                "You need to set an attribute or another deadline as the base date"
-            ))
 
     def __str__(self):
-        return f"{base_date_attribute or base_date_deadline} {str.join(self.items, ' ')}"
+        base_str = base_date_attribute or base_date_deadline or "Creation date"
+        return f"{base_str} {str.join(self.items, ' ')}"
 
 
 class DateCalculationAttribute(models.Model):
@@ -454,6 +487,12 @@ class DeadlineDateCalculation(models.Model):
         DateCalculation,
         verbose_name=_("date calculation"),
         on_delete=models.CASCADE,
+    )
+    # Only simple boolean conditions needed for now
+    conditions = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("use rule if any attribute is set"),
+        blank=True,
     )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),

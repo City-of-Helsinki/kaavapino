@@ -281,111 +281,130 @@ class Project(models.Model):
 
             attribute_data[attribute.identifier] = calculated_value
 
-    def set_default_deadlines(self):
-        phases = self.subtype.phases.all().order_by("index")
+    def _check_condition(self, deadline):
+        if not deadline.condition_attributes:
+            return True
 
-        deadlines = []
+        for identifier in deadline.condition_attributes.identifier:
+            if bool(self.attribute_data.get(identifier, None)):
+                return True
 
-        now = timezone.now()
-        previous_phase_ends = now
-        for phase in phases:
-            deadline = now
-            weeks_delta = phase.metadata.get("default_end_weeks_delta", None)
-            if weeks_delta:
-                deadline = previous_phase_ends + timezone.timedelta(weeks=weeks_delta)
-            deadlines.append(
-                {
-                    "phase_id": phase.id,
-                    "phase_name": phase.name,
-                    "start": previous_phase_ends,
-                    "deadline": deadline,
-                }
+        return False
+
+    def _get_applicable_deadlines(self):
+        return [
+            deadline
+            for deadline in list(
+                Deadline.objects.filter(phase__subtype=self.subtype)
             )
-            previous_phase_ends = deadline
-
-        self.deadlines = deadlines
-        self.save()
-
-    def get_time_line(self):
-        """Produce data for a timeline graph for the given project."""
-        timeline = [
-            {
-                "content": "Luontipvm",
-                "start": self.created_at,
-                "group": self.id,
-                "type": "point",
-            }
+            if self._check_condition(deadline)
         ]
 
-        for log_entry in self.phase_logs.order_by("created_at"):
-            timeline.append(
-                {
-                    # 'title': None,
-                    "content": log_entry.phase.name,
-                    "start": log_entry.created_at,
-                    "end": None,
-                    "group": self.id,
-                    "type": "background",
-                    "className": log_entry.phase.color,
-                }
+    def _get_calculated_deadlines(self, deadlines, initial=False):
+        unresolved = deadlines
+        return_deadlines = []
+
+        # It's possible a later deadline is referenced before it's created
+        while len(unresolved):
+            unresolved_new = []
+            for deadline in unresolved:
+                if initial:
+                    calculate_deadline = deadline.calculate_initial
+                elif deadline.automatic:
+                    calculate_deadline = deadline.calculate_updated
+                else:
+                    continue
+
+                calculated = calculate_deadline(self)
+                if calculated:
+                    return_deadlines.append((deadline, calculated))
+                else:
+                    unresolved_new.append(deadline)
+
+            if len(unresolved_new) < len(unresolved):
+                unresolved = unresolved_new
+            else:
+                break
+
+        return return_deadlines
+
+    # Generate initial project schedule proposal after project creation
+    def set_initial_deadlines(self):
+        deadlines = self._get_applicable_deadlines()
+        project_deadlines = []
+
+        calculated = self._get_calculated_deadlines(deadlines, initial=True)
+        for (deadline, date) in calculated:
+            project_deadlines.append(
+                ProjectDeadline.objects.create(
+                    project = self,
+                    deadline = deadline,
+                    date = calculated,
+                )
             )
 
-            if timeline[-2]["type"] == "background":
-                timeline[-2]["end"] = log_entry.created_at
+        self.deadlines.set(project_deadlines)
 
-        if timeline[-1]["type"] == "background" and not timeline[-1]["end"]:
-            timeline[-1]["end"] = timezone.now()
+    # Update schedule and set new deadlines from user input
+    def update_deadlines(self, values=None):
+        deadlines = self._get_applicable_deadlines()
+        # Delete no longer relevant deadlines
+        for project_deadline in self.deadlines:
+            if project_deadline.deadline not in deadlines:
+                project_deadline.delete()
 
-        for attribute in Attribute.objects.filter(value_type=Attribute.TYPE_DATE):
-            if (
-                attribute.identifier in self.attribute_data
-                and self.attribute_data[attribute.identifier]
-            ):
-                start_dt = attribute.deserialize_value(
-                    self.attribute_data[attribute.identifier]
+        project_deadlines = list(self.deadlines)
+
+        # Calculate automatic values for newly added deadlines
+        calculated = self._get_calculated_deadlines(
+            [
+                dl for dl in deadlines
+                if not self.deadlines.filter(deadline=dl).count()
+            ],
+            initial=True,
+        )
+        for (deadline, date) in calculated:
+            project_deadlines.append(
+                ProjectDeadline.objects.create(
+                    project = self,
+                    deadline = deadline,
+                    date = calculated,
                 )
+            )
 
-                timeline.append(
-                    {
-                        "type": "point",
-                        "content": attribute.name,
-                        "start": start_dt,
-                        "group": self.id,
-                    }
-                )
+        # Update user-submitted deadlines
+        for value in values or []:
+            abbreviation = value["abbreviation"]
+            date = value["date"]
+            project_deadline = next(
+                dl for dl in project_deadlines
+                if project_deadline.deadline.abbreviation == abbreviation
+            )
 
-                # TODO: Remove hard-coded logic
-                if attribute.identifier == "oas_aineiston_esillaoloaika_alkaa":
-                    timeline.append(
-                        {
-                            "type": "point",
-                            "content": "OAS-paketin määräaika",
-                            "start": start_dt - datetime.timedelta(weeks=2),
-                            "group": self.id,
-                        }
-                    )
+            if project_deadline:
+                project_deadline.date = date
+                project_deadline.save()
 
-                if (
-                    attribute.identifier
-                    == "ehdotuksen_suunniteltu_lautakuntapaivamaara_arvio"
-                    and "prosessin_kokoluokka" in self.attribute_data
-                ):
-                    weeks = (
-                        6
-                        if self.attribute_data["prosessin_kokoluokka"] in ["l", "xl"]
-                        else 14
-                    )
+        # Update automatic deadlines
+        calculated = self._get_calculated_deadlines(
+            [
+                dl for dl in project_deadlines
+                if dl.deadline.automatic
+            ],
+            initial=False,
+        )
 
-                    timeline.append(
-                        {
-                            "type": "point",
-                            "content": "Lautakuntapaketin määräaika",
-                            "start": start_dt - datetime.timedelta(weeks=weeks),
-                            "group": self.id,
-                        }
-                    )
+        for (deadline, date) in calculated:
+            project_deadline = next(
+                dl for dl in project_deadlines
+                if project_deadline.deadline.abbreviation == abbreviation
+            )
 
-        return timeline
+            if project_deadline:
+                project_deadline.date = date
+                project_deadline.save()
+
+        self.deadlines.set(project_deadlines)
 
     @property
     def type(self):
