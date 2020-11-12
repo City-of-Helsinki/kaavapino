@@ -11,6 +11,7 @@ from projects.views import (
     CommentViewSet,
     DocumentViewSet,
     ReportViewSet,
+    DeadlineSchemaViewSet,
 )
 
 app_name = "projects"
@@ -38,5 +39,5 @@ router.register(r"phases", ProjectPhaseViewSet)
 router.register(r"schemas", ProjectTypeSchemaViewSet)
 router.register(r"reports", ReportViewSet)
 router.register(r"projects/(?P<project_pk>[^/.]+)/documents", DocumentViewSet)
-
+router.register(r"deadlines", DeadlineSchemaViewSet)
 urlpatterns = router.urls

@@ -33,6 +33,7 @@ from projects.models import (
     DocumentTemplate,
     Attribute,
     Report,
+    Deadline,
 )
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
@@ -59,6 +60,7 @@ from projects.serializers.projecttype import (
     ProjectSubtypeSerializer,
 )
 from projects.serializers.report import ReportSerializer
+from projects.serializers.deadline import DeadlineSerializer
 
 
 class PrivateDownloadViewSetMixin:
@@ -489,3 +491,22 @@ class ReportViewSet(ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
         return super().list(request, *args, **kwargs)
+
+
+class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = DeadlineSerializer
+    queryset = Deadline.objects.all()
+
+    def get_queryset(self):
+        project = self.request.query_params.get("project", None)
+        try:
+            subtype = int(self.request.query_params.get("subtype", None))
+        except ValueError:
+            subtype = None
+
+        filters = {}
+
+        if subtype:
+            filters["phase__project_subtype__id"] = subtype
+
+        return Deadline.objects.filter(**filters)
