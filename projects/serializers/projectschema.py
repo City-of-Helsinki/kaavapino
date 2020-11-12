@@ -122,8 +122,8 @@ class AttributeSchemaSerializer(serializers.Serializer):
 
         def take_index(attribute):
             try:
-                return attribute.fieldset_index
-            except AttributeError:
+                return attribute["fieldset_index"] or 0
+            except KeyError:
                 return 0
 
         if attribute.value_type == Attribute.TYPE_FIELDSET:
