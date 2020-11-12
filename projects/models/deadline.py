@@ -30,13 +30,10 @@ class Deadline(models.Model):
     abbreviation = models.CharField(
         max_length=255,
         verbose_name=_("abbreviation"),
-        unique=True,
     )
     identifier = models.CharField(
         max_length=50,
         verbose_name=_("identifier"),
-        db_index=True,
-        unique=True,
         validators=[validate_identifier],
     )
     edit_privilege = models.CharField(
@@ -50,9 +47,9 @@ class Deadline(models.Model):
         verbose_name=_("date type"),
         on_delete=models.PROTECT,
     )
-    condition_attribute = models.ManyToManyField(
+    condition_attributes = models.ManyToManyField(
         Attribute,
-        verbose_name=_("attribute condition"),
+        verbose_name=_("show if any attribute is set"),
         blank=True,
     )
     phase = models.ForeignKey(
@@ -61,25 +58,33 @@ class Deadline(models.Model):
         related_name="schedule",
         on_delete=models.CASCADE,
     )
+    subtype = models.ForeignKey(
+        "ProjectSubtype",
+        verbose_name=_("subtype"),
+        related_name="schedule",
+        on_delete=models.CASCADE,
+    )
     initial_calculations = models.ManyToManyField(
         "DeadlineDateCalculation",
         verbose_name=_("initial calculations"),
         related_name="generates_deadlines",
+        blank=True,
     )
     update_calculations = models.ManyToManyField(
         "DeadlineDateCalculation",
         verbose_name=_("update calculations"),
         related_name="updates_deadlines",
+        blank=True,
     )
-    distance_reference_deadline = models.ForeignKey(
+    distance_reference_deadlines = models.ManyToManyField(
         "Deadline",
         related_name="distance_reference_to",
-        verbose_name=_("reference deadline for minimum distance"),
-        on_delete=models.PROTECT,
+        verbose_name=_("reference deadline(s) for minimum distance"),
+        blank=True,
     )
     min_distance = models.IntegerField(
         default=0,
-        verbose_name=_("minimum distance from reference deadline"),
+        verbose_name=_("minimum distance from closest applicable reference deadline"),
     )
     error_past_due = models.TextField(
         verbose_name=_("error message for past due date"),
@@ -96,6 +101,10 @@ class Deadline(models.Model):
         null=True,
         blank=True,
     )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
 
     @property
     def editable(self):
@@ -110,10 +119,10 @@ class Deadline(models.Model):
 
     def _calculate(self, project, calculations):
         def condition_result(calculation):
-            if not calculation.conditions:
+            if not calculation.conditions.count():
                 return True
 
-            for condition in calculation.conditions:
+            for condition in calculation.conditions.all():
                 if project.attribute_data.get(condition):
                     return True
 
@@ -122,18 +131,25 @@ class Deadline(models.Model):
         # Use first calculation whose condition is met
         for calculation in calculations:
             if condition_result(calculation):
-                return calculation.calculate(project)
+                return calculation.datecalculation.calculate(project)
 
         return None
 
     def calculate_initial(self, project):
-        self._calculate(project, self.initial_calculations)
+        return self._calculate(project, self.initial_calculations.all())
 
     def calculate_updated(self, project):
-        self._calculate(project, self.update_calculations)
+        return self._calculate(project, self.update_calculations.all())
 
     def __str__(self):
         return f"{self.phase} {self.deadline_type} {self.abbreviation}"
+
+    class Meta:
+        unique_together = (
+            ("abbreviation", "subtype"),
+            ("identifier", "subtype"),
+        )
+        ordering = ("index",)
 
 
 class DateType(models.Model):
@@ -155,7 +171,12 @@ class DateType(models.Model):
     business_days_only = models.BooleanField(
         default=True, verbose_name=_("do not include holidays and weekends")
     )
-    dates = ArrayField(models.DateField(), verbose_name=_("dates"))
+    dates = ArrayField(
+        models.DateField(),
+        verbose_name=_("dates"),
+        null=True,
+        blank=True,
+    )
     automatic_dates = models.ManyToManyField(
         "AutomaticDate",
         verbose_name=_("automatic dates"),
@@ -399,6 +420,11 @@ class AutomaticDate(models.Model):
 
 class DateCalculation(models.Model):
     pass
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )
     base_date_attribute = models.ForeignKey(
         Attribute,
         verbose_name=_("relies on date from attribute"),
@@ -435,7 +461,7 @@ class DateCalculation(models.Model):
 
         date += datetime.timedelta(days=self.constant)
 
-        for attribute in self.attributes:
+        for attribute in self.attributes.all():
             try:
                 date += datetime.timedelta(
                     days=project.attribute_data.get(attribute.identifier, 0)
@@ -445,15 +471,8 @@ class DateCalculation(models.Model):
 
         return date
 
-    def clean(self):
-        if self.base_date_attribute and self.base_date_deadline:
-            raise ValidationError(_(
-                "You can only set one date as the base date, an attribute or another deadline"
-            ))
-
     def __str__(self):
-        base_str = base_date_attribute or base_date_deadline or "Creation date"
-        return f"{base_str} {str.join(self.items, ' ')}"
+        return self.description
 
 
 class DateCalculationAttribute(models.Model):

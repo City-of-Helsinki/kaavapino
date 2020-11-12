@@ -128,10 +128,9 @@ class Project(models.Model):
         encoder=DjangoJSONEncoder,
     )
     deadlines = models.ManyToManyField(
-        "Deadline",
+        "ProjectDeadline",
         verbose_name=_("deadlines"),
-        related_name="project",
-        through="ProjectDeadline",
+        related_name="projects",
     )
     phase = models.ForeignKey(
         "ProjectPhase",
@@ -282,11 +281,11 @@ class Project(models.Model):
             attribute_data[attribute.identifier] = calculated_value
 
     def _check_condition(self, deadline):
-        if not deadline.condition_attributes:
+        if not deadline.condition_attributes.count():
             return True
 
-        for identifier in deadline.condition_attributes.identifier:
-            if bool(self.attribute_data.get(identifier, None)):
+        for attr in deadline.condition_attributes.all():
+            if bool(self.attribute_data.get(attr.identifier, None)):
                 return True
 
         return False
@@ -295,7 +294,7 @@ class Project(models.Model):
         return [
             deadline
             for deadline in list(
-                Deadline.objects.filter(phase__subtype=self.subtype)
+                Deadline.objects.filter(subtype=self.subtype)
             )
             if self._check_condition(deadline)
         ]
@@ -349,11 +348,11 @@ class Project(models.Model):
     def update_deadlines(self, values=None):
         deadlines = self._get_applicable_deadlines()
         # Delete no longer relevant deadlines
-        for project_deadline in self.deadlines:
+        for project_deadline in self.deadlines.all():
             if project_deadline.deadline not in deadlines:
                 project_deadline.delete()
 
-        project_deadlines = list(self.deadlines)
+        project_deadlines = list(self.deadlines.all())
 
         # Calculate automatic values for newly added deadlines
         calculated = self._get_calculated_deadlines(
@@ -363,12 +362,13 @@ class Project(models.Model):
             ],
             initial=True,
         )
+
         for (deadline, date) in calculated:
             project_deadlines.append(
                 ProjectDeadline.objects.create(
-                    project = self,
-                    deadline = deadline,
-                    date = calculated,
+                    project=self,
+                    deadline=deadline,
+                    date=date,
                 )
             )
 
@@ -740,11 +740,13 @@ class ProjectDeadline(models.Model):
     deadline = models.ForeignKey(
         Deadline,
         verbose_name=_("deadline"),
+        related_name="project_deadlines",
         on_delete=models.CASCADE,
     )
     project = models.ForeignKey(
         Project,
         verbose_name=_("project"),
+        related_name="project_deadlines",
         on_delete=models.CASCADE,
     )
     date = models.DateField(

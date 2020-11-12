@@ -8,6 +8,8 @@ from .deadline import (  # noqa
     Deadline,
     DateType,
     AutomaticDate,
+    DateCalculation,
+    DeadlineDateCalculation,
 )
 from .document import DocumentTemplate  # noqa
 from .project import (  # noqa
