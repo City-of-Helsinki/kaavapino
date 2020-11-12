@@ -56,7 +56,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     def get_is_under_min_distance_next(self, projectdeadline):
         for next_dl in projectdeadline.deadline.distance_reference_to.all():
             try:
-                projectdeadline.project.projectdeadline_set.get(deadline=next_dl)
+                projectdeadline.project.deadlines.get(deadline=next_dl)
             except ProjectDeadline.DoesNotExist:
                 continue
 
@@ -66,14 +66,15 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         return False
 
     def get_is_under_min_distance_previous(self, projectdeadline):
-        previous = projectdeadline.deadline.distance_reference_deadline \
+        previous = projectdeadline.deadline.distance_reference_deadlines \
             .order_by("-index").first()
-        ref_date = previous.date if previous else datetime.date.today()
-        distance = (projectdeadline.date - ref_date).days()
-        return distance >= projectdeadline.deadline.min_distance
+        ref_date = previous.date \
+            if previous else projectdeadline.project.created_at.date()
+        distance = (projectdeadline.date - ref_date).days
+        return distance < projectdeadline.deadline.min_distance
 
     def get_past_due(self, projectdeadline):
-        return bool(projectdeadline.project.projectdeadline_set.filter(
+        return bool(projectdeadline.project.deadlines.filter(
             deadline__index__lte=projectdeadline.deadline.index,
             confirmed=False,
             date__lt=datetime.date.today(),
@@ -85,7 +86,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
     def get_distance_reference_deadline_id(self, projectdeadline):
         try:
-            return projectdeadline.project.projectdeadline_set.filter(
+            return projectdeadline.project.deadlines.filter(
                 deadline__index__lte=projectdeadline.deadline.index,
                 confirmed=False,
                 date__lt=datetime.date.today(),
@@ -100,8 +101,8 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             "abbreviation",
             "deadline_id",
             "past_due",
-            "min_distance_previous",
-            "min_distance_next",
+            "is_under_min_distance_previous",
+            "is_under_min_distance_next",
             "out_of_sync",
             "distance_reference_deadline_id",
         ]
@@ -114,7 +115,6 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = ProjectDeadlineSerializer(
-        source="projectdeadline_set",
         many=True,
         allow_null=True,
         required=False,
@@ -576,7 +576,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             if deadlines:
                 project.update_deadlines(deadlines)
             # Halt automatic updates after subtype change until user interaction
-            elif project.deadlines.count and project.deadlines.first() \
+            elif not project.deadlines.count():
+                project.update_deadlines()
+            elif project.deadlines.first() \
                 .deadline.phase.project_subtype == instance.subtype:
                 project.update_deadlines()
 
