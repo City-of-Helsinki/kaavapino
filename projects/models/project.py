@@ -309,10 +309,8 @@ class Project(models.Model):
             for deadline in unresolved:
                 if initial:
                     calculate_deadline = deadline.calculate_initial
-                elif deadline.automatic:
-                    calculate_deadline = deadline.calculate_updated
                 else:
-                    continue
+                    calculate_deadline = deadline.calculate_updated
 
                 calculated = calculate_deadline(self)
                 if calculated:
@@ -387,10 +385,7 @@ class Project(models.Model):
 
         # Update automatic deadlines
         calculated = self._get_calculated_deadlines(
-            [
-                dl for dl in project_deadlines
-                if dl.deadline.automatic
-            ],
+            project_deadlines,
             initial=False,
         )
 
@@ -757,3 +752,53 @@ class ProjectDeadline(models.Model):
         verbose_name=_("confirmed"),
         default=False,
     )
+
+
+class ProjectPhaseSectionDeadline(models.Model):
+    """Links a deadline into a project phase deadline section."""
+
+    deadline = models.ForeignKey(
+        Deadline, verbose_name=_("deadline"), on_delete=models.CASCADE
+    )
+    section = models.ForeignKey(
+        "ProjectPhaseDeadlineSection",
+        verbose_name=_("deadline phase section"),
+        on_delete=models.CASCADE,
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+
+    class Meta:
+        verbose_name = _("project phase deadline section item")
+        verbose_name_plural = _("project phase deadline section items")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.deadline} {self.section} {self.index}"
+
+
+class ProjectPhaseDeadlineSection(models.Model):
+    """Defines a deadline section for a project phase."""
+
+    phase = models.ForeignKey(
+        ProjectPhase,
+        verbose_name=_("phase"),
+        related_name="deadline_sections",
+        on_delete=models.CASCADE,
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+    deadlines = models.ManyToManyField(
+        Deadline,
+        verbose_name=_("deadlines"),
+        related_name="phase_sections",
+        through="ProjectPhaseSectionDeadline",
+    )
+
+    class Meta:
+        verbose_name = _("project phase deadline section")
+        verbose_name_plural = _("project phase deadline sections")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.phase.name}, {self.phase.project_subtype.name}"
+
+

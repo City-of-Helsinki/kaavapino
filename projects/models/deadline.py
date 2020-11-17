@@ -39,10 +39,13 @@ class Deadline(models.Model):
         max_length=255,
         verbose_name=_("abbreviation"),
     )
-    identifier = models.CharField(
-        max_length=50,
-        verbose_name=_("identifier"),
-        validators=[validate_identifier],
+    attribute = models.OneToOneField(
+        "Attribute",
+        verbose_name=_("attribute"),
+        related_name="deadline",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
     )
     edit_privilege = models.CharField(
         default=None, null=True, blank=True, max_length=6, choices=PRIVILEGE_LEVELS
@@ -64,6 +67,7 @@ class Deadline(models.Model):
     condition_attributes = models.ManyToManyField(
         Attribute,
         verbose_name=_("show if any attribute is set"),
+        related_name="condition_to_deadlines",
         blank=True,
     )
     phase = models.ForeignKey(
@@ -127,17 +131,13 @@ class Deadline(models.Model):
 
         return True
 
-    @property
-    def automatic(self):
-        return bool(self.update_calculations.count())
-
     def _calculate(self, project, calculations):
         def condition_result(calculation):
             if not calculation.conditions.count():
                 return True
 
             for condition in calculation.conditions.all():
-                if project.attribute_data.get(condition):
+                if project.attribute_data.get(condition.identifier, False):
                     return True
 
             return False
@@ -153,16 +153,16 @@ class Deadline(models.Model):
         return self._calculate(project, self.initial_calculations.all())
 
     def calculate_updated(self, project):
-        return self._calculate(project, self.update_calculations.all())
+        if self.update_calculations.count():
+            return self._calculate(project, self.update_calculations.all())
+        else:
+            return project.attribute_data.get(self.attribute.identifier, None)
 
     def __str__(self):
         return f"{self.phase} {self.deadline_type} {self.abbreviation}"
 
     class Meta:
-        unique_together = (
-            ("abbreviation", "subtype"),
-            ("identifier", "subtype"),
-        )
+        unique_together = ("abbreviation", "subtype")
         ordering = ("index",)
 
 
