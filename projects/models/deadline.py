@@ -17,13 +17,21 @@ from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 class Deadline(models.Model):
     """Defines a common deadline type shared by multiple projects."""
 
-    TYPE_START_POINT = "start_point"
-    TYPE_END_POINT = "end_point"
+    TYPE_PHASE_START = "phase_start"
+    TYPE_PHASE_END = "phase_end"
+    TYPE_DASHED_START = "dashed_start"
+    TYPE_DASHED_END = "dashed_end"
+    TYPE_INNER_START = "inner_start"
+    TYPE_INNER_END = "inner_end"
     TYPE_MILESTONE = "milestone"
 
     TYPE_CHOICES = (
-        (TYPE_START_POINT, _("start point")),
-        (TYPE_END_POINT, _("end point")),
+        (TYPE_PHASE_START, _("phase start point")),
+        (TYPE_PHASE_END, _("phase end point")),
+        (TYPE_DASHED_START, _("dashed line start point")),
+        (TYPE_DASHED_END, _("dashed line end point")),
+        (TYPE_INNER_START, _("inner line start point")),
+        (TYPE_INNER_END, _("inner line end point")),
         (TYPE_MILESTONE, _("milestone")),
     )
 
@@ -39,8 +47,14 @@ class Deadline(models.Model):
     edit_privilege = models.CharField(
         default=None, null=True, blank=True, max_length=6, choices=PRIVILEGE_LEVELS
     )
-    deadline_type = models.CharField(
-        max_length=64, verbose_name=_("deadline type"), choices=TYPE_CHOICES
+    deadline_types = ArrayField(
+        models.CharField(
+            max_length=64,
+            choices=TYPE_CHOICES,
+        ),
+        verbose_name=_("deadline types"),
+        null=True,
+        blank=True,
     )
     date_type = models.ForeignKey(
         "DateType",
