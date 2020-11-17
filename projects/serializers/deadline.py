@@ -7,7 +7,7 @@ class DeadlineSerializer(serializers.Serializer):
     abbreviation = serializers.CharField()
     identifier = serializers.CharField()
     editable = serializers.SerializerMethodField()
-    deadline_type = serializers.CharField()
+    deadline_types = serializers.CharField()
     date_type_id = serializers.IntegerField(source="date_type.pk")
     error_past_due = serializers.CharField()
     phase_id = serializers.IntegerField(source="phase.pk")
