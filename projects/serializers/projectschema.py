@@ -11,6 +11,7 @@ from projects.models.project import (
     ProjectFloorAreaSectionAttributeMatrixCell,
     ProjectPhaseFieldSetAttributeIndex,
 )
+from projects.serializers.deadline import DeadlineSerializer
 from projects.serializers.utils import _is_attribute_required
 
 FOREIGN_KEY_TYPE_MODELS = {
@@ -353,6 +354,21 @@ class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
         return data
 
 
+class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
+    deadlines = DeadlineSerializer(many=True)
+
+
+class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField(source="name")
+    color = serializers.CharField()
+    color_code = serializers.CharField()
+    list_prefix = serializers.CharField()
+    sections = ProjectPhaseDeadlineSectionSerializer(
+        source="deadline_sections", many=True,
+    )
+
+
 class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
     def to_representation(self, data):
         query_params = getattr(self.context["request"], "GET", {})
@@ -376,6 +392,10 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
 
     phases = ProjectPhaseSchemaSerializer(many=True)
     floor_area_sections = ProjectFloorAreaSchemaSerializer(many=True)
+    deadline_sections = ProjectPhaseDeadlineSectionsSerializer(
+        many=True,
+        source="phases",
+    )
 
     class Meta:
         list_serializer_class = ProjectSubtypeListFilterSerializer

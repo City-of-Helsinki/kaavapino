@@ -34,6 +34,7 @@ from projects.permissions.media_file_permissions import (
 )
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.section import create_section_serializer
+from projects.serializers.deadline import DeadlineSerializer
 from users.models import User
 from users.serializers import UserSerializer
 
@@ -50,10 +51,13 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     is_under_min_distance_next = serializers.SerializerMethodField()
     date = serializers.DateField()
     abbreviation = serializers.CharField(source="deadline.abbreviation")
-    deadline_id = serializers.IntegerField(source="deadline.pk")
+    deadline = DeadlineSerializer()
     distance_reference_deadline_id = serializers.SerializerMethodField()
 
     def get_is_under_min_distance_next(self, projectdeadline):
+        if not projectdeadline.date:
+            return False
+
         for next_dl in projectdeadline.deadline.distance_reference_to.all():
             try:
                 projectdeadline.project.deadlines.get(deadline=next_dl)
@@ -66,6 +70,9 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         return False
 
     def get_is_under_min_distance_previous(self, projectdeadline):
+        if not projectdeadline.date:
+            return False
+
         previous = projectdeadline.deadline.distance_reference_deadlines \
             .order_by("-index").first()
         ref_date = previous.date \
@@ -355,17 +362,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("attribute_data", None), attrs
         )
 
+        self._validate_deadlines(attrs.get("attribute_data", None))
+
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
 
-        deadlines = self._validate_deadlines(attrs)
         public = self._validate_public(attrs)
 
         if public:
             attrs["public"] = public
-
-        if deadlines:
-            attrs["deadlines"] = deadlines
 
         return attrs
 
@@ -505,37 +510,26 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return user
 
-    def _validate_deadlines(self, attrs):
+    def _validate_deadlines(self, attribute_data):
         """
-        Validates that each deadline date is valid for the deadline date type
-        and all deadline items have abbreviation and date.
+        Validates that each deadline date in attribute_data is valid for
+        the deadline date type
         """
-        deadlines = attrs.get("deadlines", None)
-        if not deadlines:
-            return None
+        if not attribute_data:
+            return
 
-        for deadline in deadlines:
+        for key, value in attribute_data.items():
             try:
-                date = deadline["date"]
-                abbreviation = deadline["abbreviation"]
-            except KeyError:
-                raise ValidationError({"deadlines": _(
-                    "Specify date and abbreviation for each deadline"
-                )})
-
-            try:
-                deadline_object = Deadline.objects.get(
-                    phase__project_subtype=self.instance.subtype,
-                    abbreviation = deadline
+                deadline = Deadline.objects.get(
+                    attribute__identifier=key, phase=self.instance.phase,
                 )
-                if not deadline_object.date_type.is_valid_date(date):
-                    raise ValidationError({"deadlines": _(
-                        f"Invalid date selection for {deadline_object} ({deadline_object.date_type})"
-                    )})
             except Deadline.DoesNotExist:
-                pass
+                continue
 
-        return deadlines
+            if not deadline.date_type.is_valid_date(value):
+                raise ValidationError({"deadlines": _(
+                    f"Invalid date selection for {deadline.attribute}/{deadline} ({deadline.date_type})"
+                )})
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(

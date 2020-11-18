@@ -5,15 +5,17 @@ from projects.models import Deadline
 
 class DeadlineSerializer(serializers.Serializer):
     abbreviation = serializers.CharField()
-    identifier = serializers.CharField()
+    attribute_identifier = serializers.CharField(source="attribute.identifier")
     editable = serializers.SerializerMethodField()
-    deadline_types = serializers.CharField()
+    deadline_types = serializers.ListField(
+        serializers.CharField()
+    )
     date_type_id = serializers.IntegerField(source="date_type.pk")
     error_past_due = serializers.CharField()
     phase_id = serializers.IntegerField(source="phase.pk")
-    phase_name = serializers.IntegerField(source="phase.name")
-    phase_color = serializers.IntegerField(source="phase.color")
-    phase_color_code = serializers.IntegerField(source="phase.color_code")
+    phase_name = serializers.CharField(source="phase.name")
+    phase_color = serializers.CharField(source="phase.color")
+    phase_color_code = serializers.CharField(source="phase.color_code")
     index = serializers.IntegerField()
     min_distance = serializers.IntegerField()
     error_min_distance_previous = serializers.CharField()

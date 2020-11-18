@@ -372,29 +372,16 @@ class Project(models.Model):
                 )
             )
 
-        # Update user-submitted deadlines
-        for value in values or []:
-            abbreviation = value["abbreviation"]
-            date = value["date"]
-            project_deadline = next(
-                dl for dl in project_deadlines
-                if project_deadline.deadline.abbreviation == abbreviation
-            )
-
-            if project_deadline:
-                project_deadline.date = date
-                project_deadline.save()
-
         # Update automatic deadlines
         calculated = self._get_calculated_deadlines(
-            project_deadlines,
+            [dl.deadline for dl in project_deadlines],
             initial=False,
         )
 
         for (deadline, date) in calculated:
             project_deadline = next(
                 dl for dl in project_deadlines
-                if project_deadline.deadline.abbreviation == abbreviation
+                if dl.deadline == deadline
             )
 
             if project_deadline:

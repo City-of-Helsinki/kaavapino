@@ -382,7 +382,7 @@ class AutomaticDate(models.Model):
 
         def parse_date(date, year=year):
             [day, month] = str.split(date, ".")[:2]
-            return datetime.date(year, month, day)
+            return datetime.date(year, int(month), int(day))
 
         return_dates = []
 
@@ -391,8 +391,8 @@ class AutomaticDate(models.Model):
             end_date = datetime.datetime.strptime(f"{year}-W{self.week}-7", "%G-W%V-%u")
             return_dates = get_weekdays_in_range(start_date, end_date)
         elif self.start_date and self.end_date:
-            start = parse_date(start_date)
-            end = parse_date(end_date)
+            start = parse_date(self.start_date)
+            end = parse_date(self.end_date)
             if start > end:
                 return_dates = \
                     get_weekdays_in_range(datetime.date(year, 1, 1), end) + \
