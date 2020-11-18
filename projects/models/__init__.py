@@ -27,6 +27,8 @@ from .project import (  # noqa
     ProjectType,
     ProjectSubtype,
     ProjectDeadline,
+    ProjectPhaseDeadlineSection,
+    ProjectPhaseSectionDeadline,
 )
 from .projectcomment import (  # noqa
     ProjectComment,

@@ -159,7 +159,7 @@ class Deadline(models.Model):
             return project.attribute_data.get(self.attribute.identifier, None)
 
     def __str__(self):
-        return f"{self.phase} {self.deadline_type} {self.abbreviation}"
+        return f"{self.phase} {self.deadline_types} {self.abbreviation}"
 
     class Meta:
         unique_together = ("abbreviation", "subtype")
@@ -250,6 +250,9 @@ class DateType(models.Model):
 
     def is_valid_date(self, date):
         return date in self.get_dates(date.year)
+
+    def __str__(self):
+        return self.name
 
 
 class AutomaticDate(models.Model):
@@ -430,6 +433,9 @@ class AutomaticDate(models.Model):
                 last day before holiday, \
                 first day after holiday"
             ))
+
+    def __str__(self):
+        return self.name
 
 
 class DateCalculation(models.Model):

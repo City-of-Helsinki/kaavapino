@@ -323,6 +323,8 @@ class Project(models.Model):
             else:
                 break
 
+        return_deadlines += [(deadline, None) for deadline in unresolved]
+
         return return_deadlines
 
     # Generate initial project schedule proposal after project creation
@@ -746,12 +748,17 @@ class ProjectDeadline(models.Model):
     )
     date = models.DateField(
         verbose_name=_("deadline date"),
-
+        null=True,
+        blank=True,
     )
     confirmed = models.BooleanField(
         verbose_name=_("confirmed"),
         default=False,
     )
+
+    class Meta:
+        unique_together = ("deadline", "project")
+        ordering = ("deadline__index",)
 
 
 class ProjectPhaseSectionDeadline(models.Model):
