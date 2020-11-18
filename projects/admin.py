@@ -37,6 +37,8 @@ from .models import (
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
+    ProjectPhaseDeadlineSection,
+    ProjectPhaseSectionDeadline,
     ProjectType,
 )
 
@@ -56,6 +58,16 @@ class DeadlineAdmin(admin.ModelAdmin):
 @admin.register(DateType)
 class DateTypeAdmin(admin.ModelAdmin):
     pass
+
+
+class ProjectPhaseSectionDeadlineInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectPhaseSectionDeadline
+    extra = 0
+
+
+@admin.register(ProjectPhaseDeadlineSection)
+class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin):
+    inlines = (ProjectPhaseSectionDeadlineInline,)
 
 
 @admin.register(AutomaticDate)
