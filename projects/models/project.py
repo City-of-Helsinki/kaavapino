@@ -787,6 +787,10 @@ class ProjectPhaseDeadlineSection(models.Model):
         through="ProjectPhaseSectionDeadline",
     )
 
+    @property
+    def name(self):
+        return f"{self.phase.list_prefix}. {self.phase.name}"
+
     class Meta:
         verbose_name = _("project phase deadline section")
         verbose_name_plural = _("project phase deadline sections")

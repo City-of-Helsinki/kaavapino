@@ -355,7 +355,14 @@ class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
 
 
 class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
-    deadlines = DeadlineSerializer(many=True)
+    name = serializers.CharField()
+    attributes = serializers.SerializerMethodField("_get_attributes")
+
+    def _get_attributes(self, deadline_section):
+        return [
+            AttributeSchemaSerializer(dl.attribute).data
+            for dl in deadline_section.deadlines.select_related("attribute")
+        ]
 
 
 class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
