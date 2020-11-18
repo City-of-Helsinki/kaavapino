@@ -290,7 +290,7 @@ VALUE_TYPES = {
     "automaattinen (teksti), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
     "automaattinen (teksti), kun valitaan vastuuyksikkö": Attribute.TYPE_LONG_STRING,
     "automaattinen (teksti), tieto tulee Factasta": Attribute.TYPE_LONG_STRING,
-    "automaattinen (valinta)": Attribute.TYPE_LONG_STRING,
+    "automaattinen (valinta)": Attribute.TYPE_BOOLEAN,
     "automaattinen (valinta), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
     "Desimaaliluvun syöttö": Attribute.TYPE_DECIMAL,
     "fieldset": Attribute.TYPE_FIELDSET,
