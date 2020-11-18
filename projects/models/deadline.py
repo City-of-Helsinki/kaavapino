@@ -39,7 +39,7 @@ class Deadline(models.Model):
         max_length=255,
         verbose_name=_("abbreviation"),
     )
-    attribute = models.OneToOneField(
+    attribute = models.ForeignKey(
         "Attribute",
         verbose_name=_("attribute"),
         related_name="deadline",
@@ -162,7 +162,10 @@ class Deadline(models.Model):
         return f"{self.phase} {self.deadline_types} {self.abbreviation}"
 
     class Meta:
-        unique_together = ("abbreviation", "subtype")
+        unique_together = (
+            ("abbreviation", "subtype"),
+            ("attribute", "phase"),
+        )
         ordering = ("index",)
 
 
