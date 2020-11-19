@@ -392,8 +392,10 @@ class Project(models.Model):
         return self.subtype.project_type
 
     def save(self, *args, **kwargs):
-        self.pino_number = str(self.pk).zfill(7)
         super(Project, self).save(*args, **kwargs)
+        if not self.pino_number:
+            self.pino_number = str(self.pk).zfill(7)
+            self.save()
 
 
 class ProjectFloorAreaSection(models.Model):
