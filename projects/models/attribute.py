@@ -363,11 +363,16 @@ class Attribute(models.Model):
         elif self.value_type == Attribute.TYPE_DATE:
             if self.multiple_choice:
                 return [
-                    v.strftime(DATE_SERIALIZATION_FORMAT) if v else None
+                    datetime.datetime.strptime(v, DATE_SERIALIZATION_FORMAT).date()
+                    if v else None
                     for v in value
                 ]
+            elif value:
+                return datetime.datetime.strptime(
+                    value, DATE_SERIALIZATION_FORMAT
+                ).date()
             else:
-                return value.strftime(DATE_SERIALIZATION_FORMAT) if value else None
+                return None
         elif self.value_type == Attribute.TYPE_USER:
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).
@@ -462,7 +467,7 @@ class Attribute(models.Model):
         if isinstance(self.value_type, bool):
             return "Kyllä" if value else "Ei"
         elif isinstance(self.value_type, datetime.date):
-            return value.strftime("%d.%m.%Y")
+            return datetime.datetime.strftime(value, "%d.%m.%Y")
         elif isinstance(value, User):
             return value.get_full_name()
         else:
