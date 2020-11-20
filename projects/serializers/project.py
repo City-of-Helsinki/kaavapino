@@ -362,7 +362,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("attribute_data", None), attrs
         )
 
-        self._validate_deadlines(attrs.get("attribute_data", None))
+        self._validate_deadlines(attrs)
 
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
@@ -510,18 +510,27 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return user
 
-    def _validate_deadlines(self, attribute_data):
+    def _validate_deadlines(self, attrs):
         """
         Validates that each deadline date in attribute_data is valid for
         the deadline date type
         """
+        phase = attrs.get("phase", None)
+        if not phase and self.instance:
+            phase = self.instance.phase
+        # New project without a phase—this should never be reached
+        else:
+            return
+
+        attribute_data = attrs.get("attribute_data", None)
+
         if not attribute_data:
             return
 
         for key, value in attribute_data.items():
             try:
                 deadline = Deadline.objects.get(
-                    attribute__identifier=key, phase=self.instance.phase,
+                    attribute__identifier=key, phase=phase,
                 )
             except Deadline.DoesNotExist:
                 continue
@@ -536,8 +545,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             project_subtype=validated_data["subtype"]
         ).first()
 
-        deadlines = validated_data.pop("deadlines", [])
-
         with transaction.atomic():
             attribute_data = validated_data.pop("attribute_data", {})
             project: Project = super().create(validated_data)
@@ -551,29 +558,20 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
-            if deadlines:
-                project.update_deadlines(deadlines)
-            else:
-                project.set_initial_deadlines()
+            project.update_deadlines()
 
         return project
 
     def update(self, instance: Project, validated_data: dict) -> Project:
+        should_update_deadlines = True
         attribute_data = validated_data.pop("attribute_data", {})
-        deadlines = validated_data.pop("deadlines", None)
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
-            if deadlines:
-                project.update_deadlines(deadlines)
-            # Halt automatic updates after subtype change until user interaction
-            elif not project.deadlines.count():
-                project.update_deadlines()
-            elif project.deadlines.first() \
-                .deadline.phase.project_subtype == instance.subtype:
+            if should_update_deadlines:
                 project.update_deadlines()
 
             project.save()

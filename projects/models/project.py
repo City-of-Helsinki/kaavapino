@@ -327,24 +327,7 @@ class Project(models.Model):
 
         return return_deadlines
 
-    # Generate initial project schedule proposal after project creation
-    def set_initial_deadlines(self):
-        deadlines = self._get_applicable_deadlines()
-        project_deadlines = []
-
-        calculated = self._get_calculated_deadlines(deadlines, initial=True)
-        for (deadline, date) in calculated:
-            project_deadlines.append(
-                ProjectDeadline.objects.create(
-                    project = self,
-                    deadline = deadline,
-                    date = calculated,
-                )
-            )
-
-        self.deadlines.set(project_deadlines)
-
-    # Update schedule and set new deadlines from user input
+    # Generate or update schedule for project
     def update_deadlines(self, values=None):
         deadlines = self._get_applicable_deadlines()
         # Delete no longer relevant deadlines
