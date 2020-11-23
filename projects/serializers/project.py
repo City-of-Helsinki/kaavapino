@@ -58,14 +58,18 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         if not projectdeadline.date:
             return False
 
-        for next_dl in projectdeadline.deadline.distance_reference_to.all():
+        next_deadlines = projectdeadline.deadline.distances_to_next \
+            .order_by("deadline__index")
+        for next_distance in next_deadlines:
             try:
-                projectdeadline.project.deadlines.get(deadline=next_dl)
+                next_date = projectdeadline.project.deadlines.get(
+                    deadline=next_distance.deadline
+                )
             except ProjectDeadline.DoesNotExist:
                 continue
 
-            if self.get_is_under_min_distance_previous(next_dl):
-                return True
+            distance_to_next = (next_date - projectdeadline.date).days()
+            return distance_to_next < next_distance.distance_from_previous
 
         return False
 
@@ -73,12 +77,20 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         if not projectdeadline.date:
             return False
 
-        previous = projectdeadline.deadline.distance_reference_deadlines \
-            .order_by("-index").first()
-        ref_date = previous.date \
-            if previous else projectdeadline.project.created_at.date()
-        distance = (projectdeadline.date - ref_date).days
-        return distance < projectdeadline.deadline.min_distance
+        prev_deadlines = projectdeadline.deadline.distances_to_previous \
+            .order_by("-previous_deadline__index")
+        for prev_distance in prev_deadlines:
+            try:
+                prev_date = projectdeadline.project.deadlines.get(
+                    deadline=prev_distance.deadline
+                )
+            except ProjectDeadline.DoesNotExist:
+                continue
+
+            distance_from_prev = (projectdeadline.date - prev_date).days()
+            return distance_from_prev < prev_distance.distance_from_previous
+
+        return False
 
     def get_past_due(self, projectdeadline):
         return bool(projectdeadline.project.deadlines.filter(
