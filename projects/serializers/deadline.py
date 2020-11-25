@@ -10,14 +10,13 @@ class DeadlineSerializer(serializers.Serializer):
     deadline_types = serializers.ListField(
         serializers.CharField()
     )
-    date_type_id = serializers.IntegerField(source="date_type.pk")
+    date_type = serializers.IntegerField()
     error_past_due = serializers.CharField()
     phase_id = serializers.IntegerField(source="phase.pk")
     phase_name = serializers.CharField(source="phase.name")
     phase_color = serializers.CharField(source="phase.color")
     phase_color_code = serializers.CharField(source="phase.color_code")
     index = serializers.IntegerField()
-    min_distance = serializers.IntegerField()
     error_min_distance_previous = serializers.CharField()
     warning_min_distance_next = serializers.CharField()
 

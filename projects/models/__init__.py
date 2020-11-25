@@ -9,6 +9,7 @@ from .deadline import (  # noqa
     DateType,
     AutomaticDate,
     DateCalculation,
+    DeadlineDistance,
     DeadlineDateCalculation,
 )
 from .document import DocumentTemplate  # noqa

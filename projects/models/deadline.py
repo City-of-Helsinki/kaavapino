@@ -63,6 +63,8 @@ class Deadline(models.Model):
         "DateType",
         verbose_name=_("date type"),
         on_delete=models.PROTECT,
+        blank=True,
+        null=True,
     )
     condition_attributes = models.ManyToManyField(
         Attribute,
@@ -93,16 +95,6 @@ class Deadline(models.Model):
         verbose_name=_("update calculations"),
         related_name="updates_deadlines",
         blank=True,
-    )
-    distance_reference_deadlines = models.ManyToManyField(
-        "Deadline",
-        related_name="distance_reference_to",
-        verbose_name=_("reference deadline(s) for minimum distance"),
-        blank=True,
-    )
-    min_distance = models.IntegerField(
-        default=0,
-        verbose_name=_("minimum distance from closest applicable reference deadline"),
     )
     error_past_due = models.TextField(
         verbose_name=_("error message for past due date"),
@@ -167,6 +159,32 @@ class Deadline(models.Model):
             ("attribute", "phase"),
         )
         ordering = ("index",)
+
+
+class DeadlineDistance(models.Model):
+    deadline = models.ForeignKey(
+        "Deadline",
+        related_name="distances_to_previous",
+        verbose_name=_("deadline"),
+        on_delete=models.CASCADE,
+    )
+    previous_deadline = models.ForeignKey(
+        "Deadline",
+        related_name="distances_to_next",
+        verbose_name=_("previous deadline"),
+        on_delete=models.CASCADE,
+    )
+    distance_from_previous = models.IntegerField(
+        default=0,
+        verbose_name=_("minimum distance from previous deadline"),
+    )
+    date_type = models.ForeignKey(
+        "DateType",
+        verbose_name=_("date type"),
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+    )
 
 
 class DateType(models.Model):
@@ -442,7 +460,6 @@ class AutomaticDate(models.Model):
 
 
 class DateCalculation(models.Model):
-    pass
     description = models.CharField(
         max_length=255,
         blank=True,
@@ -453,14 +470,14 @@ class DateCalculation(models.Model):
         verbose_name=_("relies on date from attribute"),
         blank=True,
         null=True,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
     base_date_deadline = models.ForeignKey(
         Deadline,
         verbose_name=_("relies on date from deadline"),
         blank=True,
         null=True,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
     constant = models.IntegerField(
         verbose_name=_("days to add"),

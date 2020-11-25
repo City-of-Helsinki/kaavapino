@@ -11,7 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
 
-from users.models import User
+from users.models import User, PRIVILEGE_LEVELS
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 
 
@@ -235,10 +235,36 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    owner_editable = models.BooleanField(
+        default=False,
+        verbose_name=_("owner can edit"),
+    )
+    owner_viewable = models.BooleanField(
+        default=True,
+        verbose_name=_("owner can view"),
+    )
+    view_privilege = models.CharField(
+        verbose_name=_("privilege for viewing"),
+        max_length=6,
+        choices=PRIVILEGE_LEVELS,
+        default="browse",
+        null=True,
+        blank=True,
+    )
+    edit_privilege = models.CharField(
+        verbose_name=_("privilege for editing"),
+        max_length=6,
+        choices=PRIVILEGE_LEVELS,
+        default=None,
+        null=True,
+        blank=True,
+    )
     # attributes which are linked to static Project fields
     static_property = models.CharField(max_length=255, blank=True, null=True)
 
     objects = AttributeQuerySet.as_manager()
+
+
 
     class Meta:
         verbose_name = _("attribute")
