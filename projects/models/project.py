@@ -347,13 +347,17 @@ class Project(models.Model):
         )
 
         for (deadline, date) in calculated:
-            project_deadlines.append(
-                ProjectDeadline.objects.create(
-                    project=self,
-                    deadline=deadline,
-                    date=date,
-                )
+            project_deadline, _ = ProjectDeadline.objects.update_or_create(
+                project=self,
+                deadline=deadline,
+                defaults={
+                    "date": date,
+                },
             )
+            project_deadlines.append(project_deadline)
+
+            if deadline.attribute:
+                self.update_attribute_data({deadline.attribute.identifier: date})
 
         # Update automatic deadlines
         calculated = self._get_calculated_deadlines(

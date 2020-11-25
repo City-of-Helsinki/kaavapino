@@ -5,12 +5,11 @@ from projects.models import Deadline
 
 class DeadlineSerializer(serializers.Serializer):
     abbreviation = serializers.CharField()
-    attribute_identifier = serializers.CharField(source="attribute.identifier")
-    editable = serializers.SerializerMethodField()
+    attribute = serializers.SerializerMethodField()
     deadline_types = serializers.ListField(
         serializers.CharField()
     )
-    date_type = serializers.IntegerField()
+    date_type = serializers.CharField()
     error_past_due = serializers.CharField()
     phase_id = serializers.IntegerField(source="phase.pk")
     phase_name = serializers.CharField(source="phase.name")
@@ -20,13 +19,8 @@ class DeadlineSerializer(serializers.Serializer):
     error_min_distance_previous = serializers.CharField()
     warning_min_distance_next = serializers.CharField()
 
-    def get_editable(self, deadline):
-        request = self.context.get('request', None)
-        try:
-            if request.user.has_privilege(deadline.edit_privilege):
-                return True
-            else:
-                return False
-
-        except AttributeError:
-            return False
+    def get_attribute(self, deadline):
+        if deadline.attribute:
+            return deadline.attribute.identifier
+        else:
+            return None

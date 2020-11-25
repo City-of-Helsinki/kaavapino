@@ -124,8 +124,6 @@ class AttributeSchemaSerializer(serializers.Serializer):
     def get_editable(self, attribute):
         project = self.context["project"]
         user = self.context["user"]
-        print(user)
-        print(project)
 
         if not project:
             return None
@@ -306,7 +304,6 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attributes.insert(insert_index, attribute)
 
     @staticmethod
-    # def _serialize_section_attribute(section_attribute):
     def _serialize_section_attribute(section_attribute, project, user):
         if hasattr(section_attribute, "matrix"):
             return ProjectSectionAttributeMatrixSchemaSerializer(section_attribute).data

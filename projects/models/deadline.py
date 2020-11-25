@@ -147,7 +147,7 @@ class Deadline(models.Model):
     def calculate_updated(self, project):
         if self.update_calculations.count():
             return self._calculate(project, self.update_calculations.all())
-        else:
+        elif self.attribute:
             return project.attribute_data.get(self.attribute.identifier, None)
 
     def __str__(self):
@@ -245,7 +245,6 @@ class DateType(models.Model):
         if days < 0:
             dates = [date for date in dates if date >= orig_date]
             dates.reverse()
-            print(dates)
         else:
             dates = [date for date in dates if date <= orig_date]
 
@@ -489,14 +488,17 @@ class DateCalculation(models.Model):
         if self.base_date_attribute:
             date = project.attribute_data.get(
                 self.base_date_attribute,
-                project.created_at.date(),
+                None
             )
         elif self.base_date_deadline:
-            date = project.deadlines.get(
-                self.base_date_deadline,
-                project.created_at.date(),
-            )
-        else:
+            try:
+                date = project.deadlines.get(
+                    deadline = self.base_date_deadline,
+                ).date
+            except Exception:
+                date = None
+
+        if not date:
             date = project.created_at.date()
 
         date += datetime.timedelta(days=self.constant)
@@ -512,7 +514,8 @@ class DateCalculation(models.Model):
         return date
 
     def __str__(self):
-        return self.description
+        return self.description or \
+            f"Sum of {self.base_date_deadline or self.base_date_attribute} and {self.constant or 0}"
 
 
 class DateCalculationAttribute(models.Model):
@@ -557,6 +560,9 @@ class DeadlineDateCalculation(models.Model):
         verbose_name=_("index"),
         default=0,
     )
+
+    def __str__(self):
+        return f"{self.datecalculation} ({self.deadline})"
 
     class Meta:
         ordering = ("index",)

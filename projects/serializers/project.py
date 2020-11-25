@@ -51,8 +51,12 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     is_under_min_distance_next = serializers.SerializerMethodField()
     date = serializers.DateField()
     abbreviation = serializers.CharField(source="deadline.abbreviation")
-    deadline = DeadlineSerializer()
-    distance_reference_deadline_id = serializers.SerializerMethodField()
+    deadline = serializers.SerializerMethodField()
+
+    def get_deadline(self, projectdeadline):
+        return DeadlineSerializer(
+            projectdeadline.deadline
+        ).data
 
     def get_is_under_min_distance_next(self, projectdeadline):
         if not projectdeadline.date:
@@ -64,11 +68,14 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             try:
                 next_date = projectdeadline.project.deadlines.get(
                     deadline=next_distance.deadline
-                )
+                ).date
             except ProjectDeadline.DoesNotExist:
                 continue
 
-            distance_to_next = (next_date - projectdeadline.date).days()
+            if not next_date:
+                continue
+
+            distance_to_next = (next_date - projectdeadline.date).days
             return distance_to_next < next_distance.distance_from_previous
 
         return False
@@ -83,11 +90,14 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             try:
                 prev_date = projectdeadline.project.deadlines.get(
                     deadline=prev_distance.deadline
-                )
+                ).date
             except ProjectDeadline.DoesNotExist:
                 continue
 
-            distance_from_prev = (projectdeadline.date - prev_date).days()
+            if not prev_date:
+                continue
+
+            distance_from_prev = (projectdeadline.date - prev_date).days
             return distance_from_prev < prev_distance.distance_from_previous
 
         return False
@@ -102,16 +112,6 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     def get_out_of_sync(self, projectdeadline):
         return projectdeadline.project.subtype != \
             projectdeadline.deadline.phase.project_subtype
-
-    def get_distance_reference_deadline_id(self, projectdeadline):
-        try:
-            return projectdeadline.project.deadlines.filter(
-                deadline__index__lte=projectdeadline.deadline.index,
-                confirmed=False,
-                date__lt=datetime.date.today(),
-            ).first().name
-        except AttributeError:
-            return None
 
     class Meta:
         model = ProjectDeadline
