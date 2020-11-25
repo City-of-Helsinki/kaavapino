@@ -1,22 +1,20 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from projects.importing import AttributeImporter, AttributeImporterException
+from projects.importing import DeadlineImporter, DeadlineImporterException
 
 
 class Command(BaseCommand):
-    help = "Import attributes from Excel file"
+    help = "Import deadlines from Excel file"
 
     def __init__(self):
         super().__init__()
 
     def add_arguments(self, parser):
         parser.add_argument("filename", type=str)
-        parser.add_argument("--deadlines", nargs="?", type=bool)
-        parser.add_argument("--sheet", nargs="?", type=str)
 
     def handle(self, *args, **options):
-        attribute_importer = AttributeImporter(options)
+        attribute_importer = DeadlineImporter(options)
         try:
             attribute_importer.run()
-        except AttributeImporterException as e:
+        except DeadlineImporterException as e:
             raise CommandError(e)

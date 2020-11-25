@@ -16,6 +16,7 @@ from ..models import (
     Attribute,
     AttributeValueChoice,
     DataRetentionPlan,
+    Deadline,
     FieldSetAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
@@ -27,6 +28,8 @@ from ..models import (
     ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
+    ProjectPhaseDeadlineSection,
+    ProjectPhaseSectionDeadline,
 )
 from ..models.utils import create_identifier, truncate_identifier, check_identifier
 
@@ -57,6 +60,7 @@ ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunut
 ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin täytettyyn tietokenttään"
 ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
 ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
+ATTRIBUTE_EDIT_PRIVILEGE = "kenellä on oikeus muokata tietoa"
 ATTRIBUTE_ERROR = "virhetilanne"
 # TODO: ask for a dedicated column for uniqueness at some point
 ATTRIBUTE_ERROR_UNIQUE = [
@@ -103,10 +107,22 @@ ATTRIBUTE_PHASE_COLUMNS = {
     Phases.GOING_INTO_EFFECT: "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
 }
 
+ATTRIBUTE_DEADLINE_SECTION_COLUMNS = {
+    "create": "vastuuhenkilön aikataulun muokkaus -näkymän osiot ja kenttien järjestys",
+    "admin": "pääkäyttäjän päivämäärätietojen vahvistus -näkymän osiot ja kenttien järjestys",
+}
+
 ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL = "kerrosalatietojen muokkaus -näkymän tietokenttien nimet"
 EXPECTED_A1_VALUE = ATTRIBUTE_NAME
+
+USER_PRIVILEGES = {
+    "selaaja": "browse",
+    "asiantuntija": "edit",
+    "vastuuhenkilö": "create",
+    "pääkäyttäjä": "admin",
+}
 
 HIGHLIGHT_GROUPS = {
     "Asiantuntijan kenttä": "Asiantuntijat",
@@ -617,6 +633,19 @@ class AttributeImporter:
             if generated:
                 value_type = Attribute.TYPE_DECIMAL
 
+            owner_editable = (row[self.column_index[ATTRIBUTE_EDIT_PRIVILEGE]] or "" ) \
+                .find("Projektin vastuhenkilö") >= 0
+            edit_privilege = row[self.column_index[ATTRIBUTE_EDIT_PRIVILEGE]]
+
+            if edit_privilege == "automaattinen tieto, jota ei voi muokata":
+                edit_privilege = None
+            elif edit_privilege:
+                privilege_list = re.split(r",\s*", edit_privilege.lower())
+                for match_text, privilege in USER_PRIVILEGES.items():
+                    if match_text in privilege_list:
+                        edit_privilege = privilege
+                        break
+
             attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
                 defaults={
@@ -644,6 +673,10 @@ class AttributeImporter:
                     "updates_autofill": updates_autofill,
                     "highlight_group": highlight_group,
                     "static_property": static_property,
+                    "owner_editable": owner_editable,
+                    "edit_privilege": edit_privilege,
+                    "owner_viewable": True,
+                    "view_privilege": "browse",
                 },
             )
             if created:
@@ -844,8 +877,7 @@ class AttributeImporter:
                         int(float(".".join(loc.split(':')))*10000)
                         for loc in location.split(".")
                     ]
-
-                except ValueError as asd:
+                except (ValueError, AttributeError):
                     return None
 
                 return {
@@ -1064,6 +1096,57 @@ class AttributeImporter:
                 f"{section_attribute.attribute}"
             )
 
+    def _create_deadline_sections(self, rows, subtype):
+        logger.info("\nReplacing deadline sections")
+
+        ProjectPhaseDeadlineSection.objects \
+            .filter(phase__project_subtype=subtype).delete()
+
+        for row in rows:
+            try:
+                attribute = Attribute.objects.get(
+                    identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]],
+                )
+            except Attribute.DoesNotExist:
+                continue
+
+            if not attribute.deadline:
+                continue
+
+            admin_section = \
+                row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["admin"]]]
+            create_section = \
+                row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["create"]]]
+
+            # No need for separate columns for now so both have same information
+            section_string = create_section
+            phase_name_regex = r"(Käynnistys|Periaatteet|OAS|Luonnos|Ehdotus|Tarkistettu ehdotus|Hyväksyminen|Voimaantulo)"
+
+            if not section_string:
+                continue
+
+            try:
+                phase = ProjectPhase.objects.get(
+                    name=re.findall(phase_name_regex, section_string)[0],
+                    project_subtype=subtype,
+                )
+            except (IndexError, ProjectPhase.DoesNotExist):
+                continue
+
+            section, _ = ProjectPhaseDeadlineSection.objects.get_or_create(
+                phase=phase,
+                defaults={
+                    "index": phase.index,
+                }
+            )
+            try:
+                ProjectPhaseSectionDeadline.objects.create(
+                    deadline=attribute.deadline.get(subtype=subtype),
+                    section=section,
+                )
+            except Deadline.DoesNotExist:
+                pass
+
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes
         if not cell_content:
@@ -1164,7 +1247,7 @@ class AttributeImporter:
         return ordered_subtypes
 
     @transaction.atomic
-    def run(self):
+    def run_attributes(self):
         self.project_type, _ = ProjectType.objects.get_or_create(name="asemakaava")
 
         filename = self.options.get("filename")
@@ -1226,3 +1309,30 @@ class AttributeImporter:
             )
         )
         logger.info("Import done.")
+
+    @transaction.atomic
+    def run_deadline_sections(self):
+        self.project_type, _ = ProjectType.objects.get_or_create(name="asemakaava")
+
+        filename = self.options.get("filename")
+        logger.info(
+            f"Importing deadline attribute sections from file {filename} for project type {self.project_type}..."
+        )
+
+        self.workbook = self._open_workbook(filename)
+        rows = self._extract_data_from_workbook(self.workbook)
+
+        header_row = rows[0]
+        self._set_row_indexes(header_row)
+
+        data_rows = list(filter(self._check_if_row_valid, rows[1:]))
+
+        for subtype in ProjectSubtype.objects.all():
+            self._create_deadline_sections(data_rows, subtype)
+        logger.info("Import done.")
+
+    def run(self):
+        if self.options.get("deadlines"):
+            self.run_deadline_sections()
+        else:
+            self.run_attributes()
