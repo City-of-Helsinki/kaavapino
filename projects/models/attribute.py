@@ -375,18 +375,7 @@ class Attribute(models.Model):
             else:
                 return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
-            if self.multiple_choice:
-                return [
-                    datetime.datetime.strptime(v, DATE_SERIALIZATION_FORMAT).date()
-                    if v else None
-                    for v in value
-                ]
-            elif value:
-                return datetime.datetime.strptime(
-                    value, DATE_SERIALIZATION_FORMAT
-                ).date()
-            else:
-                return None
+            return value
         elif self.value_type == Attribute.TYPE_USER:
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).
