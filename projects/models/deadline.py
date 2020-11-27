@@ -485,6 +485,8 @@ class DateCalculation(models.Model):
     )
 
     def calculate(self, project):
+        date = None
+
         if self.base_date_attribute:
             date = project.attribute_data.get(
                 self.base_date_attribute,
