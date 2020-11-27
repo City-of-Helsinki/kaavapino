@@ -49,12 +49,12 @@ DATETYPE_BASE_DATETYPE_INDEX = 2
 
 # Mappings
 DEADLINE_TYPES = {
-    "vaiheen alkupiste": Deadline.TYPE_PHASE_END,
-    "vaiheen päätepiste": Deadline.TYPE_PHASE_START,
-    "katkoviivan alkupiste": Deadline.TYPE_DASHED_END,
-    "katkoviivan päätepiste": Deadline.TYPE_DASHED_START,
-    "sisäpalkin alkupiste": Deadline.TYPE_INNER_END,
-    "sisäpalkin päätepiste": Deadline.TYPE_INNER_START,
+    "vaiheen alkupiste": Deadline.TYPE_PHASE_START,
+    "vaiheen päätepiste": Deadline.TYPE_PHASE_END,
+    "katkoviivan alkupiste": Deadline.TYPE_DASHED_START,
+    "katkoviivan päätepiste": Deadline.TYPE_DASHED_END,
+    "sisäpalkin alkupiste": Deadline.TYPE_INNER_START,
+    "sisäpalkin päätepiste": Deadline.TYPE_INNER_END,
     "määräaikaetappi": Deadline.TYPE_MILESTONE,
 }
 
