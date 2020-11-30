@@ -11,6 +11,7 @@ from projects.models import (
     Project,
     ProjectFloorAreaSection,
     ProjectPhaseSection,
+    ProjectPhaseDeadlineSection,
 )
 from projects.serializers.utils import _is_attribute_required
 
@@ -177,18 +178,29 @@ def create_section_serializer(section, context, project=None, validation=True):
         return None
 
     if isinstance(section, ProjectPhaseSection):
-        section_attributes = section.projectphasesectionattribute_set.order_by("index")
+        section_attributes = [
+            section_attribute.attribute
+            for section_attribute
+            in section.projectphasesectionattribute_set.order_by("index")
+            if is_relevant_attribute(section_attribute, attribute_data)
+        ]
     elif isinstance(section, ProjectFloorAreaSection):
-        section_attributes = section.projectfloorareasectionattribute_set.order_by("index")
+        section_attributes = [
+            section_attribute.attribute
+            for section_attribute
+            in section.projectfloorareasectionattribute_set.order_by("index")
+            if is_relevant_attribute(section_attribute, attribute_data)
+        ]
+    elif isinstance(section, ProjectPhaseDeadlineSection):
+        section_attributes = [
+            section_dl.deadline.attribute
+            for section_dl in section.projectphasesectiondeadline_set.all()
+        ]
     else:
         return None
 
     serializer_fields = {}
-    for section_attribute in section_attributes:
-        if not is_relevant_attribute(section_attribute, attribute_data):
-            continue
-        attribute = section_attribute.attribute
-
+    for attribute in section_attributes:
         # Do not include generated attribute values
         if attribute.generated:
             continue

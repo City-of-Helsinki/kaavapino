@@ -20,6 +20,7 @@ from projects.models import (
     ProjectSubtype,
     ProjectPhase,
     ProjectPhaseSection,
+    ProjectPhaseDeadlineSection,
     ProjectFloorAreaSection,
     ProjectAttributeFile,
     ProjectDeadline,
@@ -361,6 +362,23 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return sections
 
+    def generate_schedule_sections_data(self, subtype, validation):
+        sections = []
+        deadline_sections = ProjectPhaseDeadlineSection.objects.filter(
+            phase__project_subtype=subtype
+        )
+        for section in deadline_sections:
+            serializer_class = create_section_serializer(
+                section,
+                context=self.context,
+                project=self.instance,
+                validation=validation,
+            )
+            section_data = SectionData(section, serializer_class)
+            sections.append(section_data)
+
+        return sections
+
     def validate(self, attrs):
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
@@ -409,13 +427,17 @@ class ProjectSerializer(serializers.ModelSerializer):
             index__lte=max_phase_index, project_subtype=subtype
         ):
             sections_data += self.generate_sections_data(
-                phase=phase, validation=self.should_validate_attributes()
-            )
+                phase=phase, validation=should_validate
+            ) or []
 
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
-            validation=self.should_validate_attributes()
-        )
+            validation=should_validate
+        ) or []
+
+        sections_data += self.generate_schedule_sections_data(
+            subtype=subtype, validation=should_validate
+        ) or []
 
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.

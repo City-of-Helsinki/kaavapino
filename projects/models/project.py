@@ -205,8 +205,11 @@ class Project(models.Model):
         floor_area_section_attrs = Attribute.objects.filter(
             floor_area_sections__project_subtype__projects=self
         )
+        deadline_attrs = Attribute.objects.filter(
+            deadline__in=Deadline.objects.filter(subtype=self.subtype)
+        )
         project_attributes = (
-            (phase_section_attrs | floor_area_section_attrs)
+            (phase_section_attrs | floor_area_section_attrs | deadline_attrs)
             .distinct()
             .prefetch_related("value_choices")
         )
