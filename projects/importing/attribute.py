@@ -698,8 +698,16 @@ class AttributeImporter:
         # Remove any attributes that was not imported
         old_attribute_ids = existing_attribute_ids - imported_attribute_ids
         logger.info(f"Old Attributes: {old_attribute_ids}")
-        if old_attribute_ids:
-            Attribute.objects.filter(identifier__in=old_attribute_ids).delete()
+        for old_id in old_attribute_ids:
+            attr = Attribute.objects.get(identifier=old_id)
+            deadlines = attr.deadline.all()
+
+            # Remove relations to any deadlines
+            for dl in deadlines:
+                dl.attribute = None
+                dl.save()
+
+            attr.delete()
 
         return {
             "created": created_attribute_count,
