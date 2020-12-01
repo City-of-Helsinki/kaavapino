@@ -389,15 +389,11 @@ class AttributeImporter:
         For importing a field the requirements are:
         - Name
         - Type
-        - Is part of a phase
-        - Phase section name has been defined
         """
         name = row[self.column_index[ATTRIBUTE_NAME]]
         attr_type = row[self.column_index[ATTRIBUTE_TYPE]]
-        belongs_to_phase = bool(self._get_attribute_input_phases(row))
-        phase_has_name = bool(row[self.column_index[PHASE_SECTION_NAME]])
 
-        if name and attr_type and belongs_to_phase and phase_has_name:
+        if name and attr_type:
             return True
 
         logger.info(f"Field {name} is not valid, it will not be imported.")
@@ -702,7 +698,10 @@ class AttributeImporter:
             attr = Attribute.objects.get(identifier=old_id)
             deadlines = attr.deadline.all()
 
-            # Remove relations to any deadlines
+            # Delete related comments
+            attr.comments.all().delete()
+
+            # Remove relations to deadlines
             for dl in deadlines:
                 dl.attribute = None
                 dl.save()
