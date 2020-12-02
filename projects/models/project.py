@@ -743,11 +743,13 @@ class ProjectDeadline(models.Model):
         ordering = ("deadline__index",)
 
 
-class ProjectPhaseSectionDeadline(models.Model):
-    """Links a deadline into a project phase deadline section."""
+class ProjectPhaseDeadlineSectionAttribute(models.Model):
+    """Links an attribute into a project phase deadline section."""
 
-    deadline = models.ForeignKey(
-        Deadline, verbose_name=_("deadline"), on_delete=models.CASCADE
+    attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("attribute"),
+        on_delete=models.CASCADE,
     )
     section = models.ForeignKey(
         "ProjectPhaseDeadlineSection",
@@ -762,7 +764,7 @@ class ProjectPhaseSectionDeadline(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return f"{self.deadline} {self.section} {self.index}"
+        return f"{self.attribute} {self.section} {self.index}"
 
 
 class ProjectPhaseDeadlineSection(models.Model):
@@ -775,11 +777,11 @@ class ProjectPhaseDeadlineSection(models.Model):
         on_delete=models.CASCADE,
     )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
-    deadlines = models.ManyToManyField(
-        Deadline,
-        verbose_name=_("deadlines"),
-        related_name="phase_sections",
-        through="ProjectPhaseSectionDeadline",
+    attributes = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("attributes"),
+        related_name="phase_deadline_sections",
+        through="ProjectPhaseDeadlineSectionAttribute",
     )
 
     @property

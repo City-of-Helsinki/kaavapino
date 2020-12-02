@@ -29,7 +29,7 @@ from .project import (  # noqa
     ProjectSubtype,
     ProjectDeadline,
     ProjectPhaseDeadlineSection,
-    ProjectPhaseSectionDeadline,
+    ProjectPhaseDeadlineSectionAttribute,
 )
 from .projectcomment import (  # noqa
     ProjectComment,

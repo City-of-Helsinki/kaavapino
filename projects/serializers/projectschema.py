@@ -431,7 +431,7 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
 
     def _get_attributes(self, deadline_section):
         serialized = []
-        deadlines = deadline_section.deadlines.select_related("attribute")
+        attributes = deadline_section.attributes.all()
 
         query_params = getattr(self.context["request"], "GET", {})
         try:
@@ -442,26 +442,23 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
             project = None
 
         user = self.context["request"].user
-        i = 0
 
-        for dl in deadlines:
+        for attribute in attributes:
             if project:
-                check_owner = dl.attribute.owner_viewable and \
+                check_owner = attribute.owner_viewable and \
                     project.user == user
             else:
                 check_owner = False
 
-            check_privilege = user.has_privilege(dl.attribute.view_privilege)
+            check_privilege = user.has_privilege(attribute.view_privilege)
             if check_owner or check_privilege:
                 serialized.append(AttributeSchemaSerializer(
-                    dl.attribute,
+                    attribute,
                     context={
                         "project": project,
                         "user": user,
                     },
                 ).data)
-                serialized[i]["deadline"] = DeadlineSerializer(dl).data
-                i += 1
 
         return serialized
 

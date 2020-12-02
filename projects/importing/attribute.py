@@ -29,7 +29,7 @@ from ..models import (
     ProjectType,
     ProjectSubtype,
     ProjectPhaseDeadlineSection,
-    ProjectPhaseSectionDeadline,
+    ProjectPhaseDeadlineSectionAttribute,
 )
 from ..models.utils import create_identifier, truncate_identifier, check_identifier
 
@@ -1115,34 +1115,33 @@ class AttributeImporter:
             create_section = \
                 row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["create"]]]
 
-            # No need for separate columns for now so both have same information
-            section_string = create_section
-            phase_name_regex = r"(Käynnistys|Periaatteet|OAS|Luonnos|Ehdotus|Tarkistettu ehdotus|Hyväksyminen|Voimaantulo)"
+            for section_string in [admin_section, create_section]:
+                phase_name_regex = r"(Käynnistys|Periaatteet|OAS|Luonnos|Ehdotus|Tarkistettu ehdotus|Hyväksyminen|Voimaantulo)"
 
-            if not section_string:
-                continue
+                if not section_string:
+                    continue
 
-            try:
-                phase = ProjectPhase.objects.get(
-                    name=re.findall(phase_name_regex, section_string)[0],
-                    project_subtype=subtype,
+                try:
+                    phase = ProjectPhase.objects.get(
+                        name=re.findall(phase_name_regex, section_string)[0],
+                        project_subtype=subtype,
+                    )
+                except (IndexError, ProjectPhase.DoesNotExist):
+                    continue
+
+                section, _ = ProjectPhaseDeadlineSection.objects.get_or_create(
+                    phase=phase,
+                    defaults={
+                        "index": phase.index,
+                    }
                 )
-            except (IndexError, ProjectPhase.DoesNotExist):
-                continue
-
-            section, _ = ProjectPhaseDeadlineSection.objects.get_or_create(
-                phase=phase,
-                defaults={
-                    "index": phase.index,
-                }
-            )
-            try:
-                ProjectPhaseSectionDeadline.objects.create(
-                    deadline=attribute.deadline.get(subtype=subtype),
-                    section=section,
-                )
-            except Deadline.DoesNotExist:
-                pass
+                try:
+                    ProjectPhaseDeadlineSectionAttribute.objects.create(
+                        attribute=attribute,
+                        section=section,
+                    )
+                except Deadline.DoesNotExist:
+                    pass
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes
@@ -1244,7 +1243,7 @@ class AttributeImporter:
         return ordered_subtypes
 
     @transaction.atomic
-    def run_attributes(self):
+    def run(self):
         self.project_type, _ = ProjectType.objects.get_or_create(name="asemakaava")
 
         filename = self.options.get("filename")
@@ -1283,6 +1282,7 @@ class AttributeImporter:
 
             self._create_floor_area_sections(data_rows, subtype)
             self._create_floor_area_attribute_section_links(data_rows, subtype)
+            self._create_deadline_sections(data_rows, subtype)
 
         logger.info("Project subtypes {}".format(ProjectSubtype.objects.count()))
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
@@ -1306,30 +1306,3 @@ class AttributeImporter:
             )
         )
         logger.info("Import done.")
-
-    @transaction.atomic
-    def run_deadline_sections(self):
-        self.project_type, _ = ProjectType.objects.get_or_create(name="asemakaava")
-
-        filename = self.options.get("filename")
-        logger.info(
-            f"Importing deadline attribute sections from file {filename} for project type {self.project_type}..."
-        )
-
-        self.workbook = self._open_workbook(filename)
-        rows = self._extract_data_from_workbook(self.workbook)
-
-        header_row = rows[0]
-        self._set_row_indexes(header_row)
-
-        data_rows = list(filter(self._check_if_row_valid, rows[1:]))
-
-        for subtype in ProjectSubtype.objects.all():
-            self._create_deadline_sections(data_rows, subtype)
-        logger.info("Import done.")
-
-    def run(self):
-        if self.options.get("deadlines"):
-            self.run_deadline_sections()
-        else:
-            self.run_attributes()
