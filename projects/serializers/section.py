@@ -193,7 +193,7 @@ def create_section_serializer(section, context, project=None, validation=True):
         ]
     elif isinstance(section, ProjectPhaseDeadlineSection):
         section_attributes = [
-            section_attribute
+            section_attribute.attribute
             for section_attribute
             in section.projectphasedeadlinesectionattribute_set.all()
         ]
