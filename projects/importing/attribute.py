@@ -1135,13 +1135,10 @@ class AttributeImporter:
                         "index": phase.index,
                     }
                 )
-                try:
-                    ProjectPhaseDeadlineSectionAttribute.objects.create(
-                        attribute=attribute,
-                        section=section,
-                    )
-                except Deadline.DoesNotExist:
-                    pass
+                ProjectPhaseDeadlineSectionAttribute.objects.get_or_create(
+                    attribute=attribute,
+                    section=section,
+                )
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes
