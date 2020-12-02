@@ -101,7 +101,7 @@ class DeadlineImporter:
         data = []
 
         for row in list(sheet.iter_rows()):
-            if not row[0].value:
+            if not row[1].value:
                 break
             data.append([col.value for col in row])
 
@@ -129,9 +129,7 @@ class DeadlineImporter:
 
     def _check_if_row_valid(self, row: Sequence) -> bool:
         """Check if the row has all required data."""
-
         try:
-            assert(row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]])
             assert(row[self.column_index[DEADLINE_ABBREVIATION]])
             assert(row[self.column_index[DEADLINE_PHASE]])
         except AssertionError:
@@ -205,7 +203,12 @@ class DeadlineImporter:
                 except IndexError:
                     end_date = start_date
 
-                if not(start_date.split("."))[1] and end_date.split(".")[1]:
+                start_month = start_date.split(".")[1]
+                end_month = end_date.split(".")[1]
+
+                if start_month and end_month:
+                    pass
+                elif not start_month and end_month:
                     month = end_date.split(".")[1]
                     if end_date and month:
                         start_date += month
@@ -286,9 +289,9 @@ class DeadlineImporter:
             in datetypes:
 
             datetype, _ = DateType.objects.update_or_create(
-                name=name,
                 identifier=identifier,
                 defaults={
+                    "name": name,
                     "exclude_selected": exclude_selected,
                 },
             )
@@ -324,7 +327,7 @@ class DeadlineImporter:
                 )
             except Attribute.DoesNotExist:
                 logger.warning(
-                    f"Invalid attribute identifier {row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]} for deadline {abbreviation}."
+                    f"Ignored invalid attribute identifier {row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]} for deadline {abbreviation}."
                 )
                 attribute = None
 
@@ -340,8 +343,10 @@ class DeadlineImporter:
             date_type = None
             if row[self.column_index[DEADLINE_DATE_TYPE]]:
                 try:
+                    identifier = row[self.column_index[DEADLINE_DATE_TYPE]] \
+                        .lower().replace(" ", "_")
                     date_type = DateType.objects.get(
-                        identifier = row[self.column_index[DEADLINE_DATE_TYPE]]
+                        identifier=identifier
                     )
                 except DateType.DoesNotExist:
                     logger.warning(
@@ -366,7 +371,7 @@ class DeadlineImporter:
                 phase = subtype.phases.get(name=row[self.column_index[DEADLINE_PHASE]])
             except ProjectPhase.DoesNotExist:
                 logger.warning(
-                    f"Ignored invalid phase {row[self.column_index[DEADLINE_PHASE]]} for deadline {abbreviation}."
+                    f"Invalid phase {row[self.column_index[DEADLINE_PHASE]]} for deadline {abbreviation} in {subtype}, skipping."
                 )
                 continue
 

@@ -359,8 +359,9 @@ class Project(models.Model):
             )
             project_deadlines.append(project_deadline)
 
-            if deadline.attribute:
-                self.update_attribute_data({deadline.attribute.identifier: date})
+            if deadline.attribute and date:
+                self.update_attribute_data( \
+                    {deadline.attribute.identifier: date})
 
         # Update automatic deadlines
         calculated = self._get_calculated_deadlines(
@@ -374,9 +375,13 @@ class Project(models.Model):
                 if dl.deadline == deadline
             )
 
-            if project_deadline:
+            if project_deadline and date:
                 project_deadline.date = date
                 project_deadline.save()
+
+                if deadline.attribute:
+                    self.update_attribute_data( \
+                        {deadline.attribute.identifier: date})
 
         self.deadlines.set(project_deadlines)
 

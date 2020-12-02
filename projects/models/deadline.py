@@ -524,7 +524,7 @@ class DateCalculationAttribute(models.Model):
     attribute = models.ForeignKey(
         Attribute,
         verbose_name=_("relies on date from attribute"),
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
     calculation = models.ForeignKey(
         DateCalculation,

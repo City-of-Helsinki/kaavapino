@@ -74,6 +74,8 @@ STATIC_ATTRIBUTES_MAPPING = {
      "luodaanko_nakyvaksi": "public",
      "pinonumero": "pino_number",
      "projektin_nimi": "name",
+     "periaatteet_luotu": "create_principles",
+     "luonnos_luotu": "create_draft",
 }
 
 PHASE_SECTION_NAME = "tietoryhmä"
@@ -859,18 +861,6 @@ class AttributeImporter:
 
             if error:
                 raise Exception(f"Could not add attribute {attribute.identifier}")
-
-    def _get_attribute_input_phases(self, row):
-        input_phases = []
-
-        for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():
-            value = row[self.column_index[column]]
-            if value in [None, "ei"]:
-                continue
-
-            input_phases.append(phase.value)
-
-        return filter(lambda x: x is not None, input_phases)
 
     def _get_attribute_locations(self, row, phase_name):
         for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():

@@ -188,11 +188,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         self._set_geometry_attributes(attribute_data, project)
 
         attribute_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
-        attribute_data['luonnos_luotu'] = project.create_draft
-        attribute_data['periaate_luotu'] = project.create_principles
 
         static_properties = [
-            "user", "name", "public", "pino_number"
+            "user",
+            "name",
+            "public",
+            "pino_number",
+            "create_principles",
+            "create_draft",
         ]
 
         for static_property in static_properties:
