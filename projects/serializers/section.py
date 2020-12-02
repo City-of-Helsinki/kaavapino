@@ -201,9 +201,7 @@ def create_section_serializer(section, context, project=None, validation=True):
         return None
 
     serializer_fields = {}
-    for section_attribute in section_attributes:
-        attribute = section_attribute.attribute
-
+    for attribute in section_attributes:
         # Do not include generated attribute values
         if attribute.generated:
             continue
