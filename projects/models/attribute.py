@@ -137,10 +137,16 @@ class Attribute(models.Model):
     )
 
     DISPLAY_DROPDOWN = "dropdown"
+    DISPLAY_CHECKBOX = "checkbox"
+    DISPLAY_READONLY = "readonly"
+    DISPLAY_READONLY_CHECKBOX = "readonly_checkbox"
 
     DISPLAY_CHOICES = (
         (None, _("default")),
         (DISPLAY_DROPDOWN, _("dropdown")),
+        (DISPLAY_CHECKBOX, _("checkbox")),
+        (DISPLAY_READONLY, _("read only")),
+        (DISPLAY_READONLY_CHECKBOX, _("read only checkbox")),
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))

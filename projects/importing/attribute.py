@@ -327,12 +327,25 @@ VALUE_TYPES = {
     "Valinta (1-x) pudotusvalikosta.": Attribute.TYPE_CHOICE,
     "Valintaruutu.": Attribute.TYPE_BOOLEAN,
     "Vuoden valinta pudotusvalikosta": Attribute.TYPE_INTEGER,
+    "Valintaruutu. (readonly)": Attribute.TYPE_BOOLEAN,
+    "Päivämäärä (readonly)": Attribute.TYPE_DATE,
+    "Lyhyt teksti (readonly)": Attribute.TYPE_RICH_TEXT_SHORT,
+    "Kyllä/Ei (readonly)": Attribute.TYPE_BOOLEAN,
+    "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.TYPE_BOOLEAN,
+    "Kokonaisluku (readonly)": Attribute.TYPE_INTEGER,
 }
 
 DISPLAY_TYPES = {
     "Valinta (1) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
     "Valinta (1-x) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
     "Vuoden valinta pudotusvalikosta": Attribute.DISPLAY_DROPDOWN,
+    "Valintaruutu.": Attribute.DISPLAY_CHECKBOX,
+    "Valintaruutu. (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
+    "Päivämäärä (readonly)": Attribute.DISPLAY_READONLY,
+    "Lyhyt teksti (readonly)": Attribute.DISPLAY_READONLY,
+    "Kyllä/Ei (readonly)": Attribute.DISPLAY_READONLY,
+    "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.DISPLAY_READONLY,
+    "Kokonaisluku (readonly)": Attribute.DISPLAY_READONLY,
 }
 
 
