@@ -5,12 +5,18 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from projects.models import Attribute, AttributeValueChoice, FieldSetAttribute
+from projects.models import (
+    Attribute,
+    AttributeValueChoice,
+    FieldSetAttribute,
+    Project,
+)
 from projects.models.project import (
     PhaseAttributeMatrixCell,
     ProjectFloorAreaSectionAttributeMatrixCell,
     ProjectPhaseFieldSetAttributeIndex,
 )
+from projects.serializers.deadline import DeadlineSerializer
 from projects.serializers.utils import _is_attribute_required
 
 FOREIGN_KEY_TYPE_MODELS = {
@@ -113,6 +119,20 @@ class AttributeSchemaSerializer(serializers.Serializer):
     searchable = serializers.BooleanField()
     highlight_group = serializers.CharField()
     display = serializers.CharField()
+    editable = serializers.SerializerMethodField("get_editable")
+
+    def get_editable(self, attribute):
+        project = self.context["project"]
+        user = self.context["user"]
+
+        if not project:
+            return None
+        elif project.user == user and attribute.owner_editable:
+            return True
+        elif user.has_privilege(attribute.edit_privilege):
+            return True
+        else:
+            return False
 
     def get_fieldset_attributes(self, attribute):
         try:
@@ -244,8 +264,23 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
                     "fields": [],
                 }
 
+            query_params = getattr(self.context["request"], "GET", {})
+            try:
+                project = Project.objects.get(
+                    pk=int(query_params.get("project", "")),
+                )
+            except Exception:
+                project = None
+
+            user = self.context["request"].user
+
             # Add each cell as fields to the matrix
-            cell_attribute = self._create_matrix_cell_attribute(cell, section_attribute)
+            cell_attribute = self._create_matrix_cell_attribute(
+                cell,
+                section_attribute,
+                project,
+                user,
+            )
             matrices[matrix_structure_id]["fields"].append(cell_attribute)
 
             # Store the field index for later removal
@@ -269,24 +304,35 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attributes.insert(insert_index, attribute)
 
     @staticmethod
-    def _serialize_section_attribute(section_attribute):
+    def _serialize_section_attribute(section_attribute, project, user):
         if hasattr(section_attribute, "matrix"):
             return ProjectSectionAttributeMatrixSchemaSerializer(section_attribute).data
 
         serialized_attribute = ProjectSectionAttributeSchemaSerializer(
             section_attribute
         ).data
-        serialized_attribute.update(
-            AttributeSchemaSerializer(section_attribute.attribute, context={"phase": section_attribute.section.phase}).data
-        )
+
+        serialized_attribute.update(AttributeSchemaSerializer(
+            section_attribute.attribute,
+            context={
+                "phase": section_attribute.section.phase,
+                "project": project,
+                "user": user,
+            },
+        ).data)
+
         return serialized_attribute
 
     @staticmethod
-    def _create_matrix_cell_attribute(cell, section_attribute):
+    def _create_matrix_cell_attribute(cell, section_attribute, project, user):
         cell_attribute = ProjectSectionAttributeSchemaSerializer(section_attribute).data
-        cell_attribute.update(
-            AttributeSchemaSerializer(section_attribute.attribute).data
-        )
+        cell_attribute.update(AttributeSchemaSerializer(
+            section_attribute.attribute,
+            context={
+                "project": project,
+                "user": user,
+            },
+        ).data)
         cell_attribute["row"] = cell.row
         cell_attribute["column"] = cell.column
 
@@ -314,13 +360,26 @@ class ProjectSectionSchemaSerializer(BaseMatrixableSchemaSerializer):
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(
+                pk=int(query_params.get("project", "")),
+            )
+        except Exception:
+            project = None
+
+        user = self.context["request"].user
         section_attributes = list(section.projectphasesectionattribute_set.all())
         self._create_matrix_fields(PhaseAttributeMatrixCell, section_attributes)
 
         # Create a list of serialized fields
         data = []
         for section_attribute in section_attributes:
-            data.append(self._serialize_section_attribute(section_attribute))
+            data.append(self._serialize_section_attribute(
+                section_attribute,
+                project,
+                user,
+            ))
 
         return data
 
@@ -339,6 +398,15 @@ class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(
+                pk=int(query_params.get("project", "")),
+            )
+        except Exception:
+            project = None
+
+        user = self.context["request"].user
         section_attributes = list(section.projectfloorareasectionattribute_set.all())
         self._create_matrix_fields(
             ProjectFloorAreaSectionAttributeMatrixCell,
@@ -348,9 +416,62 @@ class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
         # Create a list of serialized fields
         data = []
         for section_attribute in section_attributes:
-            data.append(self._serialize_section_attribute(section_attribute))
+            data.append(self._serialize_section_attribute(
+                section_attribute,
+                project,
+                user,
+            ))
 
         return data
+
+
+class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    attributes = serializers.SerializerMethodField("_get_attributes")
+
+    def _get_attributes(self, deadline_section):
+        serialized = []
+        attributes = deadline_section.attributes.all()
+
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(
+                pk=int(query_params.get("project", "")),
+            )
+        except Exception:
+            project = None
+
+        user = self.context["request"].user
+
+        for attribute in attributes:
+            if project:
+                check_owner = attribute.owner_viewable and \
+                    project.user == user
+            else:
+                check_owner = False
+
+            check_privilege = user.has_privilege(attribute.view_privilege)
+            if check_owner or check_privilege:
+                serialized.append(AttributeSchemaSerializer(
+                    attribute,
+                    context={
+                        "project": project,
+                        "user": user,
+                    },
+                ).data)
+
+        return serialized
+
+
+class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField(source="name")
+    color = serializers.CharField()
+    color_code = serializers.CharField()
+    list_prefix = serializers.CharField()
+    sections = ProjectPhaseDeadlineSectionSerializer(
+        source="deadline_sections", many=True,
+    )
 
 
 class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
@@ -376,6 +497,10 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
 
     phases = ProjectPhaseSchemaSerializer(many=True)
     floor_area_sections = ProjectFloorAreaSchemaSerializer(many=True)
+    deadline_sections = ProjectPhaseDeadlineSectionsSerializer(
+        many=True,
+        source="phases",
+    )
 
     class Meta:
         list_serializer_class = ProjectSubtypeListFilterSerializer

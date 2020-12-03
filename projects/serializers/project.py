@@ -1,4 +1,5 @@
 import copy
+import datetime
 from typing import List, NamedTuple, Type
 
 from actstream import action
@@ -19,11 +20,14 @@ from projects.models import (
     ProjectSubtype,
     ProjectPhase,
     ProjectPhaseSection,
+    ProjectPhaseDeadlineSection,
     ProjectFloorAreaSection,
     ProjectAttributeFile,
+    ProjectDeadline,
     Attribute,
     ProjectPhaseSectionAttribute,
     ProjectComment,
+    Deadline,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -31,6 +35,7 @@ from projects.permissions.media_file_permissions import (
 )
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.section import create_section_serializer
+from projects.serializers.deadline import DeadlineSerializer
 from users.models import User
 from users.serializers import UserSerializer
 
@@ -40,11 +45,87 @@ class SectionData(NamedTuple):
     serializer_class: Type[Serializer]
 
 
-class ProjectDeadlinesSerializer(serializers.Serializer):
-    phase_id = serializers.IntegerField(required=True)
-    phase_name = serializers.CharField(read_only=True)
-    start = serializers.DateTimeField()
-    deadline = serializers.DateTimeField(required=True)
+class ProjectDeadlineSerializer(serializers.Serializer):
+    past_due = serializers.SerializerMethodField()
+    out_of_sync = serializers.SerializerMethodField()
+    is_under_min_distance_previous = serializers.SerializerMethodField()
+    is_under_min_distance_next = serializers.SerializerMethodField()
+    date = serializers.DateField()
+    abbreviation = serializers.CharField(source="deadline.abbreviation")
+    deadline = serializers.SerializerMethodField()
+
+    def get_deadline(self, projectdeadline):
+        return DeadlineSerializer(
+            projectdeadline.deadline
+        ).data
+
+    def get_is_under_min_distance_next(self, projectdeadline):
+        if not projectdeadline.date:
+            return False
+
+        next_deadlines = projectdeadline.deadline.distances_to_next \
+            .order_by("deadline__index")
+        for next_distance in next_deadlines:
+            try:
+                next_date = projectdeadline.project.deadlines.get(
+                    deadline=next_distance.deadline
+                ).date
+            except ProjectDeadline.DoesNotExist:
+                continue
+
+            if not next_date:
+                continue
+
+            distance_to_next = (next_date - projectdeadline.date).days
+            return distance_to_next < next_distance.distance_from_previous
+
+        return False
+
+    def get_is_under_min_distance_previous(self, projectdeadline):
+        if not projectdeadline.date:
+            return False
+
+        prev_deadlines = projectdeadline.deadline.distances_to_previous \
+            .order_by("-previous_deadline__index")
+        for prev_distance in prev_deadlines:
+            try:
+                prev_date = projectdeadline.project.deadlines.get(
+                    deadline=prev_distance.deadline
+                ).date
+            except ProjectDeadline.DoesNotExist:
+                continue
+
+            if not prev_date:
+                continue
+
+            distance_from_prev = (projectdeadline.date - prev_date).days
+            return distance_from_prev < prev_distance.distance_from_previous
+
+        return False
+
+    def get_past_due(self, projectdeadline):
+        return bool(projectdeadline.project.deadlines.filter(
+            deadline__index__lte=projectdeadline.deadline.index,
+            confirmed=False,
+            date__lt=datetime.date.today(),
+        ).count())
+
+    def get_out_of_sync(self, projectdeadline):
+        return projectdeadline.project.subtype != \
+            projectdeadline.deadline.phase.project_subtype
+
+    class Meta:
+        model = ProjectDeadline
+        fields = [
+            "date",
+            "abbreviation",
+            "deadline_id",
+            "past_due",
+            "is_under_min_distance_previous",
+            "is_under_min_distance_next",
+            "out_of_sync",
+            "distance_reference_deadline_id",
+        ]
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -53,7 +134,11 @@ class ProjectSerializer(serializers.ModelSerializer):
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
-    deadlines = ProjectDeadlinesSerializer(many=True, allow_null=True, required=False)
+    deadlines = ProjectDeadlineSerializer(
+        many=True,
+        allow_null=True,
+        required=False,
+    )
     public = serializers.NullBooleanField(required=False, read_only=True)
     archived = serializers.NullBooleanField(required=False, read_only=True)
     onhold = serializers.NullBooleanField(required=False, read_only=True)
@@ -103,11 +188,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         self._set_geometry_attributes(attribute_data, project)
 
         attribute_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
-        attribute_data['luonnos_luotu'] = project.create_draft
-        attribute_data['periaate_luotu'] = project.create_principles
 
         static_properties = [
-            "user", "name", "public", "pino_number"
+            "user",
+            "name",
+            "public",
+            "pino_number",
+            "create_principles",
+            "create_draft",
         ]
 
         for static_property in static_properties:
@@ -277,6 +365,23 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return sections
 
+    def generate_schedule_sections_data(self, subtype, validation):
+        sections = []
+        deadline_sections = ProjectPhaseDeadlineSection.objects.filter(
+            phase__project_subtype=subtype
+        )
+        for section in deadline_sections:
+            serializer_class = create_section_serializer(
+                section,
+                context=self.context,
+                project=self.instance,
+                validation=validation,
+            )
+            section_data = SectionData(section, serializer_class)
+            sections.append(section_data)
+
+        return sections
+
     def validate(self, attrs):
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
@@ -290,17 +395,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("attribute_data", None), attrs
         )
 
+        self._validate_deadlines(attrs)
+
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
 
-        deadlines = self._validate_deadlines(attrs)
         public = self._validate_public(attrs)
 
         if public:
             attrs["public"] = public
-
-        if deadlines:
-            attrs["deadlines"] = deadlines
 
         return attrs
 
@@ -327,13 +430,17 @@ class ProjectSerializer(serializers.ModelSerializer):
             index__lte=max_phase_index, project_subtype=subtype
         ):
             sections_data += self.generate_sections_data(
-                phase=phase, validation=self.should_validate_attributes()
-            )
+                phase=phase, validation=should_validate
+            ) or []
 
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
-            validation=self.should_validate_attributes()
-        )
+            validation=should_validate
+        ) or []
+
+        sections_data += self.generate_schedule_sections_data(
+            subtype=subtype, validation=should_validate
+        ) or []
 
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
@@ -442,105 +549,38 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def _validate_deadlines(self, attrs):
         """
-        Validates that deadlines values are correct
-
-        - Only the first start date can be changed
-        - There can be no overlapping deadlines
-        - All phases in a project needs to be set at once
-        - The same phase can not be defined more than one time
+        Validates that each deadline date in attribute_data is valid for
+        the deadline date type
         """
+        phase = attrs.get("phase", None)
+        if not phase and self.instance:
+            phase = self.instance.phase
+        # New project without a phase—this should never be reached
+        else:
+            return
 
-        deadlines = attrs.get("deadlines", None)
-        if not deadlines:
-            return None
-        # Sort the deadlines in-place by phase
-        deadlines.sort(key=lambda _deadline: _deadline["phase_id"])
+        attribute_data = attrs.get("attribute_data", None)
 
-        project = self.instance
+        if not attribute_data:
+            return
 
-        # If there is no project then any value sent in will not
-        # matter since the model will set default deadlines values
-        # and override anything sent in
-        if not project:
-            return deadlines
-
-        validated_phase_ids = []
-        latest_deadline = deadlines[0]["deadline"]
-
-        # Make sure that all phases are included in the deadlines
-        required_project_phase_ids = list(
-            ProjectPhase.objects.filter(project_subtype=project.subtype)
-            .order_by("id")
-            .values_list("id", flat=True)
-        )
-        attribute_phase_ids = [deadline["phase_id"] for deadline in deadlines]
-        if not required_project_phase_ids == attribute_phase_ids:
-            raise ValidationError(
-                {
-                    "deadlines": _(
-                        "All phases for the sub type needs to be included in the deadlines list"
-                    )
-                }
-            )
-
-        for idx, deadline in enumerate(deadlines):
-            if latest_deadline > deadline["deadline"]:
-                raise ValidationError(
-                    {
-                        "deadlines": _(
-                            'Invalid date "{deadline}", must be after "{latest_deadline}"'.format(
-                                deadline=deadline["deadline"],
-                                latest_deadline=latest_deadline,
-                            )
-                        )
-                    }
-                )
-
-            phase_id = deadline["phase_id"]
-            if phase_id in validated_phase_ids:
-                raise ValidationError(
-                    {
-                        "deadlines": _(
-                            'Multiple pk value "{pk_value}"'.format(pk_value=phase_id)
-                        )
-                    }
-                )
-
+        for key, value in attribute_data.items():
             try:
-                phase = ProjectPhase.objects.get(
-                    pk=phase_id, project_subtype=project.subtype
+                deadline = Deadline.objects.get(
+                    attribute__identifier=key, phase=phase,
                 )
-            except ObjectDoesNotExist:
-                raise ValidationError(
-                    {
-                        "deadlines": _(
-                            'Invalid pk "{pk_value}" - object does not exist.'.format(
-                                pk_value=phase_id
-                            )
-                        )
-                    }
-                )
+            except Deadline.DoesNotExist:
+                continue
 
-            # Let the first start date be changed by the user
-            # and set the rest of them depending on the previous
-            # deadlines.
-            if idx == 0:
-                deadline["start"] = deadlines[0]["start"]
-            else:
-                deadline["start"] = latest_deadline
-            deadline["phase_name"] = phase.name
-
-            latest_deadline = deadline["deadline"]
-            validated_phase_ids.append(phase_id)
-
-        return deadlines
+            if not deadline.date_type.is_valid_date(value):
+                raise ValidationError({"deadlines": _(
+                    f"Invalid date selection for {deadline.attribute}/{deadline} ({deadline.date_type})"
+                )})
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
             project_subtype=validated_data["subtype"]
         ).first()
-
-        deadlines = validated_data.pop("deadlines", [])
 
         with transaction.atomic():
             attribute_data = validated_data.pop("attribute_data", {})
@@ -555,25 +595,22 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
-            if deadlines:
-                project.deadlines = deadlines
-                project.save()
-            else:
-                project.set_default_deadlines()
+            project.update_deadlines()
 
         return project
 
     def update(self, instance: Project, validated_data: dict) -> Project:
+        should_update_deadlines = True
         attribute_data = validated_data.pop("attribute_data", {})
-        deadlines = validated_data.pop("deadlines", None)
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
-            if deadlines:
-                project.deadlines = deadlines
+            if should_update_deadlines:
+                project.update_deadlines()
+
             project.save()
             return project
 

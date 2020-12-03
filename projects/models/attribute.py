@@ -8,23 +8,11 @@ from django.contrib.auth.models import Group
 from django.contrib.postgres.fields import ArrayField, JSONField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.utils.translation import ugettext_lazy as _
 
-from users.models import User
-
-DATE_SERIALIZATION_FORMAT = "%Y-%m-%d"
-
-identifier_re = re.compile(r"^[\w]+\Z")
-
-validate_identifier = RegexValidator(
-    identifier_re,
-    _(
-        "Enter a valid 'identifier' consisting of Unicode letters, numbers or underscores."
-    ),
-    "invalid",
-)
+from users.models import User, PRIVILEGE_LEVELS
+from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 
 
 class AttributeQuerySet(models.QuerySet):
@@ -149,10 +137,16 @@ class Attribute(models.Model):
     )
 
     DISPLAY_DROPDOWN = "dropdown"
+    DISPLAY_CHECKBOX = "checkbox"
+    DISPLAY_READONLY = "readonly"
+    DISPLAY_READONLY_CHECKBOX = "readonly_checkbox"
 
     DISPLAY_CHOICES = (
         (None, _("default")),
         (DISPLAY_DROPDOWN, _("dropdown")),
+        (DISPLAY_CHECKBOX, _("checkbox")),
+        (DISPLAY_READONLY, _("read only")),
+        (DISPLAY_READONLY_CHECKBOX, _("read only checkbox")),
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
@@ -247,10 +241,36 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    owner_editable = models.BooleanField(
+        default=False,
+        verbose_name=_("owner can edit"),
+    )
+    owner_viewable = models.BooleanField(
+        default=True,
+        verbose_name=_("owner can view"),
+    )
+    view_privilege = models.CharField(
+        verbose_name=_("privilege for viewing"),
+        max_length=6,
+        choices=PRIVILEGE_LEVELS,
+        default="browse",
+        null=True,
+        blank=True,
+    )
+    edit_privilege = models.CharField(
+        verbose_name=_("privilege for editing"),
+        max_length=6,
+        choices=PRIVILEGE_LEVELS,
+        default=None,
+        null=True,
+        blank=True,
+    )
     # attributes which are linked to static Project fields
     static_property = models.CharField(max_length=255, blank=True, null=True)
 
     objects = AttributeQuerySet.as_manager()
+
+
 
     class Meta:
         verbose_name = _("attribute")
@@ -361,18 +381,7 @@ class Attribute(models.Model):
             else:
                 return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
-            if self.multiple_choice:
-                return [
-                    datetime.datetime.strptime(v, DATE_SERIALIZATION_FORMAT).date()
-                    if v else None
-                    for v in value
-                ]
-            elif value:
-                return datetime.datetime.strptime(
-                    value, DATE_SERIALIZATION_FORMAT
-                ).date()
-            else:
-                return None
+            return value
         elif self.value_type == Attribute.TYPE_USER:
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).

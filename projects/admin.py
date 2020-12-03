@@ -5,7 +5,16 @@ from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
 from django.utils.translation import ugettext_lazy as _
 
-from projects.models import ProjectComment, Report, ReportAttribute
+from projects.models import (
+    ProjectComment,
+    Report,
+    ReportAttribute,
+    Deadline,
+    AutomaticDate,
+    DateType,
+    DateCalculation,
+    DeadlineDateCalculation,
+)
 from projects.models.project import (
     ProjectPhaseLog,
     PhaseAttributeMatrixStructure,
@@ -13,6 +22,7 @@ from projects.models.project import (
     ProjectFloorAreaSectionAttributeMatrixStructure,
     ProjectFloorAreaSectionAttributeMatrixCell,
     ProjectSubtype,
+    ProjectDeadline,
 )
 from .exporting import get_document_response
 from .models import (
@@ -27,8 +37,54 @@ from .models import (
     ProjectPhase,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
+    ProjectPhaseDeadlineSection,
+    ProjectPhaseDeadlineSectionAttribute,
     ProjectType,
 )
+
+class DeadlineDateCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = DeadlineDateCalculation
+    extra = 0
+
+@admin.register(DateCalculation)
+class DateCalculation(admin.ModelAdmin):
+    inlines = (DeadlineDateCalculationInline,)
+
+@admin.register(Deadline)
+class DeadlineAdmin(admin.ModelAdmin):
+    inlines = (DeadlineDateCalculationInline,)
+
+
+@admin.register(DateType)
+class DateTypeAdmin(admin.ModelAdmin):
+    pass
+
+
+class ProjectPhaseDeadlineSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectPhaseDeadlineSectionAttribute
+    extra = 0
+
+
+@admin.register(ProjectPhaseDeadlineSection)
+class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin):
+    inlines = (ProjectPhaseDeadlineSectionAttributeInline,)
+
+
+@admin.register(AutomaticDate)
+class AutomaticDateAdmin(admin.ModelAdmin):
+    list_display = (
+        "weekdays",
+        "week",
+        "start_date",
+        "end_date",
+        "before_holiday",
+        "after_holiday",
+    )
+
+
+class ProjectDeadlineInline(admin.TabularInline):
+    model = ProjectDeadline
+    extra = 0
 
 
 class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -85,7 +141,7 @@ class ProjectPhaseLogInline(admin.TabularInline):
 @admin.register(Project)
 class ProjectAdmin(OSMGeoAdmin):
     list_display = ("name", "created_at", "modified_at")
-    inlines = (ProjectPhaseLogInline,)
+    inlines = (ProjectPhaseLogInline, ProjectDeadlineInline)
 
     def get_actions(self, request):
         actions = super().get_actions(request)
