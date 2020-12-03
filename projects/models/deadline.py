@@ -111,6 +111,10 @@ class Deadline(models.Model):
         null=True,
         blank=True,
     )
+    default_to_created_at = models.BooleanField(
+        verbose_name=_("Use created at as value if no attribute or calculations are specified"),
+        default=False,
+    )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
         default=0,
@@ -138,6 +142,9 @@ class Deadline(models.Model):
         for calculation in calculations:
             if condition_result(calculation):
                 return calculation.datecalculation.calculate(project)
+
+        if self.default_to_created_at:
+            return project.created_at.date()
 
         return None
 
