@@ -419,6 +419,7 @@ class DeadlineImporter:
 
             for index, (conds, calc) in enumerate(conditions_parsed):
                 condition_attributes = []
+                not_condition_attributes = []
                 subtype_conds = [
                     cond for cond in conds
                     if cond[:25] == "kaavaprosessin_kokoluokka"
@@ -446,10 +447,20 @@ class DeadlineImporter:
 
                 # Other valid conditions are saved as Attribute relations later
                 for cond in attribute_conds:
+                    negate = False
+
+                    if cond[0] == "!":
+                        negate = True
+                        cond = cond[1:]
+
                     try:
-                        condition_attributes.append(Attribute.objects.get(
-                            identifier=cond,
-                        ))
+                        attribute = Attribute.objects.get(identifier=cond)
+
+                        if negate:
+                           not_condition_attributes.append(attribute)
+                        else:
+                           condition_attributes.append(attribute)
+
                     except Attribute.DoesNotExist:
                         logger.warning(
                             f"Ignored an invalid attribute identifier {cond} for calculating deadline {abbreviation}."
@@ -508,6 +519,7 @@ class DeadlineImporter:
                     index=index,
                 )
                 calc_object.conditions.set(condition_attributes)
+                calc_object.not_conditions.set(not_condition_attributes)
                 calculations.append(calc_object)
 
             return calculations

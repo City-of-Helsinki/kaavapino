@@ -129,11 +129,16 @@ class Deadline(models.Model):
 
     def _calculate(self, project, calculations):
         def condition_result(calculation):
-            if not calculation.conditions.count():
+            if not calculation.conditions.count() + \
+                calculation.not_conditions.count():
                 return True
 
             for condition in calculation.conditions.all():
                 if project.attribute_data.get(condition.identifier, False):
+                    return True
+
+            for condition in calculation.not_conditions.all():
+                if not project.attribute_data.get(condition.identifier, False):
                     return True
 
             return False
@@ -562,7 +567,14 @@ class DeadlineDateCalculation(models.Model):
     # Only simple boolean conditions needed for now
     conditions = models.ManyToManyField(
         Attribute,
-        verbose_name=_("use rule if any attribute is set"),
+        related_name="condition_for_deadlinedatecalculation",
+        verbose_name=_("use rule if any attribute is truthy"),
+        blank=True,
+    )
+    not_conditions = models.ManyToManyField(
+        Attribute,
+        related_name="not_condition_for_deadlinedatecalculation",
+        verbose_name=_("use rule if any attribute is falsy"),
         blank=True,
     )
     index = models.PositiveIntegerField(
