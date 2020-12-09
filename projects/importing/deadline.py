@@ -261,7 +261,7 @@ class DeadlineImporter:
             for value in datetype_rows[DATETYPE_NAME_INDEX][2:]
         ]
         exclude_selecteds = [
-            value != "kaikki paitsi"
+            value == "kaikki paitsi"
             for value in datetype_rows[DATETYPE_EXCLUDE_TYPE_INDEX][2:]
         ]
         base_datetypes = [
