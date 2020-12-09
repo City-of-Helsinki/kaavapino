@@ -127,7 +127,7 @@ class Deadline(models.Model):
 
         return True
 
-    def _calculate(self, project, calculations):
+    def _calculate(self, project, calculations, datetype):
         def condition_result(calculation):
             if not calculation.conditions.count() + \
                 calculation.not_conditions.count():
@@ -146,7 +146,7 @@ class Deadline(models.Model):
         # Use first calculation whose condition is met
         for calculation in calculations:
             if condition_result(calculation):
-                return calculation.datecalculation.calculate(project)
+                return calculation.datecalculation.calculate(project, datetype)
 
         if self.default_to_created_at:
             return project.created_at.date()
@@ -154,11 +154,19 @@ class Deadline(models.Model):
         return None
 
     def calculate_initial(self, project):
-        return self._calculate(project, self.initial_calculations.all())
+        return self._calculate(
+            project,
+            self.initial_calculations.all(),
+            self.date_type,
+        )
 
     def calculate_updated(self, project):
         if self.update_calculations.count():
-            return self._calculate(project, self.update_calculations.all())
+            return self._calculate(
+                project,
+                self.update_calculations.all(),
+                self.date_type,
+            )
         elif self.attribute:
             return project.attribute_data.get(self.attribute.identifier, None)
 
@@ -234,7 +242,7 @@ class DateType(models.Model):
     )
 
     def get_dates(self, year):
-        listed_dates = [date for date in self.dates]
+        listed_dates = self.dates or []
 
         for automatic_date in self.automatic_dates.all():
             listed_dates += automatic_date.calculate(
@@ -245,7 +253,8 @@ class DateType(models.Model):
             return [
                 datetime.date(year, 1, 1) + datetime.timedelta(days=i)
                 for i in range((366 if isleap(+year) else 365))
-                if date + datetime.timedelta(days=i) not in listed_dates
+                if datetime.date(year, 1, 1) + datetime.timedelta(days=i) \
+                    not in listed_dates
             ]
         else:
             return listed_dates
@@ -255,10 +264,10 @@ class DateType(models.Model):
         dates = sorted(self.get_dates(year))
 
         if days < 0:
-            dates = [date for date in dates if date >= orig_date]
+            dates = [date for date in dates if date <= orig_date]
             dates.reverse()
         else:
-            dates = [date for date in dates if date <= orig_date]
+            dates = [date for date in dates if date >= orig_date]
 
         # Handle the case where there aren't enough days left in the year
         while abs(days) >= len(dates):
@@ -363,90 +372,143 @@ class AutomaticDate(models.Model):
         validators=[validate_date],
     )
 
+    def _get_closest_weekday(self, date, business_days_only, previous=False):
+        cal = Finland()
+        if business_days_only:
+            weekdays = [weekday for weekday in self.weekdays if weekday < SAT]
+            if not weekdays:
+                return None
+
+            for delta in range(1, 365):
+                new_date = date + datetime.timedelta(days=(-delta if previous else delta))
+                if not cal.is_holiday(new_date) and new_date.weekday() in weekdays:
+                    return new_date
+
+        else:
+            for delta in range(1, 365):
+                new_date = date + datetime.timedelta(days=(-delta if previous else delta))
+                if new_date.weekday() in self.weekdays:
+                    return new_date
+
+        return None
+
+    def _get_weekdays_in_range(self, start_date, end_date, business_days_only):
+        cal = Finland()
+        if business_days_only:
+            weekdays = [weekday for weekday in self.weekdays if weekday < SAT]
+            if not weekdays:
+                return []
+        else:
+            weekdays = self.weekdays
+
+        date = start_date
+        return_dates = []
+
+        while date <= end_date:
+            ignore_as_holiday = business_days_only and cal.is_holiday(date)
+
+            if not ignore_as_holiday and date.weekday() in weekdays:
+                return_dates.append(date)
+
+            date += datetime.timedelta(days=1)
+
+        return return_dates
+
+    def _parse_date(self, date, year):
+        [day, month] = str.split(date, ".")[:2]
+        return datetime.date(year, int(month), int(day))
+
     def calculate(self, business_days_only, year=datetime.datetime.now().year):
         cal = Finland()
-        holidays = dict([(name, date) for date, name in cal.holidays(year)])
-        holidays_next = dict([(name, date) for date, name in cal.holidays(year+1)])
-        holidays_previous = dict([(name, date) for date, name in cal.holidays(year-1)])
-
-        def get_closest_weekday(date, previous=False):
-            if business_days_only:
-                weekdays = [weekday for weekday in self.weekdays if weekday < SAT]
-                if not weekdays:
-                    return None
-
-                for delta in range(1, 365):
-                    new_date = date + datetime.timedelta(days=(-delta if previous else delta))
-                    if not cal.is_holiday(new_date) and new_date.weekday() in weekdays:
-                        return new_date
-
-            else:
-                for delta in range(1, 365):
-                    new_date = date + datetime.timedelta(days=(-delta if previous else delta))
-                    if new_date.weekday() in self.weekdays:
-                        return new_date
-
-            return None
-
-        def get_weekdays_in_range(start_date, end_date):
-            if business_days_only:
-                weekdays = [weekday for weekday in self.weekdays if weekday < SAT]
-                if not weekdays:
-                    return []
-            else:
-                weekdays = self.weekdays
-
-            date = start_date
-            return_dates = []
-
-            while date <= end_date:
-                ignore_as_holiday = business_days_only and cal.is_holiday(date)
-
-                if not ignore_as_holiday and date.weekday() in weekdays:
-                    return_dates.append(date)
-
-                date += datetime.timedelta(days=1)
-
-            return return_dates
-
-        def parse_date(date, year=year):
-            [day, month] = str.split(date, ".")[:2]
-            return datetime.date(year, int(month), int(day))
+        holidays = dict(
+            [(name, date) for date, name in cal.holidays(year)]
+        )
+        holidays_next = dict(
+            [(name, date) for date, name in cal.holidays(year+1)]
+        )
+        holidays_previous = dict(
+            [(name, date) for date, name in cal.holidays(year-1)]
+        )
 
         return_dates = []
 
         if self.week:
-            start_date = datetime.datetime.strptime(f"{year}-W{self.week}-1", "%G-W%V-%u")
-            end_date = datetime.datetime.strptime(f"{year}-W{self.week}-7", "%G-W%V-%u")
-            return_dates = get_weekdays_in_range(start_date, end_date)
+            start_date = datetime.datetime.strptime( \
+                f"{year}-W{self.week}-1", "%G-W%V-%u").date()
+            end_date = datetime.datetime.strptime( \
+                f"{year}-W{self.week}-7", "%G-W%V-%u").date()
+            return_dates = self._get_weekdays_in_range(
+                start_date,
+                end_date,
+                business_days_only,
+            )
         elif self.start_date and self.end_date:
-            start = parse_date(self.start_date)
-            end = parse_date(self.end_date)
+            start = self._parse_date(self.start_date, year)
+            end = self._parse_date(self.end_date, year)
             if start > end:
                 return_dates = \
-                    get_weekdays_in_range(datetime.date(year, 1, 1), end) + \
-                    get_weekdays_in_range(start, datetime.date(year, 12, 31))
+                    self._get_weekdays_in_range(
+                        datetime.date(year, 1, 1),
+                        end,
+                        business_days_only,
+                    ) + self._get_weekdays_in_range(
+                        start,
+                        datetime.date(year, 12, 31),
+                        business_days_only,
+                    )
             else:
-                return_dates = get_weekdays_in_range(start, end)
+                return_dates = self._get_weekdays_in_range(
+                    start,
+                    end,
+                    business_days_only,
+                )
         elif self.start_date:
             return_dates = [
-                get_closest_weekday(parse_date(self.start_date, year-1)),
-                get_closest_weekday(parse_date(self.start_date)),
+                self._get_closest_weekday(
+                    self._parse_date(self.start_date, year-1),
+                    business_days_only,
+                ),
+                self._get_closest_weekday(
+                    self._parse_date(self.start_date, year),
+                    business_days_only,
+                ),
             ]
         elif self.end_date:
             return_dates = [
-                get_closest_weekday(parse_date(self.end_date), previous=True),
-                get_closest_weekday(parse_date(self.end_date, year+1), previous=True),
+                self._get_closest_weekday(
+                    self._parse_date(self.end_date, year),
+                    business_days_only,
+                    previous=True,
+                ),
+                self._get_closest_weekday(
+                    self._parse_date(self.end_date, year+1),
+                    business_days_only,
+                    previous=True,
+                ),
             ]
         elif self.before_holiday:
             return_dates = [
-                get_closest_weekday(holidays[self.before_holiday], previous=True),
-                get_closest_weekday(holidays_next[self.before_holiday], previous=True),
+                self._get_closest_weekday(
+                    holidays[self.before_holiday],
+                    business_days_only,
+                    previous=True,
+                ),
+                self._get_closest_weekday(
+                    holidays_next[self.before_holiday],
+                    business_days_only,
+                    previous=True,
+                ),
             ]
         elif self.after_holiday:
             return_dates = [
-                get_closest_weekday(holidays_previous[self.after_holiday]),
-                get_closest_weekday(holidays[self.after_holiday]),
+                self._get_closest_weekday(
+                    holidays_previous[self.after_holiday],
+                    business_days_only,
+                ),
+                self._get_closest_weekday(
+                    holidays[self.after_holiday],
+                    business_days_only,
+                ),
             ]
 
         return list(filter(lambda date: date is not None and date.year == year, return_dates))
@@ -496,7 +558,7 @@ class DateCalculation(models.Model):
         null=True,
     )
 
-    def calculate(self, project):
+    def calculate(self, project, datetype):
         date = None
 
         if self.base_date_attribute:
@@ -513,9 +575,13 @@ class DateCalculation(models.Model):
                 date = None
 
         if not date:
-            date = project.created_at.date()
+            return None
 
-        date += datetime.timedelta(days=self.constant)
+
+        if datetype:
+            date = datetype.valid_days_from(date, self.constant)
+        else:
+            date += datetime.timedelta(days=self.constant)
 
         for attribute in self.attributes.all():
             try:
