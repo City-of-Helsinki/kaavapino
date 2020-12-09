@@ -62,6 +62,7 @@ ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
 ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 ATTRIBUTE_EDIT_PRIVILEGE = "kenellä on oikeus muokata tietoa"
 ATTRIBUTE_ERROR = "virhetilanne"
+ATTRIBUTE_PLACEHOLDER = "syöttökentässä näkyvä ohjeistusteksti"
 # TODO: ask for a dedicated column for uniqueness at some point
 ATTRIBUTE_ERROR_UNIQUE = [
     "Virhe. Nimi on jo käytössä",
@@ -599,6 +600,7 @@ class AttributeImporter:
             is_searchable = row[self.column_index[ATTRIBUTE_SEARCHABLE]] == "kyllä"
             # TODO: ask for a dedicated column for uniqueness at some point
             is_unique = row[self.column_index[ATTRIBUTE_ERROR]] in ATTRIBUTE_ERROR_UNIQUE
+            placeholder_text = row[self.column_index[ATTRIBUTE_PLACEHOLDER]]
             error_message = row[self.column_index[ATTRIBUTE_ERROR]]
             static_property = STATIC_ATTRIBUTES_MAPPING.get(
                 row[self.column_index[ATTRIBUTE_IDENTIFIER]]
@@ -674,6 +676,7 @@ class AttributeImporter:
                     "multiple_choice": multiple_choice,
                     "data_retention_plan": data_retention_plan,
                     "character_limit": character_limit,
+                    "placeholder_text": placeholder_text,
                     "unique": is_unique,
                     "error_message": error_message,
                     "generated": generated,
