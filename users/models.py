@@ -35,7 +35,8 @@ class User(AbstractUser):
             return self.groups.filter(group__in=groups).exists()
         return self.groups.filter(name__in=groups).exists()
 
-    def get_privilege(self):
+    @property
+    def privilege(self):
         privileges = tuple(p for (p, _) in PRIVILEGE_LEVELS)
         user_privilege = None
 
@@ -56,7 +57,7 @@ class User(AbstractUser):
 
     def has_privilege(self, target_privilege):
         privileges = tuple(p for (p, _) in PRIVILEGE_LEVELS)
-        user_privilege = privileges.index(self.get_privilege())
+        user_privilege = privileges.index(self.privilege)
 
         try:
             return privileges.index(target_privilege) <= user_privilege

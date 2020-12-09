@@ -15,4 +15,5 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "is_staff",
             "email",
+            "privilege",
         ]
