@@ -595,7 +595,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
-            project.update_deadlines()
+            project.update_deadlines(user=self.context["request"].user)
 
         return project
 
