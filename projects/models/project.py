@@ -312,24 +312,26 @@ class Project(models.Model):
             project_deadline.date = date
             project_deadline.save()
 
-            if deadline.attribute and not initial:
-
+            if deadline.attribute:
                 with transaction.atomic():
                     old_value = self.attribute_data.get(deadline.attribute.identifier)
                     new_value = json.loads(json.dumps(date, default=str))
-                    self.update_attribute_data( \
-                        {deadline.attribute.identifier: date})
-                    self.save()
-                    if old_value != date:
-                        action.send(
-                            user or self.user,
-                            verb=verbs.UPDATED_ATTRIBUTE,
-                            action_object=deadline.attribute,
-                            target=self,
-                            attribute_identifier=deadline.attribute.identifier,
-                            old_value=old_value,
-                            new_value=new_value,
-                        )
+                    should_update_attribute_data = not initial or not old_value
+
+                    if should_update_attribute_data:
+                        self.update_attribute_data( \
+                            {deadline.attribute.identifier: date})
+                        self.save()
+                        if old_value != date:
+                            action.send(
+                                user or self.user,
+                                verb=verbs.UPDATED_ATTRIBUTE,
+                                action_object=deadline.attribute,
+                                target=self,
+                                attribute_identifier=deadline.attribute.identifier,
+                                old_value=old_value,
+                                new_value=new_value,
+                            )
 
     def _set_calculated_deadlines(self, deadlines, user, initial=False):
         unresolved = deadlines
