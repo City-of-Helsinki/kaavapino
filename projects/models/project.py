@@ -377,7 +377,6 @@ class Project(models.Model):
         self.deadlines.set(project_deadlines)
 
         # Calculate automatic values for newly added deadlines
-        print(f"generoidaan initiaaliarvot uusille deadlineille: {[dl.deadline for dl in generated_deadlines]}")
         self._set_calculated_deadlines(
             [
                 dl.deadline for dl in generated_deadlines
