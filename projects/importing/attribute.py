@@ -327,6 +327,7 @@ VALUE_TYPES = {
     "Valinta (1-x) pudotusvalikosta.": Attribute.TYPE_CHOICE,
     "Valintaruutu.": Attribute.TYPE_BOOLEAN,
     "Vuoden valinta pudotusvalikosta": Attribute.TYPE_INTEGER,
+    "Valinta pudotusvalikosta. (readonly)": Attribute.TYPE_CHOICE,
     "Valintaruutu. (readonly)": Attribute.TYPE_BOOLEAN,
     "Päivämäärä (readonly)": Attribute.TYPE_DATE,
     "Lyhyt teksti (readonly)": Attribute.TYPE_RICH_TEXT_SHORT,
@@ -340,6 +341,7 @@ DISPLAY_TYPES = {
     "Valinta (1-x) pudotusvalikosta.": Attribute.DISPLAY_DROPDOWN,
     "Vuoden valinta pudotusvalikosta": Attribute.DISPLAY_DROPDOWN,
     "Valintaruutu.": Attribute.DISPLAY_CHECKBOX,
+    "Valinta pudotusvalikosta. (readonly)": Attribute.DISPLAY_READONLY,
     "Valintaruutu. (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
     "Päivämäärä (readonly)": Attribute.DISPLAY_READONLY,
     "Lyhyt teksti (readonly)": Attribute.DISPLAY_READONLY,
@@ -991,7 +993,9 @@ class AttributeImporter:
                     attribute_index = locations["field_location"]
 
                 section = ProjectPhaseSection.objects.get(
-                    phase=phase, name=section_phase_name
+                    phase=phase,
+                    name=section_phase_name,
+                    index=locations["section_location"],
                 )
 
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(

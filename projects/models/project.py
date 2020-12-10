@@ -1,16 +1,19 @@
 import datetime
 import itertools
 
+from actstream import action
 from django.conf import settings
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import JSONField, ArrayField
-from django.core.serializers.json import DjangoJSONEncoder
+from django.core.serializers.json import DjangoJSONEncoder, json
+from django.db import transaction
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
 from PIL import Image
 
+from projects.actions import verbs
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
@@ -302,9 +305,36 @@ class Project(models.Model):
             if self._check_condition(deadline)
         ]
 
-    def _get_calculated_deadlines(self, deadlines, initial=False):
+    def _set_calculated_deadline(self, deadline, date, initial, user):
+        project_deadline = self.deadlines.get(deadline=deadline)
+
+        if project_deadline and date:
+            project_deadline.date = date
+            project_deadline.save()
+
+            if deadline.attribute:
+                with transaction.atomic():
+                    old_value = self.attribute_data.get(deadline.attribute.identifier)
+                    new_value = json.loads(json.dumps(date, default=str))
+                    should_update_attribute_data = not initial or not old_value
+
+                    if should_update_attribute_data:
+                        self.update_attribute_data( \
+                            {deadline.attribute.identifier: date})
+                        self.save()
+                        if old_value != date:
+                            action.send(
+                                user or self.user,
+                                verb=verbs.UPDATED_ATTRIBUTE,
+                                action_object=deadline.attribute,
+                                target=self,
+                                attribute_identifier=deadline.attribute.identifier,
+                                old_value=old_value,
+                                new_value=new_value,
+                            )
+
+    def _set_calculated_deadlines(self, deadlines, user, initial=False):
         unresolved = deadlines
-        return_deadlines = []
 
         # It's possible a later deadline is referenced before it's created
         while len(unresolved):
@@ -317,7 +347,7 @@ class Project(models.Model):
 
                 calculated = calculate_deadline(self)
                 if calculated:
-                    return_deadlines.append((deadline, calculated))
+                    self._set_calculated_deadline(deadline, calculated, initial, user)
                 else:
                     unresolved_new.append(deadline)
 
@@ -326,64 +356,48 @@ class Project(models.Model):
             else:
                 break
 
-        return_deadlines += [(deadline, None) for deadline in unresolved]
-
-        return return_deadlines
-
     # Generate or update schedule for project
-    def update_deadlines(self, values=None):
+    def update_deadlines(self, values=None, user=None,):
         deadlines = self._get_applicable_deadlines()
-        # Delete no longer relevant deadlines
-        for project_deadline in self.deadlines.all():
-            if project_deadline.deadline not in deadlines:
-                project_deadline.delete()
 
+        # Delete no longer relevant deadlines and create missing
+        self.deadlines.exclude(deadline__in=deadlines).delete()
+        generated_deadlines = []
         project_deadlines = list(self.deadlines.all())
 
+        for deadline in deadlines:
+            project_deadline, created = ProjectDeadline.objects.get_or_create(
+                project=self,
+                deadline=deadline,
+            )
+            if created:
+                generated_deadlines.append(project_deadline)
+                project_deadlines.append(project_deadline)
+
+        self.deadlines.set(project_deadlines)
+
         # Calculate automatic values for newly added deadlines
-        calculated = self._get_calculated_deadlines(
+        self._set_calculated_deadlines(
             [
-                dl for dl in deadlines
-                if not self.deadlines.filter(deadline=dl).count()
+                dl.deadline for dl in generated_deadlines
+                if dl.deadline.initial_calculations.count() \
+                    or dl.deadline.default_to_created_at
             ],
+            user,
             initial=True,
         )
 
-        for (deadline, date) in calculated:
-            project_deadline, _ = ProjectDeadline.objects.update_or_create(
-                project=self,
-                deadline=deadline,
-                defaults={
-                    "date": date,
-                },
-            )
-            project_deadlines.append(project_deadline)
-
-            if deadline.attribute and date:
-                self.update_attribute_data( \
-                    {deadline.attribute.identifier: date})
-
         # Update automatic deadlines
-        calculated = self._get_calculated_deadlines(
-            [dl.deadline for dl in project_deadlines],
+        self._set_calculated_deadlines(
+            [
+                dl.deadline for dl in project_deadlines
+                if dl.deadline.update_calculations.count() \
+                    or dl.deadline.default_to_created_at \
+                    or dl.deadline.attribute
+            ],
+            user,
             initial=False,
         )
-
-        for (deadline, date) in calculated:
-            project_deadline = next(
-                dl for dl in project_deadlines
-                if dl.deadline == deadline
-            )
-
-            if project_deadline and date:
-                project_deadline.date = date
-                project_deadline.save()
-
-                if deadline.attribute:
-                    self.update_attribute_data( \
-                        {deadline.attribute.identifier: date})
-
-        self.deadlines.set(project_deadlines)
 
     @property
     def type(self):

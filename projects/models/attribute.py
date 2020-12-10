@@ -209,7 +209,7 @@ class Attribute(models.Model):
         blank=True,
     )
     identifier = models.CharField(
-        max_length=50,
+        max_length=60,
         verbose_name=_("identifier"),
         db_index=True,
         unique=True,

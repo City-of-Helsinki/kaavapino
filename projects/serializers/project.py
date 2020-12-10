@@ -573,9 +573,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                 continue
 
             if not deadline.date_type.is_valid_date(value):
-                raise ValidationError({"deadlines": _(
-                    f"Invalid date selection for {deadline.attribute}/{deadline} ({deadline.date_type})"
-                )})
+                raise ValidationError({"deadlines":
+                    {deadline.attribute.identifier: _(
+                        f"Invalid date selection for {deadline.attribute.identifier}/{deadline.abbreviation} ({deadline.date_type})"
+                    )}
+                })
 
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
@@ -595,7 +597,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
-            project.update_deadlines()
+            project.update_deadlines(user=self.context["request"].user)
 
         return project
 

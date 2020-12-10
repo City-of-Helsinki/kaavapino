@@ -25,6 +25,7 @@ DEADLINES_SHEET_NAME = "Aikatauluetapit"
 DATETYPES_SHEET_NAME = "Päivätyypit"
 
 DEADLINES_A1_EXPECTED = "projektitietotunniste"
+DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE = "Uusi projekti luodaan"
 
 # Deadline sheet column titles
 DEADLINE_ATTRIBUTE_IDENTIFIER = "projektitietotunniste"
@@ -260,7 +261,7 @@ class DeadlineImporter:
             for value in datetype_rows[DATETYPE_NAME_INDEX][2:]
         ]
         exclude_selecteds = [
-            value != "kaikki paitsi"
+            value == "kaikki paitsi"
             for value in datetype_rows[DATETYPE_EXCLUDE_TYPE_INDEX][2:]
         ]
         base_datetypes = [
@@ -320,16 +321,22 @@ class DeadlineImporter:
 
         for i, row in enumerate(rows):
             abbreviation = row[self.column_index[DEADLINE_ABBREVIATION]]
+            attribute = row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]
+            default_to_created_at = False
 
             try:
                 attribute = Attribute.objects.get(
-                    identifier=row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]
+                    identifier=attribute
                 )
             except Attribute.DoesNotExist:
-                logger.warning(
-                    f"Ignored invalid attribute identifier {row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]} for deadline {abbreviation}."
-                )
-                attribute = None
+                if attribute == DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE:
+                    attribute = None
+                    default_to_created_at = True
+                elif attribute:
+                    logger.warning(
+                        f"Ignored invalid attribute identifier {attribute} for deadline {abbreviation}."
+                    )
+                    attribute = None
 
             deadline_types = []
             for dl_type in re.split(
@@ -391,6 +398,7 @@ class DeadlineImporter:
                     "error_past_due": error_past_due,
                     "error_min_distance_previous": error_min_distance_previous,
                     "warning_min_distance_next": warning_min_distance_next,
+                    "default_to_created_at": default_to_created_at,
                     "index": index,
                 },
             )
@@ -411,6 +419,7 @@ class DeadlineImporter:
 
             for index, (conds, calc) in enumerate(conditions_parsed):
                 condition_attributes = []
+                not_condition_attributes = []
                 subtype_conds = [
                     cond for cond in conds
                     if cond[:25] == "kaavaprosessin_kokoluokka"
@@ -438,10 +447,20 @@ class DeadlineImporter:
 
                 # Other valid conditions are saved as Attribute relations later
                 for cond in attribute_conds:
+                    negate = False
+
+                    if cond[0] == "!":
+                        negate = True
+                        cond = cond[1:]
+
                     try:
-                        condition_attributes.append(Attribute.objects.get(
-                            identifier=cond,
-                        ))
+                        attribute = Attribute.objects.get(identifier=cond)
+
+                        if negate:
+                           not_condition_attributes.append(attribute)
+                        else:
+                           condition_attributes.append(attribute)
+
                     except Attribute.DoesNotExist:
                         logger.warning(
                             f"Ignored an invalid attribute identifier {cond} for calculating deadline {abbreviation}."
@@ -500,6 +519,7 @@ class DeadlineImporter:
                     index=index,
                 )
                 calc_object.conditions.set(condition_attributes)
+                calc_object.not_conditions.set(not_condition_attributes)
                 calculations.append(calc_object)
 
             return calculations
