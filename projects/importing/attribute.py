@@ -993,7 +993,9 @@ class AttributeImporter:
                     attribute_index = locations["field_location"]
 
                 section = ProjectPhaseSection.objects.get(
-                    phase=phase, name=section_phase_name
+                    phase=phase,
+                    name=section_phase_name,
+                    index=locations["section_location"],
                 )
 
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(
