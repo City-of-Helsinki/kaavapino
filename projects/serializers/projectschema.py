@@ -107,6 +107,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     fieldset_index = serializers.SerializerMethodField("get_fieldset_index")
     type = serializers.CharField(source="value_type")
     required = serializers.SerializerMethodField()
+    placeholder_text = serializers.CharField()
     choices = serializers.SerializerMethodField()
     generated = serializers.BooleanField(read_only=True)
     unit = serializers.CharField()

@@ -199,6 +199,11 @@ class Attribute(models.Model):
         verbose_name=_("character limit"),
         null=True,
     )
+    placeholder_text = models.TextField(
+        verbose_name=_("placeholder text"),
+        null=True,
+        blank=True,
+    )
     unique = models.BooleanField(
         verbose_name=_("unique"),
         default=False,
