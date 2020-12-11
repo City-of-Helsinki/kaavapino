@@ -25,6 +25,7 @@ To manage docker-compose setup:
     docker-compose build                # Builds project container from the Dockerfile
     docker-compose up -d                # Start all required services in the background
     docker-compose stop                 # Stop services
+    docker-compose down -v              # Stop services and remove containers and volumes
     docker exec -it kaavapino-api bash  # Open bash into the django container
 
 ### Install required system packages
@@ -107,9 +108,20 @@ same context so that the variables defined in the settings are available.
 
 * Run `pytest`
 
-## Importing attributes
+## Importing attributes and deadlines
 
-* Run `python manage.py import_attributes <attribute excel file> [--sheet sheet name] [--overwrite]`
+To import data, use:
+
+* `python manage.py create_default_groups_and_mappings` (first time only, run before other commands)
+* `python manage.py import_attributes <attribute excel file> [--sheet sheet name] [--overwrite]`
+* `python manage.py import_deadlines <deadline excel file>`
+
+Deadlines rely on attributes, so it is recommended to run `import_attributes` before `import_deadlines`. Import will overwrite existing data.
+
+To clear or generate missing schedules, use:
+
+* `python manage.py clear_all_project_deadlines [--id project id]`
+* `python manage.py generate_missing_project_deadlines [--id project id]`
 
 ## Deploy staging
 
