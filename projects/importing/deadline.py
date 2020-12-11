@@ -534,7 +534,7 @@ class DeadlineImporter:
         "{% if kaavaprosessin_kokoluokka in [M, L, XL] %} xx + as {% endif %}"
         """
         def parse_distance(distance_string):
-            def add_distance(calc):
+            def add_distance(calc, attr=None):
                 try:
                     try:
                         [reference, operator, distance] = \
@@ -546,6 +546,7 @@ class DeadlineImporter:
                         Deadline.objects.get(subtype=subtype, abbreviation=reference),
                         operator,
                         distance,
+                        [attr] if attr else [],
                     ))
 
                 except Deadline.DoesNotExist:
@@ -560,20 +561,37 @@ class DeadlineImporter:
             if not conditions_parsed:
                 for calc in re.split(r";\s*", distance_string):
                     distances = add_distance(calc)
+
             else:
                 for cond, calc in conditions_parsed:
+                    if len(cond) < 1:
+                        logger.warning(
+                            f"Only one condition per distance rule currently supported in importer, ignored conditions {cond} for deadline {abbreviation}."
+                        )
+                        continue
+
+                    cond = cond[0]
                     if cond and cond[:25] == "kaavaprosessin_kokoluokka":
                         subtypes = re.findall(
                             r"XS|S|M|L|XL",
-                            re.split(r"\s*==\s*|\s+in\s+"[-1]),
+                            re.split(r"\s*==\s*|\s+in\s+", cond[0])[-1],
                         )
                         if subtype.name in subtypes:
                             add_distance(calc)
 
+                    elif not cond:
+                        add_distance(calc)
                     else:
                         logger.warning(
                             f"Ignored an invalid minimum distance specification {cond} for deadline {abbreviation}."
                         )
+                        try:
+                            attr = Attribute.objects.get(identifier=cond)
+                            add_distance(calc, attr)
+                        except (Attribute.DoesNotExist, AssertionError):
+                            logger.warning(
+                                f"Ignored an invalid minimum distance specification {cond} for deadline {abbreviation}."
+                            )
 
             return distances
 
@@ -606,14 +624,18 @@ class DeadlineImporter:
 
             # Create minimum distance relations
             if row[self.column_index[DEADLINE_MINIMUM_DISTANCE]]:
-                for target, operator, distance in parse_distance(
+                parsed = enumerate(parse_distance(
                     row[self.column_index[DEADLINE_MINIMUM_DISTANCE]]
-                ):
-                    DeadlineDistance.objects.create(
+                ))
+                for index, (target, operator, distance, conditions) in parsed:
+                    distance = DeadlineDistance.objects.create(
                         deadline=deadline if operator == "+" else target,
                         previous_deadline=target if operator == "+" else deadline,
                         distance_from_previous=distance,
+                        index=index,
                     )
+                    distance.conditions.set(conditions)
+                    distance.save()
             else:
                 logger.warning(
                     f"No found minimum distance information found for {row[self.column_index[DEADLINE_ABBREVIATION]]}."
