@@ -409,7 +409,7 @@ class DeadlineImporter:
         logger.info(f"Updating deadline relations for {subtype}")
 
         def parse_and_create_calculations(calc_string):
-            abbreviation_regex = r"([A-Z,0-9]+)\s*[+|-]*\s*[0-9]*"
+            abbreviation_regex = r"([A-Z]+[0-9]+\.?[0-9]*)\s*[+|-]*\s*[0-9]*"
             constant_regex = r"[+|-]\s*([0-9]*)"
             identifier_regex = r"\{\{(.*)\}\}"
             calculations = []
