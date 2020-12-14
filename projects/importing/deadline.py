@@ -582,15 +582,12 @@ class DeadlineImporter:
                     elif not cond:
                         add_distance(calc)
                     else:
-                        logger.warning(
-                            f"Ignored an invalid minimum distance specification {cond} for deadline {abbreviation}."
-                        )
                         try:
                             attr = Attribute.objects.get(identifier=cond)
                             add_distance(calc, attr)
                         except (Attribute.DoesNotExist, AssertionError):
                             logger.warning(
-                                f"Ignored an invalid minimum distance specification {cond} for deadline {abbreviation}."
+                                f"Ignored an invalid minimum distance specification {cond} for deadline {abbreviation}; attribute not found."
                             )
 
             return distances
@@ -611,10 +608,6 @@ class DeadlineImporter:
                     row[self.column_index[DEADLINE_INITIAL_CALCULATIONS]]
                 )
                 deadline.initial_calculations.set(initial_calculations)
-            else:
-                logger.warning(
-                    f"No initial calculations found for {row[self.column_index[DEADLINE_ABBREVIATION]]}."
-                )
 
             if row[self.column_index[DEADLINE_UPDATE_CALCULATIONS]]:
                 update_calculations = parse_and_create_calculations(
@@ -638,7 +631,7 @@ class DeadlineImporter:
                     distance.save()
             else:
                 logger.warning(
-                    f"No found minimum distance information found for {row[self.column_index[DEADLINE_ABBREVIATION]]}."
+                    f"No minimum distance information found for {row[self.column_index[DEADLINE_ABBREVIATION]]}."
                 )
 
     @transaction.atomic
