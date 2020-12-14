@@ -205,7 +205,22 @@ class DeadlineDistance(models.Model):
         blank=True,
         null=True,
     )
+    # Only simple boolean conditions needed for now
+    conditions = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("use rule if any attribute is set"),
+        blank=True,
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
 
+    def __str__(self):
+        return f"{self.previous_deadline.abbreviation} -> {self.deadline.abbreviation} ({self.distance_from_previous}{str(' ' + self.date_type) if self.date_type else ''})"
+
+    class Meta:
+        ordering = ("index",)
 
 class DateType(models.Model):
     """Defines a pool of dates to calculate deadlines"""
