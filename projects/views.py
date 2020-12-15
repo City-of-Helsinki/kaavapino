@@ -54,7 +54,14 @@ from projects.serializers.project import (
     ProjectPhaseSerializer,
     ProjectFileSerializer,
 )
-from projects.serializers.projectschema import ProjectTypeSchemaSerializer
+from projects.serializers.projectschema import (
+    AdminProjectTypeSchemaSerializer,
+    CreateProjectTypeSchemaSerializer,
+    EditProjectTypeSchemaSerializer,
+    BrowseProjectTypeSchemaSerializer,
+    AdminOwnerProjectTypeSchemaSerializer,
+    CreateOwnerProjectTypeSchemaSerializer,
+)
 from projects.serializers.projecttype import (
     ProjectTypeSerializer,
     ProjectSubtypeSerializer,
@@ -225,7 +232,35 @@ class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
-    serializer_class = ProjectTypeSchemaSerializer
+
+    def get_serializer_class(self):
+        user = self.request.user
+
+        owner = self.request.query_params.get("owner")
+        project = self.request.query_params.get("project")
+
+        try:
+            project = Project.objects.get(pk=int(project))
+        except Exception:
+            project = None
+
+        is_owner = \
+            owner in ["1", "true", "True"] or \
+            project and project.user == user
+
+        if is_owner:
+            return {
+                "admin": AdminOwnerProjectTypeSchemaSerializer,
+                "create": CreateOwnerProjectTypeSchemaSerializer,
+            }[user.get_privilege()]
+        else:
+            return {
+                "admin": AdminProjectTypeSchemaSerializer,
+                "create": CreateProjectTypeSchemaSerializer,
+                "edit": EditProjectTypeSchemaSerializer,
+                "browse": BrowseProjectTypeSchemaSerializer,
+            }[user.get_privilege()]
+
 
 
 class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -498,7 +533,6 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Deadline.objects.all()
 
     def get_queryset(self):
-        project = self.request.query_params.get("project", None)
         try:
             subtype = int(self.request.query_params.get("subtype", None))
         except ValueError:

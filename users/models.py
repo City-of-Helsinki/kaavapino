@@ -14,6 +14,13 @@ PRIVILEGE_LEVELS = (
     ('admin', 'Pääkäyttäjä'),
 )
 
+def privilege_as_int(privilege):
+    levels = [privilege[0] for privilege in PRIVILEGE_LEVELS]
+    try:
+        return levels.index(privilege)
+    except ValueError:
+        return -1
+
 class User(AbstractUser):
     additional_groups = models.ManyToManyField(
         Group,
