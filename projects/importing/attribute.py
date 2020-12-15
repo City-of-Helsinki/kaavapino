@@ -111,7 +111,7 @@ ATTRIBUTE_PHASE_COLUMNS = {
 }
 
 ATTRIBUTE_DEADLINE_SECTION_COLUMNS = {
-    "create": "vastuuhenkilön aikataulun muokkaus -näkymän osiot ja kenttien järjestys",
+    "owner": "vastuuhenkilön aikataulun muokkaus -näkymän osiot ja kenttien järjestys",
     "admin": "pääkäyttäjän päivämäärätietojen vahvistus -näkymän osiot ja kenttien järjestys",
 }
 
@@ -1132,10 +1132,10 @@ class AttributeImporter:
 
             admin_section = \
                 row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["admin"]]]
-            create_section = \
-                row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["create"]]]
+            owner_section = \
+                row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["owner"]]]
 
-            for section_string in [admin_section, create_section]:
+            for section_string, owner in [(admin_section, False), (owner_section, True)]:
                 phase_name_regex = r"(Käynnistys|Periaatteet|OAS|Luonnos|Ehdotus|Tarkistettu ehdotus|Hyväksyminen|Voimaantulo)"
 
                 if not section_string:
@@ -1149,16 +1149,29 @@ class AttributeImporter:
                 except (IndexError, ProjectPhase.DoesNotExist):
                     continue
 
-                section, _ = ProjectPhaseDeadlineSection.objects.get_or_create(
+                section, __ = ProjectPhaseDeadlineSection.objects.get_or_create(
                     phase=phase,
                     defaults={
                         "index": phase.index,
                     }
                 )
+
+                if admin_section == owner_section:
+                    defaults = {
+                        "owner_field": True,
+                        "admin_field": True,
+                    }
+                elif owner:
+                    defaults = {"owner_field": True}
+                else:
+                    defaults = {"admin_field": True}
+
                 ProjectPhaseDeadlineSectionAttribute.objects.get_or_create(
                     attribute=attribute,
                     section=section,
+                    defaults=defaults
                 )
+
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes

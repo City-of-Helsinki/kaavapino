@@ -770,6 +770,14 @@ class ProjectPhaseDeadlineSectionAttribute(models.Model):
         verbose_name=_("deadline phase section"),
         on_delete=models.CASCADE,
     )
+    owner_field = models.BooleanField(
+        default=False,
+        verbose_name=_("show for project owner"),
+    )
+    admin_field = models.BooleanField(
+        default=False,
+        verbose_name=_("show for administrator"),
+    )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
     class Meta:
