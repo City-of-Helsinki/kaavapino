@@ -1166,11 +1166,24 @@ class AttributeImporter:
                 else:
                     defaults = {"admin_field": True}
 
-                ProjectPhaseDeadlineSectionAttribute.objects.get_or_create(
-                    attribute=attribute,
-                    section=section,
-                    defaults=defaults
+                try:
+                    index = int("".join(re.split(r";\s*", section_string)[-1].split(".")[1:]))
+                except Exception:
+                    index = 0
+
+                valid_subtypes = row[self.column_index[PROJECT_SIZE]]
+                is_valid_subtype = (
+                    valid_subtypes == "kaikki" or
+                    not valid_subtypes or
+                    subtype.name in re.findall("[A-Z]+", valid_subtypes)
                 )
+                if is_valid_subtype:
+                    ProjectPhaseDeadlineSectionAttribute.objects.get_or_create(
+                        attribute=attribute,
+                        section=section,
+                        defaults=defaults,
+                        index=index,
+                    )
 
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
