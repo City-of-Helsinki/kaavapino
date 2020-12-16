@@ -314,7 +314,10 @@ class Project(models.Model):
 
             if deadline.attribute:
                 with transaction.atomic():
-                    old_value = self.attribute_data.get(deadline.attribute.identifier)
+                    old_value = json.loads(json.dumps(
+                        self.attribute_data.get(deadline.attribute.identifier),
+                        default=str,
+                    ))
                     new_value = json.loads(json.dumps(date, default=str))
                     should_update_attribute_data = not initial or not old_value
 
@@ -769,6 +772,14 @@ class ProjectPhaseDeadlineSectionAttribute(models.Model):
         "ProjectPhaseDeadlineSection",
         verbose_name=_("deadline phase section"),
         on_delete=models.CASCADE,
+    )
+    owner_field = models.BooleanField(
+        default=False,
+        verbose_name=_("show for project owner"),
+    )
+    admin_field = models.BooleanField(
+        default=False,
+        verbose_name=_("show for administrator"),
     )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 

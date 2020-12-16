@@ -111,7 +111,7 @@ ATTRIBUTE_PHASE_COLUMNS = {
 }
 
 ATTRIBUTE_DEADLINE_SECTION_COLUMNS = {
-    "create": "vastuuhenkilön aikataulun muokkaus -näkymän osiot ja kenttien järjestys",
+    "owner": "vastuuhenkilön aikataulun muokkaus -näkymän osiot ja kenttien järjestys",
     "admin": "pääkäyttäjän päivämäärätietojen vahvistus -näkymän osiot ja kenttien järjestys",
 }
 
@@ -1132,10 +1132,10 @@ class AttributeImporter:
 
             admin_section = \
                 row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["admin"]]]
-            create_section = \
-                row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["create"]]]
+            owner_section = \
+                row[self.column_index[ATTRIBUTE_DEADLINE_SECTION_COLUMNS["owner"]]]
 
-            for section_string in [admin_section, create_section]:
+            for section_string, owner in [(admin_section, False), (owner_section, True)]:
                 phase_name_regex = r"(Käynnistys|Periaatteet|OAS|Luonnos|Ehdotus|Tarkistettu ehdotus|Hyväksyminen|Voimaantulo)"
 
                 if not section_string:
@@ -1149,16 +1149,42 @@ class AttributeImporter:
                 except (IndexError, ProjectPhase.DoesNotExist):
                     continue
 
-                section, _ = ProjectPhaseDeadlineSection.objects.get_or_create(
+                section, __ = ProjectPhaseDeadlineSection.objects.get_or_create(
                     phase=phase,
                     defaults={
                         "index": phase.index,
                     }
                 )
-                ProjectPhaseDeadlineSectionAttribute.objects.get_or_create(
-                    attribute=attribute,
-                    section=section,
+
+                if admin_section == owner_section:
+                    defaults = {
+                        "owner_field": True,
+                        "admin_field": True,
+                    }
+                elif owner:
+                    defaults = {"owner_field": True}
+                else:
+                    defaults = {"admin_field": True}
+
+                try:
+                    index = int("".join(re.split(r";\s*", section_string)[-1].split(".")[1:]))
+                except Exception:
+                    index = 0
+
+                valid_subtypes = row[self.column_index[PROJECT_SIZE]]
+                is_valid_subtype = (
+                    valid_subtypes == "kaikki" or
+                    not valid_subtypes or
+                    subtype.name in re.findall("[A-Z]+", valid_subtypes)
                 )
+                if is_valid_subtype:
+                    ProjectPhaseDeadlineSectionAttribute.objects.get_or_create(
+                        attribute=attribute,
+                        section=section,
+                        defaults=defaults,
+                        index=index,
+                    )
+
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes

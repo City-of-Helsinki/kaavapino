@@ -10,6 +10,7 @@ from projects.models import (
     AttributeValueChoice,
     FieldSetAttribute,
     Project,
+    ProjectSubtype,
 )
 from projects.models.project import (
     PhaseAttributeMatrixCell,
@@ -18,6 +19,7 @@ from projects.models.project import (
 )
 from projects.serializers.deadline import DeadlineSerializer
 from projects.serializers.utils import _is_attribute_required
+from users.models import privilege_as_int
 
 FOREIGN_KEY_TYPE_MODELS = {
     Attribute.TYPE_USER: {
@@ -123,14 +125,12 @@ class AttributeSchemaSerializer(serializers.Serializer):
     editable = serializers.SerializerMethodField("get_editable")
 
     def get_editable(self, attribute):
-        project = self.context["project"]
-        user = self.context["user"]
+        privilege = privilege_as_int(self.context["privilege"])
+        owner = self.context["owner"]
 
-        if not project:
-            return None
-        elif project.user == user and attribute.owner_editable:
+        if owner and attribute.owner_editable:
             return True
-        elif user.has_privilege(attribute.edit_privilege):
+        elif privilege <= privilege_as_int(attribute.edit_privilege):
             return True
         else:
             return False
@@ -265,22 +265,12 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
                     "fields": [],
                 }
 
-            query_params = getattr(self.context["request"], "GET", {})
-            try:
-                project = Project.objects.get(
-                    pk=int(query_params.get("project", "")),
-                )
-            except Exception:
-                project = None
-
-            user = self.context["request"].user
-
             # Add each cell as fields to the matrix
             cell_attribute = self._create_matrix_cell_attribute(
                 cell,
                 section_attribute,
-                project,
-                user,
+                self.context["owner"],
+                self.context["privilege"],
             )
             matrices[matrix_structure_id]["fields"].append(cell_attribute)
 
@@ -305,7 +295,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attributes.insert(insert_index, attribute)
 
     @staticmethod
-    def _serialize_section_attribute(section_attribute, project, user):
+    def _serialize_section_attribute(section_attribute, owner, privilege):
         if hasattr(section_attribute, "matrix"):
             return ProjectSectionAttributeMatrixSchemaSerializer(section_attribute).data
 
@@ -317,22 +307,19 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attribute.attribute,
             context={
                 "phase": section_attribute.section.phase,
-                "project": project,
-                "user": user,
-            },
+                "owner": owner,
+                "privilege": privilege,
+            }
         ).data)
 
         return serialized_attribute
 
     @staticmethod
-    def _create_matrix_cell_attribute(cell, section_attribute, project, user):
+    def _create_matrix_cell_attribute(cell, section_attribute, owner, privilege):
         cell_attribute = ProjectSectionAttributeSchemaSerializer(section_attribute).data
         cell_attribute.update(AttributeSchemaSerializer(
             section_attribute.attribute,
-            context={
-                "project": project,
-                "user": user,
-            },
+            context={"owner": owner, "privilege": privilege}
         ).data)
         cell_attribute["row"] = cell.row
         cell_attribute["column"] = cell.column
@@ -361,15 +348,6 @@ class ProjectSectionSchemaSerializer(BaseMatrixableSchemaSerializer):
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.get(
-                pk=int(query_params.get("project", "")),
-            )
-        except Exception:
-            project = None
-
-        user = self.context["request"].user
         section_attributes = list(section.projectphasesectionattribute_set.all())
         self._create_matrix_fields(PhaseAttributeMatrixCell, section_attributes)
 
@@ -378,8 +356,8 @@ class ProjectSectionSchemaSerializer(BaseMatrixableSchemaSerializer):
         for section_attribute in section_attributes:
             data.append(self._serialize_section_attribute(
                 section_attribute,
-                project,
-                user,
+                self.context["owner"],
+                self.context["privilege"],
             ))
 
         return data
@@ -399,15 +377,6 @@ class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.get(
-                pk=int(query_params.get("project", "")),
-            )
-        except Exception:
-            project = None
-
-        user = self.context["request"].user
         section_attributes = list(section.projectfloorareasectionattribute_set.all())
         self._create_matrix_fields(
             ProjectFloorAreaSectionAttributeMatrixCell,
@@ -419,8 +388,8 @@ class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
         for section_attribute in section_attributes:
             data.append(self._serialize_section_attribute(
                 section_attribute,
-                project,
-                user,
+                self.context["owner"],
+                self.context["privilege"],
             ))
 
         return data
@@ -430,38 +399,32 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
     name = serializers.CharField()
     attributes = serializers.SerializerMethodField("_get_attributes")
 
-    def _get_attributes(self, deadline_section):
+    @staticmethod
+    def _get_serialized_attributes(sect_attrs, owner, privilege):
         serialized = []
-        attributes = deadline_section.attributes.all()
 
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.get(
-                pk=int(query_params.get("project", "")),
-            )
-        except Exception:
-            project = None
-
-        user = self.context["request"].user
-
-        for attribute in attributes:
-            if project:
-                check_owner = attribute.owner_viewable and \
-                    project.user == user
-            else:
-                check_owner = False
-
-            check_privilege = user.has_privilege(attribute.view_privilege)
-            if check_owner or check_privilege:
-                serialized.append(AttributeSchemaSerializer(
-                    attribute,
-                    context={
-                        "project": project,
-                        "user": user,
-                    },
-                ).data)
+        for sect_attr in sect_attrs:
+            serialized.append(AttributeSchemaSerializer(
+                sect_attr.attribute,
+                context={"owner": owner, "privilege": privilege}
+            ).data)
 
         return serialized
+
+    def _get_attributes(self, deadline_section):
+        owner = self.context.get("owner", False)
+        privilege = self.context.get("privilege", False)
+
+        if privilege == "admin":
+            sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
+                .filter(admin_field=True).select_related("attribute")
+        elif owner:
+            sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
+                .filter(owner_field=True).select_related("attribute")
+        else:
+            return
+
+        return self._get_serialized_attributes(sect_attrs, owner, privilege)
 
 
 class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
@@ -496,18 +459,119 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
     subtype_name = serializers.CharField(source="name")
     subtype = serializers.IntegerField(source="id")
 
-    phases = ProjectPhaseSchemaSerializer(many=True)
-    floor_area_sections = ProjectFloorAreaSchemaSerializer(many=True)
-    deadline_sections = ProjectPhaseDeadlineSectionsSerializer(
-        many=True,
-        source="phases",
-    )
+    def get_fields(self):
+        fields = super(ProjectSubTypeSchemaSerializer, self).get_fields()
+        fields["phases"] = ProjectPhaseSchemaSerializer(
+            many=True,
+            context=self.context,
+        )
+        fields["floor_area_sections"] = ProjectFloorAreaSchemaSerializer(
+            many=True,
+            context=self.context,
+        )
+        fields["deadline_sections"] = ProjectPhaseDeadlineSectionsSerializer(
+            many=True,
+            source="phases",
+            context=self.context,
+        )
+
+        return fields
 
     class Meta:
         list_serializer_class = ProjectSubtypeListFilterSerializer
 
 
-class ProjectTypeSchemaSerializer(serializers.Serializer):
-    subtypes = ProjectSubTypeSchemaSerializer(many=True)
+class BaseProjectTypeSchemaSerializer(serializers.Serializer):
     type_name = serializers.CharField(source="name")
     type = serializers.IntegerField(source="id")
+
+    def _get_subtypes(self, obj, privilege=None):
+        context = self.context
+        context["privilege"] = privilege
+        context["owner"] = False
+        serializer = ProjectSubTypeSchemaSerializer(
+            ProjectSubtype.objects.all(),
+            many=True,
+            context=context,
+        )
+        return serializer.data
+
+def create_project_type_schema_serializer(privilege, owner):
+    prefix = f"{(privilege or '').capitalize()}{('Owner' if owner else '')}"
+
+    def get_subtypes(self, obj):
+        context = self.context
+        context["privilege"] = privilege
+        context["owner"] = owner
+        serializer = ProjectSubTypeSchemaSerializer(
+            ProjectSubtype.objects.all(),
+            many=True,
+            context=context,
+        )
+        return serializer.data
+
+    return type(
+        f"{prefix}ProjectTypeSchemaSerializer",
+        (BaseProjectTypeSchemaSerializer,),
+        {
+            "subtypes": serializers.SerializerMethodField(),
+            "type_name": serializers.CharField(source="name"),
+            "type": serializers.IntegerField(source="id"),
+            "get_subtypes": get_subtypes,
+        },
+    )
+
+
+AdminProjectTypeSchemaSerializer = create_project_type_schema_serializer("admin", False)
+CreateProjectTypeSchemaSerializer = create_project_type_schema_serializer("create", False)
+EditProjectTypeSchemaSerializer = create_project_type_schema_serializer("edit", False)
+BrowseProjectTypeSchemaSerializer = create_project_type_schema_serializer("browse", False)
+AdminOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("admin", True)
+CreateOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("create", True)
+
+
+class CreateProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
+    def get_subtypes(self, obj):
+        return self._get_subtypes(obj, "create")
+
+    def get_fields(self):
+        fields = super(self).get_fields()
+        fields["subtypes"] = serializers.SerializerMethodField()
+        return fields
+
+
+class EditProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
+    def get_subtypes(self, obj):
+        return self._get_subtypes(obj, "edit")
+
+    def get_fields(self):
+        fields = super(EditProjectTypeSchemaSerializer, self).get_fields()
+        fields["subtypes"] = serializers.SerializerMethodField()
+        return fields
+
+
+class BrowseProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
+    def get_subtypes(self, obj):
+        return self._get_subtypes(obj, "browse")
+
+    def get_fields(self):
+        fields = super(BrowseProjectTypeSchemaSerializer, self).get_fields()
+        fields["subtypes"] = serializers.SerializerMethodField()
+        return fields
+
+
+class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
+    subtypes = serializers.SerializerMethodField()
+    type_name = serializers.CharField(source="name")
+    type = serializers.IntegerField(source="id")
+
+    def get_subtypes(self, obj):
+        context = self.context
+        context["privilege"] = False
+        context["owner"] = True
+        serializer = ProjectSubTypeSchemaSerializer(
+            ProjectSubtype.objects.all(),
+            many=True,
+            context=context,
+        )
+        return serializer.data
