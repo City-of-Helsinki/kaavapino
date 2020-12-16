@@ -440,17 +440,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             # TODO: check if this subtype should be an attribute of phase object instead
             #validate_attributes.get("phase").project_subtype
         should_validate = self.should_validate_attributes()
-        max_phase_index = current_phase.index if current_phase else 1
-        if not should_validate:
-            max_phase_index = (
-                ProjectPhase.objects.filter(project_subtype=subtype)
-                .order_by("-index")
-                .values_list("index", flat=True)
-                .first()
-            ) or max_phase_index
-        for phase in ProjectPhase.objects.filter(
-            index__lte=max_phase_index, project_subtype=subtype
-        ):
+        min_phase_index = current_phase.index if current_phase else 1
+        # Phase index 1 is always editable
+        # Otherwise only current phase and upcoming phases are editable
+        for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
+            .exclude(index__range=[2, min_phase_index-1]):
             sections_data += self.generate_sections_data(
                 phase=phase, validation=should_validate
             ) or []
