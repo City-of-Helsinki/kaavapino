@@ -252,14 +252,14 @@ class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
             return {
                 "admin": AdminOwnerProjectTypeSchemaSerializer,
                 "create": CreateOwnerProjectTypeSchemaSerializer,
-            }[user.get_privilege()]
+            }[user.privilege]
         else:
             return {
                 "admin": AdminProjectTypeSchemaSerializer,
                 "create": CreateProjectTypeSchemaSerializer,
                 "edit": EditProjectTypeSchemaSerializer,
                 "browse": BrowseProjectTypeSchemaSerializer,
-            }[user.get_privilege()]
+            }[user.privilege]
 
 
 
