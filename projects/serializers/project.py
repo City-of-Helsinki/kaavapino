@@ -162,6 +162,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         required=False,
     )
     public = serializers.NullBooleanField(required=False, read_only=True)
+    owner_edit_override = serializers.NullBooleanField(required=False, read_only=True)
     archived = serializers.NullBooleanField(required=False, read_only=True)
     onhold = serializers.NullBooleanField(required=False, read_only=True)
 
@@ -182,6 +183,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "phase",
             "id",
             "public",
+            "owner_edit_override",
             "archived",
             "onhold",
             "deadlines",
@@ -414,7 +416,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
         attrs["attribute_data"] = self._validate_attribute_data(
-            attrs.get("attribute_data", None), attrs
+            attrs.get("attribute_data", None),
+            attrs,
+            self.instance.user if self.instance else None,
+            self.instance.owner_edit_override if self.instance else None,
         )
 
         self._validate_deadlines(attrs)
@@ -427,9 +432,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         if public:
             attrs["public"] = public
 
+        attrs["owner_edit_override"] = self._validate_owner_edit_override(attrs)
+
         return attrs
 
-    def _validate_attribute_data(self, attribute_data, validate_attributes):
+    def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
         if not attribute_data:
             return {}
         # Get serializers for all sections in all phases
@@ -441,6 +448,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             #validate_attributes.get("phase").project_subtype
         should_validate = self.should_validate_attributes()
         min_phase_index = current_phase.index if current_phase else 1
+
+        try:
+            is_owner = self.context["request"].user == self.user
+            if owner_edit_override and is_owner:
+                min_phase_index = 1
+        except AttributeError:
+            pass
+
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
@@ -505,6 +520,20 @@ class ProjectSerializer(serializers.ModelSerializer):
             return True
 
         return public
+
+    def _validate_owner_edit_override(self, attrs):
+        owner_edit_override = attrs.get("owner_edit_override", False)
+        is_admin = self.context["request"].user.has_privilege("admin")
+
+        if self.instance and is_admin:
+            if owner_edit_override is None:
+                return self.instance.owner_edit_override
+            else:
+                return owner_edit_override
+        elif self.instance:
+            return self.instance.owner_edit_override
+        else:
+            return False
 
     def validate_phase(self, phase, subtype_id=None):
         if not subtype_id:
@@ -725,6 +754,7 @@ class AdminProjectSerializer(ProjectSerializer):
 
         fields["archived"] = serializers.NullBooleanField(required=False)
         fields["public"] = serializers.NullBooleanField(required=False)
+        fields["owner_edit_override"] = serializers.NullBooleanField(required=False)
         fields["onhold"] = serializers.NullBooleanField(required=False)
 
         return fields
