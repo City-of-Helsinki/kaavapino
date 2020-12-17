@@ -389,11 +389,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return sections
 
-    def generate_schedule_sections_data(self, subtype, validation):
+    def generate_schedule_sections_data(self, phase, validation):
         sections = []
-        deadline_sections = ProjectPhaseDeadlineSection.objects.filter(
-            phase__project_subtype=subtype
-        )
+        deadline_sections = phase.deadline_sections.all()
         for section in deadline_sections:
             serializer_class = create_section_serializer(
                 section,
@@ -463,15 +461,16 @@ class ProjectSerializer(serializers.ModelSerializer):
             sections_data += self.generate_sections_data(
                 phase=phase, validation=should_validate
             ) or []
+            sections_data += self.generate_schedule_sections_data(
+                phase=phase,
+                validation=should_validate,
+            ) or []
 
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
             validation=should_validate
         ) or []
 
-        sections_data += self.generate_schedule_sections_data(
-            subtype=subtype, validation=should_validate
-        ) or []
 
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
