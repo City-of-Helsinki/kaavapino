@@ -325,7 +325,7 @@ class Project(models.Model):
                         self.update_attribute_data( \
                             {deadline.attribute.identifier: date})
                         self.save()
-                        if old_value != date:
+                        if old_value != new_value:
                             action.send(
                                 user or self.user,
                                 verb=verbs.UPDATED_ATTRIBUTE,
