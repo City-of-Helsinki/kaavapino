@@ -153,6 +153,7 @@ class Project(models.Model):
     public = models.BooleanField(default=True)
     archived = models.BooleanField(default=False)
     onhold = models.BooleanField(default=False)
+    owner_edit_override = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = _("project")
