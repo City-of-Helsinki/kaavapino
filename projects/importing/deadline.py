@@ -157,7 +157,7 @@ class DeadlineImporter:
             name="Arkipäivät",
             identifier="arkipäivät",
             defaults={
-                "exclude_selected": False,
+                "exclude_selected": True,
                 "business_days_only": True,
             },
         )
