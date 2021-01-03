@@ -128,24 +128,24 @@ class Deadline(models.Model):
         return True
 
     def _calculate(self, project, calculations, datetype):
-        def condition_result(calculation):
-            if not calculation.conditions.count() + \
-                calculation.not_conditions.count():
-                return True
-
-            for condition in calculation.conditions.all():
-                if project.attribute_data.get(condition.identifier, False):
-                    return True
-
-            for condition in calculation.not_conditions.all():
-                if not project.attribute_data.get(condition.identifier, False):
-                    return True
-
-            return False
 
         # Use first calculation whose condition is met
         for calculation in calculations:
-            if condition_result(calculation):
+            condition_result = False
+
+            if not calculation.conditions.count() + \
+                calculation.not_conditions.count():
+                condition_result = True
+
+            for condition in calculation.conditions.all():
+                if project.attribute_data.get(condition.identifier, False):
+                    condition_result = True
+
+            for condition in calculation.not_conditions.all():
+                if not project.attribute_data.get(condition.identifier, False):
+                    condition_result = True
+
+            if condition_result:
                 return calculation.datecalculation.calculate(project, datetype)
 
         if self.default_to_created_at:
@@ -578,7 +578,7 @@ class DateCalculation(models.Model):
 
         if self.base_date_attribute:
             date = project.attribute_data.get(
-                self.base_date_attribute,
+                self.base_date_attribute.identifier,
                 None
             )
         elif self.base_date_deadline:
@@ -592,10 +592,9 @@ class DateCalculation(models.Model):
         if not date:
             return None
 
-
-        if datetype:
+        if datetype and date:
             date = datetype.valid_days_from(date, self.constant)
-        else:
+        elif date:
             date += datetime.timedelta(days=self.constant)
 
         for attribute in self.attributes.all():

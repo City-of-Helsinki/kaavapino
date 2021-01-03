@@ -213,7 +213,7 @@ class Project(models.Model):
             deadline__in=Deadline.objects.filter(subtype=self.subtype)
         )
         project_attributes = (
-            (phase_section_attrs | floor_area_section_attrs | deadline_attrs)
+            Attribute.objects.all()
             .distinct()
             .prefetch_related("value_choices")
         )
@@ -320,22 +320,20 @@ class Project(models.Model):
                         default=str,
                     ))
                     new_value = json.loads(json.dumps(date, default=str))
-                    should_update_attribute_data = not initial or not old_value
 
-                    if should_update_attribute_data:
-                        self.update_attribute_data( \
-                            {deadline.attribute.identifier: date})
-                        self.save()
-                        if old_value != new_value:
-                            action.send(
-                                user or self.user,
-                                verb=verbs.UPDATED_ATTRIBUTE,
-                                action_object=deadline.attribute,
-                                target=self,
-                                attribute_identifier=deadline.attribute.identifier,
-                                old_value=old_value,
-                                new_value=new_value,
-                            )
+                    self.update_attribute_data( \
+                        {deadline.attribute.identifier: date})
+                    self.save()
+                    if old_value != new_value:
+                        action.send(
+                            user or self.user,
+                            verb=verbs.UPDATED_ATTRIBUTE,
+                            action_object=deadline.attribute,
+                            target=self,
+                            attribute_identifier=deadline.attribute.identifier,
+                            old_value=old_value,
+                            new_value=new_value,
+                        )
 
     def _set_calculated_deadlines(self, deadlines, user, initial=False):
         unresolved = deadlines
@@ -361,7 +359,7 @@ class Project(models.Model):
                 break
 
     # Generate or update schedule for project
-    def update_deadlines(self, values=None, user=None,):
+    def update_deadlines(self, values=None, user=None):
         deadlines = self._get_applicable_deadlines()
 
         # Delete no longer relevant deadlines and create missing
