@@ -595,7 +595,11 @@ class DateCalculation(models.Model):
         if datetype and date:
             date = datetype.valid_days_from(date, self.constant)
         elif date:
-            date += datetime.timedelta(days=self.constant)
+            try:
+                date += datetime.timedelta(days=self.constant)
+            except TypeError:
+                date = datetime.datetime.strptime(date, DATE_SERIALIZATION_FORMAT)
+                date += datetime.timedelta(days=self.constant)
 
         for attribute in self.attributes.all():
             try:
