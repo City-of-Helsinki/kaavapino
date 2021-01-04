@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -28,6 +28,7 @@ from projects.models import (
     ProjectPhaseSectionAttribute,
     ProjectComment,
     Deadline,
+    DeadlineDateCalculation,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -651,8 +652,30 @@ class ProjectSerializer(serializers.ModelSerializer):
         return project
 
     def update(self, instance: Project, validated_data: dict) -> Project:
-        should_update_deadlines = True
         attribute_data = validated_data.pop("attribute_data", {})
+        attr_identifiers = list(attribute_data.keys())
+        phase = validated_data.get("phase")
+        phase_changed = phase is not None and phase != instance.phase
+
+        if phase_changed:
+            should_update_deadlines = False
+        else:
+            should_update_deadlines = bool(
+                instance.deadlines.prefetch_related("deadline").filter(
+                    deadline__attribute__identifier__in=[attr_identifiers]
+                ).count()
+            )
+
+            if not should_update_deadlines:
+                should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
+                    deadline__project_deadlines__project=instance
+                ).filter(
+                    Q(conditions__identifier__in=attr_identifiers) | \
+                    Q(not_conditions__identifier__in=attr_identifiers) | \
+                    Q(datecalculation__base_date_attribute__identifier__in=attr_identifiers) | \
+                    Q(datecalculation__attributes__attribute__identifier__in=attr_identifiers)
+                ).count())
+
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
             if attribute_data:
