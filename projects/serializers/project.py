@@ -157,11 +157,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
-    deadlines = ProjectDeadlineSerializer(
-        many=True,
-        allow_null=True,
-        required=False,
-    )
+    deadlines = serializers.SerializerMethodField()
     public = serializers.NullBooleanField(required=False, read_only=True)
     owner_edit_override = serializers.NullBooleanField(required=False, read_only=True)
     archived = serializers.NullBooleanField(required=False, read_only=True)
@@ -235,6 +231,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_type(self, project):
         return project.type.pk
+
+    def get_deadlines(self, project):
+        deadlines = project.deadlines.filter(deadline__subtype=project.subtype)
+        return ProjectDeadlineSerializer(
+            deadlines,
+            many=True,
+            allow_null=True,
+            required=False,
+        ).data
 
     def _set_file_attributes(self, attribute_data, project):
         request = self.context["request"]
