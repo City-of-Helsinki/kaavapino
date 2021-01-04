@@ -661,6 +661,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         attr_identifiers = list(attribute_data.keys())
         phase = validated_data.get("phase")
         phase_changed = phase is not None and phase != instance.phase
+        should_generate_deadlines = getattr(
+            self.context["request"], "GET", {}
+        ).get("generate_schedule") in ["1", "true", "True"]
 
         if phase_changed:
             should_update_deadlines = False
@@ -687,8 +690,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 instance.update_attribute_data(attribute_data)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
-            if should_update_deadlines:
-                project.update_deadlines()
+            if should_generate_deadlines:
+                project.deadlines.all().delete()
+                project.update_deadlines(user=self.context["request"].user)
+
+            elif should_update_deadlines:
+                project.update_deadlines(user=self.context["request"].user)
 
             project.save()
             return project
