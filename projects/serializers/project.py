@@ -691,6 +691,13 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
             if should_generate_deadlines:
+                cleared_attributes = {
+                    project_dl.deadline.attribute.identifier: None
+                    for project_dl in project.deadlines.all()
+                    if project_dl.deadline.attribute
+                }
+                instance.update_attribute_data(cleared_attributes)
+                self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
                 project.update_deadlines(user=self.context["request"].user)
 
