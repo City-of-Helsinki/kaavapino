@@ -37,6 +37,7 @@ from projects.permissions.media_file_permissions import (
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
+from sitecontent.models import ListViewAttributeColumn
 from users.models import User
 from users.serializers import UserSerializer
 
@@ -149,6 +150,47 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             "out_of_sync",
             "distance_reference_deadline_id",
         ]
+
+
+class ProjectListSerializer(serializers.Serializer):
+    user = serializers.SlugRelatedField(
+        read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
+    )
+    attribute_data = AttributeDataField(allow_null=True, required=False)
+    type = serializers.SerializerMethodField()
+    public = serializers.NullBooleanField(required=False, read_only=True)
+    owner_edit_override = serializers.NullBooleanField(required=False, read_only=True)
+    archived = serializers.NullBooleanField(required=False, read_only=True)
+    onhold = serializers.NullBooleanField(required=False, read_only=True)
+
+    def get_type(self, project):
+        return project.type.pk
+
+    def get_attribute_data(self, project):
+        static_properties = [
+            "user",
+            "name",
+            "public",
+            "pino_number",
+            "create_principles",
+            "create_draft",
+        ]
+        return_data = {}
+        attrs = ListViewAttributeColumn.objects.all().select_related("attribute")
+        attribute_data = getattr(project, "attribute_data", {})
+        for attr in attrs:
+            identifier = attr.attribute.identifier
+            value = attribute_data.get(identifier)
+            if attr.attribute.static_property in static_properties:
+                return_data[identifier] = getattr(
+                    project, attr.attribute.static_property
+                )
+            elif value:
+                return_data[identifier] = value
+
+        return_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
+
+        return return_data
 
 
 class ProjectSerializer(serializers.ModelSerializer):
