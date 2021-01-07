@@ -438,6 +438,17 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         attrs["owner_edit_override"] = self._validate_owner_edit_override(attrs)
 
+        subtype = attrs.get("subtype")
+        if not subtype and self.instance:
+            subtype = self.instance.subtype
+
+        if attrs.get("create_principles") or attrs.get("create_draft"):
+            if subtype and subtype.name != "XL":
+                raise ValidationError({"subtype": _("Principles and drafts can only be created for XL projects.")})
+        else:
+            if subtype and subtype.name == "XL":
+                raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
+
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
