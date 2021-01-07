@@ -1,5 +1,6 @@
 import copy
 import datetime
+import numpy as np
 from typing import List, NamedTuple, Type
 
 from actstream import action
@@ -500,6 +501,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
             raise ValidationError(errors)
+
+        invalid_identifiers = list(np.setdiff1d(
+            list(attribute_data.keys()),
+            list(valid_attributes.keys()),
+        ))
+
+        if len(invalid_identifiers):
+            raise ValidationError(
+                {
+                    key: _("Cannot edit field.")
+                    for key in invalid_identifiers
+                }
+            )
 
         return valid_attributes
 
