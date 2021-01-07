@@ -152,16 +152,34 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         ]
 
 
-class ProjectListSerializer(serializers.Serializer):
+class ProjectListSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
-    public = serializers.NullBooleanField(required=False, read_only=True)
-    owner_edit_override = serializers.NullBooleanField(required=False, read_only=True)
-    archived = serializers.NullBooleanField(required=False, read_only=True)
-    onhold = serializers.NullBooleanField(required=False, read_only=True)
+
+    class Meta:
+        model = Project
+        fields = [
+            "user",
+            "created_at",
+            "modified_at",
+            "name",
+            "identifier",
+            "pino_number",
+            "type",
+            "subtype",
+            "attribute_data",
+            "phase",
+            "id",
+            "public",
+            "owner_edit_override",
+            "archived",
+            "onhold",
+            "create_principles",
+            "create_draft",
+        ]
 
     def get_type(self, project):
         return project.type.pk
