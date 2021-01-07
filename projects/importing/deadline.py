@@ -361,9 +361,25 @@ class DeadlineImporter:
                     )
 
             condition_attributes = []
-            cond_attr_identifiers = self._parse_conditions(
-                row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+
+            # check possible subtype limitations
+            split_cell = re.split(
+                r";\s*", row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
             )
+            subtypes = re.findall(
+                r"XS|S|M|L|XL",
+                re.split(r"\s*==\s*|\s+in\s+", split_cell[0])[-1],
+            )
+            if len(split_cell) < 2 or subtype.name in subtypes:
+                cond_attr_identifiers = self._parse_conditions(
+                    row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+                )
+
+            if not len(cond_attr_identifiers) \
+                and len(subtypes) \
+                and subtype.name not in subtypes:
+                continue
+
             for identifier in cond_attr_identifiers:
                 try:
                     condition_attributes.append(
@@ -600,6 +616,24 @@ class DeadlineImporter:
                     abbreviation=abbreviation,
                 )
             except Deadline.DoesNotExist:
+                continue
+
+            # check possible subtype limitations
+            split_cell = re.split(
+                r";\s*", row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+            )
+            subtypes = re.findall(
+                r"XS|S|M|L|XL",
+                re.split(r"\s*==\s*|\s+in\s+", split_cell[0])[-1],
+            )
+            if len(split_cell) < 2 or subtype.name in subtypes:
+                cond_attr_identifiers = self._parse_conditions(
+                    row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+                )
+
+            if not len(cond_attr_identifiers) \
+                and len(subtypes) \
+                and subtype.name not in subtypes:
                 continue
 
             # Create DateCalculations and Deadline relations
