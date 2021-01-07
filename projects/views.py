@@ -535,7 +535,7 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         try:
             subtype = int(self.request.query_params.get("subtype", None))
-        except ValueError:
+        except (ValueError, TypeError):
             subtype = None
 
         filters = {}
