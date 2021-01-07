@@ -215,12 +215,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         with transaction.atomic():
             # Remove any file using the same attribute for the project
-            ProjectAttributeFile.objects.filter(
+            files_to_delete = list(ProjectAttributeFile.objects.filter(
                 attribute=serializer.validated_data["attribute"], project=project
-            ).delete()
+            ))
 
             # Save the new file and metadata to disk
             serializer.save()
+            for file in files_to_delete:
+                file.delete()
 
         return Response(serializer.data)
 
