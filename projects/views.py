@@ -50,6 +50,7 @@ from projects.serializers.comment import (
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.project import (
     ProjectSerializer,
+    ProjectListSerializer,
     AdminProjectSerializer,
     ProjectPhaseSerializer,
     ProjectFileSerializer,
@@ -100,6 +101,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     ordering_fields = ("name", "identifier", "created_at", "modified_at")
 
     def get_serializer_class(self):
+        if self.action == "list":
+            return ProjectListSerializer
+
         user = self.request.user
 
         if user.has_privilege('admin'):

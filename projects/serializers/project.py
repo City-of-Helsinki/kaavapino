@@ -37,6 +37,7 @@ from projects.permissions.media_file_permissions import (
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
+from sitecontent.models import ListViewAttributeColumn
 from users.models import User
 from users.serializers import UserSerializer
 
@@ -149,6 +150,72 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             "out_of_sync",
             "distance_reference_deadline_id",
         ]
+
+
+class ProjectListSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(
+        read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
+    )
+    attribute_data = AttributeDataField(allow_null=True, required=False)
+    type = serializers.SerializerMethodField()
+    phase_start_date = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            "user",
+            "created_at",
+            "modified_at",
+            "name",
+            "identifier",
+            "pino_number",
+            "type",
+            "subtype",
+            "attribute_data",
+            "phase",
+            "id",
+            "public",
+            "owner_edit_override",
+            "archived",
+            "onhold",
+            "create_principles",
+            "create_draft",
+            "phase_start_date",
+        ]
+
+    def get_type(self, project):
+        return project.type.pk
+
+    def get_phase_start_date(self, project):
+        return project.deadlines \
+            .filter(deadline__phase=project.phase) \
+            .order_by("deadline__index").first().date
+
+    def get_attribute_data(self, project):
+        static_properties = [
+            "user",
+            "name",
+            "public",
+            "pino_number",
+            "create_principles",
+            "create_draft",
+        ]
+        return_data = {}
+        attrs = ListViewAttributeColumn.objects.all().select_related("attribute")
+        attribute_data = getattr(project, "attribute_data", {})
+        for attr in attrs:
+            identifier = attr.attribute.identifier
+            value = attribute_data.get(identifier)
+            if attr.attribute.static_property in static_properties:
+                return_data[identifier] = getattr(
+                    project, attr.attribute.static_property
+                )
+            elif value:
+                return_data[identifier] = value
+
+        return_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
+
+        return return_data
 
 
 class ProjectSerializer(serializers.ModelSerializer):
