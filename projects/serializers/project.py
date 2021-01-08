@@ -158,6 +158,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
     )
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
+    phase_start_date = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -179,10 +180,16 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "onhold",
             "create_principles",
             "create_draft",
+            "phase_start_date",
         ]
 
     def get_type(self, project):
         return project.type.pk
+
+    def get_phase_start_date(self, project):
+        return project.deadlines \
+            .filter(deadline__phase=project.phase) \
+            .order_by("deadline__index").first().date
 
     def get_attribute_data(self, project):
         static_properties = [
