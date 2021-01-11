@@ -187,9 +187,12 @@ class ProjectListSerializer(serializers.ModelSerializer):
         return project.type.pk
 
     def get_phase_start_date(self, project):
-        return project.deadlines \
-            .filter(deadline__phase=project.phase) \
-            .order_by("deadline__index").first().date
+        try:
+            return project.deadlines \
+                .filter(deadline__phase=project.phase) \
+                .order_by("deadline__index").first().date
+        except AttributeError:
+            return None
 
     def get_attribute_data(self, project):
         static_properties = [
