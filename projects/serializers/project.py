@@ -512,7 +512,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         if attrs.get("create_principles") or attrs.get("create_draft"):
             if subtype and subtype.name != "XL":
                 raise ValidationError({"subtype": _("Principles and drafts can only be created for XL projects.")})
-        else:
+        elif attrs.get("create_principles") == False and \
+            attrs.get("create_draft") == False:
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
 
