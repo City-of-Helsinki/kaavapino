@@ -66,7 +66,10 @@ JWT_AUTH = {
 
 DATABASES = {"default": env.db()}
 
-CACHES = {"default": env.cache()}
+CACHES = {"default": {
+    "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+    "LOCATION": "kaavapino_api_cache_table",
+}}
 
 vars().update(env.email_url())  # EMAIL_BACKEND etc.
 

@@ -3,6 +3,9 @@
 echo "NOTICE: Get static files for serving"
 ./manage.py collectstatic --no-input
 
+# Create cache table
+python /code/manage.py createcachetable
+
 # Apply database migrations
 # TODO: run migrations only within one instance
 echo "Applying database migrations"

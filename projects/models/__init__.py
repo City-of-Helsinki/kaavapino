@@ -30,6 +30,8 @@ from .project import (  # noqa
     ProjectDeadline,
     ProjectPhaseDeadlineSection,
     ProjectPhaseDeadlineSectionAttribute,
+    PhaseAttributeMatrixStructure,
+    PhaseAttributeMatrixCell,
 )
 from .projectcomment import (  # noqa
     ProjectComment,

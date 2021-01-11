@@ -3,6 +3,7 @@ from collections import namedtuple
 
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework import serializers
 
 from projects.models import (
@@ -369,7 +370,39 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     color = serializers.CharField()
     color_code = serializers.CharField()
     list_prefix = serializers.CharField()
-    sections = ProjectSectionSchemaSerializer(many=True)
+    sections = serializers.SerializerMethodField()
+
+    @staticmethod
+    def _get_sections(privilege, owner, phase):
+        sections_cache = cache.get("serialized_phase_sections", {})
+
+        try:
+            return sections_cache[(privilege, owner, phase)]
+        except KeyError:
+            pass
+
+        sections = [
+            ProjectSectionSchemaSerializer(
+                section,
+                context={"privilege": privilege, "owner": owner},
+            ).data
+            for section in phase.sections.all()
+        ]
+
+        sections_cache[(privilege, owner, phase)] = sections
+        cache.set("serialized_phase_sections", sections_cache, None)
+        return sections
+
+    def get_sections(self, phase):
+        try:
+            context = self.context
+        except AttributeError:
+            context = {}
+        return self._get_sections(
+            context.get("privilege"),
+            context.get("owner"),
+            phase,
+        )
 
 
 class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
@@ -433,9 +466,39 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
     color = serializers.CharField()
     color_code = serializers.CharField()
     list_prefix = serializers.CharField()
-    sections = ProjectPhaseDeadlineSectionSerializer(
-        source="deadline_sections", many=True,
-    )
+    sections = serializers.SerializerMethodField()
+
+    @staticmethod
+    def _get_sections(privilege, owner, phase):
+        sections_cache = cache.get("serialized_deadline_sections", {})
+
+        try:
+            return sections_cache[(privilege, owner, phase)]
+        except KeyError:
+            pass
+
+        deadline_sections = [
+            ProjectPhaseDeadlineSectionSerializer(
+                section,
+                context={"privilege": privilege, "owner": owner},
+            ).data
+            for section in phase.deadline_sections.all()
+        ]
+
+        sections_cache[(privilege, owner, phase)] = deadline_sections
+        cache.set("serialized_deadline_sections", sections_cache, None)
+        return deadline_sections
+
+    def get_sections(self, phase):
+        try:
+            context = self.context
+        except AttributeError:
+            context = {}
+        return self._get_sections(
+            context.get("privilege"),
+            context.get("owner"),
+            phase,
+        )
 
 
 class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
