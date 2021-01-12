@@ -20,6 +20,7 @@ from projects.models import (
     Project,
     ProjectSubtype,
     ProjectPhase,
+    ProjectPhaseLog,
     ProjectPhaseSection,
     ProjectPhaseDeadlineSection,
     ProjectFloorAreaSection,
@@ -757,9 +758,18 @@ class ProjectSerializer(serializers.ModelSerializer):
         attr_identifiers = list(attribute_data.keys())
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
+        phase = validated_data.get("phase")
+        phase_changed = phase is not None and phase != instance.phase
         should_generate_deadlines = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
+
+        if phase_changed:
+            ProjectPhaseLog.objects.create(
+                project=instance,
+                phase=phase,
+                user=self.context["request"].user,
+            )
 
         if subtype_changed:
             should_update_deadlines = False
