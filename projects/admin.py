@@ -84,6 +84,8 @@ class AutomaticDateAdmin(admin.ModelAdmin):
 
 class ProjectDeadlineInline(admin.TabularInline):
     model = ProjectDeadline
+    fields = ("deadline", "date")
+    readonly_fields = ("deadline",)
     extra = 0
 
 
