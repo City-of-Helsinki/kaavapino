@@ -36,6 +36,8 @@ DEADLINE_MINIMUM_DISTANCE = "minimietäisyys"
 DEADLINE_INITIAL_CALCULATIONS = "generoitu ehdotus"
 DEADLINE_ATTRIBUTE_CONDITION = "milloin tieto kuuluu prosessin"
 DEADLINE_DATE_TYPE = "tiedon päivätyyppi"
+# TODO needs a column
+# DEADLINE_CALCULATION_DATE_TYPE = ""
 DEADLINE_TYPE = "tiedon jananäkymätyyppi "
 DEADLINE_PHASE = "vaihe, johon päivämäärä liittyy"
 DEADLINE_ERROR_PAST_DUE = "mitä tapahtuu, jos aikatauluun merkittyä  päivämäärää ei ole vahvistettu ja kyseisen etapin määräaika on ohitettu"
@@ -316,6 +318,20 @@ class DeadlineImporter:
 
             datetype.automatic_dates.set(automatic_dates)
 
+    def get_datetype(self, row, target):
+        if row:
+            try:
+                identifier = row.lower().replace(" ", "_")
+                return DateType.objects.get(
+                    identifier=identifier
+                )
+            except DateType.DoesNotExist:
+                logger.warning(
+                    f"Ignoring invalid date type {row} for {target}."
+                )
+
+        return None
+
     def _create_deadlines(self, subtype, rows):
         logger.info(f"Creating deadlines for {subtype}")
 
@@ -347,18 +363,10 @@ class DeadlineImporter:
                 except KeyError:
                     pass
 
-            date_type = None
-            if row[self.column_index[DEADLINE_DATE_TYPE]]:
-                try:
-                    identifier = row[self.column_index[DEADLINE_DATE_TYPE]] \
-                        .lower().replace(" ", "_")
-                    date_type = DateType.objects.get(
-                        identifier=identifier
-                    )
-                except DateType.DoesNotExist:
-                    logger.warning(
-                        f"Ignoring invalid date type {row[self.column_index[DEADLINE_DATE_TYPE]]} for deadline {abbreviation}."
-                    )
+            date_type = self.get_datetype(
+                row[self.column_index[DEADLINE_DATE_TYPE]],
+                f"deadline {abbreviation}",
+            )
 
             condition_attributes = []
 
@@ -424,7 +432,7 @@ class DeadlineImporter:
     def _create_deadline_relations(self, subtype, rows):
         logger.info(f"Updating deadline relations for {subtype}")
 
-        def parse_and_create_calculations(calc_string):
+        def parse_and_create_calculations(calc_string, calc_datetype):
             abbreviation_regex = r"([A-Z]+[0-9]+\.?[0-9]*)\s*[+|-]*\s*[0-9]*"
             constant_regex = r"[+|-]\s*([0-9]*)"
             identifier_regex = r"\{\{(.*)\}\}"
@@ -531,6 +539,7 @@ class DeadlineImporter:
                         base_date_attribute=base_attribute,
                         base_date_deadline=base_deadline,
                         constant=constant,
+                        date_type=calc_datetype,
                     ),
                     index=index,
                 )
@@ -636,16 +645,27 @@ class DeadlineImporter:
                 and subtype.name not in subtypes:
                 continue
 
+            # TODO needs a column
+            # calc_datetype = self.get_datetype(
+            #     row[self.column_index[DEADLINE_CALCULATION_DATE_TYPE]],
+            #     "deadline calculation",
+            # )
+
+            # TODO delete once we have the column
+            calc_datetype = None
+
             # Create DateCalculations and Deadline relations
             if row[self.column_index[DEADLINE_INITIAL_CALCULATIONS]]:
                 initial_calculations = parse_and_create_calculations(
-                    row[self.column_index[DEADLINE_INITIAL_CALCULATIONS]]
+                    row[self.column_index[DEADLINE_INITIAL_CALCULATIONS]],
+                    calc_datetype,
                 )
                 deadline.initial_calculations.set(initial_calculations)
 
             if row[self.column_index[DEADLINE_UPDATE_CALCULATIONS]]:
                 update_calculations = parse_and_create_calculations(
-                    row[self.column_index[DEADLINE_UPDATE_CALCULATIONS]]
+                    row[self.column_index[DEADLINE_UPDATE_CALCULATIONS]],
+                    calc_datetype,
                 )
                 deadline.update_calculations.set(update_calculations)
 

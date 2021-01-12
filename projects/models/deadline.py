@@ -128,7 +128,6 @@ class Deadline(models.Model):
         return True
 
     def _calculate(self, project, calculations, datetype):
-
         # Use first calculation whose condition is met
         for calculation in calculations:
             condition_result = False
@@ -221,6 +220,7 @@ class DeadlineDistance(models.Model):
 
     class Meta:
         ordering = ("index",)
+
 
 class DateType(models.Model):
     """Defines a pool of dates to calculate deadlines"""
@@ -572,8 +572,15 @@ class DateCalculation(models.Model):
         blank=True,
         null=True,
     )
+    date_type = models.ForeignKey(
+        "DateType",
+        verbose_name=_("date type"),
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+    )
 
-    def calculate(self, project, datetype):
+    def calculate(self, project, dl_datetype):
         date = None
 
         if self.base_date_attribute:
@@ -592,8 +599,8 @@ class DateCalculation(models.Model):
         if not date:
             return None
 
-        if datetype and date:
-            date = datetype.valid_days_from(date, self.constant)
+        if self.date_type and date:
+            date = self.date_type.valid_days_from(date, self.constant)
         elif date:
             try:
                 date += datetime.timedelta(days=self.constant)
@@ -609,7 +616,10 @@ class DateCalculation(models.Model):
             except TypeError:
                 pass
 
-        return date
+        if dl_datetype:
+            return dl_datetype.valid_days_from(date, 0)
+        else:
+            return date
 
     def __str__(self):
         return self.description or \
