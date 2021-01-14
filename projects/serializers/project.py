@@ -755,14 +755,15 @@ class ProjectSerializer(serializers.ModelSerializer):
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
         attr_identifiers = list(attribute_data.keys())
-        phase = validated_data.get("phase")
-        phase_changed = phase is not None and phase != instance.phase
+        subtype = validated_data.get("subtype")
+        subtype_changed = subtype is not None and subtype != instance.subtype
         should_generate_deadlines = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
 
-        if phase_changed:
+        if subtype_changed:
             should_update_deadlines = False
+
         else:
             should_update_deadlines = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
