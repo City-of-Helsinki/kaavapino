@@ -510,11 +510,11 @@ class AttributeImporter:
             return branches
 
         def parse_autofill_readonly(rule):
-            if rule == "kyllä" or \
+            if rule == "ei" or \
                 (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
-                return False
-            elif rule == "ei":
                 return True
+            elif rule == "kyllä":
+                return False
 
             return None
 
