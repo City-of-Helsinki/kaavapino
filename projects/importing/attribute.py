@@ -479,7 +479,7 @@ class AttributeImporter:
                 "comparison_value_type": value_type,
             }
 
-        def parse_autofill_rule(rule):
+        def parse_autofill_rule(rule, type):
             if rule == "ei":
                 return None
 
@@ -491,9 +491,9 @@ class AttributeImporter:
             branches = []
 
             for (then, condition) in zip(thens, conditions):
-                if then == "kyllä":
+                if type == Attribute.TYPE_BOOLEAN and then == "kyllä":
                     then = True
-                elif then == "ei":
+                elif type == Attribute.TYPE_BOOLEAN and then == "ei":
                     then = False
 
                 new_branches = [
@@ -625,7 +625,8 @@ class AttributeImporter:
             )
             try:
                 autofill_rule = parse_autofill_rule(
-                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]]
+                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]],
+                    value_type,
                 )
                 autofill_readonly = parse_autofill_readonly(
                     row[self.column_index[ATTRIBUTE_RULE_AUTOFILL_READONLY]]
