@@ -955,3 +955,29 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         self._validate_attribute(attrs["attribute"], attrs["project"])
 
         return attrs
+
+    def create(self, validated_data):
+        try:
+            old_file = ProjectAttributeFile.objects.filter(
+                project=validated_data["project"],
+                attribute=validated_data["attribute"],
+            )[0]
+            old_value = old_file.description
+        except IndexError:
+            old_value = None
+
+        new_file = super().create(validated_data)
+        new_value = new_file.description
+
+        if old_value != new_value:
+            action.send(
+                self.context["request"].user or validated_data["project"].user,
+                verb=verbs.UPDATED_ATTRIBUTE,
+                action_object=validated_data["attribute"],
+                target=validated_data["project"],
+                attribute_identifier=validated_data["attribute"].identifier,
+                new_value=new_value,
+                old_value=old_value,
+            )
+
+        return new_file
