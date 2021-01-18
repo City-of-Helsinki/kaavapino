@@ -749,7 +749,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
-            project.update_deadlines(user=self.context["request"].user)
+            user=self.context["request"].user
+            project.update_deadlines(user=user)
+            for dl in project.deadlines:
+                self.create_deadline_updates_log(
+                    dl.deadline, project, user, None, dl.date
+                )
 
         return project
 
@@ -763,12 +768,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         should_generate_deadlines = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
+        user=self.context["request"].user
 
         if phase_changed:
             ProjectPhaseLog.objects.create(
                 project=instance,
                 phase=phase,
-                user=self.context["request"].user,
+                user=user,
             )
 
         if subtype_changed:
@@ -797,6 +803,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 instance.update_attribute_data(attribute_data)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
+            old_deadlines = project.deadlines.all()
             if should_generate_deadlines:
                 cleared_attributes = {
                     project_dl.deadline.attribute.identifier: None
@@ -806,12 +813,28 @@ class ProjectSerializer(serializers.ModelSerializer):
                 instance.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=self.context["request"].user)
-
+                project.update_deadlines(user=user)
             elif should_update_deadlines:
-                project.update_deadlines(user=self.context["request"].user)
+                project.update_deadlines(user=user)
 
             project.save()
+
+            updated_deadlines = old_deadlines.union(project.deadlines.all())
+            for dl in updated_deadlines:
+                try:
+                    new_date = project.deadlines.get(deadline=dl.deadline).date
+                except ProjectDeadline.DoesNotExist:
+                    new_date = None
+
+                try:
+                    old_date = old_deadlines.get(deadline=dl.deadline).date
+                except ProjectDeadline.DoesNotExist:
+                    old_date = None
+
+                self.create_deadline_updates_log(
+                    dl.deadline, project, user, old_date, new_date
+                )
+
             return project
 
     def log_updates_attribute_data(self, attribute_data, project=None):
@@ -893,6 +916,22 @@ class ProjectSerializer(serializers.ModelSerializer):
                 generated=True,
                 content=f'{user.get_display_name()} päivitti "{attribute.name}" tietoa.{change_string}',
             )
+
+    def create_deadline_updates_log(self, deadline, project, user, old_date, new_date):
+        old_value = json.loads(json.dumps(old_date, default=str))
+        new_value = json.loads(json.dumps(new_date, default=str))
+
+        if old_value != new_value:
+            action.send(
+                user,
+                verb=verbs.UPDATED_DEADLINE,
+                action_object=deadline,
+                target=project,
+                deadline_abbreviation=deadline.abbreviation,
+                old_value=old_value,
+                new_value=new_value,
+            )
+
 
 
 class AdminProjectSerializer(ProjectSerializer):
