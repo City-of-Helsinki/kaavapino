@@ -50,6 +50,7 @@ from projects.serializers.comment import (
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.project import (
     ProjectSerializer,
+    ProjectSnapshotSerializer,
     ProjectListSerializer,
     AdminProjectSerializer,
     ProjectPhaseSerializer,
@@ -103,6 +104,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "list":
             return ProjectListSerializer
+
+        if self.request.query_params.get("snapshot"):
+            return ProjectSnapshotSerializer
 
         user = self.request.user
 
