@@ -284,7 +284,13 @@ class ProjectSerializer(serializers.ModelSerializer):
                     "%Y-%m-%dT%H:%M:%S.%fZ%z",
                 )
             except ValueError:
-                raise ParseError(detail=_("Incorrect snapshot datetime format, use %Y-%m-%dT%H:%M:%S.%fZ%z or phase id"))
+                try:
+                    snapshot = datetime.datetime.strptime(
+                        snapshot_param[:-3]+snapshot_param[-2:],
+                        "%Y-%m-%dT%H:%M:%S%z",
+                    )
+                except ValueError:
+                    raise ParseError(detail=_("Incorrect snapshot datetime format, use one of the following:\n%Y-%m-%dT%H:%M:%S.%fZ%z\n\nphase id"))
 
             if snapshot < project.created_at:
                 raise NotFound(detail=_("Project data at selected date cannot be found"))
