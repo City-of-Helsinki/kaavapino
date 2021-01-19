@@ -1064,11 +1064,11 @@ class ProjectSnapshotSerializer(ProjectSerializer):
             identifier = \
                 Attribute.objects.get(static_property=static_property).identifier
             return attribute_data[identifier]
-        except Attribute.DoesNotExist:
-            return None
+        except (Attribute.DoesNotExist, KeyError):
+            return getattr(project, static_property)
 
     def get_user(self, project):
-        return self._get_static_property(project, "user")
+        return self._get_static_property(project, "user").uuid
 
     def get_name(self, project):
         return self._get_static_property(project, "name")
@@ -1088,8 +1088,8 @@ class ProjectSnapshotSerializer(ProjectSerializer):
                 created_at__lte=self._get_snapshot_date(project),
                 project=project
             ).order_by("-created_at").first().phase.project_subtype.id
-        except ProjectPhaseLog.DoesNotExist:
-            return project.subtype
+        except (ProjectPhaseLog.DoesNotExist, AttributeError):
+            return project.subtype.id
 
     def get_phase(self, project):
         try:
@@ -1097,8 +1097,8 @@ class ProjectSnapshotSerializer(ProjectSerializer):
                 created_at__lte=self._get_snapshot_date(project),
                 project=project
             ).order_by("-created_at").first().phase.id
-        except ProjectPhaseLog.DoesNotExist:
-            return project.phase
+        except (ProjectPhaseLog.DoesNotExist, AttributeError):
+            return project.phase.id
 
     def get_deadlines(self, project):
         snapshot = self._get_snapshot_date(project)
