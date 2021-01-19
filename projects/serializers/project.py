@@ -377,7 +377,10 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def _set_file_attributes(self, attribute_data, project):
         request = self.context["request"]
-        attribute_files = ProjectAttributeFile.objects.filter(project=project)
+        attribute_files = ProjectAttributeFile.objects \
+            .filter(project=project) \
+            .order_by("attribute__pk", "project__pk", "-created_at") \
+            .distinct("attribute__pk", "project__pk")
 
         # Add file attributes to the attribute data
         # File values are represented as absolute URLs
@@ -1207,9 +1210,9 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             old_file = ProjectAttributeFile.objects.filter(
                 project=validated_data["project"],
                 attribute=validated_data["attribute"],
-            )[0]
+            ).order_by("-created_at").first()
             old_value = old_file.description
-        except IndexError:
+        except AttributeError:
             old_value = None
 
         new_file = super().create(validated_data)
