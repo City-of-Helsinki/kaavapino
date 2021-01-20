@@ -36,8 +36,7 @@ DEADLINE_MINIMUM_DISTANCE = "minimietäisyys"
 DEADLINE_INITIAL_CALCULATIONS = "generoitu ehdotus"
 DEADLINE_ATTRIBUTE_CONDITION = "milloin tieto kuuluu prosessin"
 DEADLINE_DATE_TYPE = "tiedon päivätyyppi"
-# TODO needs a column
-# DEADLINE_CALCULATION_DATE_TYPE = ""
+DEADLINE_CALCULATION_DATE_TYPE = "laskettavien päivien päivätyyppi"
 DEADLINE_TYPE = "tiedon jananäkymätyyppi "
 DEADLINE_PHASE = "vaihe, johon päivämäärä liittyy"
 DEADLINE_ERROR_PAST_DUE = "mitä tapahtuu, jos aikatauluun merkittyä  päivämäärää ei ole vahvistettu ja kyseisen etapin määräaika on ohitettu"
@@ -645,14 +644,10 @@ class DeadlineImporter:
                 and subtype.name not in subtypes:
                 continue
 
-            # TODO needs a column
-            # calc_datetype = self.get_datetype(
-            #     row[self.column_index[DEADLINE_CALCULATION_DATE_TYPE]],
-            #     "deadline calculation",
-            # )
-
-            # TODO delete once we have the column
-            calc_datetype = None
+            calc_datetype = self.get_datetype(
+                row[self.column_index[DEADLINE_CALCULATION_DATE_TYPE]],
+                "deadline calculation",
+            )
 
             # Create DateCalculations and Deadline relations
             if row[self.column_index[DEADLINE_INITIAL_CALCULATIONS]]:
