@@ -10,3 +10,4 @@ class AppConfig(DjangoAppConfig):
 
         registry.register(self.get_model("Project"))
         registry.register(self.get_model("Attribute"))
+        registry.register(self.get_model("Deadline"))
