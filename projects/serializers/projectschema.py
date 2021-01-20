@@ -593,36 +593,6 @@ AdminOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("a
 CreateOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("create", True)
 
 
-class CreateProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
-    def get_subtypes(self, obj):
-        return self._get_subtypes(obj, "create")
-
-    def get_fields(self):
-        fields = super(self).get_fields()
-        fields["subtypes"] = serializers.SerializerMethodField()
-        return fields
-
-
-class EditProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
-    def get_subtypes(self, obj):
-        return self._get_subtypes(obj, "edit")
-
-    def get_fields(self):
-        fields = super(EditProjectTypeSchemaSerializer, self).get_fields()
-        fields["subtypes"] = serializers.SerializerMethodField()
-        return fields
-
-
-class BrowseProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
-    def get_subtypes(self, obj):
-        return self._get_subtypes(obj, "browse")
-
-    def get_fields(self):
-        fields = super(BrowseProjectTypeSchemaSerializer, self).get_fields()
-        fields["subtypes"] = serializers.SerializerMethodField()
-        return fields
-
-
 class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
     subtypes = serializers.SerializerMethodField()
     type_name = serializers.CharField(source="name")

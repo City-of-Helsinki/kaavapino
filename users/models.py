@@ -47,7 +47,7 @@ class User(AbstractUser):
         privileges = tuple(p for (p, _) in PRIVILEGE_LEVELS)
         user_privilege = None
 
-        for group in self.groups.all():
+        for group in self.groups.all().union(self.additional_groups.all()):
             try:
                 privilege_name = group.groupprivilege.privilege_level
                 group_privilege = privileges.index(privilege_name)
