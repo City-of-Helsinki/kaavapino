@@ -544,19 +544,28 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
+            visibility_row = row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
             ifs = re.findall(
                 "\{%\s*if\s*(.*?)\s*%\}",
-                row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
+                visibility_row,
             )
             conditions = []
 
             for if_condition in ifs:
                 conditions += re.split("\s+or\s+", if_condition)
 
-            visibility_conditions = [
-                parse_condition(condition)
-                for condition in conditions
-            ]
+            if len(re.findall(r"ei\s*\{%\s*endif\s*%\}", visibility_row)):
+                visibility_conditions = []
+                hide_conditions = [
+                    parse_condition(condition)
+                    for condition in conditions
+                ]
+            else:
+                visibility_conditions = [
+                    parse_condition(condition)
+                    for condition in conditions
+                ]
+                hide_conditions = []
 
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
@@ -669,6 +678,7 @@ class AttributeImporter:
                     "value_type": value_type,
                     "display": display,
                     "visibility_conditions": visibility_conditions,
+                    "hide_conditions": hide_conditions,
                     "help_text": help_text,
                     "help_link": help_link,
                     "public": is_public,

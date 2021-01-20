@@ -172,6 +172,17 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    hide_conditions = ArrayField(
+        JSONField(
+            default=dict,
+            blank=True,
+            null=True,
+            encoder=DjangoJSONEncoder,
+        ),
+        verbose_name=_("hide condition"),
+        null=True,
+        blank=True,
+    )
     unit = models.CharField(
         max_length=255, verbose_name=_("unit"), null=True, blank=True
     )
