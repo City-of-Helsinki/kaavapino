@@ -127,6 +127,14 @@ class Deadline(models.Model):
 
         return True
 
+    def _check_condition(self, project, condition):
+        if project.attribute_data.get(condition.identifier):
+            return True
+        elif condition.static_property:
+            return bool(getattr(project, condition.static_property))
+        else:
+            return False
+
     def _calculate(self, project, calculations, datetype):
         # Use first calculation whose condition is met
         for calculation in calculations:
@@ -137,11 +145,11 @@ class Deadline(models.Model):
                 condition_result = True
 
             for condition in calculation.conditions.all():
-                if project.attribute_data.get(condition.identifier, False):
+                if self._check_condition(project, condition):
                     condition_result = True
 
             for condition in calculation.not_conditions.all():
-                if not project.attribute_data.get(condition.identifier, False):
+                if not self._check_condition(project, condition):
                     condition_result = True
 
             if condition_result:
