@@ -459,6 +459,12 @@ class AttributeImporter:
 
             else:
                 value = condition[2]
+                if value[0] == '"':
+                    value = value[1:]
+
+                if value[-1] == '"':
+                    value = value[:-1]
+
                 if value[0] == "[" and value[-1] == "]":
                     try:
                         [int(i) for i in re.split(r",\s+", value[1:-1])]
