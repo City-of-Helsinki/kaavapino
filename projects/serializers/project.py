@@ -860,7 +860,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             user=self.context["request"].user
             project.update_deadlines(user=user)
-            for dl in project.deadlines:
+            for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
                 )
