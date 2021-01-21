@@ -323,8 +323,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         else:
             attribute_data = getattr(project, "attribute_data", {})
 
-        if not snapshot:
-            self._set_file_attributes(attribute_data, project)
+        self._set_file_attributes(attribute_data, project, snapshot)
 
         # TODO handle snapshot case
         self._set_geometry_attributes(attribute_data, project)
@@ -375,9 +374,18 @@ class ProjectSerializer(serializers.ModelSerializer):
             required=False,
         ).data
 
-    def _set_file_attributes(self, attribute_data, project):
+    def _set_file_attributes(self, attribute_data, project, snapshot):
         request = self.context["request"]
-        attribute_files = ProjectAttributeFile.objects.filter(project=project)
+        if snapshot:
+            attribute_files = ProjectAttributeFile.objects \
+                .filter(project=project, created_at__lte=snapshot) \
+                .order_by("attribute__pk", "project__pk", "-created_at") \
+                .distinct("attribute__pk", "project__pk")
+        else:
+            attribute_files = ProjectAttributeFile.objects \
+                .filter(project=project) \
+                .order_by("attribute__pk", "project__pk", "-created_at") \
+                .distinct("attribute__pk", "project__pk")
 
         # Add file attributes to the attribute data
         # File values are represented as absolute URLs
@@ -1207,9 +1215,9 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             old_file = ProjectAttributeFile.objects.filter(
                 project=validated_data["project"],
                 attribute=validated_data["attribute"],
-            )[0]
+            ).order_by("-created_at").first()
             old_value = old_file.description
-        except IndexError:
+        except AttributeError:
             old_value = None
 
         new_file = super().create(validated_data)

@@ -30,13 +30,6 @@ from projects.models import (
 )
 
 
-@receiver(pre_delete, sender=ProjectAttributeFile)
-def delete_file_pre_delete_post(sender, instance, *args, **kwargs):
-    if instance.file:
-        path = instance.file.path
-        if os.path.isfile(path):
-            os.remove(path)
-
 @receiver([post_save, post_delete, m2m_changed], sender=Attribute)
 @receiver([post_save, post_delete, m2m_changed], sender=DataRetentionPlan)
 @receiver([post_save, post_delete, m2m_changed], sender=AttributeValueChoice)
