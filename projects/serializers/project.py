@@ -57,6 +57,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     date = serializers.DateField()
     abbreviation = serializers.CharField(source="deadline.abbreviation")
     deadline = serializers.SerializerMethodField()
+    generated = serializers.BooleanField()
 
     def get_deadline(self, projectdeadline):
         return DeadlineSerializer(
@@ -706,6 +707,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                     for key in invalid_identifiers
                 }
             )
+
+        if self.instance:
+            for dl in ProjectDeadline.objects.filter(
+                project=self.instance,
+                deadline__attribute__identifier__in=valid_attributes.keys()
+            ):
+                dl.generated = False
+                dl.save()
 
         return {**static_property_attributes, **valid_attributes}
 

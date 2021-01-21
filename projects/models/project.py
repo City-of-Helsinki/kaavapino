@@ -368,6 +368,9 @@ class Project(models.Model):
             project_deadline, created = ProjectDeadline.objects.get_or_create(
                 project=self,
                 deadline=deadline,
+                defaults={
+                    "generated": True,
+                }
             )
             if created:
                 generated_deadlines.append(project_deadline)
@@ -750,6 +753,10 @@ class ProjectDeadline(models.Model):
     )
     confirmed = models.BooleanField(
         verbose_name=_("confirmed"),
+        default=False,
+    )
+    generated = models.BooleanField(
+        verbose_name=_("generated"),
         default=False,
     )
 
