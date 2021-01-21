@@ -610,6 +610,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
+        static_property_attributes = {}
         if self.instance:
             static_properties = [
                 "user",
@@ -619,7 +620,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "create_principles",
                 "create_draft",
             ]
-            static_property_attributes = {}
             for static_property in static_properties:
                 try:
                     try:
