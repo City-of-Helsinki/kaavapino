@@ -235,6 +235,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     owner_edit_override = serializers.NullBooleanField(required=False, read_only=True)
     archived = serializers.NullBooleanField(required=False, read_only=True)
     onhold = serializers.NullBooleanField(required=False, read_only=True)
+    generated_deadline_attributes = serializers.SerializerMethodField()
 
     _metadata = serializers.SerializerMethodField()
 
@@ -259,6 +260,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "deadlines",
             "create_principles",
             "create_draft",
+            "generated_deadline_attributes",
             "_metadata",
         ]
         read_only_fields = ["type", "created_at", "modified_at"]
@@ -374,6 +376,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             allow_null=True,
             required=False,
         ).data
+
+    def get_generated_deadline_attributes(self, project):
+        return [
+            dl.deadline.attribute.identifier
+            for dl in project.deadlines.filter(generated=True)
+            if dl.deadline.attribute
+        ]
 
     def _set_file_attributes(self, attribute_data, project, snapshot):
         request = self.context["request"]
