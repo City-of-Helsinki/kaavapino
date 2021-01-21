@@ -610,6 +610,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
+        static_property_attributes = {}
         if self.instance:
             static_properties = [
                 "user",
@@ -619,7 +620,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "create_principles",
                 "create_draft",
             ]
-            static_property_attributes = {}
             for static_property in static_properties:
                 try:
                     try:
@@ -860,7 +860,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             user=self.context["request"].user
             project.update_deadlines(user=user)
-            for dl in project.deadlines:
+            for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
                 )

@@ -116,6 +116,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     unit = serializers.CharField()
     calculations = serializers.ListField(child=serializers.CharField())
     visibility_conditions = serializers.ListField(child=ConditionSerializer())
+    hide_conditions = serializers.ListField(child=ConditionSerializer())
     autofill_rule = serializers.ListField(child=AutofillRuleSerializer())
     autofill_readonly = serializers.BooleanField()
     updates_autofill = serializers.BooleanField()
