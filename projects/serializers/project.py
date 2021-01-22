@@ -576,8 +576,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 {"phase": _("Archived projects cannot be edited")}
             )
 
-        self._validate_deadlines(attrs)
-
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
 
@@ -808,38 +806,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return user
 
-    def _validate_deadlines(self, attrs):
-        """
-        Validates that each deadline date in attribute_data is valid for
-        the deadline date type
-        """
-        phase = attrs.get("phase", None)
-        if not phase and self.instance:
-            phase = self.instance.phase
-        # New project without a phase—this should never be reached
-        else:
-            return
-
-        attribute_data = attrs.get("attribute_data", None)
-
-        if not attribute_data:
-            return
-
-        for key, value in attribute_data.items():
-            try:
-                deadline = Deadline.objects.get(
-                    attribute__identifier=key, phase=phase,
-                )
-            except Deadline.DoesNotExist:
-                continue
-
-            if not deadline.date_type.is_valid_date(value):
-                raise ValidationError({"deadlines":
-                    {deadline.attribute.identifier: _(
-                        f"Invalid date selection for {deadline.attribute.identifier}/{deadline.abbreviation} ({deadline.date_type})"
-                    )}
-                })
-
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
             project_subtype=validated_data["subtype"]
@@ -892,7 +858,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         else:
             should_update_deadlines = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
-                    deadline__attribute__identifier__in=[attr_identifiers]
+                    deadline__attribute__identifier__in=attr_identifiers
                 ).count()
             )
 
