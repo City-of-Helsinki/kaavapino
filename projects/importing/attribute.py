@@ -509,7 +509,7 @@ class AttributeImporter:
                         "then_branch": then,
                         "else_branch": None
                     }
-                    for condition_or in re.split(r"\s(or)+\s", condition)
+                    for condition_or in re.split(r"\sor+\s", condition)
                 ]
                 branches += new_branches
 
