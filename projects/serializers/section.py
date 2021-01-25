@@ -1,5 +1,6 @@
 import collections
 import copy
+import datetime
 
 from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
@@ -9,6 +10,7 @@ from rest_framework_gis.fields import GeometryField
 from projects.models import (
     Attribute,
     Project,
+    ProjectDeadline,
     ProjectFloorAreaSection,
     ProjectPhaseSection,
     ProjectPhaseDeadlineSection,
@@ -41,44 +43,84 @@ FIELD_TYPES = {
 FieldData = namedtuple("FieldData", ["field_class", "field_arguments"])
 
 
-def create_attribute_field_data(attribute, validation, project):
-    """Create data for initializing attribute field serializer."""
-    field_arguments = {}
-    field_class = FIELD_TYPES.get(attribute.value_type, None)
+def get_rich_text_validator(attribute):
+    def validate(value):
+        error_msg = attribute.error_message or _("Character limit exceeded")
+        try:
+            total_length = 0
 
-    def get_rich_text_validator(attribute):
-        def validate(value):
-            error_msg = attribute.error_message or _("Character limit exceeded")
-            try:
-                total_length = 0
+            for item in value["ops"]:
+                total_length += len(item["insert"])
 
-                for item in value["ops"]:
-                    total_length += len(item["insert"])
-
-                if attribute.character_limit and total_length > attribute.character_limit:
-                    raise ValidationError(
-                        {attribute.identifier: error_msg}
-                    )
-
-                return value
-
-            except (KeyError, TypeError):
-                raise ValidationError(
-                    {attribute.identifier: _("Incorrect rich text formatting")}
-                )
-
-        return validate
-
-    def get_unique_validator(attribute):
-        def validate(value):
-            column = f"attribute_data__{attribute.identifier}"
-            error_msg = attribute.error_message or _("Value must be unique")
-            if Project.objects.filter(**{column: value}).exclude(pk=project.pk).count() > 0:
+            if attribute.character_limit and total_length > attribute.character_limit:
                 raise ValidationError(
                     {attribute.identifier: error_msg}
                 )
 
-        return validate
+            return value
+
+        except (KeyError, TypeError):
+            raise ValidationError(
+                {attribute.identifier: _("Incorrect rich text formatting")}
+            )
+
+    return validate
+
+def get_unique_validator(attribute, project_id):
+    def validate(value):
+        column = f"attribute_data__{attribute.identifier}"
+        error_msg = attribute.error_message or _("Value must be unique")
+        if Project.objects.filter(**{column: value}).exclude(pk=project_id).count() > 0:
+            raise ValidationError(
+                {attribute.identifier: error_msg}
+            )
+
+    return validate
+
+def get_deadline_validator(attribute, project_dls, subtype):
+    def validate(value):
+        for attr_dl in attribute.deadline.filter(subtype=subtype):
+            # validate datetype
+            try:
+                assert attr_dl.date_type.is_valid_date(value)
+            except AttributeError:
+                pass
+            except AssertionError:
+                raise ValidationError(_(
+                    f"Invalid date selection for date type {attr_dl.date_type}"
+                ))
+
+            # validate minimum distance to previous deadline(s)
+            for distance in attr_dl.distances_to_previous.all():
+                try:
+                    prev_dl = project_dls.get(
+                        deadline=distance.previous_deadline,
+                    )
+                except ProjectDeadline.DoesNotExist:
+                    continue
+
+                default_error = _(f"Minimum distance to {prev_dl.deadline.abbreviation} not met")
+
+                if distance.date_type and distance.date_type.valid_days_from(
+                    prev_dl.date,
+                    distance.distance_from_previous,
+                ) > value:
+                    raise ValidationError(
+                        attr_dl.error_min_distance_previous or default_error
+                    )
+                elif prev_dl.date + datetime.timedelta(
+                    days=distance.distance_from_previous,
+                ) > value:
+                    raise ValidationError(
+                        attr_dl.error_min_distance_previous or default_error
+                    )
+
+    return validate
+
+def create_attribute_field_data(attribute, validation, project):
+    """Create data for initializing attribute field serializer."""
+    field_arguments = {}
+    field_class = FIELD_TYPES.get(attribute.value_type, None)
 
     field_arguments["validators"] = []
 
@@ -86,7 +128,14 @@ def create_attribute_field_data(attribute, validation, project):
         field_arguments["validators"] += [get_rich_text_validator(attribute)]
 
     if attribute.unique:
-        field_arguments["validators"] += [get_unique_validator(attribute)]
+        field_arguments["validators"] += [get_unique_validator(attribute, project.pk)]
+
+    if attribute.deadline.count():
+        field_arguments["validators"] += [get_deadline_validator(
+            attribute,
+            project.deadlines,
+            project.phase.project_subtype,
+        )]
 
     if attribute.value_type == Attribute.TYPE_CHOICE:
         choices = attribute.value_choices.all()

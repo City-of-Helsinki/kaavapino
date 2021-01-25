@@ -26,22 +26,9 @@ def truncate_identifier(identifier: str, length: int = None, hash_len: int = 4):
 
 
 class KaavapinoPrivateStorage(PrivateFileSystemStorage):
-    """
-    Storage class that overwrites files instead of renaming
-
-    Since the system is not used for the purpose of keeping
-    data history nor as a primary storage service, there is
-    no reason to keep any old files laying around or keeping
-    a history of old files.
-    """
-
     def __init__(self, url_postfix=None, *args, **kwargs):
         self.url_postfix = url_postfix
         super().__init__(*args, **kwargs)
-
-    def get_available_name(self, name, max_length=None):
-        self.delete(name)
-        return name
 
     def url(self, name):
         # Make sure reverse_lazy() is evaluated, as Python 3 won't do this here.

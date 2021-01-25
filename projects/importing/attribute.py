@@ -445,7 +445,7 @@ class AttributeImporter:
 
     def _create_attributes(self, rows: Iterable[Sequence[str]]):
         def parse_condition(condition):
-            condition = re.split("\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
+            condition = re.split(r"\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
 
             if len(condition) == 1:
                 negate = condition[0][0] == "!"
@@ -459,18 +459,24 @@ class AttributeImporter:
 
             else:
                 value = condition[2]
-                if value[0] == '[' and value[-1] == ']':
+                if value[0] == '"':
+                    value = value[1:]
+
+                if value[-1] == '"':
+                    value = value[:-1]
+
+                if value[0] == "[" and value[-1] == "]":
                     try:
-                        [int(i) for i in re.split(',\s+', value[1:-1])]
-                        value_type = 'list<number>'
+                        [int(i) for i in re.split(r",\s+", value[1:-1])]
+                        value_type = "list<number>"
                     except ValueError:
-                        value_type = 'list<string>'
+                        value_type = "list<string>"
                 else:
                     try:
                         int(value)
-                        value_type = 'number'
+                        value_type = "number"
                     except ValueError:
-                        value_type = 'string'
+                        value_type = "string"
 
             return {
                 "variable": condition[0],
@@ -479,21 +485,21 @@ class AttributeImporter:
                 "comparison_value_type": value_type,
             }
 
-        def parse_autofill_rule(rule):
+        def parse_autofill_rule(rule, type):
             if rule == "ei":
                 return None
 
             # TODO: make a more general implementation for including fields if cases become more complex
-            variables = re.findall("^\{\{(.*)\}\}", rule)
-            thens = re.findall("\{%+\sif.*?%\}\s*(.*?)\s*\{% endif %\}", rule)
-            conditions = re.findall("\{%\s*if\s*(.*?)\s*%\}.*?\{%\s*endif\s*%\}", rule)
+            variables = re.findall(r"^\{\{(.*)\}\}", rule)
+            thens = re.findall(r"\{%+\sif.*?%\}\s*(.*?)\s*\{% endif %\}", rule)
+            conditions = re.findall(r"\{%\s*if\s*(.*?)\s*%\}.*?\{%\s*endif\s*%\}", rule)
 
             branches = []
 
             for (then, condition) in zip(thens, conditions):
-                if then == "kyllä":
+                if type == Attribute.TYPE_BOOLEAN and then == "kyllä":
                     then = True
-                elif then == "ei":
+                elif type == Attribute.TYPE_BOOLEAN and then == "ei":
                     then = False
 
                 new_branches = [
@@ -503,18 +509,18 @@ class AttributeImporter:
                         "then_branch": then,
                         "else_branch": None
                     }
-                    for condition_or in re.split("\s(or)+\s", condition)
+                    for condition_or in re.split(r"\sor+\s", condition)
                 ]
                 branches += new_branches
 
             return branches
 
         def parse_autofill_readonly(rule):
-            if rule == "kyllä" or \
+            if rule == "ei" or \
                 (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
-                return False
-            elif rule == "ei":
                 return True
+            elif rule == "kyllä":
+                return False
 
             return None
 
@@ -544,19 +550,28 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
+            visibility_row = row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
             ifs = re.findall(
-                "\{%\s*if\s*(.*?)\s*%\}",
-                row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
+                r"\{%\s*if\s*(.*?)\s*%\}",
+                visibility_row,
             )
             conditions = []
 
             for if_condition in ifs:
-                conditions += re.split("\s+or\s+", if_condition)
+                conditions += re.split(r"\s+or\s+", if_condition)
 
-            visibility_conditions = [
-                parse_condition(condition)
-                for condition in conditions
-            ]
+            if len(re.findall(r"ei\s*\{%\s*endif\s*%\}", visibility_row)):
+                visibility_conditions = []
+                hide_conditions = [
+                    parse_condition(condition)
+                    for condition in conditions
+                ]
+            else:
+                visibility_conditions = [
+                    parse_condition(condition)
+                    for condition in conditions
+                ]
+                hide_conditions = []
 
             unit = row[self.column_index[ATTRIBUTE_UNIT]] or None
 
@@ -620,12 +635,13 @@ class AttributeImporter:
             # autofill
 
             related_fields = re.findall(
-                '\{\{(.*?)\}\}',
-                row[self.column_index[ATTRIBUTE_RELATED_FIELDS]] or ''
+                r"\{\{(.*?)\}\}",
+                row[self.column_index[ATTRIBUTE_RELATED_FIELDS]] or ""
             )
             try:
                 autofill_rule = parse_autofill_rule(
-                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]]
+                    row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]],
+                    value_type,
                 )
                 autofill_readonly = parse_autofill_readonly(
                     row[self.column_index[ATTRIBUTE_RULE_AUTOFILL_READONLY]]
@@ -668,6 +684,7 @@ class AttributeImporter:
                     "value_type": value_type,
                     "display": display,
                     "visibility_conditions": visibility_conditions,
+                    "hide_conditions": hide_conditions,
                     "help_text": help_text,
                     "help_link": help_link,
                     "public": is_public,
@@ -780,7 +797,7 @@ class AttributeImporter:
                     }
                 )
             except IntegrityError:
-                logger.warning(f'Duplicate choice "{value} ({identifier})" for {attribute}, ignoring row')
+                logger.warning(f'Duplicate choice "{choice} ({identifier})" for {attribute}, ignoring row')
 
             if created:
                 created_choices_count += 1
@@ -1275,7 +1292,7 @@ class AttributeImporter:
         # Create subtypes
         ordered_subtypes = []
         for index, subtype_name in enumerate(ordered_subtype_names):
-            project_subtype, created = ProjectSubtype.objects.update_or_create(
+            project_subtype, __ = ProjectSubtype.objects.update_or_create(
                 pk=index+1,
                 project_type=self.project_type,
                 name=subtype_name.upper(),

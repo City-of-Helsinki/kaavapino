@@ -179,10 +179,10 @@ class Project(models.Model):
                 deserialized_value = geometry.geometry
             elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 try:
-                    deserialized_value = ProjectAttributeFile.objects.get(
+                    deserialized_value = ProjectAttributeFile.objects.filter(
                         attribute=attribute, project=self
-                    ).file
-                except ProjectAttributeFile.DoesNotExist:
+                    ).order_by("-created_at").first().file
+                except AttributeError:
                     deserialized_value = None
             elif attribute.identifier in self.attribute_data:
                 deserialized_value = attribute.deserialize_value(
@@ -240,9 +240,6 @@ class Project(models.Model):
                     )
             elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 if not value:
-                    ProjectAttributeFile.objects.filter(
-                        attribute=attribute, project=self
-                    ).delete()
                     self.attribute_data.pop(identifier, None)
             elif attribute.value_type == Attribute.TYPE_FIELDSET:
                 serialized_value = attribute.serialize_value(value)
@@ -371,6 +368,9 @@ class Project(models.Model):
             project_deadline, created = ProjectDeadline.objects.get_or_create(
                 project=self,
                 deadline=deadline,
+                defaults={
+                    "generated": True,
+                }
             )
             if created:
                 generated_deadlines.append(project_deadline)
@@ -654,8 +654,10 @@ class ProjectAttributeFile(models.Model):
         related_name="files",
         on_delete=models.CASCADE,
     )
-
     description = models.TextField(verbose_name=_("description"), null=True, blank=True)
+    created_at = models.DateTimeField(
+        verbose_name=_("created at"),auto_now_add=True, editable=False
+    )
 
     def get_upload_subfolder(self):
         project_id = str(self.project.pk)
@@ -751,6 +753,10 @@ class ProjectDeadline(models.Model):
     )
     confirmed = models.BooleanField(
         verbose_name=_("confirmed"),
+        default=False,
+    )
+    generated = models.BooleanField(
+        verbose_name=_("generated"),
         default=False,
     )
 

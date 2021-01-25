@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from rest_framework.serializers import Serializer
 from rest_framework_gis.fields import GeometryField
 
@@ -20,6 +20,7 @@ from projects.models import (
     Project,
     ProjectSubtype,
     ProjectPhase,
+    ProjectPhaseLog,
     ProjectPhaseSection,
     ProjectPhaseDeadlineSection,
     ProjectFloorAreaSection,
@@ -56,6 +57,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     date = serializers.DateField()
     abbreviation = serializers.CharField(source="deadline.abbreviation")
     deadline = serializers.SerializerMethodField()
+    generated = serializers.BooleanField()
 
     def get_deadline(self, projectdeadline):
         return DeadlineSerializer(
@@ -233,6 +235,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     owner_edit_override = serializers.NullBooleanField(required=False, read_only=True)
     archived = serializers.NullBooleanField(required=False, read_only=True)
     onhold = serializers.NullBooleanField(required=False, read_only=True)
+    generated_deadline_attributes = serializers.SerializerMethodField()
 
     _metadata = serializers.SerializerMethodField()
 
@@ -257,9 +260,47 @@ class ProjectSerializer(serializers.ModelSerializer):
             "deadlines",
             "create_principles",
             "create_draft",
+            "generated_deadline_attributes",
             "_metadata",
         ]
         read_only_fields = ["type", "created_at", "modified_at"]
+
+    def _get_snapshot_date(self, project):
+        query_params = getattr(self.context["request"], "GET", {})
+        snapshot_param = query_params.get("snapshot")
+        snapshot = None
+
+        if snapshot_param:
+            try:
+                return ProjectPhaseLog.objects.filter(
+                    phase__id=int(snapshot_param),
+                    project=project,
+                ).order_by("-created_at").first().created_at
+            except AttributeError:
+                raise NotFound(detail=_("Project data at selected phase start cannot be found"))
+            except ValueError:
+                pass
+
+            try:
+                snapshot = datetime.datetime.strptime(
+                    snapshot_param,
+                    "%Y-%m-%dT%H:%M:%S.%fZ%z",
+                )
+            except ValueError:
+                try:
+                    snapshot = datetime.datetime.strptime(
+                        snapshot_param[:-3]+snapshot_param[-2:],
+                        "%Y-%m-%dT%H:%M:%S%z",
+                    )
+                except ValueError:
+                    raise ParseError(detail=_("Incorrect snapshot datetime format, use one of the following:\n%Y-%m-%dT%H:%M:%S.%fZ%z\n\nphase id"))
+
+            if snapshot < project.created_at:
+                raise NotFound(detail=_("Project data at selected date cannot be found"))
+
+            return snapshot
+
+        return None
 
     def get_fields(self):
         fields = super(ProjectSerializer, self).get_fields()
@@ -275,11 +316,33 @@ class ProjectSerializer(serializers.ModelSerializer):
         return fields
 
     def get_attribute_data(self, project):
-        attribute_data = getattr(project, "attribute_data", {})
-        self._set_file_attributes(attribute_data, project)
+        snapshot = self._get_snapshot_date(project)
+
+        if snapshot:
+            attribute_data = {
+                k: v["new_value"]
+                for k, v in self._get_updates(project, cutoff=snapshot).items()
+            }
+        else:
+            attribute_data = getattr(project, "attribute_data", {})
+
+        self._set_file_attributes(attribute_data, project, snapshot)
+
+        # TODO handle snapshot case
         self._set_geometry_attributes(attribute_data, project)
 
-        attribute_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
+        if snapshot:
+            try:
+                subtype = ProjectPhaseLog.objects.filter(
+                    created_at__lte=self._get_snapshot_date(project),
+                    project=project
+                ).order_by("-created_at").first().phase.project_subtype
+            except AttributeError:
+                subtype = project.phase.project_subtype
+            attribute_data['kaavaprosessin_kokoluokka'] = subtype.name
+        else:
+            attribute_data['kaavaprosessin_kokoluokka'] = \
+                project.phase.project_subtype.name
 
         static_properties = [
             "user",
@@ -290,13 +353,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             "create_draft",
         ]
 
-        for static_property in static_properties:
-            try:
-                identifier = \
-                    Attribute.objects.get(static_property=static_property).identifier
-                attribute_data[identifier] = getattr(project, static_property)
-            except Attribute.DoesNotExist:
-                continue
+
+        if not snapshot:
+            for static_property in static_properties:
+                try:
+                    identifier = \
+                        Attribute.objects.get(static_property=static_property).identifier
+                    attribute_data[identifier] = getattr(project, static_property)
+                except Attribute.DoesNotExist:
+                    continue
 
         return attribute_data
 
@@ -312,9 +377,25 @@ class ProjectSerializer(serializers.ModelSerializer):
             required=False,
         ).data
 
-    def _set_file_attributes(self, attribute_data, project):
+    def get_generated_deadline_attributes(self, project):
+        return [
+            dl.deadline.attribute.identifier
+            for dl in project.deadlines.filter(generated=True)
+            if dl.deadline.attribute
+        ]
+
+    def _set_file_attributes(self, attribute_data, project, snapshot):
         request = self.context["request"]
-        attribute_files = ProjectAttributeFile.objects.filter(project=project)
+        if snapshot:
+            attribute_files = ProjectAttributeFile.objects \
+                .filter(project=project, created_at__lte=snapshot) \
+                .order_by("attribute__pk", "project__pk", "-created_at") \
+                .distinct("attribute__pk", "project__pk")
+        else:
+            attribute_files = ProjectAttributeFile.objects \
+                .filter(project=project) \
+                .order_by("attribute__pk", "project__pk", "-created_at") \
+                .distinct("attribute__pk", "project__pk")
 
         # Add file attributes to the attribute data
         # File values are represented as absolute URLs
@@ -345,7 +426,9 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"
         metadata = {"users": self._get_users(project, list_view=list_view)}
-        if not list_view:
+        query_params = getattr(self.context["request"], "GET", {})
+        snapshot_param = query_params.get("snapshot")
+        if not list_view and not snapshot_param:
             metadata["updates"] = self._get_updates(project)
 
         return metadata
@@ -401,16 +484,29 @@ class ProjectSerializer(serializers.ModelSerializer):
         return values
 
     @staticmethod
-    def _get_updates(project):
+    def _get_updates(project, cutoff=None):
         # Get the latest attribute updates for distinct attributes
-        actions = (
-            project.target_actions.filter(verb=verbs.UPDATED_ATTRIBUTE)
-            .order_by(
-                "action_object_content_type", "action_object_object_id", "-timestamp"
+        if cutoff:
+            actions = (
+                project.target_actions.filter(
+                    verb=verbs.UPDATED_ATTRIBUTE,
+                    timestamp__lte=cutoff,
+                )
+                .order_by(
+                    "action_object_content_type", "action_object_object_id", "-timestamp"
+                )
+                .distinct("action_object_content_type", "action_object_object_id")
+                .prefetch_related("actor")
             )
-            .distinct("action_object_content_type", "action_object_object_id")
-            .prefetch_related("actor")
-        )
+        else:
+            actions = (
+                project.target_actions.filter(verb=verbs.UPDATED_ATTRIBUTE)
+                .order_by(
+                    "action_object_content_type", "action_object_object_id", "-timestamp"
+                )
+                .distinct("action_object_content_type", "action_object_object_id")
+                .prefetch_related("actor")
+            )
 
         updates = {}
         for _action in actions:
@@ -490,15 +586,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 {"phase": _("Archived projects cannot be edited")}
             )
 
-        attrs["attribute_data"] = self._validate_attribute_data(
-            attrs.get("attribute_data", None),
-            attrs,
-            self.instance.user if self.instance else None,
-            self.instance.owner_edit_override if self.instance else None,
-        )
-
-        self._validate_deadlines(attrs)
-
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
 
@@ -521,11 +608,42 @@ class ProjectSerializer(serializers.ModelSerializer):
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
 
+        attrs["attribute_data"] = self._validate_attribute_data(
+            attrs.get("attribute_data", None),
+            attrs,
+            self.instance.user if self.instance else None,
+            self.instance.owner_edit_override if self.instance else None,
+        )
+
         return attrs
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
+        static_property_attributes = {}
+        if self.instance:
+            static_properties = [
+                "user",
+                "name",
+                "public",
+                "pino_number",
+                "create_principles",
+                "create_draft",
+            ]
+            for static_property in static_properties:
+                try:
+                    try:
+                        attr = validate_attributes[static_property]
+                    except KeyError:
+                        continue
+
+                    static_property_attributes[
+                        Attribute.objects.get(static_property=static_property).identifier
+                    ] = attr
+                except Attribute.DoesNotExist:
+                    continue
+
         if not attribute_data:
-            return {}
+            return static_property_attributes
+
         # Get serializers for all sections in all phases
         sections_data = []
         current_phase = getattr(self.instance, "phase", None)
@@ -597,7 +715,15 @@ class ProjectSerializer(serializers.ModelSerializer):
                 }
             )
 
-        return valid_attributes
+        if self.instance:
+            for dl in ProjectDeadline.objects.filter(
+                project=self.instance,
+                deadline__attribute__identifier__in=valid_attributes.keys()
+            ):
+                dl.generated = False
+                dl.save()
+
+        return {**static_property_attributes, **valid_attributes}
 
     def _validate_public(self, attrs):
         public = attrs.get("public", True)
@@ -698,38 +824,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return user
 
-    def _validate_deadlines(self, attrs):
-        """
-        Validates that each deadline date in attribute_data is valid for
-        the deadline date type
-        """
-        phase = attrs.get("phase", None)
-        if not phase and self.instance:
-            phase = self.instance.phase
-        # New project without a phase—this should never be reached
-        else:
-            return
-
-        attribute_data = attrs.get("attribute_data", None)
-
-        if not attribute_data:
-            return
-
-        for key, value in attribute_data.items():
-            try:
-                deadline = Deadline.objects.get(
-                    attribute__identifier=key, phase=phase,
-                )
-            except Deadline.DoesNotExist:
-                continue
-
-            if not deadline.date_type.is_valid_date(value):
-                raise ValidationError({"deadlines":
-                    {deadline.attribute.identifier: _(
-                        f"Invalid date selection for {deadline.attribute.identifier}/{deadline.abbreviation} ({deadline.date_type})"
-                    )}
-                })
-
     def create(self, validated_data: dict) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
             project_subtype=validated_data["subtype"]
@@ -748,25 +842,41 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
-            project.update_deadlines(user=self.context["request"].user)
+            user=self.context["request"].user
+            project.update_deadlines(user=user)
+            for dl in project.deadlines.all():
+                self.create_deadline_updates_log(
+                    dl.deadline, project, user, None, dl.date
+                )
 
         return project
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
         attr_identifiers = list(attribute_data.keys())
+        subtype = validated_data.get("subtype")
+        subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
         phase_changed = phase is not None and phase != instance.phase
         should_generate_deadlines = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
+        user=self.context["request"].user
 
         if phase_changed:
+            ProjectPhaseLog.objects.create(
+                project=instance,
+                phase=phase,
+                user=user,
+            )
+
+        if subtype_changed:
             should_update_deadlines = False
+
         else:
             should_update_deadlines = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
-                    deadline__attribute__identifier__in=[attr_identifiers]
+                    deadline__attribute__identifier__in=attr_identifiers
                 ).count()
             )
 
@@ -786,6 +896,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 instance.update_attribute_data(attribute_data)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
+            old_deadlines = project.deadlines.all()
             if should_generate_deadlines:
                 cleared_attributes = {
                     project_dl.deadline.attribute.identifier: None
@@ -795,12 +906,28 @@ class ProjectSerializer(serializers.ModelSerializer):
                 instance.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=self.context["request"].user)
-
+                project.update_deadlines(user=user)
             elif should_update_deadlines:
-                project.update_deadlines(user=self.context["request"].user)
+                project.update_deadlines(user=user)
 
             project.save()
+
+            updated_deadlines = old_deadlines.union(project.deadlines.all())
+            for dl in updated_deadlines:
+                try:
+                    new_date = project.deadlines.get(deadline=dl.deadline).date
+                except ProjectDeadline.DoesNotExist:
+                    new_date = None
+
+                try:
+                    old_date = old_deadlines.get(deadline=dl.deadline).date
+                except ProjectDeadline.DoesNotExist:
+                    old_date = None
+
+                self.create_deadline_updates_log(
+                    dl.deadline, project, user, old_date, new_date
+                )
+
             return project
 
     def log_updates_attribute_data(self, attribute_data, project=None):
@@ -883,6 +1010,118 @@ class ProjectSerializer(serializers.ModelSerializer):
                 content=f'{user.get_display_name()} päivitti "{attribute.name}" tietoa.{change_string}',
             )
 
+    def create_deadline_updates_log(self, deadline, project, user, old_date, new_date):
+        old_value = json.loads(json.dumps(old_date, default=str))
+        new_value = json.loads(json.dumps(new_date, default=str))
+
+        if old_value != new_value:
+            action.send(
+                user,
+                verb=verbs.UPDATED_DEADLINE,
+                action_object=deadline,
+                target=project,
+                deadline_abbreviation=deadline.abbreviation,
+                old_value=old_value,
+                new_value=new_value,
+            )
+
+
+class ProjectSnapshotSerializer(ProjectSerializer):
+    user = serializers.SerializerMethodField()
+    name = serializers.SerializerMethodField()
+    pino_number = serializers.SerializerMethodField()
+    create_principles = serializers.SerializerMethodField()
+    create_draft = serializers.SerializerMethodField()
+    subtype = serializers.SerializerMethodField()
+    phase = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            "user",
+            "created_at",
+            "modified_at",
+            "name",
+            "identifier",
+            "pino_number",
+            "type",
+            "subtype",
+            "attribute_data",
+            "phase",
+            "id",
+            "deadlines",
+            "create_principles",
+            "create_draft",
+            "_metadata",
+        ]
+        read_only_fields = fields
+
+    def _get_static_property(self, project, static_property):
+        attribute_data = self.get_attribute_data(project)
+        try:
+            identifier = \
+                Attribute.objects.get(static_property=static_property).identifier
+            return attribute_data[identifier]
+        except (Attribute.DoesNotExist, KeyError):
+            return getattr(project, static_property)
+
+    def get_user(self, project):
+        return self._get_static_property(project, "user").uuid
+
+    def get_name(self, project):
+        return self._get_static_property(project, "name")
+
+    def get_pino_number(self, project):
+        return self._get_static_property(project, "pino_number")
+
+    def get_create_principles(self, project):
+        return self._get_static_property(project, "create_principles")
+
+    def get_create_draft(self, project):
+        return self._get_static_property(project, "create_draft")
+
+    def get_subtype(self, project):
+        try:
+            return ProjectPhaseLog.objects.filter(
+                created_at__lte=self._get_snapshot_date(project),
+                project=project
+            ).order_by("-created_at").first().phase.project_subtype.id
+        except (ProjectPhaseLog.DoesNotExist, AttributeError):
+            return project.subtype.id
+
+    def get_phase(self, project):
+        try:
+            return ProjectPhaseLog.objects.filter(
+                created_at__lte=self._get_snapshot_date(project),
+                project=project
+            ).order_by("-created_at").first().phase.id
+        except (ProjectPhaseLog.DoesNotExist, AttributeError):
+            return project.phase.id
+
+    def get_deadlines(self, project):
+        snapshot = self._get_snapshot_date(project)
+
+        actions = (
+            project.target_actions.filter(
+                verb=verbs.UPDATED_DEADLINE,
+                timestamp__lte=snapshot,
+            )
+            .order_by(
+                "action_object_content_type", "action_object_object_id", "-timestamp"
+            )
+            .distinct("action_object_content_type", "action_object_object_id")
+            .prefetch_related("actor")
+        )
+
+        return [
+            {
+                "date": _action.data.get("new_value"),
+                "abbreviation": _action.data.get("deadline_abbreviation")
+            }
+            for _action in actions
+            if _action.data.get("new_value") is not None
+        ]
+
 
 class AdminProjectSerializer(ProjectSerializer):
     def get_fields(self):
@@ -954,3 +1193,29 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         self._validate_attribute(attrs["attribute"], attrs["project"])
 
         return attrs
+
+    def create(self, validated_data):
+        try:
+            old_file = ProjectAttributeFile.objects.filter(
+                project=validated_data["project"],
+                attribute=validated_data["attribute"],
+            ).order_by("-created_at").first()
+            old_value = old_file.description
+        except AttributeError:
+            old_value = None
+
+        new_file = super().create(validated_data)
+        new_value = new_file.description
+
+        if old_value != new_value:
+            action.send(
+                self.context["request"].user or validated_data["project"].user,
+                verb=verbs.UPDATED_ATTRIBUTE,
+                action_object=validated_data["attribute"],
+                target=validated_data["project"],
+                attribute_identifier=validated_data["attribute"].identifier,
+                new_value=new_value,
+                old_value=old_value,
+            )
+
+        return new_file

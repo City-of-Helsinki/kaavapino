@@ -50,6 +50,7 @@ from projects.serializers.comment import (
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.project import (
     ProjectSerializer,
+    ProjectSnapshotSerializer,
     ProjectListSerializer,
     AdminProjectSerializer,
     ProjectPhaseSerializer,
@@ -103,6 +104,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "list":
             return ProjectListSerializer
+
+        if self.request.query_params.get("snapshot"):
+            return ProjectSnapshotSerializer
 
         user = self.request.user
 
@@ -217,14 +221,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         serializer = ProjectFileSerializer(data=request.data, context=context)
         serializer.is_valid(raise_exception=True)
 
-        with transaction.atomic():
-            # Remove any file using the same attribute for the project
-            ProjectAttributeFile.objects.filter(
-                attribute=serializer.validated_data["attribute"], project=project
-            ).delete()
-
-            # Save the new file and metadata to disk
-            serializer.save()
+        serializer.save()
 
         return Response(serializer.data)
 

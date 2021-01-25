@@ -127,22 +127,41 @@ class Deadline(models.Model):
 
         return True
 
+    def _check_condition(self, project, condition):
+        if project.attribute_data.get(condition.identifier):
+            return True
+        elif condition.static_property:
+            return bool(getattr(project, condition.static_property))
+        else:
+            return False
+
     def _calculate(self, project, calculations, datetype):
         # Use first calculation whose condition is met
+        # and target has a value
         for calculation in calculations:
             condition_result = False
+            base_attr = calculation.datecalculation.base_date_attribute
+            base_deadline = calculation.datecalculation.base_date_deadline
 
-            if not calculation.conditions.count() + \
-                calculation.not_conditions.count():
-                condition_result = True
+            if base_attr:
+                base_date = project.attribute_data.get(base_attr.identifier)
+            elif base_deadline:
+                base_date = project.deadlines.get(deadline=base_deadline).date
+            else:
+                base_date = None
 
-            for condition in calculation.conditions.all():
-                if project.attribute_data.get(condition.identifier, False):
+            if base_date:
+                if not calculation.conditions.count() + \
+                    calculation.not_conditions.count():
                     condition_result = True
 
-            for condition in calculation.not_conditions.all():
-                if not project.attribute_data.get(condition.identifier, False):
-                    condition_result = True
+                for condition in calculation.conditions.all():
+                    if self._check_condition(project, condition):
+                        condition_result = True
+
+                for condition in calculation.not_conditions.all():
+                    if not self._check_condition(project, condition):
+                        condition_result = True
 
             if condition_result:
                 return calculation.datecalculation.calculate(project, datetype)
@@ -599,14 +618,13 @@ class DateCalculation(models.Model):
         if not date:
             return None
 
+        if type(date) == str:
+            date = datetime.datetime.strptime(date, DATE_SERIALIZATION_FORMAT).date()
+
         if self.date_type and date:
             date = self.date_type.valid_days_from(date, self.constant)
         elif date:
-            try:
-                date += datetime.timedelta(days=self.constant)
-            except TypeError:
-                date = datetime.datetime.strptime(date, DATE_SERIALIZATION_FORMAT)
-                date += datetime.timedelta(days=self.constant)
+            date += datetime.timedelta(days=self.constant)
 
         for attribute in self.attributes.all():
             try:

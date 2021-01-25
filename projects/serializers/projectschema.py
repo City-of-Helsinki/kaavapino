@@ -116,6 +116,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     unit = serializers.CharField()
     calculations = serializers.ListField(child=serializers.CharField())
     visibility_conditions = serializers.ListField(child=ConditionSerializer())
+    hide_conditions = serializers.ListField(child=ConditionSerializer())
     autofill_rule = serializers.ListField(child=AutofillRuleSerializer())
     autofill_readonly = serializers.BooleanField()
     updates_autofill = serializers.BooleanField()
@@ -591,36 +592,6 @@ EditProjectTypeSchemaSerializer = create_project_type_schema_serializer("edit", 
 BrowseProjectTypeSchemaSerializer = create_project_type_schema_serializer("browse", False)
 AdminOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("admin", True)
 CreateOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("create", True)
-
-
-class CreateProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
-    def get_subtypes(self, obj):
-        return self._get_subtypes(obj, "create")
-
-    def get_fields(self):
-        fields = super(self).get_fields()
-        fields["subtypes"] = serializers.SerializerMethodField()
-        return fields
-
-
-class EditProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
-    def get_subtypes(self, obj):
-        return self._get_subtypes(obj, "edit")
-
-    def get_fields(self):
-        fields = super(EditProjectTypeSchemaSerializer, self).get_fields()
-        fields["subtypes"] = serializers.SerializerMethodField()
-        return fields
-
-
-class BrowseProjectTypeSchemaSerializer(BaseProjectTypeSchemaSerializer):
-    def get_subtypes(self, obj):
-        return self._get_subtypes(obj, "browse")
-
-    def get_fields(self):
-        fields = super(BrowseProjectTypeSchemaSerializer, self).get_fields()
-        fields["subtypes"] = serializers.SerializerMethodField()
-        return fields
 
 
 class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
