@@ -137,20 +137,31 @@ class Deadline(models.Model):
 
     def _calculate(self, project, calculations, datetype):
         # Use first calculation whose condition is met
+        # and target has a value
         for calculation in calculations:
             condition_result = False
+            base_attr = calculation.datecalculation.base_date_attribute
+            base_deadline = calculation.datecalculation.base_date_deadline
 
-            if not calculation.conditions.count() + \
-                calculation.not_conditions.count():
-                condition_result = True
+            if base_attr:
+                base_date = project.attribute_data.get(base_attr.identifier)
+            elif base_deadline:
+                base_date = project.deadlines.get(deadline=base_deadline).date
+            else:
+                base_date = None
 
-            for condition in calculation.conditions.all():
-                if self._check_condition(project, condition):
+            if base_date:
+                if not calculation.conditions.count() + \
+                    calculation.not_conditions.count():
                     condition_result = True
 
-            for condition in calculation.not_conditions.all():
-                if not self._check_condition(project, condition):
-                    condition_result = True
+                for condition in calculation.conditions.all():
+                    if self._check_condition(project, condition):
+                        condition_result = True
+
+                for condition in calculation.not_conditions.all():
+                    if not self._check_condition(project, condition):
+                        condition_result = True
 
             if condition_result:
                 return calculation.datecalculation.calculate(project, datetype)
