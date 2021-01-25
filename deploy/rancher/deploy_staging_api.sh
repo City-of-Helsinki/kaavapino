@@ -12,7 +12,7 @@ fi
 VERSION=$1
 RUN=$2
 NS="kaavapino-staging"
-REGISTRY="127.0.0.1:34754"
+REGISTRY="127.0.0.1:34522"
 
 
 
