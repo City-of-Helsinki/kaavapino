@@ -295,10 +295,21 @@ class Project(models.Model):
         return False
 
     def _get_applicable_deadlines(self):
+        excluded_phases = []
+
+        # TODO hard-coded, maybe change later
+        if not self.create_principles:
+            excluded_phases.append("Periaatteet")
+
+        if not self.create_draft:
+            excluded_phases.append("Luonnos")
+
         return [
             deadline
             for deadline in list(
-                Deadline.objects.filter(subtype=self.subtype)
+                Deadline.objects \
+                    .filter(subtype=self.subtype) \
+                    .exclude(phase__name__in=excluded_phases)
             )
             if self._check_condition(deadline)
         ]

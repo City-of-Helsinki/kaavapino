@@ -6,7 +6,7 @@ from workalendar.europe import Finland
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils.translation import ugettext_lazy as _
 
 from users.models import PRIVILEGE_LEVELS
@@ -136,6 +136,12 @@ class Deadline(models.Model):
             return False
 
     def _calculate(self, project, calculations, datetype):
+        # TODO hard-coded, maybe change later
+        if self.phase.name == "Periaatteet" and not project.create_principles:
+            return None
+        elif self.phase.name == "Luonnos" and not project.create_draft:
+            return None
+
         # Use first calculation whose condition is met
         # and target has a value
         for calculation in calculations:
@@ -143,10 +149,15 @@ class Deadline(models.Model):
             base_attr = calculation.datecalculation.base_date_attribute
             base_deadline = calculation.datecalculation.base_date_deadline
 
-            if base_attr:
+            if base_attr and base_attr.static_property:
+                base_attr = getattr(project, base_attr.static_property, None)
+            elif base_attr:
                 base_date = project.attribute_data.get(base_attr.identifier)
             elif base_deadline:
-                base_date = project.deadlines.get(deadline=base_deadline).date
+                try:
+                    base_date = project.deadlines.get(deadline=base_deadline).date
+                except ObjectDoesNotExist:
+                    base_date = None
             else:
                 base_date = None
 
@@ -275,6 +286,18 @@ class DateType(models.Model):
         default=False, verbose_name=_("exclude selected dates")
     )
 
+    @staticmethod
+    def _filter_date_list(date_list, business_days_only):
+        cal = Finland()
+
+        if not business_days_only:
+            return date_list
+
+        return [
+            date for date in date_list
+            if cal.is_working_day(date)
+        ]
+
     def get_dates(self, year):
         listed_dates = self.dates or []
 
@@ -284,14 +307,14 @@ class DateType(models.Model):
             )
 
         if self.exclude_selected:
-            return [
+            return self._filter_date_list([
                 datetime.date(year, 1, 1) + datetime.timedelta(days=i)
                 for i in range((366 if isleap(+year) else 365))
                 if datetime.date(year, 1, 1) + datetime.timedelta(days=i) \
                     not in listed_dates
-            ]
+            ], self.business_days_only)
         else:
-            return listed_dates
+            return self._filter_date_list(listed_dates, self.business_days_only)
 
     def valid_days_from(self, orig_date, days):
         year = orig_date.year
