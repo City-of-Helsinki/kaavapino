@@ -40,8 +40,8 @@ DEADLINE_CALCULATION_DATE_TYPE = "laskettavien päivien päivätyyppi"
 DEADLINE_TYPE = "tiedon jananäkymätyyppi "
 DEADLINE_PHASE = "vaihe, johon päivämäärä liittyy"
 DEADLINE_ERROR_PAST_DUE = "mitä tapahtuu, jos aikatauluun merkittyä  päivämäärää ei ole vahvistettu ja kyseisen etapin määräaika on ohitettu"
-DEADLINE_ERROR_MIN_DISTANCE_PREV = "mitä tapahtuu, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
-DEADLINE_WARNING_MIN_DISTANCE_NEXT = "mitä tapahtuu, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
+DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
+DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 
 
 # Date type row indices
