@@ -25,7 +25,7 @@ DEADLINES_SHEET_NAME = "Aikatauluetapit"
 DATETYPES_SHEET_NAME = "Päivätyypit"
 
 DEADLINES_A1_EXPECTED = "projektitietotunniste"
-DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE = "Uusi projekti luodaan"
+DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE = "projektin_kaynnistys_pvm"
 
 # Deadline sheet column titles
 DEADLINE_ATTRIBUTE_IDENTIFIER = "projektitietotunniste"
