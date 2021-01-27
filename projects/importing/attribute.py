@@ -519,10 +519,8 @@ class AttributeImporter:
             if rule == "ei" or \
                 (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
                 return True
-            elif rule == "kyllä":
-                return False
 
-            return None
+            return False
 
         logger.info("\nCreating attributes...")
 
