@@ -337,21 +337,21 @@ class DeadlineImporter:
         for i, row in enumerate(rows):
             abbreviation = row[self.column_index[DEADLINE_ABBREVIATION]]
             attribute = row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]
-            default_to_created_at = False
+
+            if attribute == DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE:
+                default_to_created_at = True
+            else:
+                default_to_created_at = False
 
             try:
                 attribute = Attribute.objects.get(
                     identifier=attribute
                 )
             except Attribute.DoesNotExist:
-                if attribute == DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE:
-                    attribute = None
-                    default_to_created_at = True
-                elif attribute:
-                    logger.warning(
-                        f"Ignored invalid attribute identifier {attribute} for deadline {abbreviation}."
-                    )
-                    attribute = None
+                logger.warning(
+                    f"Ignored invalid attribute identifier {attribute} for deadline {abbreviation}."
+                )
+                attribute = None
 
             deadline_types = []
             for dl_type in re.split(
