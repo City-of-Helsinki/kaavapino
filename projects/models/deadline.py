@@ -121,6 +121,22 @@ class Deadline(models.Model):
     )
 
     @property
+    def initial_depends_on(self):
+        return list(set([
+            calc.datecalculation.base_date_deadline
+            for calc in self.initial_calculations.all()
+            if calc.datecalculation.base_date_deadline
+        ]))
+
+    @property
+    def update_depends_on(self):
+        return list(set([
+            calc.datecalculation.base_date_deadline
+            for calc in self.update_calculations.all()
+            if calc.datecalculation.base_date_deadline
+        ]))
+
+    @property
     def editable(self):
         if not self.edit_privilege:
             return False

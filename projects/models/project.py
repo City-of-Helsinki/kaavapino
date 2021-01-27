@@ -315,7 +315,10 @@ class Project(models.Model):
         ]
 
     def _set_calculated_deadline(self, deadline, date, initial, user):
-        project_deadline = self.deadlines.get(deadline=deadline)
+        try:
+            project_deadline = self.deadlines.get(deadline=deadline)
+        except ProjectDeadline.DoesNotExist:
+            return
 
         if project_deadline and date:
             project_deadline.date = date
@@ -343,28 +346,37 @@ class Project(models.Model):
                             new_value=new_value,
                         )
 
-    def _set_calculated_deadlines(self, deadlines, user, initial=False):
-        unresolved = deadlines
-
-        # It's possible a later deadline is referenced before it's created
-        while len(unresolved):
-            unresolved_new = []
-            for deadline in unresolved:
-                if initial:
-                    calculate_deadline = deadline.calculate_initial
-                else:
-                    calculate_deadline = deadline.calculate_updated
-
-                calculated = calculate_deadline(self)
-                if calculated:
-                    self._set_calculated_deadline(deadline, calculated, initial, user)
-                else:
-                    unresolved_new.append(deadline)
-
-            if len(unresolved_new) < len(unresolved):
-                unresolved = unresolved_new
+    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False):
+        for deadline in deadlines:
+            if initial:
+                calculate_deadline = deadline.calculate_initial
+                dependencies = [
+                    dl for dl in deadline.initial_depends_on
+                    if dl not in ignore
+                ]
             else:
-                break
+                calculate_deadline = deadline.calculate_updated
+                dependencies = [
+                    dl for dl in deadline.update_depends_on
+                    if dl not in ignore
+                ]
+
+            if dependencies:
+                ignore += dependencies
+                self._set_calculated_deadlines(
+                    dependencies,
+                    user,
+                    ignore=ignore,
+                    initial=initial,
+                )
+
+            self._set_calculated_deadline(
+                deadline,
+                calculate_deadline(self),
+                initial,
+                user,
+            )
+
 
     # Generate or update schedule for project
     def update_deadlines(self, values=None, user=None):
@@ -388,6 +400,17 @@ class Project(models.Model):
                 project_deadlines.append(project_deadline)
 
         self.deadlines.set(project_deadlines)
+
+        # Update attribute-based deadlines
+        for dl in self.deadlines.all():
+            if not dl.deadline.attribute:
+                continue
+
+            value = self.attribute_data.get(dl.deadline.attribute.identifier)
+
+            if value:
+                dl.date = value
+                dl.save()
 
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
