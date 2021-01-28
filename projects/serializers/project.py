@@ -116,7 +116,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
             try:
                 prev_date = projectdeadline.project.deadlines.get(
-                    deadline=prev_distance.deadline
+                    deadline=prev_distance.previous_deadline
                 ).date
             except ProjectDeadline.DoesNotExist:
                 continue
@@ -125,7 +125,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
                 continue
 
             distance_from_prev = (projectdeadline.date - prev_date).days
-            if distance_from_prev > prev_distance.distance_from_previous:
+            if distance_from_prev < prev_distance.distance_from_previous:
                 return True
 
         return False
