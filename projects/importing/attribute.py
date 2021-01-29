@@ -1342,6 +1342,10 @@ class AttributeImporter:
             self._create_floor_area_attribute_section_links(data_rows, subtype)
             self._create_deadline_sections(data_rows, subtype)
 
+        # Clear cached sections
+        cache.delete("serialized_phase_sections")
+        cache.delete("serialized_deadline_sections")
+
         logger.info("Project subtypes {}".format(ProjectSubtype.objects.count()))
         logger.info("Phases {}".format(ProjectPhase.objects.count()))
         logger.info(f"  Created: {phase_info['created']}")
