@@ -14,6 +14,7 @@ from projects.models import (
     ProjectFloorAreaSection,
     ProjectPhaseSection,
     ProjectPhaseDeadlineSection,
+    ProjectSubtype,
 )
 from projects.serializers.utils import _is_attribute_required
 
@@ -77,8 +78,11 @@ def get_unique_validator(attribute, project_id):
 
     return validate
 
-def get_deadline_validator(attribute, project_dls, subtype):
+def get_deadline_validator(attribute, project_dls, subtype, preview):
     def validate(value):
+        if not preview:
+            return
+
         for attr_dl in attribute.deadline.filter(subtype=subtype):
             # validate datetype
             try:
@@ -92,11 +96,8 @@ def get_deadline_validator(attribute, project_dls, subtype):
 
             # validate minimum distance to previous deadline(s)
             for distance in attr_dl.distances_to_previous.all():
-                try:
-                    prev_dl = project_dls.get(
-                        deadline=distance.previous_deadline,
-                    )
-                except ProjectDeadline.DoesNotExist:
+                prev_dl = preview.get(distance.previous_deadline)
+                if not prev_dl:
                     continue
 
                 default_error = _(f"Minimum distance to {prev_dl.deadline.abbreviation} not met")
@@ -117,7 +118,7 @@ def get_deadline_validator(attribute, project_dls, subtype):
 
     return validate
 
-def create_attribute_field_data(attribute, validation, project):
+def create_attribute_field_data(attribute, validation, project, preview):
     """Create data for initializing attribute field serializer."""
     field_arguments = {}
     field_class = FIELD_TYPES.get(attribute.value_type, None)
@@ -135,6 +136,7 @@ def create_attribute_field_data(attribute, validation, project):
             attribute,
             project.deadlines,
             project.phase.project_subtype,
+            preview,
         )]
 
     if attribute.value_type == Attribute.TYPE_CHOICE:
@@ -176,7 +178,7 @@ def create_attribute_field_data(attribute, validation, project):
     return FieldData(field_class, field_arguments)
 
 
-def create_fieldset_field_data(attribute, validation, project):
+def create_fieldset_field_data(attribute, validation, project, preview):
     """Dynamically create a serializer for a fieldset type Attribute instance."""
     serializer_fields = {}
     field_arguments = {}
@@ -185,7 +187,7 @@ def create_fieldset_field_data(attribute, validation, project):
         field_arguments["many"] = True
 
     for attr in attribute.fieldset_attributes.order_by("fieldset_attribute_source"):
-        field_data = create_attribute_field_data(attr, validation, project)
+        field_data = create_attribute_field_data(attr, validation, project, preview)
         if not field_data.field_class:
             # TODO: Handle this by failing instead of continuing
             continue
@@ -204,7 +206,9 @@ def create_fieldset_field_data(attribute, validation, project):
     return FieldData(serializer, field_arguments)
 
 
-def create_section_serializer(section, context, project=None, validation=True):
+def create_section_serializer(
+    section, context, project=None, validation=True, preview=None,
+):
     """
     Dynamically create a serializer for a ProjectPhaseSection or
     ProjectFloorAreaSection instance
@@ -256,9 +260,13 @@ def create_section_serializer(section, context, project=None, validation=True):
             continue
 
         if attribute.value_type == Attribute.TYPE_FIELDSET:
-            field_data = create_fieldset_field_data(attribute, validation, project)
+            field_data = create_fieldset_field_data(
+                attribute, validation, project, preview,
+            )
         else:
-            field_data = create_attribute_field_data(attribute, validation, project)
+            field_data = create_attribute_field_data(
+                attribute, validation, project, preview,
+            )
 
             if not field_data.field_class:
                 # TODO: Handle this by failing instead of continuing

@@ -294,7 +294,7 @@ class Project(models.Model):
 
         return False
 
-    def _get_applicable_deadlines(self):
+    def _get_applicable_deadlines(self, subtype=None):
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -308,19 +308,22 @@ class Project(models.Model):
             deadline
             for deadline in list(
                 Deadline.objects \
-                    .filter(subtype=self.subtype) \
+                    .filter(subtype=subtype or self.subtype) \
                     .exclude(phase__name__in=excluded_phases)
             )
             if self._check_condition(deadline)
         ]
 
-    def _set_calculated_deadline(self, deadline, date, initial, user):
+    def _set_calculated_deadline(self, deadline, date, initial, user, preview):
         try:
             project_deadline = self.deadlines.get(deadline=deadline)
         except ProjectDeadline.DoesNotExist:
             return
 
         if project_deadline and date:
+            if preview:
+                return date
+
             project_deadline.date = date
             project_deadline.save()
 
@@ -346,7 +349,11 @@ class Project(models.Model):
                             new_value=new_value,
                         )
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False):
+            return date
+
+    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False):
+        results = {}
+
         for deadline in deadlines:
             if initial:
                 calculate_deadline = deadline.calculate_initial
@@ -370,13 +377,15 @@ class Project(models.Model):
                     initial=initial,
                 )
 
-            self._set_calculated_deadline(
+            results[deadline] = self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self),
                 initial,
                 user,
+                preview,
             )
 
+        return results
 
     # Generate or update schedule for project
     def update_deadlines(self, values=None, user=None):
@@ -434,6 +443,58 @@ class Project(models.Model):
             user,
             initial=False,
         )
+
+    # Calculate a preview schedule without saving anything
+    def get_preview_deadlines(self, updated_attributes, subtype):
+        # Filter out deadlines that would be deleted
+        project_dls = {
+            dl.deadline: dl.date
+            for dl in self.deadlines.all()
+            if dl.deadline.subtype == subtype
+        }
+
+        # List deadlines that would be created
+        new_dls = {
+            dl: None
+            for dl in self._get_applicable_deadlines(subtype=subtype)
+        }
+
+        project_dls = {**new_dls, **project_dls}
+
+        # Update attribute-based deadlines
+        for dl in project_dls.keys():
+            if not dl.attribute:
+                continue
+
+            value = self.attribute_data.get(dl.attribute.identifier)
+
+            if value:
+                project_dls[dl] = value
+
+        # Generate newly added deadlines
+        project_dls = {**project_dls, **self._set_calculated_deadlines(
+            [
+                dl for dl in new_dls.keys()
+                if dl.initial_calculations.count() \
+                    or dl.default_to_created_at
+            ],
+            None,
+            initial=True,
+            preview=True,
+        )}
+
+        # Update all deadlines
+        project_dls = {**project_dls, **self._set_calculated_deadlines(
+            [
+                dl for dl in project_dls
+                if dl.update_calculations.count() \
+                    or dl.default_to_created_at \
+                    or dl.attribute
+            ],
+            None,
+            initial=False,
+            preview=True,
+        )}
 
     @property
     def type(self):

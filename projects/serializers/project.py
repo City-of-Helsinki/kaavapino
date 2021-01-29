@@ -531,7 +531,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         return serializers.BooleanField().to_internal_value(validate_field_data)
 
     def generate_sections_data(
-        self, phase: ProjectPhase, validation: bool = True
+        self,
+        phase: ProjectPhase,
+        preview=None,
+        validation: bool = True,
     ) -> List[SectionData]:
         sections = []
         for section in phase.sections.order_by("index"):
@@ -540,6 +543,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 context=self.context,
                 project=self.instance,
                 validation=validation,
+                preview=preview,
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
@@ -617,6 +621,29 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
+        if subtype_changed:
+            should_update_deadlines = False
+        elif instance:
+            attr_identifiers = list(attribute_data.keys())
+            should_update_deadlines = bool(
+                instance.deadlines.prefetch_related("deadline").filter(
+                    deadline__attribute__identifier__in=attr_identifiers
+                ).count()
+            )
+
+            if not should_update_deadlines:
+                should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
+                    deadline__project_deadlines__project=instance
+                ).filter(
+                    Q(conditions__identifier__in=attr_identifiers) | \
+                    Q(not_conditions__identifier__in=attr_identifiers) | \
+                    Q(datecalculation__base_date_attribute__identifier__in=attr_identifiers) | \
+                    Q(datecalculation__attributes__attribute__identifier__in=attr_identifiers)
+                ).count())
+
+        return should_update_deadlines
+
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
         static_property_attributes = {}
         if self.instance:
@@ -661,12 +688,23 @@ class ProjectSerializer(serializers.ModelSerializer):
         except AttributeError:
             pass
 
+        should_update_deadlines = self._get_should_update_deadlines(
+            False, self.instance, attribute_data,
+        )
+        preview = None
+        if self.instance and should_update_deadlines:
+            preview = self.instance.get_preview_deadlines(
+                attribute_data,
+                subtype,
+            )
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
             .exclude(index__range=[2, min_phase_index-1]):
             sections_data += self.generate_sections_data(
-                phase=phase, validation=should_validate
+                phase=phase,
+                preview=preview,
+                validation=should_validate,
             ) or []
             sections_data += self.generate_schedule_sections_data(
                 phase=phase,
@@ -853,7 +891,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
-        attr_identifiers = list(attribute_data.keys())
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
@@ -870,25 +907,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 user=user,
             )
 
-        if subtype_changed:
-            should_update_deadlines = False
-
-        else:
-            should_update_deadlines = bool(
-                instance.deadlines.prefetch_related("deadline").filter(
-                    deadline__attribute__identifier__in=attr_identifiers
-                ).count()
-            )
-
-            if not should_update_deadlines:
-                should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
-                    deadline__project_deadlines__project=instance
-                ).filter(
-                    Q(conditions__identifier__in=attr_identifiers) | \
-                    Q(not_conditions__identifier__in=attr_identifiers) | \
-                    Q(datecalculation__base_date_attribute__identifier__in=attr_identifiers) | \
-                    Q(datecalculation__attributes__attribute__identifier__in=attr_identifiers)
-                ).count())
+        should_update_deadlines = self._get_should_update_deadlines(
+            subtype_changed, instance, attribute_data,
+        )
 
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
@@ -982,12 +1003,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
     def _create_updates_log(self, attribute, project, user, new_value, old_value):
-        try:
-            json.dumps(new_value)
-        except TypeError:
-            # Decimals and dates cause TypeError later
-            new_value = json.loads(json.dumps(new_value, default=str))
-
+        new_value = json.loads(json.dumps(new_value, default=str))
+        old_value = json.loads(json.dumps(old_value, default=str))
         action.send(
             user,
             verb=verbs.UPDATED_ATTRIBUTE,
