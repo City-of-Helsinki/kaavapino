@@ -6,6 +6,7 @@ from enum import Enum
 from itertools import filterfalse
 from typing import Iterable, Sequence, List, Optional
 
+from django.core.cache import cache
 from django.db.utils import IntegrityError
 from django.contrib.auth.models import Group
 from django.db import transaction
