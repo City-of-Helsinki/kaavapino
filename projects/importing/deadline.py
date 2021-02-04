@@ -598,7 +598,7 @@ class DeadlineImporter:
                     if cond and cond[:25] == "kaavaprosessin_kokoluokka":
                         subtypes = re.findall(
                             r"XS|S|M|L|XL",
-                            re.split(r"\s*==\s*|\s+in\s+", cond[0])[-1],
+                            re.split(r"\s*==\s*|\s+in\s+", cond)[-1],
                         )
                         if subtype.name in subtypes:
                             add_distance(calc)
