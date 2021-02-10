@@ -42,17 +42,56 @@ from .models import (
     ProjectType,
 )
 
-class DeadlineDateCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
+class InitialCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
     model = DeadlineDateCalculation
     extra = 0
+    ordering = ("index",)
+    verbose_name = _("initial calculation")
+    verbose_name_plural = _("initial calculations")
+
+    def get_queryset(self, request):
+        deadline_id = request.resolver_match.kwargs['object_id']
+        return Deadline.objects.get(id=deadline_id).initial_calculations
+
+
+class UpdateCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = DeadlineDateCalculation
+    extra = 0
+    ordering = ("index",)
+    verbose_name = _("update calculation")
+    verbose_name_plural = _("update calculations")
+
+    def get_queryset(self, request):
+        deadline_id = request.resolver_match.kwargs['object_id']
+        return Deadline.objects.get(id=deadline_id).update_calculations
+
 
 @admin.register(DateCalculation)
 class DateCalculation(admin.ModelAdmin):
-    inlines = (DeadlineDateCalculationInline,)
+    def get_model_perms(self, request):
+        return {}
+
 
 @admin.register(Deadline)
 class DeadlineAdmin(admin.ModelAdmin):
-    inlines = (DeadlineDateCalculationInline,)
+    inlines = (InitialCalculationInline, UpdateCalculationInline)
+    exclude = ("initial_calculations", "update_calculations")
+
+
+@admin.register(AutomaticDate)
+class AutomaticDateInline(admin.ModelAdmin):
+    fields = (
+        "name",
+        "weekdays",
+        "week",
+        "start_date",
+        "end_date",
+        "before_holiday",
+        "after_holiday",
+    )
+
+    def get_model_perms(self, request):
+        return {}
 
 
 @admin.register(DateType)
@@ -70,23 +109,12 @@ class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin):
     inlines = (ProjectPhaseDeadlineSectionAttributeInline,)
 
 
-@admin.register(AutomaticDate)
-class AutomaticDateAdmin(admin.ModelAdmin):
-    list_display = (
-        "weekdays",
-        "week",
-        "start_date",
-        "end_date",
-        "before_holiday",
-        "after_holiday",
-    )
-
-
 class ProjectDeadlineInline(admin.TabularInline):
     model = ProjectDeadline
     fields = ("deadline", "date")
-    readonly_fields = ("deadline",)
+    readonly_fields = ("deadline", "date")
     extra = 0
+    can_delete = False
 
 
 class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -143,6 +171,24 @@ class ProjectPhaseLogInline(admin.TabularInline):
 @admin.register(Project)
 class ProjectAdmin(OSMGeoAdmin):
     list_display = ("name", "created_at", "modified_at")
+    readonly_fields = (
+        "name",
+        "user",
+        "created_at",
+        "modified_at",
+        "pino_number",
+        "subtype",
+        "phase",
+        "create_principles",
+        "create_draft",
+    )
+    fields = (
+        *readonly_fields,
+        "public",
+        "archived",
+        "onhold",
+        "owner_edit_override",
+    )
     inlines = (ProjectPhaseLogInline, ProjectDeadlineInline)
 
     def get_actions(self, request):
@@ -166,9 +212,10 @@ class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(ProjectPhase)
 class ProjectPhaseAdmin(admin.ModelAdmin):
-    list_display = ("name", "project_type")
+    list_display = ("name", "project_type", "project_subtype")
     exclude = ("index",)
     inlines = (ProjectPhaseSectionInline,)
+    ordering = ("project_subtype__id", "index")
 
 
 class ProjectPhaseSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -181,7 +228,7 @@ class ProjectPhaseSectionAdmin(admin.ModelAdmin):
     list_display = ("name", "phase")
     exclude = ("index",)
     inlines = (ProjectPhaseSectionAttributeInline,)
-    ordering = ("phase", "index")
+    ordering = ("phase__project_subtype__id", "phase__index", "index")
 
 
 class ProjectPhaseInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -216,6 +263,10 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "file")
     readonly_fields = ("slug",)
 
+    # Hide this from admin for now
+    def get_model_perms(self, request):
+        return {}
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "project_phase":
             return PhaseChoiceField(
@@ -224,11 +275,6 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
                 )
             )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-
-@admin.register(ProjectAttributeFile)
-class ProjectAttributeFileAdmin(admin.ModelAdmin):
-    pass
 
 
 class PhaseSectionChoiceField(forms.ModelChoiceField):
@@ -422,21 +468,6 @@ class ProjectFloorAreaSectionAttributeMatrixStructureAdmin(admin.ModelAdmin):
                 )
 
 
-class ReportAttributeInline(admin.TabularInline):
-    model = ReportAttribute
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "attribute":
-            kwargs["queryset"] = Attribute.objects.report_friendly()
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-
-@admin.register(Report)
-class ReportAdmin(admin.ModelAdmin):
-    inlines = (ReportAttributeInline,)
-    list_display = ("name", "project_type")
-
-
 class ProjectFloorAreaSectionAttributeInline(
     admin.TabularInline
 ):
@@ -451,12 +482,14 @@ class ProjectFloorAreaSectionAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectComment)
 class ProjectComment(admin.ModelAdmin):
-    pass
+    def get_model_perms(self, request):
+        return {}
 
 
 @admin.register(DataRetentionPlan)
 class DataRetentionPlanAdmin(admin.ModelAdmin):
-    pass
+    def get_model_perms(self, request):
+        return {}
 
 
 admin.site.index_template = "admin/kaavapino_index.html"

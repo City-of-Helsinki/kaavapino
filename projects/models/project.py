@@ -859,6 +859,9 @@ class ProjectDeadline(models.Model):
         unique_together = ("deadline", "project")
         ordering = ("deadline__index",)
 
+    def __str__(self):
+        return f"{self.deadline.abbreviation} {self.date}"
+
 
 class ProjectPhaseDeadlineSectionAttribute(models.Model):
     """Links an attribute into a project phase deadline section."""

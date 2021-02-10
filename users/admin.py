@@ -30,7 +30,16 @@ class UserAdmin(UserAdmin):
             break
 
     filter_horizontal = UserAdmin.filter_horizontal + ("additional_groups",)
-    readonly_fields = UserAdmin.readonly_fields + ("groups",)
+    readonly_fields = UserAdmin.readonly_fields + (
+        "groups",
+        "username",
+        "date_joined",
+        "last_login",
+        "first_name",
+        "last_name",
+        "is_staff",
+        "is_superuser",
+    )
 
 
 class GroupPrivilegeInline(admin.TabularInline):
