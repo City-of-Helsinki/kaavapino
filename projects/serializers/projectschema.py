@@ -130,9 +130,12 @@ class AttributeSchemaSerializer(serializers.Serializer):
         privilege = privilege_as_int(self.context["privilege"])
         owner = self.context["owner"]
 
+        # owner can edit owner-editable fields regardless of their role
         if owner and attribute.owner_editable:
             return True
-        elif privilege <= privilege_as_int(attribute.edit_privilege):
+        # check privilege for others
+        elif attribute.edit_privilege and \
+            privilege >= privilege_as_int(attribute.edit_privilege):
             return True
         else:
             return False
