@@ -389,11 +389,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         if snapshot:
             attribute_files = ProjectAttributeFile.objects \
                 .filter(project=project, created_at__lte=snapshot) \
+                .exclude(archived_at__lte=snapshot) \
                 .order_by("attribute__pk", "project__pk", "-created_at") \
                 .distinct("attribute__pk", "project__pk")
         else:
             attribute_files = ProjectAttributeFile.objects \
-                .filter(project=project) \
+                .filter(project=project, archived_at=None) \
                 .order_by("attribute__pk", "project__pk", "-created_at") \
                 .distinct("attribute__pk", "project__pk")
 
@@ -962,6 +963,17 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         for identifier, value in attribute_data.items():
             existing_value = instance_attribute_date.get(identifier, None)
+
+            if not value and not existing_value:
+                old_file = ProjectAttributeFile.objects \
+                    .filter(
+                        project=project,
+                        archived_at=None,
+                        attribute__identifier=identifier,
+                    ).order_by("-created_at").first()
+                if old_file:
+                    existing_value = old_file.description
+
             if value != existing_value:
                 updated_attribute_values[identifier] = {
                     "old": existing_value,
@@ -1005,7 +1017,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def _create_updates_log(self, attribute, project, user, new_value, old_value):
         new_value = json.loads(json.dumps(new_value, default=str))
         old_value = json.loads(json.dumps(old_value, default=str))
-        action.send(
+        entry = action.send(
             user,
             verb=verbs.UPDATED_ATTRIBUTE,
             action_object=attribute,
@@ -1026,6 +1038,17 @@ class ProjectSerializer(serializers.ModelSerializer):
                 generated=True,
                 content=f'{user.get_display_name()} päivitti "{attribute.name}" tietoa.{change_string}',
             )
+
+        if attribute.value_type in [Attribute.TYPE_FILE, Attribute.TYPE_IMAGE] \
+            and new_value is None:
+            timestamp = entry[0][1].timestamp
+            for old_file in ProjectAttributeFile.objects.filter(
+                project=project,
+                attribute=attribute,
+                archived_at=None,
+            ):
+                old_file.archived_at = timestamp
+                old_file.save()
 
     def create_deadline_updates_log(self, deadline, project, user, old_date, new_date):
         old_value = json.loads(json.dumps(old_date, default=str))
@@ -1216,16 +1239,23 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             old_file = ProjectAttributeFile.objects.filter(
                 project=validated_data["project"],
                 attribute=validated_data["attribute"],
+                archived_at=None,
             ).order_by("-created_at").first()
             old_value = old_file.description
         except AttributeError:
             old_value = None
 
+        old_files = list(ProjectAttributeFile.objects.filter(
+            project=validated_data["project"],
+            attribute=validated_data["attribute"],
+            archived_at=None,
+        ))
+
         new_file = super().create(validated_data)
         new_value = new_file.description
 
         if old_value != new_value:
-            action.send(
+            entry = action.send(
                 self.context["request"].user or validated_data["project"].user,
                 verb=verbs.UPDATED_ATTRIBUTE,
                 action_object=validated_data["attribute"],
@@ -1234,5 +1264,10 @@ class ProjectFileSerializer(serializers.ModelSerializer):
                 new_value=new_value,
                 old_value=old_value,
             )
+
+        timestamp = entry[0][1].timestamp
+        for old_file in old_files:
+            old_file.archived_at = timestamp
+            old_file.save()
 
         return new_file

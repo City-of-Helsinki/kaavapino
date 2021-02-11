@@ -753,6 +753,11 @@ class ProjectAttributeFile(models.Model):
     created_at = models.DateTimeField(
         verbose_name=_("created at"),auto_now_add=True, editable=False
     )
+    archived_at = models.DateTimeField(
+        verbose_name=_("archived at"),
+        null=True,
+        blank=True,
+    )
 
     def get_upload_subfolder(self):
         project_id = str(self.project.pk)
