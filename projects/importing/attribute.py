@@ -663,8 +663,10 @@ class AttributeImporter:
             if generated:
                 value_type = Attribute.TYPE_DECIMAL
 
-            owner_editable = (row[self.column_index[ATTRIBUTE_EDIT_PRIVILEGE]] or "" ) \
-                .find("Projektin vastuhenkilö") >= 0
+            owner_editable = len(re.findall(
+                row[self.column_index[ATTRIBUTE_EDIT_PRIVILEGE]] or "",
+                "Projektin vastuhenkilö",
+            )) > 0
             edit_privilege = row[self.column_index[ATTRIBUTE_EDIT_PRIVILEGE]]
 
             if edit_privilege == "automaattinen tieto, jota ei voi muokata":
