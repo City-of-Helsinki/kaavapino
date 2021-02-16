@@ -664,8 +664,8 @@ class AttributeImporter:
                 value_type = Attribute.TYPE_DECIMAL
 
             owner_editable = len(re.findall(
+                "Projektin vastuuhenkilö",
                 row[self.column_index[ATTRIBUTE_EDIT_PRIVILEGE]] or "",
-                "Projektin vastuhenkilö",
             )) > 0
             edit_privilege = row[self.column_index[ATTRIBUTE_EDIT_PRIVILEGE]]
 

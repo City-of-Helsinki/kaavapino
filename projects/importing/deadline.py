@@ -485,6 +485,9 @@ class DeadlineImporter:
                 for cond in attribute_conds:
                     negate = False
 
+                    if cond == "":
+                        continue
+
                     if cond[0] == "!":
                         negate = True
                         cond = cond[1:]
