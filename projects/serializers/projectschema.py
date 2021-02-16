@@ -377,24 +377,34 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     sections = serializers.SerializerMethodField()
 
     @staticmethod
-    def _get_sections(privilege, owner, phase):
+    def _get_sections(privilege, owner, phase, project=None):
         sections_cache = cache.get("serialized_phase_sections", {})
 
         try:
-            return sections_cache[(privilege, owner, phase)]
+            sections = sections_cache[(privilege, owner, phase)]
         except KeyError:
-            pass
+            sections = [
+                ProjectSectionSchemaSerializer(
+                    section,
+                    context={"privilege": privilege, "owner": owner},
+                ).data
+                for section in phase.sections.all()
+            ]
 
-        sections = [
-            ProjectSectionSchemaSerializer(
-                section,
-                context={"privilege": privilege, "owner": owner},
-            ).data
-            for section in phase.sections.all()
-        ]
+            sections_cache[(privilege, owner, phase)] = sections
+            cache.set("serialized_phase_sections", sections_cache, None)
 
-        sections_cache[(privilege, owner, phase)] = sections
-        cache.set("serialized_phase_sections", sections_cache, None)
+        confirmed_deadlines = [
+            dl.deadline.attribute.identifier for dl in project.deadlines.all()
+            if dl.confirmed and dl.deadline.attribute
+        ] if project else []
+        print(confirmed_deadlines)
+
+        for sect_i, section in enumerate(sections):
+            for attr_i, attr in enumerate(section["fields"]):
+                if attr["name"] in confirmed_deadlines:
+                    sections[sect_i]["fields"][attr_i]["editable"] = False
+
         return sections
 
     def get_sections(self, phase):
@@ -402,10 +412,18 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             context = self.context
         except AttributeError:
             context = {}
+
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(pk=int(query_params.get("project")))
+        except (ValueError, Project.DoesNotExist):
+            project = None
+
         return self._get_sections(
             context.get("privilege"),
             context.get("owner"),
             phase,
+            project,
         )
 
 
@@ -473,24 +491,33 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
     sections = serializers.SerializerMethodField()
 
     @staticmethod
-    def _get_sections(privilege, owner, phase):
+    def _get_sections(privilege, owner, phase, project=None):
         sections_cache = cache.get("serialized_deadline_sections", {})
 
         try:
-            return sections_cache[(privilege, owner, phase)]
+            deadline_sections = sections_cache[(privilege, owner, phase)]
         except KeyError:
-            pass
+            deadline_sections = [
+                ProjectPhaseDeadlineSectionSerializer(
+                    section,
+                    context={"privilege": privilege, "owner": owner},
+                ).data
+                for section in phase.deadline_sections.all()
+            ]
 
-        deadline_sections = [
-            ProjectPhaseDeadlineSectionSerializer(
-                section,
-                context={"privilege": privilege, "owner": owner},
-            ).data
-            for section in phase.deadline_sections.all()
-        ]
+            sections_cache[(privilege, owner, phase)] = deadline_sections
+            cache.set("serialized_deadline_sections", sections_cache, None)
 
-        sections_cache[(privilege, owner, phase)] = deadline_sections
-        cache.set("serialized_deadline_sections", sections_cache, None)
+        confirmed_deadlines = [
+            dl.deadline.attribute.identifier for dl in project.deadlines.all()
+            if dl.confirmed and dl.deadline.attribute
+        ] if project else []
+
+        for sect_i, section in enumerate(deadline_sections):
+            for attr_i, attr in enumerate(section["attributes"]):
+                if attr["name"] in confirmed_deadlines:
+                    deadline_sections[sect_i]["attributes"][attr_i]["editable"] = False
+
         return deadline_sections
 
     def get_sections(self, phase):
@@ -498,10 +525,18 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
             context = self.context
         except AttributeError:
             context = {}
+
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(pk=int(query_params.get("project")))
+        except (ValueError, Project.DoesNotExist):
+            project = None
+
         return self._get_sections(
             context.get("privilege"),
             context.get("owner"),
             phase,
+            project,
         )
 
 

@@ -47,6 +47,14 @@ class Deadline(models.Model):
         blank=True,
         on_delete=models.PROTECT,
     )
+    confirmation_attribute = models.ForeignKey(
+        "Attribute",
+        verbose_name=_("attribute for confirmation"),
+        related_name="confirms_deadline",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
     edit_privilege = models.CharField(
         default=None, null=True, blank=True, max_length=6, choices=PRIVILEGE_LEVELS
     )

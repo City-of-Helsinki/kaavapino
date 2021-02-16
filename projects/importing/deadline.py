@@ -29,6 +29,7 @@ DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE = "projektin_kaynnistys_pvm"
 
 # Deadline sheet column titles
 DEADLINE_ATTRIBUTE_IDENTIFIER = "projektitietotunniste"
+DEADLINE_CONFIRMATION_ATTRIBUTE_IDENTIFIER = "vahvistus-kentän tunniste"
 DEADLINE_ABBREVIATION = "etapin lyhenne"
 DEADLINE_EDIT_PRIVILEGE = "kuka/mikä muokkaa tietoa"
 DEADLINE_UPDATE_CALCULATIONS = "mihin tietoon tieto kytkeytyy"
@@ -337,6 +338,7 @@ class DeadlineImporter:
         for i, row in enumerate(rows):
             abbreviation = row[self.column_index[DEADLINE_ABBREVIATION]]
             attribute = row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]
+            confirmation_attribute = row[self.column_index[DEADLINE_CONFIRMATION_ATTRIBUTE_IDENTIFIER]]
 
             if attribute == DEADLINE_CREATED_AT_ATTRIBUTE_FIELD_VALUE:
                 default_to_created_at = True
@@ -352,6 +354,16 @@ class DeadlineImporter:
                     f"Ignored invalid attribute identifier {attribute} for deadline {abbreviation}."
                 )
                 attribute = None
+
+            try:
+                confirmation_attribute = Attribute.objects.get(
+                    identifier=confirmation_attribute
+                )
+            except Attribute.DoesNotExist:
+                logger.warning(
+                    f"Ignored invalid confirmation attribute identifier {confirmation_attribute} for deadline {abbreviation}."
+                )
+                confirmation_attribute = None
 
             deadline_types = []
             for dl_type in re.split(
@@ -416,6 +428,7 @@ class DeadlineImporter:
                 subtype=subtype,
                 defaults={
                     "attribute": attribute,
+                    "confirmation_attribute": confirmation_attribute,
                     "deadline_types": deadline_types,
                     "date_type": date_type,
                     "error_past_due": error_past_due,

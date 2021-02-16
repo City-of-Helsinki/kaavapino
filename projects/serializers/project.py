@@ -131,11 +131,13 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         return False
 
     def get_past_due(self, projectdeadline):
-        return bool(projectdeadline.project.deadlines.filter(
-            deadline__index__lte=projectdeadline.deadline.index,
-            confirmed=False,
-            date__lt=datetime.date.today(),
-        ).count())
+        return len([
+            dl for dl in projectdeadline.project.deadlines.filter(
+                deadline__index__lte=projectdeadline.deadline.index,
+                date__lt=datetime.date.today(),
+            )
+            if not dl.confirmed
+        ]) > 0
 
     def get_out_of_sync(self, projectdeadline):
         return projectdeadline.project.subtype != \
@@ -740,6 +742,18 @@ class ProjectSerializer(serializers.ModelSerializer):
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
             raise ValidationError(errors)
+
+        # Confirmed deadlines can't be edited
+        confirmed_deadlines = [
+            dl.deadline.attribute.identifier for dl in self.instance.deadlines.all()
+            if dl.confirmed and dl.deadline.attribute
+        ] if self.instance else []
+
+        if confirmed_deadlines:
+            valid_attributes = {
+                k: v for k, v in valid_attributes.items()
+                if k not in confirmed_deadlines
+            }
 
         invalid_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),

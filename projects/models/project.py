@@ -851,14 +851,24 @@ class ProjectDeadline(models.Model):
         null=True,
         blank=True,
     )
-    confirmed = models.BooleanField(
-        verbose_name=_("confirmed"),
-        default=False,
-    )
     generated = models.BooleanField(
         verbose_name=_("generated"),
         default=False,
     )
+
+    @property
+    def confirmed(self):
+        try:
+            identifier = self.deadline.confirmation_attribute.identifier
+        except AttributeError:
+            return None
+
+        value = self.project.attribute_data.get(identifier)
+
+        if value is not None:
+            return bool(value)
+
+        return None
 
     class Meta:
         unique_together = ("deadline", "project")
