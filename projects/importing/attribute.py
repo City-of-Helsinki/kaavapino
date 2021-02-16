@@ -1180,6 +1180,9 @@ class AttributeImporter:
                         "admin_field": True,
                     }
                 elif owner:
+                    # Marked as owner fields here and in the excel but should actually
+                    # be visible (although non-editable) to everyone besides admins
+                    # who have their own sections specified
                     defaults = {"owner_field": True}
                 else:
                     defaults = {"admin_field": True}

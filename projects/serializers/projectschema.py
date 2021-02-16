@@ -473,11 +473,9 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
         if privilege == "admin":
             sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
                 .filter(admin_field=True).select_related("attribute")
-        elif owner:
+        else:
             sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
                 .filter(owner_field=True).select_related("attribute")
-        else:
-            return
 
         return self._get_serialized_attributes(sect_attrs, owner, privilege)
 
