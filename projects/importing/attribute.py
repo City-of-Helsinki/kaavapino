@@ -498,7 +498,9 @@ class AttributeImporter:
             branches = []
 
             for (then, condition) in zip(thens, conditions):
-                if type == Attribute.TYPE_BOOLEAN and then == "kyllä":
+                if type == Attribute.TYPE_CHOICE:
+                    then = self._get_identifier_for_value(str(then))
+                elif type == Attribute.TYPE_BOOLEAN and then == "kyllä":
                     then = True
                 elif type == Attribute.TYPE_BOOLEAN and then == "ei":
                     then = False
