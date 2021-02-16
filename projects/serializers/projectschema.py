@@ -416,7 +416,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
         query_params = getattr(self.context["request"], "GET", {})
         try:
             project = Project.objects.get(pk=int(query_params.get("project")))
-        except (ValueError, Project.DoesNotExist):
+        except (ValueError, TypeError, Project.DoesNotExist):
             project = None
 
         return self._get_sections(
@@ -527,7 +527,7 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
         query_params = getattr(self.context["request"], "GET", {})
         try:
             project = Project.objects.get(pk=int(query_params.get("project")))
-        except (ValueError, Project.DoesNotExist):
+        except (ValueError, TypeError, Project.DoesNotExist):
             project = None
 
         return self._get_sections(
