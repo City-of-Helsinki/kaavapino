@@ -255,10 +255,6 @@ def create_section_serializer(
 
     serializer_fields = {}
     for attribute in section_attributes:
-        # Do not include generated attribute values
-        if attribute.generated:
-            continue
-
         if attribute.value_type == Attribute.TYPE_FIELDSET:
             field_data = create_fieldset_field_data(
                 attribute, validation, project, preview,

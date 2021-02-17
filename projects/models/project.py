@@ -255,10 +255,9 @@ class Project(models.Model):
                 else:
                     self.attribute_data.pop(identifier, None)
 
-        self.update_generated_values(generated_attributes, self.attribute_data)
-
         return True
 
+    # TODO disabled for now; frontend generates and sends values but we need to develop this later
     def update_generated_values(self, generated_attributes, attribute_data):
         for attribute in generated_attributes:
             calculation_operators = attribute.calculation_operators
