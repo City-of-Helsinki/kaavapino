@@ -793,10 +793,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         except KeyError:
             phase_index = self.instance.phase.index
 
-        if not self.instance.public and (phase_index > 0):
-            return True
-
-        if public is None:
+        if not self.instance.public and (phase_index > 1):
             return True
 
         return public
