@@ -115,6 +115,7 @@ To import data, use:
 * `python manage.py create_default_groups_and_mappings` (first time only, run before other commands)
 * `python manage.py import_attributes <attribute excel file> [--sheet sheet name] [--overwrite]`
 * `python manage.py import_deadlines <deadline excel file>`
+* `python manage.py create_default_listviewattributecolumns`
 
 Deadlines rely on attributes, so it is recommended to run `import_attributes` before `import_deadlines`. Import will overwrite existing data.
 
