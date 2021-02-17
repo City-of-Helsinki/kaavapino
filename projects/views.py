@@ -127,7 +127,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         if users is not None:
             queryset = self._filter_users(users, queryset)
         if search is not None:
-            print(search)
             queryset = self._search(search, queryset)
 
         queryset = self._filter_private(queryset, user)

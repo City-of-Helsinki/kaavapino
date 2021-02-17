@@ -398,7 +398,6 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             dl.deadline.attribute.identifier for dl in project.deadlines.all()
             if dl.confirmed and dl.deadline.attribute
         ] if project else []
-        print(confirmed_deadlines)
 
         for sect_i, section in enumerate(sections):
             for attr_i, attr in enumerate(section["fields"]):
