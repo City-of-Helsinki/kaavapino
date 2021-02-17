@@ -1011,7 +1011,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                         value.identifier for value in values["new"]
                     ]
                 else:
-                    values["new"] = values["new"].identifier
+                    try:
+                        values["new"] = values["new"].identifier
+                    except AttributeError:
+                        pass
 
             self._create_updates_log(
                 attribute, project, user, values["new"], values["old"]
