@@ -163,9 +163,6 @@ def create_attribute_field_data(attribute, validation, project, preview):
     field_arguments["allow_null"] = True
 
     field_arguments["required"] = False
-    if validation:
-        field_arguments["required"] = _is_attribute_required(attribute)
-        field_arguments["allow_null"] = False
 
     if attribute.value_type == Attribute.TYPE_BOOLEAN:
         field_arguments.pop("allow_null")
@@ -196,9 +193,6 @@ def create_fieldset_field_data(attribute, validation, project, preview):
         serializer_fields[attr.identifier] = serializer_field
 
     field_arguments["required"] = False
-    if validation:
-        field_arguments["required"] = _is_attribute_required(attribute)
-        field_arguments["allow_null"] = False
 
     serializer = type("FieldSetSerializer", (serializers.Serializer,), {})
     serializer._declared_fields = serializer_fields
