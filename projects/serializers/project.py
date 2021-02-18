@@ -536,7 +536,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def generate_sections_data(
         self,
         phase: ProjectPhase,
-        preview=None,
+        preview,
         validation: bool = True,
     ) -> List[SectionData]:
         sections = []
@@ -554,7 +554,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def generate_floor_area_sections_data(
-        self, floor_area_sections, validation: bool = True
+        self, floor_area_sections, preview, validation: bool = True
     ) -> List[SectionData]:
         sections = []
         for section in floor_area_sections.order_by("index"):
@@ -563,13 +563,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                 context=self.context,
                 project=self.instance,
                 validation=validation,
+                preview=preview,
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
 
         return sections
 
-    def generate_schedule_sections_data(self, phase, validation):
+    def generate_schedule_sections_data(self, phase, preview, validation=True):
         sections = []
         deadline_sections = phase.deadline_sections.all()
         for section in deadline_sections:
@@ -578,6 +579,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 context=self.context,
                 project=self.instance,
                 validation=validation,
+                preview=preview,
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
@@ -712,11 +714,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             sections_data += self.generate_schedule_sections_data(
                 phase=phase,
                 validation=should_validate,
+                preview=preview,
             ) or []
 
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
-            validation=should_validate
+            validation=should_validate,
+            preview=preview,
         ) or []
 
 

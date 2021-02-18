@@ -100,16 +100,16 @@ def get_deadline_validator(attribute, project_dls, subtype, preview):
                 if not prev_dl:
                     continue
 
-                default_error = _(f"Minimum distance to {prev_dl.deadline.abbreviation} not met")
+                default_error = _(f"Minimum distance to {distance.previous_deadline.abbreviation} not met")
 
                 if distance.date_type and distance.date_type.valid_days_from(
-                    prev_dl.date,
+                    prev_dl,
                     distance.distance_from_previous,
                 ) > value:
                     raise ValidationError(
                         attr_dl.error_min_distance_previous or default_error
                     )
-                elif prev_dl.date + datetime.timedelta(
+                elif prev_dl + datetime.timedelta(
                     days=distance.distance_from_previous,
                 ) > value:
                     raise ValidationError(
