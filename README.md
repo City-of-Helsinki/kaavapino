@@ -133,3 +133,13 @@ Install kubectl locally. Check version to deploy and run:
 ... kaavapino/api/deploy/rancher
 #> ./deploy_staging_api.sh <version> run
 ```
+
+## Database manipulation
+* `docker-compose -f ./docker-compose.yml exec api ./manage.py shell`
+* `from projects.models import *`
+* `project = Project.objects.get(pk=1)` where pk is the subclass of the project
+* `project.attribute_data.pop("hakemus_fieldset[0]")` remove data
+* `project.attribute_data["lisatieto_kaavoittaja[0]"] = {ops: [insert: "LK1"]}` add data
+* `project.attribute_data["kiinteistotunnus_hakemus[0][1]"] = "KTH1"`
+* `project.save()`
+* `exit`
