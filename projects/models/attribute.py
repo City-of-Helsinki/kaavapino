@@ -353,12 +353,12 @@ class Attribute(models.Model):
             value_choices = None
 
         if value_choices and value_choices.exists():
-            if self.multiple_choice:
+            if self.multiple_choice and value is not None:
                 return [v.identifier for v in value]
             else:
                 return value.identifier if value else None
         elif self.value_type == Attribute.TYPE_INTEGER:
-            if self.multiple_choice:
+            if self.multiple_choice and value is not None:
                 return [
                     int(v) if v is not None else None
                     for v in value
@@ -373,7 +373,7 @@ class Attribute(models.Model):
             Attribute.TYPE_LINK,
             Attribute.TYPE_CHOICE,
         ):
-            if self.multiple_choice:
+            if self.multiple_choice and value is not None:
                 return [
                     str(v) if v else None
                     for v in value
@@ -384,12 +384,12 @@ class Attribute(models.Model):
             Attribute.TYPE_RICH_TEXT,
             Attribute.TYPE_RICH_TEXT_SHORT,
         ):
-            if self.multiple_choice:
+            if self.multiple_choice and value is not None:
                 return [v for v in value]
             else:
                 return value
         elif self.value_type == Attribute.TYPE_BOOLEAN:
-            if self.multiple_choice:
+            if self.multiple_choice and value is not None:
                 return [
                     bool(v) if v is not None else None
                     for v in value
@@ -402,12 +402,12 @@ class Attribute(models.Model):
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).
             if isinstance(value, get_user_model()):
-                if self.multiple_choice:
+                if self.multiple_choice and value is not None:
                     return [v.uuid for v in value]
                 else:
                     return value.uuid
             else:
-                if self.multiple_choice:
+                if self.multiple_choice and value is not None:
                     return [v or None for v in value]
                 else:
                     return value or None
@@ -423,7 +423,7 @@ class Attribute(models.Model):
             value_choices = None
 
         if value_choices and value_choices.exists():
-            if self.multiple_choice:
+            if self.multiple_choice and value is not None:
                 return [v for v in value_choices.filter(identifier__in=value)]
             else:
                 return value_choices.get(identifier=value)
