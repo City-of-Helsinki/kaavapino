@@ -20,7 +20,7 @@ class FooterLink(models.Model):
 
     class Meta:
         verbose_name = _("footer link")
-        verbose_name_plural = _("footer link")
+        verbose_name_plural = _("footer links")
         ordering = ("index",)
 
     def __str__(self):
@@ -47,4 +47,6 @@ class ListViewAttributeColumn(models.Model):
         Attribute, primary_key=True, on_delete=models.CASCADE)
 
     class Meta(object):
+        verbose_name = _("list view attribute column")
+        verbose_name_plural = _("list view attribute columns")
         ordering = ("index",)
