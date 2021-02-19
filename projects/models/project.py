@@ -495,6 +495,8 @@ class Project(models.Model):
             preview=True,
         )}
 
+        return project_dls
+
     @property
     def type(self):
         return self.subtype.project_type
