@@ -209,6 +209,7 @@ class Attribute(models.Model):
     character_limit = models.PositiveIntegerField(
         verbose_name=_("character limit"),
         null=True,
+        blank=True,
     )
     placeholder_text = models.TextField(
         verbose_name=_("placeholder text"),
