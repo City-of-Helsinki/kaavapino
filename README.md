@@ -139,7 +139,9 @@ Install kubectl locally. Check version to deploy and run:
 * `from projects.models import *`
 * `project = Project.objects.get(pk=1)` where pk is the subclass of the project
 * `project.attribute_data.pop("hakemus_fieldset[0]")` remove data
-* `project.attribute_data["lisatieto_kaavoittaja[0]"] = {ops: [insert: "LK1"]}` add data
-* `project.attribute_data["kiinteistotunnus_hakemus[0][1]"] = "KTH1"`
+* `project.attribute_data["lisatieto_kaavoittaja[0]"] = {"ops": [{"insert": "LK1"}]}` add data
+* `project.attribute_data["kiinteistotunnus_hakemus[0][0]"] = "KTH00"`
+* `project.attribute_data["kiinteistotunnus_hakemus[0][1]"] = "KTH01"`
+* `project.attribute_data["kiinteistotunnus_hakemus[1][0]"] = "KTH10"`
 * `project.save()`
 * `exit`
