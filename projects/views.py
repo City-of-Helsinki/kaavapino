@@ -192,7 +192,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     @staticmethod
     def _filter_private(queryset, user):
-        if user.is_superuser:
+        if user.has_privilege("admin"):
             return queryset
 
         return queryset.exclude(~Q(user=user) & Q(public=False))
