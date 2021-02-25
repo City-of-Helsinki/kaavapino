@@ -390,8 +390,9 @@ class DeadlineImporter:
                 re.split(r"\s*==\s*|\s+in\s+", split_cell[0])[-1],
             )
             if len(split_cell) < 2 or subtype.name in subtypes:
-                cond_attr_identifiers = self._parse_conditions(
-                    row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+                cond_attr_identifiers = re.findall(
+                    r"\{%\s*if\s*(.*?)\s*%\}",
+                    row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]],
                 )
 
             if not len(cond_attr_identifiers) \
