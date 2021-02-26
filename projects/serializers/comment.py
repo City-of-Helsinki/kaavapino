@@ -50,8 +50,9 @@ class FieldCommentSerializer(CommentSerializer):
     field = serializers.SlugRelatedField(
         read_only=False, slug_field="identifier", queryset=Attribute.objects.all()
     )
+    fieldset_index = serializers.ListField(child=serializers.IntegerField(), required=False)
     class Meta(CommentSerializer.Meta):
-        fields = CommentSerializer.Meta.fields + ['field']
+        fields = CommentSerializer.Meta.fields + ["field", "fieldset_index"]
         model = FieldComment
 
 

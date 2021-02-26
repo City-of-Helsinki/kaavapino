@@ -1,6 +1,7 @@
 from datetime import datetime
 from django.conf import settings
 from django.contrib.gis.db import models
+from django.contrib.postgres.fields import ArrayField
 from django.utils.translation import ugettext_lazy as _
 
 
@@ -78,6 +79,13 @@ class FieldComment(models.Model):
     )
 
     content = models.TextField(verbose_name=_("content"))
+
+    fieldset_index = ArrayField(
+        models.PositiveIntegerField(),
+        verbose_name=_("fieldset index"),
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = _("field comment")
