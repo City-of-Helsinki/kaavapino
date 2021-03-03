@@ -1272,7 +1272,7 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         new_file = super().create(validated_data)
         new_value = new_file.description
 
-        if old_value != new_value:
+        if old_value != new_value or old_file.file != new_file.file:
             entry = action.send(
                 self.context["request"].user or validated_data["project"].user,
                 verb=verbs.UPDATED_ATTRIBUTE,
@@ -1283,7 +1283,11 @@ class ProjectFileSerializer(serializers.ModelSerializer):
                 old_value=old_value,
             )
 
-        timestamp = entry[0][1].timestamp
+        if entry:
+            timestamp = entry[0][1].timestamp
+        else:
+            timestamp = datetime.datetime.now()
+
         for old_file in old_files:
             old_file.archived_at = timestamp
             old_file.save()
