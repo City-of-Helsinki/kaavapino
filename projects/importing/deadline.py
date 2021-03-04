@@ -381,9 +381,10 @@ class DeadlineImporter:
 
             condition_attributes = []
 
+            deadline_attribute_condition_row = row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]] or ""
             # check possible subtype limitations
             split_cell = re.split(
-                r";\s*", row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+                r";\s*", deadline_attribute_condition_row
             )
             subtypes = re.findall(
                 r"XS|S|M|L|XL",
@@ -392,7 +393,7 @@ class DeadlineImporter:
             if len(split_cell) < 2 or subtype.name in subtypes:
                 cond_attr_identifiers = re.findall(
                     r"\{%\s*if\s*(.*?)\s*%\}",
-                    row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]],
+                    deadline_attribute_condition_row,
                 )
 
             if not len(cond_attr_identifiers) \
@@ -643,9 +644,10 @@ class DeadlineImporter:
             except Deadline.DoesNotExist:
                 continue
 
+            deadline_attribute_condition_row = row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]] or ""
             # check possible subtype limitations
             split_cell = re.split(
-                r";\s*", row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+                r";\s*", deadline_attribute_condition_row
             )
             subtypes = re.findall(
                 r"XS|S|M|L|XL",
@@ -653,7 +655,7 @@ class DeadlineImporter:
             )
             if len(split_cell) < 2 or subtype.name in subtypes:
                 cond_attr_identifiers = self._parse_conditions(
-                    row[self.column_index[DEADLINE_ATTRIBUTE_CONDITION]]
+                    deadline_attribute_condition_row
                 )
 
             if not len(cond_attr_identifiers) \
