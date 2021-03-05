@@ -102,6 +102,9 @@ def get_deadline_validator(attribute, project_dls, subtype, preview):
 
                 default_error = _(f"Minimum distance to {distance.previous_deadline.abbreviation} not met")
 
+                if type(prev_dl) == str:
+                    prev_dl = datetime.datetime.strptime(prev_dl, "%Y-%m-%d").date()
+
                 if distance.date_type and distance.date_type.valid_days_from(
                     prev_dl,
                     distance.distance_from_previous,

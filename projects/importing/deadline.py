@@ -38,6 +38,7 @@ DEADLINE_INITIAL_CALCULATIONS = "generoitu ehdotus"
 DEADLINE_ATTRIBUTE_CONDITION = "milloin tieto kuuluu prosessin"
 DEADLINE_DATE_TYPE = "tiedon päivätyyppi"
 DEADLINE_CALCULATION_DATE_TYPE = "laskettavien päivien päivätyyppi"
+DEADLINE_DISTANCE_DATE_TYPE = "minimietäisyyden päivätyyppi"
 DEADLINE_TYPE = "tiedon jananäkymätyyppi "
 DEADLINE_PHASE = "vaihe, johon päivämäärä liittyy"
 DEADLINE_ERROR_PAST_DUE = "mitä tapahtuu, jos aikatauluun merkittyä  päivämäärää ei ole vahvistettu ja kyseisen etapin määräaika on ohitettu"
@@ -688,11 +689,19 @@ class DeadlineImporter:
                 parsed = enumerate(parse_distance(
                     row[self.column_index[DEADLINE_MINIMUM_DISTANCE]]
                 ))
+
+                distance_datetype = self.get_datetype(
+                    row[self.column_index[DEADLINE_CALCULATION_DATE_TYPE]],
+                    "minimum distance",
+                )
+                row[self.column_index[DEADLINE_DISTANCE_DATE_TYPE]]
+
                 for index, (target, operator, distance, conditions) in parsed:
                     distance = DeadlineDistance.objects.create(
                         deadline=deadline if operator == "+" else target,
                         previous_deadline=target if operator == "+" else deadline,
                         distance_from_previous=distance,
+                        date_type=distance_datetype,
                         index=index,
                     )
                     distance.conditions.set(conditions)

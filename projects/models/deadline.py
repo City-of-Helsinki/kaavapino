@@ -270,7 +270,7 @@ class DeadlineDistance(models.Model):
     )
 
     def __str__(self):
-        return f"{self.previous_deadline.abbreviation} -> {self.deadline.abbreviation} ({self.distance_from_previous}{str(' ' + self.date_type) if self.date_type else ''})"
+        return f"{self.previous_deadline.abbreviation} -> {self.deadline.abbreviation} ({self.distance_from_previous}{' ' + str(self.date_type) if self.date_type else ''})"
 
     class Meta:
         ordering = ("index",)
@@ -340,9 +340,36 @@ class DateType(models.Model):
         else:
             return self._filter_date_list(listed_dates, self.business_days_only)
 
+    def valid_days_to(self, date_a, date_b):
+        days = (date_b - date_a).days
+        reverse = 1
+
+        # Swap a and b if b comes before a
+        if days < 0:
+            [date_a, date_b] = [date_b, date_a]
+            reverse = -1
+
+        # Get valid dates for all relevant years
+        valid_dates = []
+        for year in range(date_a.year, date_b.year+1):
+            valid_dates += self.get_dates(year)
+
+        return len(list(filter(
+            lambda x: x > date_a and x <= date_b,
+            valid_dates,
+        ))) * reverse
+
     def valid_days_from(self, orig_date, days):
         year = orig_date.year
         dates = sorted(self.get_dates(year))
+
+        is_valid = self.is_valid_date(orig_date)
+
+        if days == 0:
+            if is_valid:
+                return orig_date
+            else:
+                return None
 
         if days < 0:
             dates = [date for date in dates if date <= orig_date]
@@ -368,10 +395,19 @@ class DateType(models.Model):
             if days < 0:
                 dates.reverse()
 
+        if not is_valid:
+            return dates[abs(days) - 1]
+
         return dates[abs(days)]
 
     def is_valid_date(self, date):
         return date in self.get_dates(date.year)
+
+    def get_closest_valid_date(self, date):
+        if self.is_valid_date(date):
+            return date
+
+        return self.valid_days_from(date, 1)
 
     def __str__(self):
         return self.name
@@ -682,7 +718,7 @@ class DateCalculation(models.Model):
                 pass
 
         if dl_datetype:
-            return dl_datetype.valid_days_from(date, 0)
+            return dl_datetype.get_closest_valid_date(date)
         else:
             return date
 
