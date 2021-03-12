@@ -1,10 +1,13 @@
+from django.utils.translation import ugettext_lazy as _
 from rest_framework import serializers
+from rest_framework.exceptions import ValidationError
 
 from projects.models import (
     FieldComment,
     ProjectComment,
     LastReadTimestamp,
     Attribute,
+    FieldCommentFieldsetPathLocation,
 )
 from users.serializers import UserSerializer
 
@@ -46,14 +49,39 @@ class CommentSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class FieldsetPathSerializer(serializers.Serializer):
+    parent = serializers.SlugRelatedField(
+        read_only=False,
+        slug_field="identifier",
+        queryset=Attribute.objects.all(),
+    )
+    index = serializers.IntegerField()
+
+
 class FieldCommentSerializer(CommentSerializer):
     field = serializers.SlugRelatedField(
         read_only=False, slug_field="identifier", queryset=Attribute.objects.all()
     )
-    fieldset_index = serializers.ListField(child=serializers.IntegerField(), required=False)
+    fieldset_path = FieldsetPathSerializer(
+        many=True,
+        required=False,
+    )
     class Meta(CommentSerializer.Meta):
-        fields = CommentSerializer.Meta.fields + ["field", "fieldset_index"]
         model = FieldComment
+        fields = CommentSerializer.Meta.fields + ["field", "fieldset_path"]
+
+    def create(self, validated_data):
+        fieldset_path = validated_data.pop("fieldset_path", [])
+        comment = super().create(validated_data)
+        for i, location in enumerate(fieldset_path):
+            FieldCommentFieldsetPathLocation.objects.create(
+                target=comment,
+                index=i,
+                child_index=location["index"],
+                parent_fieldset=location["parent"],
+            )
+
+        return comment
 
 
 class LastReadTimestampSerializer(serializers.ModelSerializer):

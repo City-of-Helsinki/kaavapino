@@ -32,6 +32,8 @@ from .project import (  # noqa
     ProjectPhaseDeadlineSectionAttribute,
     PhaseAttributeMatrixStructure,
     PhaseAttributeMatrixCell,
+    ProjectAttributeFileFieldsetPathLocation,
+    FieldCommentFieldsetPathLocation,
 )
 from .projectcomment import (  # noqa
     ProjectComment,

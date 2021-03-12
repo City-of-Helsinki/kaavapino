@@ -80,12 +80,12 @@ class FieldComment(models.Model):
 
     content = models.TextField(verbose_name=_("content"))
 
-    fieldset_index = ArrayField(
-        models.PositiveIntegerField(),
-        verbose_name=_("fieldset index"),
-        null=True,
-        blank=True,
-    )
+    @property
+    def fieldset_path(self):
+        return [
+            {"parent": loc.parent_fieldset, "index": loc.child_index}
+            for loc in self.fieldset_path_locations.all()
+        ]
 
     class Meta:
         verbose_name = _("field comment")

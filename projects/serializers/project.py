@@ -31,11 +31,13 @@ from projects.models import (
     ProjectComment,
     Deadline,
     DeadlineDateCalculation,
+    ProjectAttributeFileFieldsetPathLocation,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
+from projects.serializers.utils import _set_fieldset_path
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
@@ -408,24 +410,45 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_files = ProjectAttributeFile.objects \
                 .filter(project=project, created_at__lte=snapshot) \
                 .exclude(archived_at__lte=snapshot) \
-                .order_by("attribute__pk", "project__pk", "-created_at") \
-                .distinct("attribute__pk", "project__pk")
+                .order_by(
+                    "fieldset_path_str",
+                    "attribute__pk",
+                    "project__pk",
+                    "-created_at",
+                ) \
+                .distinct("fieldset_path_str", "attribute__pk", "project__pk")
         else:
             attribute_files = ProjectAttributeFile.objects \
                 .filter(project=project, archived_at=None) \
-                .order_by("attribute__pk", "project__pk", "-created_at") \
-                .distinct("attribute__pk", "project__pk")
+                .order_by(
+                    "fieldset_path_str",
+                    "attribute__pk",
+                    "project__pk",
+                    "-created_at",
+                ) \
+                .distinct("fieldset_path_str", "attribute__pk", "project__pk")
 
         # Add file attributes to the attribute data
         # File values are represented as absolute URLs
-        file_attributes = {
-            attribute_file.attribute.identifier: {
-                "link": request.build_absolute_uri(attribute_file.file.url),
-                "description": attribute_file.description,
-            }
-            for attribute_file in attribute_files
-            if has_project_attribute_file_permissions(attribute_file, request)
-        }
+        file_attributes = {}
+        for attribute_file in attribute_files:
+            if has_project_attribute_file_permissions(attribute_file, request):
+                if not attribute_file.fieldset_path:
+                    file_attributes[attribute_file.attribute.identifier] = {
+                        "link": request.build_absolute_uri(attribute_file.file.url),
+                        "description": attribute_file.description,
+                    }
+                else:
+                    _set_fieldset_path(
+                        attribute_file.fieldset_path,
+                        file_attributes,
+                        0,
+                        attribute_file.attribute.identifier,
+                        {
+                            "link": request.build_absolute_uri(attribute_file.file.url),
+                            "description": attribute_file.description,
+                        }
+                    )
         attribute_data.update(file_attributes)
 
     @staticmethod
@@ -512,18 +535,34 @@ class ProjectSerializer(serializers.ModelSerializer):
                     timestamp__lte=cutoff,
                 )
                 .order_by(
-                    "action_object_content_type", "action_object_object_id", "-timestamp"
+                    "data__attribute_identifier",
+                    "action_object_content_type",
+                    "action_object_object_id",
+                    "-timestamp",
                 )
-                .distinct("action_object_content_type", "action_object_object_id")
+                .distinct(
+                    "data__attribute_identifier",
+                    "action_object_content_type",
+                    "action_object_object_id",
+                )
+
                 .prefetch_related("actor")
             )
         else:
             actions = (
                 project.target_actions.filter(verb=verbs.UPDATED_ATTRIBUTE)
                 .order_by(
-                    "action_object_content_type", "action_object_object_id", "-timestamp"
+                    "data__attribute_identifier",
+                    "action_object_content_type",
+                    "action_object_object_id",
+                    "-timestamp",
                 )
-                .distinct("action_object_content_type", "action_object_object_id")
+                .distinct(
+                    "data__attribute_identifier",
+                    "action_object_content_type",
+                    "action_object_object_id",
+                )
+
                 .prefetch_related("actor")
             )
 
@@ -1230,6 +1269,17 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
         return project.project_type.pk
 
 
+class FieldsetPathField(serializers.JSONField):
+    def to_representation(self, value):
+        return [
+            {
+                "parent": i["parent"].identifier,
+                "index": i["index"],
+            }
+            for i in value
+        ]
+
+
 class ProjectFileSerializer(serializers.ModelSerializer):
     file = serializers.FileField(use_url=True)
     attribute = serializers.SlugRelatedField(
@@ -1239,10 +1289,11 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         ),
     )
     project = serializers.PrimaryKeyRelatedField(queryset=Project.objects.all())
+    fieldset_path = FieldsetPathField(binary=True, required=False)
 
     class Meta:
         model = ProjectAttributeFile
-        fields = ["file", "attribute", "project", "description"]
+        fields = ["file", "attribute", "project", "description", "fieldset_path"]
 
     @staticmethod
     def _validate_attribute(attribute: Attribute, project: Project):
@@ -1269,37 +1320,61 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
-        try:
-            old_file = ProjectAttributeFile.objects.filter(
-                project=validated_data["project"],
-                attribute=validated_data["attribute"],
-                archived_at=None,
-            ).order_by("-created_at").first()
-            old_value = old_file.description
-        except AttributeError:
-            old_value = None
+        fieldset_path = validated_data.pop("fieldset_path", [])
+        attribute = validated_data["attribute"]
 
-        old_files = list(ProjectAttributeFile.objects.filter(
+        # Save new path as a string for easier querying
+        if fieldset_path:
+            path_string = ".".join([
+                f"{loc['parent']}[{loc['index']}]"
+                for loc in fieldset_path
+            ]) + f".{attribute.identifier}"
+            validated_data["fieldset_path_str"] = path_string
+
+        else:
+            path_string = None
+
+        old_files = ProjectAttributeFile.objects.filter(
             project=validated_data["project"],
-            attribute=validated_data["attribute"],
+            attribute=attribute,
             archived_at=None,
-        ))
+            fieldset_path_str=path_string,
+        ).order_by("-created_at")
+
+        try:
+            old_file = old_files[0]
+            old_value = old_file.description
+        except (AttributeError, IndexError):
+            old_file = None
+            old_value = None
 
         new_file = super().create(validated_data)
         new_value = new_file.description
 
-        if old_value != new_value or old_file.file != new_file.file:
+        # Create related fieldset path objects
+        for i, location in enumerate(fieldset_path):
+            ProjectAttributeFileFieldsetPathLocation.objects.create(
+                target=new_file,
+                index=i,
+                child_index=location["index"],
+                parent_fieldset=Attribute.objects.get(
+                    identifier=location["parent"],
+                ),
+            )
+
+        if old_value != new_value or old_file and old_file.file != new_file.file:
+            log_identifier = \
+                path_string or \
+                validated_data["attribute"].identifier
             entry = action.send(
                 self.context["request"].user or validated_data["project"].user,
                 verb=verbs.UPDATED_ATTRIBUTE,
-                action_object=validated_data["attribute"],
+                action_object=attribute,
                 target=validated_data["project"],
-                attribute_identifier=validated_data["attribute"].identifier,
+                attribute_identifier=log_identifier,
                 new_value=new_value,
                 old_value=old_value,
             )
-
-        if entry:
             timestamp = entry[0][1].timestamp
         else:
             timestamp = datetime.datetime.now()

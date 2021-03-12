@@ -17,6 +17,7 @@ from projects.actions import verbs
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
+from .projectcomment import FieldComment
 
 
 class BaseAttributeMatrixStructure(models.Model):
@@ -759,6 +760,18 @@ class ProjectAttributeFile(models.Model):
         null=True,
         blank=True,
     )
+    fieldset_path_str = models.TextField(
+        verbose_name=_("fieldset path string"),
+        null=True,
+        blank=True,
+    )
+
+    @property
+    def fieldset_path(self):
+        return [
+            {"parent": loc.parent_fieldset, "index": loc.child_index}
+            for loc in self.fieldset_path_locations.all()
+        ]
 
     def get_upload_subfolder(self):
         project_id = str(self.project.pk)
@@ -941,3 +954,40 @@ class ProjectPhaseDeadlineSection(models.Model):
         return f"{self.phase.name}, {self.phase.project_subtype.name}"
 
 
+class FieldsetPathLocation(models.Model):
+    """Defines a single node in a fieldset path to a field"""
+    child_index = models.PositiveIntegerField(verbose_name=_("child index"))
+    parent_fieldset = models.ForeignKey(
+        Attribute,
+        verbose_name=_("parent fieldset"),
+        on_delete=models.CASCADE,
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"))
+
+    class Meta:
+        abstract = True
+        ordering = ("index",)
+
+
+class ProjectAttributeFileFieldsetPathLocation(FieldsetPathLocation):
+    target = models.ForeignKey(
+        ProjectAttributeFile,
+        verbose_name=_("target file"),
+        related_name="fieldset_path_locations",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta(FieldsetPathLocation.Meta):
+        unique_together = ("index", "target")
+
+
+class FieldCommentFieldsetPathLocation(FieldsetPathLocation):
+    target = models.ForeignKey(
+        FieldComment,
+        verbose_name=_("target comment"),
+        related_name="fieldset_path_locations",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta(FieldsetPathLocation.Meta):
+        unique_together = ("index", "target")
