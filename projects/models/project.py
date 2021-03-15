@@ -284,17 +284,18 @@ class Project(models.Model):
 
             attribute_data[attribute.identifier] = calculated_value
 
-    def _check_condition(self, deadline):
+    def _check_condition(self, deadline, preview_attributes={}):
         if not deadline.condition_attributes.count():
             return True
 
+        attribute_data = {**self.attribute_data, **preview_attributes}
         for attr in deadline.condition_attributes.all():
-            if bool(self.attribute_data.get(attr.identifier, None)):
+            if bool(attribute_data.get(attr.identifier, None)):
                 return True
 
         return False
 
-    def _get_applicable_deadlines(self, subtype=None):
+    def _get_applicable_deadlines(self, subtype=None, preview_attributes={}):
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -311,12 +312,20 @@ class Project(models.Model):
                     .filter(subtype=subtype or self.subtype) \
                     .exclude(phase__name__in=excluded_phases)
             )
-            if self._check_condition(deadline)
+            if self._check_condition(deadline, preview_attributes)
         ]
 
-    def _set_calculated_deadline(self, deadline, date, initial, user, preview):
+    def _set_calculated_deadline(self, deadline, date, initial, user, preview, preview_attribute_data={}):
         try:
-            project_deadline = self.deadlines.get(deadline=deadline)
+            if preview:
+                try:
+                    identifier = deadline.attribute.identifier
+                except AttributeError:
+                    identifier = None
+
+                project_deadline = preview_attribute_data.get(identifier) or self.deadlines.get(deadline=deadline)
+            else:
+                project_deadline = self.deadlines.get(deadline=deadline)
         except ProjectDeadline.DoesNotExist:
             return
 
@@ -351,10 +360,18 @@ class Project(models.Model):
 
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False, preview_attribute_data={}):
         results = {}
 
         for deadline in deadlines:
+            try:
+                identifier = deadline.attribute.identifier
+                asd = preview_attribute_data.get(identifier) or self.deadlines.get(deadline=deadline)
+                preview_dl = preview and identifier in preview_attribute_data.keys()
+            except (TypeError, AttributeError, ProjectDeadline.DoesNotExist):
+                identifier = None
+                preview_dl = False
+
             if initial:
                 calculate_deadline = deadline.calculate_initial
                 dependencies = [
@@ -375,14 +392,17 @@ class Project(models.Model):
                     user,
                     ignore=ignore,
                     initial=initial,
+                    preview=preview,
+                    preview_attribute_data=preview_attribute_data,
                 )
 
             results[deadline] = self._set_calculated_deadline(
                 deadline,
-                calculate_deadline(self),
+                calculate_deadline(self, preview_attributes=preview_attribute_data),
                 initial,
                 user,
                 preview,
+                preview_attribute_data,
             )
 
         return results
@@ -456,27 +476,32 @@ class Project(models.Model):
         # List deadlines that would be created
         new_dls = {
             dl: None
-            for dl in self._get_applicable_deadlines(subtype=subtype)
+            for dl in self._get_applicable_deadlines(
+                subtype=subtype,
+                preview_attributes=updated_attributes,
+            )
+            if dl not in project_dls
         }
 
         project_dls = {**new_dls, **project_dls}
 
         # Update attribute-based deadlines
+        updated_attribute_data = {**self.attribute_data, **updated_attributes}
         for dl in project_dls.keys():
             if not dl.attribute:
                 continue
 
-            value = self.attribute_data.get(dl.attribute.identifier)
+            value = updated_attribute_data.get(dl.attribute.identifier)
 
             if value:
                 project_dls[dl] = value
+
 
         # Generate newly added deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in new_dls.keys()
-                if dl.initial_calculations.count() \
-                    or dl.default_to_created_at
+                if dl.initial_calculations.count() or dl.default_to_created_at
             ],
             None,
             initial=True,
@@ -494,6 +519,7 @@ class Project(models.Model):
             None,
             initial=False,
             preview=True,
+            preview_attribute_data=updated_attributes,
         )}
 
         return project_dls

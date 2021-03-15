@@ -151,20 +151,23 @@ class Deadline(models.Model):
 
         return True
 
-    def _check_condition(self, project, condition):
-        if project.attribute_data.get(condition.identifier):
+    def _check_condition(self, project, condition, preview_attributes={}):
+        attribute_data = {**project.attribute_data, **preview_attributes}
+        if attribute_data.get(condition.identifier):
             return True
         elif condition.static_property:
             return bool(getattr(project, condition.static_property))
         else:
             return False
 
-    def _calculate(self, project, calculations, datetype):
+    def _calculate(self, project, calculations, datetype, preview_attributes={}):
         # TODO hard-coded, maybe change later
         if self.phase.name == "Periaatteet" and not project.create_principles:
             return None
         elif self.phase.name == "Luonnos" and not project.create_draft:
             return None
+
+        attribute_data = {**project.attribute_data, **preview_attributes}
 
         # Use first calculation whose condition is met
         # and target has a value
@@ -176,7 +179,13 @@ class Deadline(models.Model):
             if base_attr and base_attr.static_property:
                 base_attr = getattr(project, base_attr.static_property, None)
             elif base_attr:
-                base_date = project.attribute_data.get(base_attr.identifier)
+                base_date = attribute_data.get(base_attr.identifier)
+            elif base_deadline and base_deadline.attribute:
+                try:
+                    base_date = preview_attributes.get(base_deadline.attribute.identifier) or \
+                        project.deadlines.get(deadline=base_deadline).date
+                except ObjectDoesNotExist:
+                    base_date = None
             elif base_deadline:
                 try:
                     base_date = project.deadlines.get(deadline=base_deadline).date
@@ -191,37 +200,40 @@ class Deadline(models.Model):
                     condition_result = True
 
                 for condition in calculation.conditions.all():
-                    if self._check_condition(project, condition):
+                    if self._check_condition(project, condition, preview_attributes):
                         condition_result = True
 
                 for condition in calculation.not_conditions.all():
-                    if not self._check_condition(project, condition):
+                    if not self._check_condition(project, condition, preview_attributes):
                         condition_result = True
 
             if condition_result:
-                return calculation.datecalculation.calculate(project, datetype)
+                return calculation.datecalculation.calculate(project, datetype, preview_attributes)
 
         if self.default_to_created_at:
             return project.created_at.date()
 
         return None
 
-    def calculate_initial(self, project):
+    def calculate_initial(self, project, preview_attributes={}):
         return self._calculate(
             project,
             self.initial_calculations.all(),
             self.date_type,
+            preview_attributes,
         )
 
-    def calculate_updated(self, project):
+    def calculate_updated(self, project, preview_attributes={}):
         if self.update_calculations.count():
             return self._calculate(
                 project,
                 self.update_calculations.all(),
                 self.date_type,
+                preview_attributes,
             )
         elif self.attribute:
-            return project.attribute_data.get(self.attribute.identifier, None)
+            attribute_data = {**project.attribute_data, **preview_attributes}
+            return attribute_data.get(self.attribute.identifier, None)
 
     def __str__(self):
         return f"{self.phase} {self.deadline_types} {self.abbreviation}"
@@ -682,14 +694,24 @@ class DateCalculation(models.Model):
         null=True,
     )
 
-    def calculate(self, project, dl_datetype):
+    def calculate(self, project, dl_datetype, preview_attributes={}):
+        attribute_data = {**project.attribute_data, **preview_attributes}
         date = None
 
         if self.base_date_attribute:
-            date = project.attribute_data.get(
+            date = attribute_data.get(
                 self.base_date_attribute.identifier,
                 None
             )
+        elif self.base_date_deadline and self.base_date_deadline.attribute:
+            try:
+                date = preview_attributes.get(
+                    self.base_date_deadline.attribute.identifier,
+                ) or project.deadlines.get(
+                    deadline = self.base_date_deadline
+                ).date
+            except Exception:
+                date = None
         elif self.base_date_deadline:
             try:
                 date = project.deadlines.get(
@@ -712,7 +734,7 @@ class DateCalculation(models.Model):
         for attribute in self.attributes.all():
             try:
                 date += datetime.timedelta(
-                    days=project.attribute_data.get(attribute.identifier, 0)
+                    days=attribute_data.get(attribute.identifier, 0)
                 )
             except TypeError:
                 pass
