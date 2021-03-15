@@ -364,14 +364,6 @@ class Project(models.Model):
         results = {}
 
         for deadline in deadlines:
-            try:
-                identifier = deadline.attribute.identifier
-                asd = preview_attribute_data.get(identifier) or self.deadlines.get(deadline=deadline)
-                preview_dl = preview and identifier in preview_attribute_data.keys()
-            except (TypeError, AttributeError, ProjectDeadline.DoesNotExist):
-                identifier = None
-                preview_dl = False
-
             if initial:
                 calculate_deadline = deadline.calculate_initial
                 dependencies = [
