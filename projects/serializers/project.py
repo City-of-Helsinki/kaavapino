@@ -1334,12 +1334,12 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         else:
             path_string = None
 
-        old_files = ProjectAttributeFile.objects.filter(
+        old_files = list(ProjectAttributeFile.objects.filter(
             project=validated_data["project"],
             attribute=attribute,
             archived_at=None,
             fieldset_path_str=path_string,
-        ).order_by("-created_at")
+        ).order_by("-created_at"))
 
         try:
             old_file = old_files[0]
