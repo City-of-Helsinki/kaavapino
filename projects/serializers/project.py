@@ -693,6 +693,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
             if not should_update_deadlines:
+                should_update_deadlines = bool(
+                    Deadline.objects.filter(
+                        subtype=instance.subtype,
+                        condition_attributes__identifier__in=attr_identifiers,
+                    ).count()
+                )
+
+            if not should_update_deadlines:
                 should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
                     deadline__project_deadlines__project=instance
                 ).filter(
