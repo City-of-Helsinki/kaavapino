@@ -439,7 +439,15 @@ class ProjectSerializer(serializers.ModelSerializer):
                         "description": attribute_file.description,
                     }
                 else:
+                    try:
+                        fieldset_content = self.instance.attribute_data.get(
+                            attribute_file.fieldset_path[0]["parent"].identifier, []
+                        )[attribute_file.fieldset_path[0]["index"]]
+                    except (KeyError, IndexError, TypeError):
+                        fieldset_content = {}
+
                     _set_fieldset_path(
+                        fieldset_content,
                         attribute_file.fieldset_path,
                         file_attributes,
                         0,
@@ -449,6 +457,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                             "description": attribute_file.description,
                         }
                     )
+
         attribute_data.update(file_attributes)
 
     @staticmethod

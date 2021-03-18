@@ -7,7 +7,7 @@ def _is_attribute_required(attribute: Attribute):
     else:
         return False
 
-def _set_fieldset_path(path, parent_obj, i, identifier, value):
+def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value):
     parent_id = path[i]["parent"].identifier
     index = path[i]["index"]
 
@@ -21,16 +21,38 @@ def _set_fieldset_path(path, parent_obj, i, identifier, value):
         parent_obj[parent_id] += [None] * (index + 1 - len(parent_obj[parent_id]))
         next_obj = parent_obj[parent_id][index]
 
-    if i < len(path) - 1:
+
+    # TODO multi-level fieldset image uploads not needed/supported for now
+    if False and i < len(path) - 1:
         if next_obj is None:
-            print("jäljellä kamaa, täyetään tyhjä kohta ja jatketaan")
-            parent_obj[parent_id][index] = {}
+            if fieldset_content:
+                parent_obj[parent_id][index] = {**fieldset_content}
+            else:
+                parent_obj[parent_id][index] = {}
+
             next_obj = parent_obj[parent_id][index]
 
-        _set_fieldset_path(path, next_obj, i+1, identifier, value)
+        # TODO Handle fieldset_content within multi-level fieldsets later
+        _set_fieldset_path(
+            None,
+            path,
+            next_obj,
+            i+1,
+            identifier,
+            value
+        )
 
     else:
         if next_obj is None:
-            parent_obj[parent_id][index] = {identifier: value}
+            if fieldset_content:
+                parent_obj[parent_id][index] = {
+                    **fieldset_content,
+                    identifier: value,
+                }
+            else:
+                parent_obj[parent_id][index] = {identifier: value}
         else:
+            for k, v in fieldset_content.items():
+                next_obj[k] = v
+
             next_obj[identifier] = value
