@@ -414,6 +414,11 @@ class Attribute(models.Model):
                     return value or None
         elif self.value_type == Attribute.TYPE_FIELDSET:
             return self._get_fieldset_serialization(value)
+        elif self.value_type in (Attribute.TYPE_FILE, Attribute.TYPE_IMAGE):
+            if value is None:
+                return None
+            else:
+                return ""
         else:
             raise Exception('Cannot serialize attribute type "%s".' % self.value_type)
 
@@ -467,11 +472,19 @@ class Attribute(models.Model):
         entities = []
         fieldset_attributes = self.fieldset_attributes.all()
 
-        for listitem in value:
+        for i, listitem in enumerate(value):
             processed_entity = {}
+            processed_entity_has_files = False
             for key, val in listitem.items():
                 for attr in fieldset_attributes:
-                    if attr.identifier == key:
+                    if attr.value_type in (
+                        Attribute.TYPE_FILE, Attribute.TYPE_IMAGE
+                    ):
+                        # TODO If alternate file deletion method is needed,
+                        # add if val is None check
+                        processed_entity_has_files = True
+
+                    elif attr.identifier == key:
                         if deserialize:
                             processed_value = attr.deserialize_value(
                                 key
@@ -482,7 +495,7 @@ class Attribute(models.Model):
                     else:
                         continue
 
-            if processed_entity:
+            if processed_entity or processed_entity_has_files:
                 entities.append(processed_entity)
 
         return entities

@@ -831,10 +831,26 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if k not in confirmed_deadlines
             }
 
-        invalid_identifiers = list(np.setdiff1d(
+        # mostly invalid identifiers, but could be fieldset file fields
+        unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
             list(valid_attributes.keys()),
         ))
+
+        invalid_identifiers = []
+        files_to_archive = []
+        for identifier in unusual_identifiers:
+            try:
+                attribute_file = ProjectAttributeFile.objects.get(
+                    archived_at=None,
+                    fieldset_path_str=identifier,
+                    project=self.instance,
+                )
+                files_to_archive.append((identifier, attribute_file))
+
+            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist):
+                invalid_identifiers.append(identifier)
+
 
         if len(invalid_identifiers):
             raise ValidationError(
@@ -843,6 +859,21 @@ class ProjectSerializer(serializers.ModelSerializer):
                     for key in invalid_identifiers
                 }
             )
+
+        for identifier, attribute_file in files_to_archive:
+            entry = action.send(
+                user,
+                verb=verbs.UPDATED_ATTRIBUTE,
+                action_object=attribute_file.attribute,
+                target=self.instance,
+                attribute_identifier=identifier,
+                new_value=None,
+                old_value=attribute_file.description,
+            )
+            timestamp = entry[0][1].timestamp
+
+            attribute_file.archived_at = timestamp
+            attribute_file.save()
 
         if self.instance:
             for dl in ProjectDeadline.objects.filter(
@@ -1039,7 +1070,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             return project
 
-    def log_updates_attribute_data(self, attribute_data, project=None):
+    def log_updates_attribute_data(self, attribute_data, project=None, prefix=""):
         project = project or self.instance
         if not project:
             raise ValueError("Can't update attribute data log if no project")
@@ -1081,6 +1112,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             values = updated_attribute_values[attribute.identifier]
 
+            if attribute.value_type == Attribute.TYPE_FIELDSET:
+                for i, children in enumerate(values["new"]):
+                    for k, v in dict(children).items():
+                        self.log_updates_attribute_data(
+                            {k: v},
+                            project=project,
+                            prefix=f"{prefix}{attribute.identifier}[{i}].",
+                        )
+
             if attribute.value_type == Attribute.TYPE_CHOICE:
                 if isinstance(values["new"], list):
                     values["new"] = [
@@ -1093,7 +1133,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         pass
 
             self._create_updates_log(
-                attribute, project, user, values["new"], values["old"]
+                attribute, project, user, values["new"], values["old"], prefix
             )
 
         for geometry_attribute in geometry_attributes:
@@ -1104,7 +1144,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             if geometry_instance and geometry_instance.geometry != new_geometry:
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
-    def _create_updates_log(self, attribute, project, user, new_value, old_value):
+    def _create_updates_log(self, attribute, project, user, new_value, old_value, prefix=""):
         new_value = json.loads(json.dumps(new_value, default=str))
         old_value = json.loads(json.dumps(old_value, default=str))
         entry = action.send(
@@ -1112,7 +1152,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             verb=verbs.UPDATED_ATTRIBUTE,
             action_object=attribute,
             target=project,
-            attribute_identifier=attribute.identifier,
+            attribute_identifier=prefix+attribute.identifier,
             old_value=old_value,
             new_value=new_value,
         )
