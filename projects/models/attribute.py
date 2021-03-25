@@ -476,6 +476,10 @@ class Attribute(models.Model):
             processed_entity = {}
             processed_entity_has_files = False
             for key, val in listitem.items():
+                if key == "_deleted":
+                    processed_entity[key] = val
+                    continue
+
                 for attr in fieldset_attributes:
                     if attr.value_type in (
                         Attribute.TYPE_FILE, Attribute.TYPE_IMAGE

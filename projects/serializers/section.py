@@ -196,6 +196,10 @@ def create_fieldset_field_data(attribute, validation, project, preview):
         serializer_field = field_data.field_class(**field_data.field_arguments)
         serializer_fields[attr.identifier] = serializer_field
 
+    serializer_fields["_deleted"] = serializers.BooleanField(
+        required=False,
+        default=False,
+    )
     field_arguments["required"] = False
 
     serializer = type("FieldSetSerializer", (serializers.Serializer,), {})
