@@ -185,7 +185,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         search_fields = [
             search_field_for_attribute(attr)
             for attr in Attribute.objects.filter(searchable=True)
-        ]
+        ] + ['subtype__project_type__name']
         return queryset \
             .annotate(search=SearchVector(*search_fields)) \
             .filter(search=search)
