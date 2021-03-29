@@ -37,7 +37,7 @@ ptyprocess==0.6.0         # via pexpect
 py==1.8.1                 # via pytest
 pycodestyle==2.6.0        # via flake8, flake8-print
 pyflakes==2.2.0           # via flake8
-pygments==2.6.1           # via ipython
+pygments==2.7.4           # via ipython
 pyparsing==2.4.7          # via packaging
 pytest==5.4.3
 pytest-cov==2.10.0
