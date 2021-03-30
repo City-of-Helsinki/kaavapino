@@ -1171,11 +1171,13 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if attribute.value_type in [Attribute.TYPE_FILE, Attribute.TYPE_IMAGE] \
             and new_value is None:
+            fieldset_path_str = prefix + attribute.identifier if prefix else None
             timestamp = entry[0][1].timestamp
             for old_file in ProjectAttributeFile.objects.filter(
                 project=project,
                 attribute=attribute,
                 archived_at=None,
+                fieldset_path_str=fieldset_path_str
             ):
                 old_file.archived_at = timestamp
                 old_file.save()
