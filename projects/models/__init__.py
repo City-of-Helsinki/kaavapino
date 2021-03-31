@@ -16,6 +16,8 @@ from .document import DocumentTemplate  # noqa
 from .project import (  # noqa
     Project,
     ProjectAttributeFile,
+    ProjectCardSection,
+    ProjectCardSectionAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
     ProjectFloorAreaSectionAttributeMatrixStructure,

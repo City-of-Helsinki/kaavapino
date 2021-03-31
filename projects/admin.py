@@ -1,4 +1,4 @@
-from adminsortable2.admin import SortableInlineAdminMixin
+from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
@@ -32,6 +32,8 @@ from .models import (
     DocumentTemplate,
     Project,
     ProjectAttributeFile,
+    ProjectCardSection,
+    ProjectCardSectionAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
     ProjectPhase,
@@ -203,6 +205,17 @@ class ProjectAdmin(OSMGeoAdmin):
             )
 
         return actions
+
+
+class ProjectCardSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectCardSectionAttribute
+    extra = 0
+
+
+@admin.register(ProjectCardSection)
+class ProjectCardSectionAdmin(SortableAdminMixin, admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (ProjectCardSectionAttributeInline,)
 
 
 class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):

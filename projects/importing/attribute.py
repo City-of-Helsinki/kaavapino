@@ -19,6 +19,8 @@ from ..models import (
     DataRetentionPlan,
     Deadline,
     FieldSetAttribute,
+    ProjectCardSection,
+    ProjectCardSectionAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
     ProjectFloorAreaSectionAttributeMatrixCell,
@@ -84,6 +86,11 @@ PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
 HELP_TEXT = "ohje tiedon syöttäjälle"
 HELP_LINK = "ohjeeseen liittyvä linkki"
+
+# Project card related columns
+CARD_SECTION_NAME = "tieto näkyy projektikortissa; projektikortin osio"
+CARD_SECTION_LOCATION = "tieto näkyy projektikortissa; kenttien järjestys"
+CARD_SECTION_DATE_FORMAT = "tieto näkyy projektikortissa; päivämäärän yhteydessä näkyvä teksti "
 
 CALCULATIONS_COLUMN = "laskelmat"
 
@@ -924,6 +931,45 @@ class AttributeImporter:
 
         return None
 
+    def _create_card_sections(self, rows):
+        logger.info("\nReplacing project card sections...")
+        ProjectCardSection.objects.all().delete()
+        ProjectCardSectionAttribute.objects.all().delete()
+
+        for row in rows:
+            section_name = row[self.column_index[CARD_SECTION_NAME]]
+            if not section_name or section_name == "ei":
+                continue
+
+            location = row[self.column_index[CARD_SECTION_LOCATION]]
+            date_format = row[self.column_index[CARD_SECTION_DATE_FORMAT]]
+            attribute = Attribute.objects.get(
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
+
+            if not location:
+                location = [0]
+            elif type(location) == str:
+                location = location.split(".")
+            elif type(location) == int:
+                location = [location]
+
+            attr_index = int(location[-1]) if len(location) >= 1 else 0
+
+            section, __ = ProjectCardSection.objects.update_or_create(
+                name=section_name,
+                defaults={
+                    "index": int(location[0]),
+                },
+            )
+            ProjectCardSectionAttribute.objects.create(
+                attribute=attribute,
+                section=section,
+                date_format=date_format or None,
+                index=attr_index,
+            )
+
+
     def _create_sections(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing sections...")
 
@@ -1341,6 +1387,8 @@ class AttributeImporter:
 
         # Remove all attributes from further processing that were part of a fieldset
         data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
+
+        self._create_card_sections(data_rows)
 
         for subtype in subtypes:
             self._create_sections(data_rows, subtype)

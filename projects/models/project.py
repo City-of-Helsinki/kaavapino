@@ -740,6 +740,59 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
+class ProjectCardSection(models.Model):
+    """Defines a section to be shown on project card view."""
+
+    name = models.CharField(
+        max_length=255,
+        verbose_name=_("name"),
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
+
+    class Meta:
+        verbose_name = _("project card section")
+        verbose_name_plural = _("project card sections")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.name}"
+
+class ProjectCardSectionAttribute(models.Model):
+    """Links an attribute into a project card section."""
+    attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("attribute"),
+        on_delete=models.CASCADE,
+    )
+    section = models.ForeignKey(
+        ProjectCardSection,
+        verbose_name=_("project card section"),
+        related_name="attributes",
+        on_delete=models.CASCADE,
+    )
+    date_format = models.CharField(
+        max_length=255,
+        verbose_name=_("date format and text"),
+        null=True,
+        blank=True,
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
+
+    class Meta:
+        verbose_name = _("project card section attribute")
+        verbose_name_plural = _("project card section attributes")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.attribute} {self.section} {self.index}"
+
+
 class ProjectPhaseFieldSetAttributeIndex(models.Model):
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     phase = models.ForeignKey(
