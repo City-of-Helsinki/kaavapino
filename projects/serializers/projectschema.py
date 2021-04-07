@@ -651,8 +651,8 @@ class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
 
 class ProjectCardSchemaSerializer(serializers.ModelSerializer):
     choices = serializers.SerializerMethodField()
-    label = serializers.CharField(source="attribute.identifier")
-    name = serializers.CharField(source="attribute.name")
+    label = serializers.CharField(source="attribute.name")
+    name = serializers.CharField(source="attribute.identifier")
     section_name = serializers.CharField(source="section.name")
 
     class Meta:
