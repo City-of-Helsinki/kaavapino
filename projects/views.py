@@ -26,6 +26,7 @@ from projects.models import (
     ProjectComment,
     LastReadTimestamp,
     Project,
+    ProjectCardSectionAttribute,
     ProjectPhase,
     ProjectType,
     ProjectSubtype,
@@ -63,6 +64,7 @@ from projects.serializers.projectschema import (
     BrowseProjectTypeSchemaSerializer,
     AdminOwnerProjectTypeSchemaSerializer,
     CreateOwnerProjectTypeSchemaSerializer,
+    ProjectCardSchemaSerializer,
 )
 from projects.serializers.projecttype import (
     ProjectTypeSerializer,
@@ -228,6 +230,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all()
     serializer_class = ProjectPhaseSerializer
+
+
+class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ProjectCardSectionAttribute.objects.all()
+    serializer_class = ProjectCardSchemaSerializer
 
 
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):

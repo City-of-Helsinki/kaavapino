@@ -12,6 +12,7 @@ from projects.models import (
     FieldSetAttribute,
     Project,
     ProjectSubtype,
+    ProjectCardSectionAttribute,
 )
 from projects.models.project import (
     PhaseAttributeMatrixCell,
@@ -646,3 +647,37 @@ class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
             context=context,
         )
         return serializer.data
+
+
+class ProjectCardSchemaSerializer(serializers.ModelSerializer):
+    choices = serializers.SerializerMethodField()
+    label = serializers.CharField(source="attribute.identifier")
+    name = serializers.CharField(source="attribute.name")
+    section_name = serializers.CharField(source="section.name")
+
+    class Meta:
+        model = ProjectCardSectionAttribute
+        fields = [
+            "label",
+            "name",
+            "section_name",
+            "choices",
+            "date_format",
+        ]
+
+    @staticmethod
+    def get_choices(sect_attr):
+        attribute = sect_attr.attribute
+        foreign_key_choice = FOREIGN_KEY_TYPE_MODELS.get(attribute.value_type, None)
+
+        if foreign_key_choice:
+            choices = AttributeSchemaSerializer._get_foreign_key_choices(
+                foreign_key_choice
+            )
+        else:
+            choices = AttributeSchemaSerializer._get_attribute_choices(attribute)
+
+        if not choices:
+            return None
+
+        return AttributeChoiceSchemaSerializer(choices, many=True).data
