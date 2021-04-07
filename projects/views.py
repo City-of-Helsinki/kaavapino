@@ -233,7 +233,9 @@ class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectCardSectionAttribute.objects.all()
+    queryset = ProjectCardSectionAttribute.objects.all().order_by(
+        "section__index", "index"
+    )
     serializer_class = ProjectCardSchemaSerializer
 
 
