@@ -1386,9 +1386,8 @@ class AttributeImporter:
         self._validate_generated_attributes()
 
         # Remove all attributes from further processing that were part of a fieldset
+        all_data_rows = data_rows
         data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
-
-        self._create_card_sections(data_rows)
 
         for subtype in subtypes:
             self._create_sections(data_rows, subtype)
@@ -1397,6 +1396,8 @@ class AttributeImporter:
             self._create_floor_area_sections(data_rows, subtype)
             self._create_floor_area_attribute_section_links(data_rows, subtype)
             self._create_deadline_sections(data_rows, subtype)
+
+        self._create_card_sections(all_data_rows)
 
         # Clear cached sections
         cache.delete("serialized_phase_sections")
