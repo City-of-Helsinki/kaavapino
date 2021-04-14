@@ -1,5 +1,5 @@
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.contrib.postgres.search import SearchVector
 from django.db import transaction
 from django.db.models import Q
@@ -24,6 +24,8 @@ from projects.importing.report import ReportTypeCreator
 from projects.models import (
     FieldComment,
     ProjectComment,
+    ProjectDeadline,
+    ProjectFloorAreaSection,
     LastReadTimestamp,
     Project,
     ProjectCardSectionAttribute,
@@ -242,6 +244,115 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ).data
             for document_section in DocumentLinkSection.objects.all()
         ]})
+
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+    )
+    def overview(self, request):
+        today = datetime.now().date()
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        try:
+            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            start_date = datetime(today.year, 1, 1).date()
+
+        try:
+            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            end_date = datetime(start_date.year, 12, 31).date()
+
+        if (end_date-start_date).days > 366:
+            return Response(
+                {"detail": "Date range has to be 366 days or less"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Can't go backwards in time
+        if start_date > end_date:
+            [start_date, end_date] = [start_date, end_date]
+
+        # Dates should be Tuesdays
+        start_date += timedelta((1-start_date.weekday()) % 7)
+        end_date += timedelta((1-end_date.weekday()) % 7)
+
+        date_range = [
+            start_date + timedelta(days=i)
+            for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
+        ]
+
+        floor_area_attrs = ProjectFloorAreaSection.objects.get(
+            name="Kerrosalan lisäys yhteensä", project_subtype__name="M"
+        ).attributes.all()
+
+        # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
+        projects_by_date = {
+            date: ProjectDeadline.objects.filter(
+                project__public=True,
+                deadline__attribute__identifier__icontains="lautakunnassa",
+                date=date,
+            ).order_by("project__pk").distinct("project__pk").count()
+            for date in date_range
+        }
+
+        projects_in_range_by_date = {
+            date: [dl.project for dl in ProjectDeadline.objects.filter(
+                project__public=True,
+                deadline__attribute__identifier__icontains="lautakunnassa",
+                date__gte=start_date,
+                date__lte=date,
+            ).order_by("project__pk").distinct("project__pk")]
+            for date in date_range
+        }
+        projects_in_range = projects_in_range_by_date[end_date]
+
+        confirmed_projects_by_date = {
+            date: [dl.project for dl in ProjectDeadline.objects.filter(
+                project__public=True,
+                project__pk__in=[p.pk for p in projects_in_range],
+                deadline__attribute__identifier__in=[
+                    "tarkistettu_ehdotus_hyvaksytty_kylk",
+                    "toteutunut_kirje_kaupunginhallitukselle",
+                    "kylk_hyvaksymispaatos_pvm",
+                ],
+                date__lte=date,
+            ).order_by("project__pk").distinct("project__pk")]
+            for date in date_range
+        }
+
+        def get_floor_area(date, attr):
+            if date < today:
+                projects = confirmed_projects_by_date[date]
+            else:
+                projects = projects_in_range_by_date[date]
+
+            total = 0
+
+            for project in projects:
+                total += int(float(project.attribute_data.get(attr.identifier, 0)))
+
+            return total
+
+        return Response({
+            "date": today,
+            "daily_stats": [
+                {
+                    "date": str(date),
+                    "meetings": projects_by_date[date],
+                    "floor_area": {
+                        "is_prediction": date >= today,
+                        **{
+                            attr.identifier: get_floor_area(date, attr)
+                            for attr in floor_area_attrs
+                        },
+                    },
+                }
+                for date in date_range
+            ]
+        })
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
