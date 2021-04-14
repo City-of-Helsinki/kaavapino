@@ -3,6 +3,8 @@ from .attribute import (  # noqa
     AttributeValueChoice,
     DataRetentionPlan,
     FieldSetAttribute,
+    DocumentLinkFieldSet,
+    DocumentLinkSection,
 )
 from .deadline import (  # noqa
     Deadline,

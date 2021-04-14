@@ -18,6 +18,8 @@ from ..models import (
     AttributeValueChoice,
     DataRetentionPlan,
     Deadline,
+    DocumentLinkFieldSet,
+    DocumentLinkSection,
     FieldSetAttribute,
     ProjectCardSection,
     ProjectCardSectionAttribute,
@@ -91,6 +93,9 @@ HELP_LINK = "ohjeeseen liittyvä linkki"
 CARD_SECTION_NAME = "tieto näkyy projektikortissa; projektikortin osio"
 CARD_SECTION_LOCATION = "tieto näkyy projektikortissa; kenttien järjestys"
 CARD_SECTION_DATE_FORMAT = "tieto näkyy projektikortissa; päivämäärän yhteydessä näkyvä teksti "
+CARD_EXTERNAL_DOCUMENT_FIELDS = "tieto näkyy projektikortissa; valmiit dokumentit nimi ja linkki"
+CARD_EXTERNAL_DOCUMENT_SECTION = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien otsikot"
+CARD_EXTERNAL_DOCUMENT_SECTION_INDEX = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien järjestys"
 
 CALCULATIONS_COLUMN = "laskelmat"
 
@@ -931,6 +936,50 @@ class AttributeImporter:
 
         return None
 
+    def _create_document_link_sections(self, rows):
+        logger.info("\nReplacing external document link sections...")
+        DocumentLinkFieldSet.objects.all().delete()
+
+        for row in rows:
+            section_name = row[self.column_index[CARD_EXTERNAL_DOCUMENT_SECTION]]
+            section_index = row[self.column_index[CARD_EXTERNAL_DOCUMENT_SECTION_INDEX]]
+
+            if not (section_name and section_index):
+                continue
+
+            identifiers = row[self.column_index[CARD_EXTERNAL_DOCUMENT_FIELDS]].split(";")
+
+            if len(identifiers) != 3:
+                logger.warning(f"Invalid attribute identifier formatting {fieldset.identifier}, ignoring")
+                continue
+
+            section, __ = DocumentLinkSection.objects.update_or_create(
+                name=section_name,
+                defaults={
+                    "index": int(section_index),
+                },
+            )
+            fieldset = Attribute.objects.get(
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
+            try:
+                [name, custom_name, link] = [
+                    Attribute.objects.get(identifier=identifier)
+                    if identifier else None
+                    for identifier in identifiers
+                ]
+            except Attribute.DoesNotExist:
+                logger.warning(f"Invalid document link attributes specified for {fieldset.identifier}, ignoring")
+
+            DocumentLinkFieldSet.objects.create(
+                section=section,
+                fieldset_attribute=fieldset,
+                document_name_attribute=name,
+                document_custom_name_attribute=custom_name,
+                document_link_attribute=link,
+            )
+
+
     def _create_card_sections(self, rows):
         logger.info("\nReplacing project card sections...")
         ProjectCardSection.objects.all().delete()
@@ -1398,6 +1447,7 @@ class AttributeImporter:
             self._create_deadline_sections(data_rows, subtype)
 
         self._create_card_sections(all_data_rows)
+        self._create_document_link_sections(all_data_rows)
 
         # Clear cached sections
         cache.delete("serialized_phase_sections")

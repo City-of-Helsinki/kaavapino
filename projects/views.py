@@ -35,6 +35,8 @@ from projects.models import (
     Attribute,
     Report,
     Deadline,
+    DocumentLinkFieldSet,
+    DocumentLinkSection,
 )
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
@@ -56,6 +58,7 @@ from projects.serializers.project import (
     AdminProjectSerializer,
     ProjectPhaseSerializer,
     ProjectFileSerializer,
+    ProjectExternalDocumentSectionSerializer,
 )
 from projects.serializers.projectschema import (
     AdminProjectTypeSchemaSerializer,
@@ -225,6 +228,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         serializer.save()
 
         return Response(serializer.data)
+
+    @action(
+        methods=["get"],
+        detail=True,
+        permission_classes=[ProjectPermissions],
+    )
+    def external_documents(self, request, pk):
+        project = self.get_object()
+        return Response({"sections": [
+            ProjectExternalDocumentSectionSerializer(
+                project, context={"section": document_section}
+            ).data
+            for document_section in DocumentLinkSection.objects.all()
+        ]})
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):

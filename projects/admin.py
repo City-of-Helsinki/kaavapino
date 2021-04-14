@@ -14,6 +14,8 @@ from projects.models import (
     DateType,
     DateCalculation,
     DeadlineDateCalculation,
+    DocumentLinkFieldSet,
+    DocumentLinkSection,
 )
 from projects.models.project import (
     ProjectPhaseLog,
@@ -217,6 +219,16 @@ class ProjectCardSectionAdmin(SortableAdminMixin, admin.ModelAdmin):
     list_display = ("name",)
     inlines = (ProjectCardSectionAttributeInline,)
 
+
+class DocumentLinkFieldSetInline(admin.TabularInline):
+    model = DocumentLinkFieldSet
+    extra = 0
+
+
+@admin.register(DocumentLinkSection)
+class DocumentLinkSectionAdmin(SortableAdminMixin, admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (DocumentLinkFieldSetInline,)
 
 class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectPhaseSection

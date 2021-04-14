@@ -46,6 +46,7 @@ class AttributeQuerySet(models.QuerySet):
             ]
         )
 
+
 class DataRetentionPlan(models.Model):
     """Defines a data retention plan for an attribute"""
 
@@ -589,3 +590,66 @@ class FieldSetAttribute(models.Model):
 
     def __str__(self):
         return f"{self.attribute_source} -> {self.attribute_target}"
+
+
+class DocumentLinkSection(models.Model):
+    """Defines a project card document link subsection"""
+    name = models.CharField(
+        max_length=255,
+        verbose_name=_("name"),
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
+
+    class Meta:
+        verbose_name = _("document link section")
+        verbose_name_plural = _("document link sections")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.name}"
+
+
+class DocumentLinkFieldSet(models.Model):
+    """Connects external document link and name within a fieldset"""
+    section = models.ForeignKey(
+        DocumentLinkSection,
+        on_delete=models.CASCADE,
+    )
+    fieldset_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="document_fieldsets",
+        verbose_name=_("fieldset attribute"),
+    )
+    document_name_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="name_in_document_fieldsets",
+        verbose_name=_("document name attribute"),
+        null=True,
+        blank=True,
+    )
+    document_custom_name_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="custom_name_in_document_fieldsets",
+        verbose_name=_("document custom name attribute"),
+        null=True,
+        blank=True,
+    )
+    document_link_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="link_in_document_fieldsets",
+        verbose_name=_("document link attribute"),
+    )
+
+    class Meta:
+        verbose_name = _("document link fieldset")
+        verbose_name_plural = _("document link fieldsets")
+
+    def __str__(self):
+        return f"{self.fieldset_attribute.name}"

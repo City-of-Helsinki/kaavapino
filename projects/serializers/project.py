@@ -27,6 +27,7 @@ from projects.models import (
     ProjectAttributeFile,
     ProjectDeadline,
     Attribute,
+    AttributeValueChoice,
     ProjectPhaseSectionAttribute,
     ProjectComment,
     Deadline,
@@ -242,6 +243,72 @@ class ProjectListSerializer(serializers.ModelSerializer):
         return_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
 
         return return_data
+
+
+class ProjectExternalDocumentSerializer(serializers.Serializer):
+    document_name = serializers.SerializerMethodField()
+    link = serializers.SerializerMethodField()
+
+    def _get_field_as_string(self, fieldset_item, attribute):
+        value = fieldset_item.get(attribute.identifier)
+        if attribute.value_choices.count():
+            try:
+                choice = attribute.value_choices.get(identifier=value)
+                return choice.value
+            except AttributeValueChoice.DoesNotExist:
+                return value
+
+        elif value and attribute.value_type in (
+            Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT
+        ):
+            return "".join([item["insert"] for item in value["ops"]]).strip()
+        else:
+            return value
+
+    def get_document_name(self, fieldset_item):
+        name_attribute = self.context["document_fieldset"]. \
+            document_name_attribute
+        custom_name_attribute = self.context["document_fieldset"]. \
+            document_custom_name_attribute
+
+        name = self._get_field_as_string(
+            fieldset_item, name_attribute
+        )
+        custom_name = self._get_field_as_string(
+            fieldset_item, custom_name_attribute
+        )
+
+        return custom_name or name
+
+    def get_link(self, fieldset_item):
+        return fieldset_item.get(
+            self.context["document_fieldset"].document_link_attribute.identifier
+        )
+
+class ProjectExternalDocumentSectionSerializer(serializers.Serializer):
+    section_name = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
+
+    def get_section_name(self, *args):
+        return self.context["section"].name
+
+    def get_documents(self, project):
+        section = self.context["section"]
+        fields = []
+
+        for document_fieldset in section.documentlinkfieldset_set.all():
+            fieldset_data = project.attribute_data.get(
+                document_fieldset.fieldset_attribute.identifier, []
+            )
+
+            for item in fieldset_data:
+                if item.get(document_fieldset.document_link_attribute.identifier):
+                    fields.append(ProjectExternalDocumentSerializer(
+                        item, context={"document_fieldset": document_fieldset},
+                    ).data)
+
+        fields.reverse()
+        return fields
 
 
 class ProjectSerializer(serializers.ModelSerializer):
