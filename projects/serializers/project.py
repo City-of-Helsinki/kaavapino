@@ -250,6 +250,9 @@ class ProjectExternalDocumentSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
 
     def _get_field_as_string(self, fieldset_item, attribute):
+        if not attribute:
+            return None
+
         value = fieldset_item.get(attribute.identifier)
         if attribute.value_choices.count():
             try:
