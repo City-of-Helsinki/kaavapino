@@ -57,6 +57,7 @@ from projects.serializers.project import (
     ProjectSerializer,
     ProjectSnapshotSerializer,
     ProjectListSerializer,
+    ProjectOverviewSerializer,
     AdminProjectSerializer,
     ProjectPhaseSerializer,
     ProjectFileSerializer,
@@ -290,11 +291,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         projects_by_date = {
-            date: ProjectDeadline.objects.filter(
+            date: [dl.project for dl in ProjectDeadline.objects.filter(
                 project__public=True,
                 deadline__attribute__identifier__icontains="lautakunnassa",
                 date=date,
-            ).order_by("project__pk").distinct("project__pk").count()
+            ).order_by("project__pk").distinct("project__pk")]
             for date in date_range
         }
 
@@ -341,7 +342,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "daily_stats": [
                 {
                     "date": str(date),
-                    "meetings": projects_by_date[date],
+                    "meetings": len(projects_by_date[date]),
+                    "projects": [
+                        ProjectOverviewSerializer(project).data
+                        for project in projects_by_date[date]
+                    ],
                     "floor_area": {
                         "is_prediction": date >= today,
                         **{

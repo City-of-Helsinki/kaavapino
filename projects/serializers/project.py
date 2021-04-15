@@ -176,6 +176,23 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         ]
 
 
+class ProjectOverviewSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(
+        slug_field="uuid",
+        queryset=get_user_model().objects.all(),
+    )
+
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "user",
+            "name",
+            "subtype",
+            "phase",
+        ]
+
+
 class ProjectListSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
