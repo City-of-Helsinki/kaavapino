@@ -657,6 +657,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "timestamp": _action.timestamp,
                 "new_value": _action.data.get("new_value", None),
                 "old_value": _action.data.get("old_value", None),
+                "labels": _action.data.get("labels", None),
             }
 
         return updates
@@ -1214,9 +1215,36 @@ class ProjectSerializer(serializers.ModelSerializer):
             if geometry_instance and geometry_instance.geometry != new_geometry:
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
+    def _get_labels(self, values, attribute):
+        labels = {}
+
+        for val in values:
+            try:
+                labels[val] = attribute.value_choices.get(identifier=val).value
+            except AttributeValueChoice.DoesNotExist:
+                pass
+
+        return labels
+
+
     def _create_updates_log(self, attribute, project, user, new_value, old_value, prefix=""):
         new_value = json.loads(json.dumps(new_value, default=str))
         old_value = json.loads(json.dumps(old_value, default=str))
+        labels = {}
+
+        if attribute.value_type == Attribute.TYPE_CHOICE:
+            if new_value:
+                labels = {**labels, **self._get_labels(
+                    new_value if type(new_value) is list else [new_value],
+                    attribute,
+                )}
+
+            if old_value:
+                labels = {**labels, **self._get_labels(
+                    old_value if type(old_value) is list else [old_value],
+                    attribute,
+                )}
+
         entry = action.send(
             user,
             verb=verbs.UPDATED_ATTRIBUTE,
@@ -1225,6 +1253,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_identifier=prefix+attribute.identifier,
             old_value=old_value,
             new_value=new_value,
+            labels=labels,
         )
         if attribute.broadcast_changes:
             if not old_value and not new_value:
