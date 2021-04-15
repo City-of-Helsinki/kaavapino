@@ -285,9 +285,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
 
-        floor_area_attrs = ProjectFloorAreaSection.objects.get(
-            name="Kerrosalan lisäys yhteensä", project_subtype__name="M"
-        ).attributes.all()
+        # TODO hard-coded for now; consider a boolean field for Attribute
+        floor_area_attrs = [
+            "kerrosalan_lisays_yhteensa_asuminen",
+            "kerrosalan_lisays_yhteensa_julkinen",
+            "kerrosalan_lisays_yhteensa_muut",
+            "kerrosalan_lisays_yhteensa_toimitila",
+        ]
 
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         projects_by_date = {
@@ -333,9 +337,35 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             total = 0
 
             for project in projects:
-                total += int(float(project.attribute_data.get(attr.identifier, 0)))
+                total += int(float(project.attribute_data.get(attr, 0)))
 
             return total
+
+        floor_area_by_date = {
+            start_date: {
+                attr: get_floor_area(start_date, attr)
+                for attr in floor_area_attrs
+            }
+        }
+
+        for date, prev in zip(date_range[1:], date_range[:-1]):
+            if date < today:
+                new_projects = set(confirmed_projects_by_date[date]) - \
+                    set(confirmed_projects_by_date[prev])
+            else:
+                new_projects = set(projects_in_range_by_date[date]) - \
+                    set(projects_in_range_by_date[prev])
+
+            floor_area_by_date[date] = {}
+
+            for attr in floor_area_attrs:
+                total = floor_area_by_date[prev][attr]
+
+                for project in new_projects:
+                    total += int(float( \
+                        project.attribute_data.get(attr, 0)))
+
+                floor_area_by_date[date][attr] = total
 
         return Response({
             "date": today,
@@ -349,10 +379,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     ],
                     "floor_area": {
                         "is_prediction": date >= today,
-                        **{
-                            attr.identifier: get_floor_area(date, attr)
-                            for attr in floor_area_attrs
-                        },
+                        **floor_area_by_date[date],
                     },
                 }
                 for date in date_range
