@@ -250,8 +250,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         methods=["get"],
         detail=False,
         permission_classes=[ProjectPermissions],
+        url_path="overview/floor_area",
+        url_name="projects-overview-floor-area"
     )
-    def overview(self, request):
+    def overview_floor_area(self, request):
         today = datetime.now().date()
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
@@ -285,19 +287,25 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
 
-        # TODO hard-coded for now; consider a boolean field for Attribute
+        # TODO hard-coded for now; consider a new field for Attribute
         floor_area_attrs = [
             "kerrosalan_lisays_yhteensa_asuminen",
             "kerrosalan_lisays_yhteensa_julkinen",
             "kerrosalan_lisays_yhteensa_muut",
             "kerrosalan_lisays_yhteensa_toimitila",
         ]
+        meeting_attrs = [
+            "milloin_tarkistettu_ehdotus_lautakunnassa",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_2",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_3",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_4",
+        ]
 
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         projects_by_date = {
             date: [dl.project for dl in ProjectDeadline.objects.filter(
                 project__public=True,
-                deadline__attribute__identifier__icontains="lautakunnassa",
+                deadline__attribute__identifier__in=meeting_attrs,
                 date=date,
             ).order_by("project__pk").distinct("project__pk")]
             for date in date_range
@@ -306,7 +314,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         projects_in_range_by_date = {
             date: [dl.project for dl in ProjectDeadline.objects.filter(
                 project__public=True,
-                deadline__attribute__identifier__icontains="lautakunnassa",
+                deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
                 date__lte=date,
             ).order_by("project__pk").distinct("project__pk")]
