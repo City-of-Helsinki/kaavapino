@@ -58,6 +58,7 @@ from projects.serializers.project import (
     ProjectSnapshotSerializer,
     ProjectListSerializer,
     ProjectOverviewSerializer,
+    ProjectSubtypeOverviewSerializer,
     AdminProjectSerializer,
     ProjectPhaseSerializer,
     ProjectFileSerializer,
@@ -394,6 +395,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ]
         })
 
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+        url_path="overview/by_subtype",
+        url_name="projects-overview-by-subtype"
+    )
+    def overview_by_subtype(self, request):
+        queryset = ProjectSubtype.objects.all()
+        return Response({
+            "subtypes": ProjectSubtypeOverviewSerializer(
+                queryset, many=True,
+            ).data
+        })
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all()

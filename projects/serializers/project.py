@@ -193,6 +193,47 @@ class ProjectOverviewSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
+    project_count = serializers.SerializerMethodField()
+    projects = serializers.SerializerMethodField()
+
+    def get_project_count(self, phase):
+        return phase.projects.count()
+
+    def get_projects(self, phase):
+        return ProjectOverviewSerializer(
+            phase.projects.all(),
+            many=True,
+        ).data
+
+    class Meta:
+        model = ProjectPhase
+        fields = [
+            "name",
+            "color_code",
+            "color",
+            "project_count",
+            "projects",
+        ]
+
+
+class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
+    phases = serializers.SerializerMethodField()
+
+    def get_phases(self, subtype):
+        return ProjectPhaseOverviewSerializer(
+            subtype.phases.all(),
+            many=True,
+        ).data
+
+    class Meta:
+        model = ProjectSubtype
+        fields = [
+            "name",
+            "phases",
+        ]
+
+
 class ProjectListSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
