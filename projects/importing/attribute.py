@@ -21,6 +21,8 @@ from ..models import (
     DocumentLinkFieldSet,
     DocumentLinkSection,
     FieldSetAttribute,
+    OverviewFilter,
+    OverviewFilterAttribute,
     ProjectCardSection,
     ProjectCardSectionAttribute,
     ProjectFloorAreaSection,
@@ -96,6 +98,16 @@ CARD_SECTION_DATE_FORMAT = "tieto näkyy projektikortissa; päivämäärän yhte
 CARD_EXTERNAL_DOCUMENT_FIELDS = "tieto näkyy projektikortissa; valmiit dokumentit nimi ja linkki"
 CARD_EXTERNAL_DOCUMENT_SECTION = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien otsikot"
 CARD_EXTERNAL_DOCUMENT_SECTION_INDEX = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien järjestys"
+
+# Overview-related columns
+OVERVIEW_FILTER_NAME = "yleisnäkymä;\nsuodattimen nimi"
+OVERVIEW_FILTERS = "yleisnäkymä;\nnäkymät joissa suodatinta käytetään"
+
+class OverviewViews(Enum):
+    BY_SUBTYPE = "Kaavaprojektien jakauma"
+    ON_MAP = "Kaavaprojektit kartalla"
+    FLOOR_AREA = "Kaavoitettu kerrosala"
+
 
 CALCULATIONS_COLUMN = "laskelmat"
 
@@ -1018,6 +1030,36 @@ class AttributeImporter:
                 index=attr_index,
             )
 
+    def _create_overview_filters(self, rows):
+        logger.info("\nReplacing project overview filters...")
+        OverviewFilter.objects.all().delete()
+
+        for row in rows:
+            filter_name = row[self.column_index[OVERVIEW_FILTER_NAME]]
+            filters = row[self.column_index[OVERVIEW_FILTERS]] or ""
+            filters_by_subtype = OverviewViews.BY_SUBTYPE.value in filters
+            filters_on_map = OverviewViews.ON_MAP.value in filters
+            filters_floor_area = OverviewViews.FLOOR_AREA.value in filters
+
+            if not filter_name:
+                continue
+
+            overview_filter, __ = OverviewFilter.objects.get_or_create(
+                name=filter_name,
+                defaults={
+                    "identifier": self._get_identifier_for_value(filter_name)
+                },
+            )
+            attribute = Attribute.objects.get(
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
+            OverviewFilterAttribute.objects.create(
+                attribute=attribute,
+                overview_filter=overview_filter,
+                filters_by_subtype=filters_by_subtype,
+                filters_floor_area=filters_floor_area,
+                filters_on_map=filters_on_map,
+            )
 
     def _create_sections(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing sections...")
@@ -1448,6 +1490,7 @@ class AttributeImporter:
 
         self._create_card_sections(all_data_rows)
         self._create_document_link_sections(all_data_rows)
+        self._create_overview_filters(all_data_rows)
 
         # Clear cached sections
         cache.delete("serialized_phase_sections")

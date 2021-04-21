@@ -33,6 +33,7 @@ from projects.models import (
     Deadline,
     DeadlineDateCalculation,
     ProjectAttributeFileFieldsetPathLocation,
+    OverviewFilter,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -193,16 +194,85 @@ class ProjectOverviewSerializer(serializers.ModelSerializer):
         ]
 
 
+class OverviewFilterSerializer(serializers.ModelSerializer):
+    parameter = serializers.CharField(source="identifier")
+    filters_by_subtype = serializers.SerializerMethodField()
+    filters_on_map = serializers.SerializerMethodField()
+    filters_floor_area = serializers.SerializerMethodField()
+    value_type = serializers.SerializerMethodField()
+    accepts_year = serializers.SerializerMethodField()
+    choices = serializers.SerializerMethodField()
+
+    def _get_filters(self, overview_filter, filters):
+        return bool(overview_filter.attributes.filter(**{filters: True}).count())
+
+    def get_filters_by_subtype(self, overview_filter):
+        return self._get_filters(overview_filter, "filters_by_subtype")
+
+    def get_filters_on_map(self, overview_filter):
+        return self._get_filters(overview_filter, "filters_on_map")
+
+    def get_filters_floor_area(self, overview_filter):
+        return self._get_filters(overview_filter, "filters_floor_area")
+
+    def get_value_type(self, overview_filter):
+        # It's never validated one filter only contains one type of values;
+        # trusting the admin user for now
+        if overview_filter.attributes.first():
+            return overview_filter.attributes.first().attribute.value_type
+
+        return None
+
+    def get_accepts_year(self, overview_filter):
+        for attr in overview_filter.attributes.all():
+            if attr.attribute.value_type == Attribute.TYPE_DATE and \
+                not attr.attribute.fieldsets.count():
+                return True
+
+        return False
+
+    def get_choices(self, overview_filter):
+        choices = {}
+
+        for attr in overview_filter.attributes.all():
+            for choice in attr.attribute.value_choices.all():
+                choices[choice.identifier] = choice.value
+
+        return [
+            {"label": v, "value": k}
+            for k, v in choices.items()
+        ]
+
+    class Meta:
+        model = OverviewFilter
+        fields = [
+            "name",
+            "parameter",
+            "filters_by_subtype",
+            "filters_on_map",
+            "filters_floor_area",
+            "value_type",
+            "accepts_year",
+            "choices",
+        ]
+
+
 class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
     project_count = serializers.SerializerMethodField()
     projects = serializers.SerializerMethodField()
 
     def get_project_count(self, phase):
-        return phase.projects.count()
+        return phase.projects.filter(
+            self.context.get("query", Q()),
+            public=True,
+        ).count()
 
     def get_projects(self, phase):
         return ProjectOverviewSerializer(
-            phase.projects.all(),
+            phase.projects.filter(
+                self.context.get("query", Q()),
+                public=True,
+            ),
             many=True,
         ).data
 
@@ -224,6 +294,7 @@ class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
         return ProjectPhaseOverviewSerializer(
             subtype.phases.all(),
             many=True,
+            context=self.context,
         ).data
 
     class Meta:

@@ -653,3 +653,59 @@ class DocumentLinkFieldSet(models.Model):
 
     def __str__(self):
         return f"{self.fieldset_attribute.name}"
+
+
+class OverviewFilter(models.Model):
+    """Defines a filter on project overview views"""
+    name = models.CharField(
+        max_length=255,
+        verbose_name=_("name"),
+    )
+    identifier = models.CharField(
+        max_length=20,
+        verbose_name=_("identifier"),
+        db_index=True,
+        unique=True,
+        validators=[validate_identifier],
+    )
+
+    class Meta:
+        verbose_name = _("overview filter")
+        verbose_name_plural = _("overview filters")
+
+    def __str__(self):
+        return f"{self.name}"
+
+
+class OverviewFilterAttribute(models.Model):
+    """Defines an attribute in a filter"""
+    attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        verbose_name=_("attribute"),
+    )
+    overview_filter = models.ForeignKey(
+        OverviewFilter,
+        on_delete=models.CASCADE,
+        verbose_name=_("overview filter"),
+        related_name="attributes",
+    )
+    filters_by_subtype = models.BooleanField(
+        verbose_name=_("filters project subtype overview"),
+        default=False,
+    )
+    filters_floor_area = models.BooleanField(
+        verbose_name=_("filters project floor area overview"),
+        default=False,
+    )
+    filters_on_map = models.BooleanField(
+        verbose_name=_("filters project map overview"),
+        default=False,
+    )
+
+    class Meta:
+        verbose_name = _("overview filter attribute")
+        verbose_name_plural = _("overview filter attributes")
+
+    def __str__(self):
+        return f"{self.overview_filter.name}/{self.attribute.name}"

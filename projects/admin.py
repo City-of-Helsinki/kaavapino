@@ -44,6 +44,8 @@ from .models import (
     ProjectPhaseDeadlineSection,
     ProjectPhaseDeadlineSectionAttribute,
     ProjectType,
+    OverviewFilter,
+    OverviewFilterAttribute,
 )
 
 class InitialCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -229,6 +231,18 @@ class DocumentLinkFieldSetInline(admin.TabularInline):
 class DocumentLinkSectionAdmin(SortableAdminMixin, admin.ModelAdmin):
     list_display = ("name",)
     inlines = (DocumentLinkFieldSetInline,)
+
+
+class OverviewFilterAttributeInline(admin.TabularInline):
+    model = OverviewFilterAttribute
+    extra = 0
+
+
+@admin.register(OverviewFilter)
+class OverviewFilterAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (OverviewFilterAttributeInline,)
+
 
 class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectPhaseSection

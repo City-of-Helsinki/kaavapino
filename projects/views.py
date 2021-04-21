@@ -1,6 +1,7 @@
 import pytz
 from datetime import datetime, timedelta
 from django.contrib.postgres.search import SearchVector
+from django.core.exceptions import FieldError
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -39,6 +40,8 @@ from projects.models import (
     Deadline,
     DocumentLinkFieldSet,
     DocumentLinkSection,
+    OverviewFilter,
+    OverviewFilterAttribute,
 )
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
@@ -63,6 +66,7 @@ from projects.serializers.project import (
     ProjectPhaseSerializer,
     ProjectFileSerializer,
     ProjectExternalDocumentSectionSerializer,
+    OverviewFilterSerializer,
 )
 from projects.serializers.projectschema import (
     AdminProjectTypeSchemaSerializer,
@@ -247,6 +251,104 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             for document_section in DocumentLinkSection.objects.all()
         ]})
 
+    def _get_valid_filters(self, filters_view):
+        try:
+            attrs = OverviewFilterAttribute.objects.filter(
+                **{filters_view: True},
+            )
+        except FieldError:
+            return None
+
+        filters = {}
+
+        for attr in attrs:
+            try:
+                filters[attr.overview_filter].append(attr)
+            except KeyError:
+                filters[attr.overview_filter] = [attr]
+
+        return filters
+
+    def _get_query(self, filters, prefix=""):
+        if prefix:
+            prefix = f"{prefix}__"
+
+        params = self.request.query_params
+        query = Q()
+
+        for filter_obj, attrs in filters.items():
+            param = params.get(filter_obj.identifier)
+
+            if not param:
+                continue
+
+            q = Q()
+
+            for attr in attrs:
+                # Only supports one-fieldset-deep queries for now
+                attr = attr.attribute
+
+                if attr.value_type == Attribute.TYPE_BOOLEAN:
+                    param_parsed = \
+                        False if param in ["false", "False"] else bool(param)
+                elif attr.value_type == Attribute.TYPE_DATE:
+                    try:
+                        param_parsed = \
+                            datetime.strptime(param, "%Y-%m-%d").date()
+                    except (TypeError, ValueError):
+                        # Custom handling if only year is provided, doesn't support fieldsets
+                        if not attr.fieldsets.count():
+                            try:
+                                year = int(param)
+                                gte_date = datetime(year=year, month=1, day=1).date()
+                                lt_date = datetime(year=year+1, month=1, day=1).date()
+                                if attr.static_property:
+                                    q_gte = Q(**{f"{prefix}{attr.static_property}__gte": gte_date})
+                                    q_lt = Q(**{f"{prefix}{attr.static_property}__lt": lt_date})
+                                    q |= Q(q_gte & q_lt)
+                                else:
+                                    q_gte = Q(**{f"{prefix}attribute_data__{attr.identifier}__gte": gte_date})
+                                    q_lt = Q(**{f"{prefix}attribute_data__{attr.identifier}__lt": lt_date})
+                                    q |= Q(q_gte & q_lt)
+
+                            except (TypeError, ValueError):
+                                pass
+
+                        continue
+
+                elif attr.value_type == Attribute.TYPE_INTEGER:
+                    try:
+                        param_parsed = int(param)
+                    except (TypeError, ValueError):
+                        continue
+                else:
+                    param_parsed = param
+
+                if attr.fieldsets.first():
+                    q |= Q(**{
+                        f"{prefix}attribute_data__{attr.fieldsets.first().identifier}__contains": \
+                            [{attr.identifier: param_parsed}]
+                    })
+                elif attr.static_property:
+                    q |= Q(**{f"{prefix}{attr.static_property}": param_parsed})
+                else:
+                    q |= Q(**{f"{prefix}attribute_data__{attr.identifier}": param_parsed})
+
+            query &= q
+
+        return query
+
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+        url_path="overview/filters",
+        url_name="projects-overview-filters",
+    )
+    def overview_filters(self, request):
+        queryset = OverviewFilter.objects.all()
+        return Response(OverviewFilterSerializer(queryset, many=True).data)
+
     @action(
         methods=["get"],
         detail=False,
@@ -258,6 +360,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         today = datetime.now().date()
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
+        valid_filters = self._get_valid_filters("filters_floor_area")
+        query = self._get_query(valid_filters, "project")
 
         try:
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -305,6 +409,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         projects_by_date = {
             date: [dl.project for dl in ProjectDeadline.objects.filter(
+                query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date=date,
@@ -314,6 +419,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         projects_in_range_by_date = {
             date: [dl.project for dl in ProjectDeadline.objects.filter(
+                query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
@@ -325,6 +431,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         confirmed_projects_by_date = {
             date: [dl.project for dl in ProjectDeadline.objects.filter(
+                query,
                 project__public=True,
                 project__pk__in=[p.pk for p in projects_in_range],
                 deadline__attribute__identifier__in=[
@@ -403,10 +510,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         url_name="projects-overview-by-subtype"
     )
     def overview_by_subtype(self, request):
+        valid_filters = self._get_valid_filters("filters_by_subtype")
+        query = self._get_query(valid_filters)
         queryset = ProjectSubtype.objects.all()
         return Response({
             "subtypes": ProjectSubtypeOverviewSerializer(
-                queryset, many=True,
+                queryset, many=True, context={"query": query},
             ).data
         })
 
@@ -452,7 +561,6 @@ class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                 "edit": EditProjectTypeSchemaSerializer,
                 "browse": BrowseProjectTypeSchemaSerializer,
             }[user.privilege]
-
 
 
 class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):

@@ -5,6 +5,8 @@ from .attribute import (  # noqa
     FieldSetAttribute,
     DocumentLinkFieldSet,
     DocumentLinkSection,
+    OverviewFilter,
+    OverviewFilterAttribute,
 )
 from .deadline import (  # noqa
     Deadline,
