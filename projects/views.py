@@ -69,6 +69,7 @@ from projects.serializers.project import (
     OverviewFilterSerializer,
 )
 from projects.serializers.projectschema import (
+    SimpleAttributeSerializer,
     AdminProjectTypeSchemaSerializer,
     CreateProjectTypeSchemaSerializer,
     EditProjectTypeSchemaSerializer,
@@ -529,6 +530,11 @@ class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
         "section__index", "index"
     )
     serializer_class = ProjectCardSchemaSerializer
+
+
+class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Attribute.objects.all()
+    serializer_class = SimpleAttributeSerializer
 
 
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
