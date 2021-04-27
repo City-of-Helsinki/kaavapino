@@ -348,6 +348,12 @@ class DateType(models.Model):
 
     def get_dates(self, year):
         listed_dates = self.dates or []
+        base_dates = []
+        has_base_datetypes = bool(self.base_datetype.count())
+
+        for base_datetype in self.base_datetype.all():
+            base_dates += base_datetype.get_dates(year)
+
 
         for automatic_date in self.automatic_dates.all():
             listed_dates += automatic_date.calculate(
@@ -355,14 +361,27 @@ class DateType(models.Model):
             )
 
         if self.exclude_selected:
+            def include(date):
+                if date not in listed_dates \
+                    and has_base_datetypes \
+                    and date in base_dates:
+                    return True
+                elif date not in listed_dates \
+                    and not has_base_datetypes:
+                    return True
+                else:
+                    return False
+
             return self._filter_date_list([
                 datetime.date(year, 1, 1) + datetime.timedelta(days=i)
                 for i in range((366 if isleap(+year) else 365))
-                if datetime.date(year, 1, 1) + datetime.timedelta(days=i) \
-                    not in listed_dates
+                if include(datetime.date(year, 1, 1)+datetime.timedelta(days=i))
             ], self.business_days_only)
         else:
-            return self._filter_date_list(listed_dates, self.business_days_only)
+            return self._filter_date_list(
+                listed_dates + base_dates,
+                self.business_days_only,
+            )
 
     def valid_days_to(self, date_a, date_b):
         days = (date_b - date_a).days
