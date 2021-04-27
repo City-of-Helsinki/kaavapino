@@ -160,7 +160,7 @@ class Deadline(models.Model):
         else:
             return False
 
-    def _calculate(self, project, calculations, datetype, preview_attributes={}):
+    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}):
         # TODO hard-coded, maybe change later
         if self.phase.name == "Periaatteet" and not project.create_principles:
             return None
@@ -175,6 +175,10 @@ class Deadline(models.Model):
             condition_result = False
             base_attr = calculation.datecalculation.base_date_attribute
             base_deadline = calculation.datecalculation.base_date_deadline
+
+            # When calculating previews, do not use base deadlines that will be deleted
+            if base_deadline and valid_dls and base_deadline not in valid_dls:
+                continue
 
             if base_attr and base_attr.static_property:
                 base_attr = getattr(project, base_attr.static_property, None)
@@ -216,19 +220,27 @@ class Deadline(models.Model):
         return None
 
     def calculate_initial(self, project, preview_attributes={}):
+        valid_dls = project.get_applicable_deadlines(
+            preview_attributes=preview_attributes
+        )
         return self._calculate(
             project,
             self.initial_calculations.all(),
             self.date_type,
+            valid_dls,
             preview_attributes,
         )
 
     def calculate_updated(self, project, preview_attributes={}):
         if self.update_calculations.count():
+            valid_dls = project.get_applicable_deadlines(
+                preview_attributes=preview_attributes
+            )
             return self._calculate(
                 project,
                 self.update_calculations.all(),
                 self.date_type,
+                valid_dls,
                 preview_attributes,
             )
         elif self.attribute:

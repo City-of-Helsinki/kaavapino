@@ -295,7 +295,7 @@ class Project(models.Model):
 
         return False
 
-    def _get_applicable_deadlines(self, subtype=None, preview_attributes={}):
+    def get_applicable_deadlines(self, subtype=None, preview_attributes={}):
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -401,7 +401,7 @@ class Project(models.Model):
 
     # Generate or update schedule for project
     def update_deadlines(self, values=None, user=None):
-        deadlines = self._get_applicable_deadlines()
+        deadlines = self.get_applicable_deadlines()
 
         # Delete no longer relevant deadlines and create missing
         self.deadlines.exclude(deadline__in=deadlines).delete()
@@ -468,7 +468,7 @@ class Project(models.Model):
         # List deadlines that would be created
         new_dls = {
             dl: None
-            for dl in self._get_applicable_deadlines(
+            for dl in self.get_applicable_deadlines(
                 subtype=subtype,
                 preview_attributes=updated_attributes,
             )
