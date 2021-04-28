@@ -42,6 +42,7 @@ DEADLINE_DISTANCE_DATE_TYPE = "minimietäisyyden päivätyyppi"
 DEADLINE_TYPE = "tiedon jananäkymätyyppi "
 DEADLINE_PHASE = "vaihe, johon päivämäärä liittyy"
 DEADLINE_ERROR_PAST_DUE = "mitä tapahtuu, jos aikatauluun merkittyä  päivämäärää ei ole vahvistettu ja kyseisen etapin määräaika on ohitettu"
+DEADLINE_ERROR_DATE_TYPE_MISMATCH = "virheilmoitus, jos valittu päivä ei ole oikeaa päivätyyppiä"
 DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 
@@ -421,6 +422,7 @@ class DeadlineImporter:
                 continue
 
             error_past_due = row[self.column_index[DEADLINE_ERROR_PAST_DUE]]
+            error_date_type_mismatch = row[self.column_index[DEADLINE_ERROR_DATE_TYPE_MISMATCH]]
             error_min_distance_previous = row[self.column_index[DEADLINE_ERROR_MIN_DISTANCE_PREV]]
             warning_min_distance_next = row[self.column_index[DEADLINE_WARNING_MIN_DISTANCE_NEXT]]
             index = i + 1
@@ -435,6 +437,7 @@ class DeadlineImporter:
                     "deadline_types": deadline_types,
                     "date_type": date_type,
                     "error_past_due": error_past_due,
+                    "error_date_type_mismatch": error_date_type_mismatch,
                     "error_min_distance_previous": error_min_distance_previous,
                     "warning_min_distance_next": warning_min_distance_next,
                     "default_to_created_at": default_to_created_at,

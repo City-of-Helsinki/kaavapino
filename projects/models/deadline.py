@@ -109,6 +109,11 @@ class Deadline(models.Model):
         null=True,
         blank=True,
     )
+    error_date_type_mismatch = models.TextField(
+        verbose_name=_("error message for date type mismatch"),
+        null=True,
+        blank=True,
+    )
     error_min_distance_previous = models.TextField(
         verbose_name=_("error message for minimum distance to previous date not met"),
         null=True,
