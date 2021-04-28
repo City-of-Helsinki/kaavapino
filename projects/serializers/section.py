@@ -92,6 +92,7 @@ def get_deadline_validator(attribute, project_dls, subtype, preview):
                 pass
             except AssertionError:
                 raise ValidationError(_(
+                    attr_dl.error_date_type_mismatch or \
                     f"Invalid date selection for date type {attr_dl.date_type}"
                 ))
 
