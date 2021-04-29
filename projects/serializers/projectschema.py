@@ -100,6 +100,11 @@ class AutofillRuleSerializer(serializers.Serializer):
     variables = serializers.ListField(child=serializers.CharField())
 
 
+class SimpleAttributeSerializer(serializers.Serializer):
+    label = serializers.CharField(source="name")
+    name = serializers.CharField(source="identifier")
+
+
 class AttributeSchemaSerializer(serializers.Serializer):
     label = serializers.CharField(source="name")
     name = serializers.CharField(source="identifier")
