@@ -447,7 +447,7 @@ class Project(models.Model):
         # Update automatic deadlines
         self._set_calculated_deadlines(
             [
-                dl.deadline for dl in project_deadlines
+                dl.deadline for dl in self.deadlines.all()
                 if dl.deadline.update_calculations.count() \
                     or dl.deadline.default_to_created_at \
                     or dl.deadline.attribute

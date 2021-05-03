@@ -225,9 +225,13 @@ class Deadline(models.Model):
         return None
 
     def calculate_initial(self, project, preview_attributes={}):
-        valid_dls = project.get_applicable_deadlines(
-            preview_attributes=preview_attributes
-        )
+        if preview_attributes:
+            valid_dls = project.get_applicable_deadlines(
+                preview_attributes=preview_attributes
+            )
+        else:
+            valid_dls = []
+
         return self._calculate(
             project,
             self.initial_calculations.all(),
@@ -238,9 +242,13 @@ class Deadline(models.Model):
 
     def calculate_updated(self, project, preview_attributes={}):
         if self.update_calculations.count():
-            valid_dls = project.get_applicable_deadlines(
-                preview_attributes=preview_attributes
-            )
+            if preview_attributes:
+                valid_dls = project.get_applicable_deadlines(
+                    preview_attributes=preview_attributes
+                )
+            else:
+                valid_dls = []
+
             return self._calculate(
                 project,
                 self.update_calculations.all(),
