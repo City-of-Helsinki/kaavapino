@@ -182,12 +182,29 @@ class ProjectOverviewSerializer(serializers.ModelSerializer):
         slug_field="uuid",
         queryset=get_user_model().objects.all(),
     )
+    user_name = serializers.SerializerMethodField()
+    subtype = serializers.SerializerMethodField()
+    phase = serializers.SerializerMethodField()
+
+    def get_user_name(self, project):
+        first_name = project.user.first_name
+        last_name = project.user.last_name
+
+        return " ".join([first_name, last_name])
+
+    def get_phase(self, project):
+        return ProjectPhaseSerializer(project.phase).data
+
+    def get_subtype(self, project):
+        return ProjectSubtypeSerializer(project.subtype).data
 
     class Meta:
         model = Project
         fields = [
             "id",
+            "pino_number",
             "user",
+            "user_name",
             "name",
             "subtype",
             "phase",
@@ -1549,6 +1566,22 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
             "color",
             "color_code",
             "list_prefix",
+            "index",
+        ]
+
+    def get_project_type(self, project):
+        return project.project_type.pk
+
+
+class ProjectSubtypeSerializer(serializers.ModelSerializer):
+    project_type = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectSubtype
+        fields = [
+            "id",
+            "project_type",
+            "name",
             "index",
         ]
 
