@@ -486,6 +486,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return Response({
             "date": today,
+            "total_to_date": sum(floor_area_by_date[today].values()),
+            "total_predicted": sum(floor_area_by_date[date_range[-1]].values()),
             "daily_stats": [
                 {
                     "date": str(date),
