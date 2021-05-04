@@ -417,6 +417,7 @@ class ProjectExternalDocumentSerializer(serializers.Serializer):
             self.context["document_fieldset"].document_link_attribute.identifier
         )
 
+
 class ProjectExternalDocumentSectionSerializer(serializers.Serializer):
     section_name = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
@@ -1354,7 +1355,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 pass
 
         return labels
-
 
     def _create_updates_log(self, attribute, project, user, new_value, old_value, prefix=""):
         new_value = json.loads(json.dumps(new_value, default=str))
