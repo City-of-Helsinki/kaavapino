@@ -1438,6 +1438,39 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
 
+class SimpleProjectSerializer(serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(
+        read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
+    )
+    type = serializers.CharField(source="subtype.id")
+    phase = serializers.CharField(source="phase.id")
+
+    class Meta:
+        model = Project
+        fields = [
+            "user",
+            "created_at",
+            "modified_at",
+            "name",
+            "identifier",
+            "pino_number",
+            "type",
+            "subtype",
+            "attribute_data",
+            "phase",
+            "id",
+            "public",
+            "owner_edit_override",
+            "archived",
+            "onhold",
+            "create_principles",
+            "create_draft",
+            "type",
+            "created_at",
+            "modified_at",
+        ]
+
+
 class ProjectSnapshotSerializer(ProjectSerializer):
     user = serializers.SerializerMethodField()
     name = serializers.SerializerMethodField()

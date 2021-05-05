@@ -67,6 +67,7 @@ from projects.serializers.project import (
     ProjectFileSerializer,
     ProjectExternalDocumentSectionSerializer,
     OverviewFilterSerializer,
+    SimpleProjectSerializer,
 )
 from projects.serializers.projectschema import (
     SimpleAttributeSerializer,
@@ -215,6 +216,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["action"] = self.action
         return context
+
+    @action(
+        methods=["get"],
+        detail=True,
+        permission_classes=[ProjectPermissions],
+    )
+    def simple(self, request, pk):
+        return Response(SimpleProjectSerializer(self.get_object()).data)
 
     @action(
         methods=["put"],
