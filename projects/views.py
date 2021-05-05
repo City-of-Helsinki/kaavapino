@@ -484,10 +484,23 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
                 floor_area_by_date[date][attr] = total
 
+        total_predicted = sum(floor_area_by_date[date_range[-1]].values())
+
+        latest_tuesday = \
+            today - timedelta((today.weekday() - 1) % 7)
+
+        try:
+            total_to_date = sum(floor_area_by_date[latest_tuesday].values())
+        except KeyError:
+            if latest_tuesday > end_date:
+                total_to_date = total_predicted
+            else:
+                total_to_date = 0
+
         return Response({
             "date": today,
-            "total_to_date": sum(floor_area_by_date[today].values()),
-            "total_predicted": sum(floor_area_by_date[date_range[-1]].values()),
+            "total_to_date": total_to_date,
+            "total_predicted": total_predicted,
             "daily_stats": [
                 {
                     "date": str(date),
