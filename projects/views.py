@@ -278,64 +278,74 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         query = Q()
 
         for filter_obj, attrs in filters.items():
-            param = params.get(filter_obj.identifier)
-
-            if not param:
+            try:
+                split_params = params.get(filter_obj.identifier).split(",")
+            except AttributeError:
                 continue
 
-            q = Q()
+            def get_query_for_filter(param):
+                q = Q()
 
-            for attr in attrs:
-                # Only supports one-fieldset-deep queries for now
-                attr = attr.attribute
+                for attr in attrs:
+                    # Only supports one-fieldset-deep queries for now
+                    attr = attr.attribute
 
-                if attr.value_type == Attribute.TYPE_BOOLEAN:
-                    param_parsed = \
-                        False if param in ["false", "False"] else bool(param)
-                elif attr.value_type == Attribute.TYPE_DATE:
-                    try:
+                    if attr.value_type == Attribute.TYPE_BOOLEAN:
                         param_parsed = \
-                            datetime.strptime(param, "%Y-%m-%d").date()
-                    except (TypeError, ValueError):
-                        # Custom handling if only year is provided, doesn't support fieldsets
-                        if not attr.fieldsets.count():
-                            try:
-                                year = int(param)
-                                gte_date = datetime(year=year, month=1, day=1).date()
-                                lt_date = datetime(year=year+1, month=1, day=1).date()
-                                if attr.static_property:
-                                    q_gte = Q(**{f"{prefix}{attr.static_property}__gte": gte_date})
-                                    q_lt = Q(**{f"{prefix}{attr.static_property}__lt": lt_date})
-                                    q |= Q(q_gte & q_lt)
-                                else:
-                                    q_gte = Q(**{f"{prefix}attribute_data__{attr.identifier}__gte": gte_date})
-                                    q_lt = Q(**{f"{prefix}attribute_data__{attr.identifier}__lt": lt_date})
-                                    q |= Q(q_gte & q_lt)
+                            False if param in ["false", "False"] else bool(param)
+                    elif attr.value_type == Attribute.TYPE_DATE:
+                        try:
+                            param_parsed = \
+                                datetime.strptime(param, "%Y-%m-%d").date()
+                        except (TypeError, ValueError):
+                            # Custom handling if only year is provided, doesn't support fieldsets
+                            if not attr.fieldsets.count():
+                                try:
+                                    year = int(param)
+                                    gte_date = datetime(year=year, month=1, day=1).date()
+                                    lt_date = datetime(year=year+1, month=1, day=1).date()
+                                    if attr.static_property:
+                                        q_gte = Q(**{f"{prefix}{attr.static_property}__gte": gte_date})
+                                        q_lt = Q(**{f"{prefix}{attr.static_property}__lt": lt_date})
+                                        q |= Q(q_gte & q_lt)
+                                    else:
+                                        q_gte = Q(**{f"{prefix}attribute_data__{attr.identifier}__gte": gte_date})
+                                        q_lt = Q(**{f"{prefix}attribute_data__{attr.identifier}__lt": lt_date})
+                                        q |= Q(q_gte & q_lt)
 
-                            except (TypeError, ValueError):
-                                pass
+                                except (TypeError, ValueError):
+                                    pass
 
-                        continue
+                            continue
 
-                elif attr.value_type == Attribute.TYPE_INTEGER:
-                    try:
-                        param_parsed = int(param)
-                    except (TypeError, ValueError):
-                        continue
-                else:
-                    param_parsed = param
+                    elif attr.value_type == Attribute.TYPE_INTEGER:
+                        try:
+                            param_parsed = int(param)
+                        except (TypeError, ValueError):
+                            continue
+                    else:
+                        param_parsed = param
 
-                if attr.fieldsets.first():
-                    q |= Q(**{
-                        f"{prefix}attribute_data__{attr.fieldsets.first().identifier}__contains": \
-                            [{attr.identifier: param_parsed}]
-                    })
-                elif attr.static_property:
-                    q |= Q(**{f"{prefix}{attr.static_property}": param_parsed})
-                else:
-                    q |= Q(**{f"{prefix}attribute_data__{attr.identifier}": param_parsed})
+                    if attr.fieldsets.first():
+                        q |= Q(**{
+                            f"{prefix}attribute_data__{attr.fieldsets.first().identifier}__contains": \
+                                [{attr.identifier: param_parsed}]
+                        })
+                    elif attr.static_property:
+                        q |= Q(**{f"{prefix}{attr.static_property}": param_parsed})
+                    else:
+                        # TODO: __iexact is no longer needed if kaavaprosessin_kokoluokka
+                        # ever gets refactored
+                        q |= Q(**{f"{prefix}attribute_data__{attr.identifier}__iexact": param_parsed})
 
-            query &= q
+                return q
+
+            param_queries = Q()
+
+            for param in split_params:
+                param_queries |= get_query_for_filter(param)
+
+            query &= param_queries
 
         return query
 
