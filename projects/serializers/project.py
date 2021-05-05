@@ -386,8 +386,6 @@ class ProjectListSerializer(serializers.ModelSerializer):
             elif value:
                 return_data[identifier] = value
 
-        return_data['kaavaprosessin_kokoluokka'] = project.phase.project_subtype.name
-
         return return_data
 
 
@@ -577,9 +575,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             except AttributeError:
                 subtype = project.phase.project_subtype
             attribute_data['kaavaprosessin_kokoluokka'] = subtype.name
-        else:
-            attribute_data['kaavaprosessin_kokoluokka'] = \
-                project.phase.project_subtype.name
 
         static_properties = [
             "user",

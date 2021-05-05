@@ -2,7 +2,11 @@ import os
 
 from django.core.cache import cache
 from django.db.models.signals import (
-    pre_delete, post_save, post_delete, m2m_changed
+    pre_delete,
+    pre_save,
+    post_save,
+    post_delete,
+    m2m_changed,
 )
 from django.dispatch import receiver
 
@@ -27,6 +31,7 @@ from projects.models import (
     ProjectPhaseDeadlineSection,
     ProjectPhaseDeadlineSectionAttribute,
     Deadline,
+    Project,
 )
 
 
@@ -52,3 +57,9 @@ from projects.models import (
 def delete_cached_sections(*args, **kwargs):
     cache.delete("serialized_phase_sections")
     cache.delete("serialized_deadline_sections")
+
+@receiver([pre_save], sender=Project)
+def save_attribute_data_subtype(sender, instance, *args, **kwargs):
+    # TODO: hard-coded attribute identifiers are not ideal
+    instance.attribute_data["kaavaprosessin_kokoluokka"] = \
+        instance.phase.project_subtype.name
