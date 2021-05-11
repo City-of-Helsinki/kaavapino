@@ -492,7 +492,7 @@ class Attribute(models.Model):
                     elif attr.identifier == key:
                         if deserialize:
                             processed_value = attr.deserialize_value(
-                                key
+                                val
                             )
                         else:
                             processed_value = attr.serialize_value(val)
