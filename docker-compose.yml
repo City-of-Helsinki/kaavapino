@@ -32,6 +32,8 @@ services:
       - SOCIAL_AUTH_TUNNISTAMO_KEY=
       - SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT=
       - SOCIAL_AUTH_TUNNISTAMO_SECRET=
+      - KAAVOITUS_API_BASE_URL=
+      - KAAVOITUS_API_AUTH_TOKEN=
     ports:
       - "8000:8000"
     depends_on:

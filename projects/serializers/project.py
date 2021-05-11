@@ -1,9 +1,11 @@
 import copy
 import datetime
 import numpy as np
+import requests
 from typing import List, NamedTuple, Type
 
 from actstream import action
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
@@ -321,6 +323,29 @@ class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
             "phases",
         ]
 
+
+class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
+    geoserver_data = serializers.SerializerMethodField()
+
+    def get_geoserver_data(self, project):
+        identifier = project.attribute_data.get("hankenumero")
+        if identifier:
+            response = requests.get(
+                f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}",
+                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+            )
+            if response.status_code == 200:
+                return response.json()
+
+        return None
+
+    class Meta:
+        model = Project
+        fields = [
+            "name",
+            "pk",
+            "geoserver_data",
+        ]
 
 class ProjectListSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(

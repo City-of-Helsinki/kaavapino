@@ -110,3 +110,13 @@ spec:
               secretKeyRef:
                 name: api
                 key: SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT
+          - name: KAAVOITUS_API_AUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: KAAVOITUS_API_AUTH_TOKEN
+          - name: KAAVOITUS_API_BASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: KAAVOITUS_API_BASE_URL

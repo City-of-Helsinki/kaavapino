@@ -61,6 +61,7 @@ from projects.serializers.project import (
     ProjectSnapshotSerializer,
     ProjectListSerializer,
     ProjectOverviewSerializer,
+    ProjectOnMapOverviewSerializer,
     ProjectSubtypeOverviewSerializer,
     AdminProjectSerializer,
     ProjectPhaseSerializer,
@@ -553,6 +554,24 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 queryset, many=True, context={"query": query},
             ).data
         })
+
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+        url_path="overview/on_map",
+        url_name="projects-overview-on-map"
+    )
+    def overview_on_map(self, request):
+        valid_filters = self._get_valid_filters("filters_on_map")
+        query = self._get_query(valid_filters)
+        queryset = Project.objects.filter(query, public=True)
+        return Response({
+            "projects": ProjectOnMapOverviewSerializer(
+                queryset, many=True, context={"query": query},
+            ).data
+        })
+
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all()
