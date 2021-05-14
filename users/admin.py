@@ -32,7 +32,6 @@ class UserAdmin(UserAdmin):
     filter_horizontal = UserAdmin.filter_horizontal + ("additional_groups",)
     readonly_fields = UserAdmin.readonly_fields + (
         "groups",
-        "username",
         "date_joined",
         "last_login",
         "first_name",
