@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from sitecontent.models import FooterSection, FooterLink
+from sitecontent.models import FooterSection, FooterLink, TargetFloorArea
 
 
 class FooterLinkSerializer(serializers.ModelSerializer):
