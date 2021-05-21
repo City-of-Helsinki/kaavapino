@@ -103,6 +103,12 @@ CARD_EXTERNAL_DOCUMENT_SECTION_INDEX = "tieto näkyy projektikortissa; valmiit d
 OVERVIEW_FILTER_NAME = "yleisnäkymä;\nsuodattimen nimi"
 OVERVIEW_FILTERS = "yleisnäkymä;\nnäkymät joissa suodatinta käytetään"
 
+# External API integration
+EXT_DATA_SOURCE = "tiedon sijainti kaavoitus-api:ssa"
+EXT_DATA_SOURCE_KEY = "tiedon polku kaavoitus-api:n paluudatassa"
+EXT_DATA_KEY_ATTRIBUTE = "tiedon hakuavainkenttä kaavapinossa"
+EXT_DATA_PARENT_KEY_ATTRIBUTE = "vanhemmalta peritty tiedon hakuavainkenttä kaavapinossa"
+
 class OverviewViews(Enum):
     BY_SUBTYPE = "Kaavaprojektien jakauma"
     ON_MAP = "Kaavaprojektit kartalla"
@@ -371,9 +377,25 @@ DISPLAY_TYPES = {
     "Valintaruutu. (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
     "Päivämäärä (readonly)": Attribute.DISPLAY_READONLY,
     "Lyhyt teksti (readonly)": Attribute.DISPLAY_READONLY,
-    "Kyllä/Ei (readonly)": Attribute.DISPLAY_READONLY,
-    "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.DISPLAY_READONLY,
+    "Kyllä/Ei (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
+    "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
     "Kokonaisluku (readonly)": Attribute.DISPLAY_READONLY,
+    "automaatinen (teksti), kun valitaan henkilö": Attribute.DISPLAY_READONLY,
+    "automaattinen (desimaaliluku), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), jonka Kaavapino laskee": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), kun projekti luodaan": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), kun projekti luodaan, kokonaisluku": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), tieto tulee Factasta": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
+    "automaattinen (pvm)": Attribute.DISPLAY_READONLY,
+    "automaattinen (pvm), mutta päivämäärää voi muuttaa": Attribute.DISPLAY_READONLY,
+    "automaattinen (spatiaalinen), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), jonka Kaavapino muodostaa": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), kun projekti luodaan": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), kun valitaan vastuuyksikkö": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), tieto tulee Factasta": Attribute.DISPLAY_READONLY,
+    "automaattinen (valinta)": Attribute.DISPLAY_READONLY,
+    "automaattinen (valinta), kun projekti luodaan": Attribute.DISPLAY_READONLY,
 }
 
 
@@ -704,6 +726,10 @@ class AttributeImporter:
                         edit_privilege = privilege
                         break
 
+            data_source = row[self.column_index[EXT_DATA_SOURCE]]
+            data_source_key = row[self.column_index[EXT_DATA_SOURCE_KEY]]
+            key_attribute_path = row[self.column_index[EXT_DATA_PARENT_KEY_ATTRIBUTE]]
+
             attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
                 defaults={
@@ -737,6 +763,9 @@ class AttributeImporter:
                     "edit_privilege": edit_privilege,
                     "owner_viewable": True,
                     "view_privilege": "browse",
+                    "data_source": data_source,
+                    "data_source_key": data_source_key,
+                    "key_attribute_path": key_attribute_path,
                 },
             )
             if created:
@@ -778,6 +807,25 @@ class AttributeImporter:
             "deleted": len(old_attribute_ids),
             "choices": created_choices_count,
         }
+
+    def _create_attribute_key_relations(self, rows):
+        # remove all old relations
+        for attr in Attribute.objects.filter(key_attribute__isnull=False):
+            attr.key_attribute = None
+            attr.save()
+
+        for row in rows:
+            identifier = self._get_attribute_row_identifier(row)
+            key_identifier = row[self.column_index[EXT_DATA_KEY_ATTRIBUTE]]
+            attr = Attribute.objects.get(identifier=identifier)
+
+            try:
+                key_attr = Attribute.objects.get(identifier=key_identifier)
+            except Attribute.DoesNotExist:
+                continue
+
+            attr.key_attribute = key_attr
+            attr.save()
 
     def _get_generated_calculations(self, row):
         calculations_string = row[self.column_index[CALCULATIONS_COLUMN]]
@@ -1464,6 +1512,7 @@ class AttributeImporter:
 
         subtypes = self.create_subtypes(data_rows)
         attribute_info = self._create_attributes(data_rows)
+        self._create_attribute_key_relations(data_rows)
         phase_info = {"created": 0, "updated": 0, "deleted": 0}
         # Reset Fieldset relations
         FieldSetAttribute.objects.all().delete()

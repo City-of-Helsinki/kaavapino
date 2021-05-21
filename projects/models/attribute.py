@@ -150,6 +150,16 @@ class Attribute(models.Model):
         (DISPLAY_READONLY_CHECKBOX, _("read only checkbox")),
     )
 
+    SOURCE_PARENT_FIELDSET = "fieldset"
+    SOURCE_FACTA = "/facta/v1/kiinteisto/<pk>/all"
+    SOURCE_GEOSERVER = "/geoserver/v1/kiinteisto/<pk>/all"
+
+    SOURCE_CHOICES = (
+        (SOURCE_PARENT_FIELDSET, _("Same as parent fieldset")),
+        (SOURCE_FACTA, _("FACTA")),
+        (SOURCE_GEOSERVER, _("Geoserver")),
+    )
+
     name = models.CharField(max_length=255, verbose_name=_("name"))
     value_type = models.CharField(
         max_length=64, verbose_name=_("value type"), choices=TYPE_CHOICES
@@ -286,6 +296,34 @@ class Attribute(models.Model):
     # attributes which are linked to static Project fields
     static_property = models.CharField(max_length=255, blank=True, null=True)
 
+    # attributes whose data is fetched from an external source
+    data_source = models.CharField(
+        max_length=255,
+        verbose_name=_("external data source"),
+        choices=SOURCE_CHOICES,
+        null=True,
+        blank=True,
+    )
+    data_source_key = models.CharField(
+        verbose_name=_("field key for external data source"),
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    key_attribute = models.ForeignKey(
+        "Attribute",
+        verbose_name=_("key attribute for fetching external data"),
+        related_name="key_for_attributes",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
+    key_attribute_path = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+
     objects = AttributeQuerySet.as_manager()
 
 
@@ -349,6 +387,10 @@ class Attribute(models.Model):
             )
 
     def serialize_value(self, value):
+        if self.value_type != Attribute.TYPE_FIELDSET \
+            and self.data_source:
+            return None
+
         if self.value_type == Attribute.TYPE_CHOICE:
             value_choices = self.value_choices.all()
         else:
