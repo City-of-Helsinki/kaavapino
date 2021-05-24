@@ -131,6 +131,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     highlight_group = serializers.CharField()
     display = serializers.CharField()
     editable = serializers.SerializerMethodField("get_editable")
+    disable_fieldset_delete_add = serializers.SerializerMethodField()
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
@@ -145,6 +146,15 @@ class AttributeSchemaSerializer(serializers.Serializer):
             return True
         else:
             return False
+
+    def get_disable_fieldset_delete_add(self, attribute):
+        if attribute.value_type != Attribute.TYPE_FIELDSET:
+            return None
+
+        if attribute.data_source and not attribute.key_attribute:
+            return True
+
+        return False
 
     def get_fieldset_attributes(self, attribute):
         try:
