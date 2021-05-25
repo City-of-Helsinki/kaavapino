@@ -331,10 +331,20 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
     def get_geoserver_data(self, project):
         identifier = project.attribute_data.get("hankenumero")
         if identifier:
-            response = requests.get(
-                f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}",
-                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-            )
+            url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
+
+            if cache.get(url) is not None:
+                response = cache.get(url)
+            else:
+                response = requests.get(
+                    url,
+                    headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                )
+                if response.status_code == 200:
+                    cache.set(url, response, 28800)
+                else:
+                    cache.set(url, response, 180)
+
             if response.status_code == 200:
                 return response.json()
 
