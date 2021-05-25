@@ -865,14 +865,16 @@ class ProjectSerializer(serializers.ModelSerializer):
                 data.get(attribute_path[0].identifier, [])[attribute_path[1][0]]
             )
 
+        leaf_paths = []
+
         def get_branch_paths(data, solved_path, remaining_path, saved_keys={}, first_run=True):
             if first_run:
                 saved_keys = {}
 
             if not remaining_path:
-                return [[solved_path] if first_run else solved_path]
+                leaf_paths.append([solved_path] if first_run else solved_path)
+                return
 
-            return_paths = []
             data_source_key = None
             data_source_keys = None
             current = remaining_path[0]
@@ -881,22 +883,22 @@ class ProjectSerializer(serializers.ModelSerializer):
                 data_source_keys = get_in_attribute_data(
                     solved_path + [current, current.key_attribute]
                 )
-                data_item = fetched_data.get(current)
-                item_count = len(data_item)
+                data_items = fetched_data.get(current)
+                item_count = len(data_items)
             elif current.data_source != Attribute.SOURCE_PARENT_FIELDSET \
                 and current.key_attribute_path:
                 data_source_keys = saved_keys.get(current.key_attribute_path)
-                data_item = fetched_data.get(current)
+                data_items = fetched_data.get(current)
                 item_count = len(data_source_keys)
             elif current.key_attribute_path:
                 data_source_key = saved_keys.get(current.key_attribute_path[0])
-                data_item = fetched_data.get(current)
+                data_items = fetched_data.get(current)
                 item_count = 1
             else:
-                data_item = data
-                if type(data_item) is list:
-                    item_count = len(data_item)
-                elif not data_item:
+                data_items = data
+                if type(data_items) is list:
+                    item_count = len(data_items)
+                elif not data_items:
                     item_count = 0
                 else:
                     item_count = 1
@@ -905,11 +907,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             for i in range(0, item_count):
                 new_saved_keys = saved_keys
                 if data_source_key:
-                    data_item = data_item.get(data_source_key)
+                    data_item = data_items.get(data_source_key)
                     data_index = None
                     pass
                 elif current.key_attribute_path:
-                    data_item = data_item.get(data_source_keys[i])
+                    data_item = data_items.get(data_source_keys[i])
                     data_index = data_source_keys[i]
 
                     if not data_item:
@@ -919,7 +921,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 elif data_source_keys:
                     data_index = data_source_keys[i]
                     data_item = get_deep(
-                        data_item,
+                        data_items,
                         current.data_source_key,
                     ).get(data_source_keys[i])
                     new_saved_keys[
@@ -932,7 +934,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if current.value_type == Attribute.TYPE_FIELDSET:
                     if type(data_item) is list:
                         for j in range(0, len(data_item)):
-                            return_paths += get_branch_paths(
+                            get_branch_paths(
                                 data_item,
                                 solved_path + [current] + [(
                                     fs_children_counter+j,
@@ -943,10 +945,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                                 new_saved_keys,
                                 first_run=False,
                             )
-                            fs_children_counter += len(data_item)
+
+                        fs_children_counter += len(data_item)
 
                     else:
-                        return_paths += get_branch_paths(
+                        get_branch_paths(
                             data_item,
                             solved_path + [current] + [(i, data_index, None)],
                             remaining_path[1:],
@@ -955,7 +958,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         )
                         fs_children_counter += 1
                 else:
-                    return_paths += get_branch_paths(
+                    get_branch_paths(
                         data_item,
                         solved_path + [current],
                         remaining_path[1:],
@@ -963,15 +966,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                         first_run=False,
                     )
 
-
-            return return_paths
-
-        leaf_paths = []
-
         for attr in leaf_node_attrs:
             fieldset_path = get_fieldset_path(attr) + [attr]
 
-            leaf_paths += get_branch_paths(
+            get_branch_paths(
                 fetched_data,
                 [],
                 fieldset_path,
