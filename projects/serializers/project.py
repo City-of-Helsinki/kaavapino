@@ -508,6 +508,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     archived = serializers.NullBooleanField(required=False, read_only=True)
     onhold = serializers.NullBooleanField(required=False, read_only=True)
     generated_deadline_attributes = serializers.SerializerMethodField()
+    geoserver_data = serializers.SerializerMethodField()
 
     _metadata = serializers.SerializerMethodField()
 
@@ -533,9 +534,34 @@ class ProjectSerializer(serializers.ModelSerializer):
             "create_principles",
             "create_draft",
             "generated_deadline_attributes",
+            "geoserver_data",
             "_metadata",
         ]
         read_only_fields = ["type", "created_at", "modified_at"]
+
+    def get_geoserver_data(self, project):
+        identifier = project.attribute_data.get("hankenumero")
+        print(identifier)
+        if identifier:
+            url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
+            print(url)
+
+            if cache.get(url) is not None:
+                response = cache.get(url)
+            else:
+                response = requests.get(
+                    url,
+                    headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                )
+                if response.status_code == 200:
+                    cache.set(url, response, 28800)
+                else:
+                    cache.set(url, response, 180)
+
+            if response.status_code == 200:
+                return response.json()
+
+        return None
 
     def _get_snapshot_date(self, project):
         query_params = getattr(self.context["request"], "GET", {})
