@@ -564,7 +564,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_geoserver_data(self, project):
         identifier = project.attribute_data.get("hankenumero")
-        print(identifier)
         if identifier:
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
@@ -1103,7 +1102,27 @@ class ProjectSerializer(serializers.ModelSerializer):
                     list(fetched_data.get(path[-1]).keys())[pk_index]
                 )
 
-            data_source_keys = path[-1].data_source_key.split(".")
+            # Split on "." until we reach a "{"
+            [dsk_path, dsk_rule] = (
+                path[-1].data_source_key.split("{", 1) + [None]
+            )[0:2]
+
+            if "." in dsk_path and dsk_rule:
+                data_source_keys = [
+                    item for item in dsk_path.split(".") + ["{"+dsk_rule]
+                    if item
+                ]
+            elif "." in dsk_path:
+                data_source_keys = [
+                    item for item in dsk_path.split(".")
+                    if item
+                ]
+            elif dsk_rule:
+                # put this back together after all
+                data_source_keys = [dsk_path+"{"+dsk_rule]
+            else:
+                data_source_keys = [dsk_path]
+
 
             if len(data_source_keys) > 1:
                 value = get_deep(value, data_source_keys[:-1])
@@ -1117,6 +1136,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             #   where some_key can be nested (...if some_key.another_key else...)
             #   and if/else value foo,bar will be parsed as ["foo", "bar"]
             #   if operator is "in" or "not in"
+            #   note: a list of dicts will result in adding the results together
             # - dictionary ("some_key:{"key_1": "value 1", "key_2": "value_2"}")
             last_key = data_source_keys[-1]
             if ";" in last_key:
@@ -1158,20 +1178,30 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if_value = parse_value(if_value)
                 else_value = parse_value(else_value)
 
-                value = get_deep(value, last_key.split("."))
+                def get_result(value):
+                    if equals:
+                        return if_value if value == equals else else_value
+                    elif not_equals:
+                        return if_value if value != not_equals else else_value
+                    elif not_in:
+                        return if_value \
+                            if value not in not_in.split(",") \
+                            else else_value
+                    elif is_in:
+                        return if_value \
+                            if value in is_in.split(",") \
+                            else else_value
 
-                if equals:
-                    value = if_value if value == equals else else_value
-                elif not_equals:
-                    value = if_value if value != not_equals else else_value
-                elif not_in:
-                    value = if_value \
-                        if value not in not_in.split(",") \
-                        else else_value
-                elif is_in:
-                    value = if_value \
-                        if value in is_in.split(",") \
-                        else else_value
+                if type(value) is list:
+                    values = [
+                        get_deep(item, last_key.split("."))
+                        for item in value
+                    ]
+                    value = bool(sum([
+                        get_result(value) for value in values
+                    ]))
+                else:
+                    value = get_result(get_deep(value, last_key.split(".")))
 
             else:
                 value = value.get(data_source_keys[-1])
