@@ -544,19 +544,15 @@ class ProjectSerializer(serializers.ModelSerializer):
         print(identifier)
         if identifier:
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
-            print(url)
 
-            if cache.get(url) is not None:
-                response = cache.get(url)
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+            )
+            if response.status_code == 200:
+                cache.set(url, response, 28800)
             else:
-                response = requests.get(
-                    url,
-                    headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                )
-                if response.status_code == 200:
-                    cache.set(url, response, 28800)
-                else:
-                    cache.set(url, response, 180)
+                cache.set(url, response, 180)
 
             if response.status_code == 200:
                 return response.json()
