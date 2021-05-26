@@ -327,6 +327,7 @@ class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
 
 class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
     geoserver_data = serializers.SerializerMethodField()
+    phase_color = serializers.CharField(source="phase.color_code")
 
     def get_geoserver_data(self, project):
         identifier = project.attribute_data.get("hankenumero")
@@ -355,6 +356,7 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "pk",
+            "phase_color",
             "geoserver_data",
         ]
 
