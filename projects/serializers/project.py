@@ -328,6 +328,9 @@ class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
 class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
     geoserver_data = serializers.SerializerMethodField()
     phase_color = serializers.CharField(source="phase.color_code")
+    user_name = serializers.SerializerMethodField()
+    subtype = serializers.SerializerMethodField()
+    phase = serializers.SerializerMethodField()
 
     def get_geoserver_data(self, project):
         identifier = project.attribute_data.get("hankenumero")
@@ -351,6 +354,18 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
 
         return None
 
+    def get_user_name(self, project):
+        first_name = project.user.first_name
+        last_name = project.user.last_name
+
+        return " ".join([first_name, last_name])
+
+    def get_phase(self, project):
+        return ProjectPhaseSerializer(project.phase).data
+
+    def get_subtype(self, project):
+        return ProjectSubtypeSerializer(project.subtype).data
+
     class Meta:
         model = Project
         fields = [
@@ -358,6 +373,11 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
             "pk",
             "phase_color",
             "geoserver_data",
+            "user",
+            "user_name",
+            "pino_number",
+            "subtype",
+            "phase",
         ]
 
 
