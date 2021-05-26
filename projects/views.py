@@ -451,17 +451,16 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         projects_in_range = projects_in_range_by_date[end_date]
 
         confirmed_projects_by_date = {
-            date: [dl.project for dl in ProjectDeadline.objects.filter(
+            date: Project.objects.filter(
                 query,
-                project__public=True,
-                project__pk__in=[p.pk for p in projects_in_range],
-                deadline__attribute__identifier__in=[
-                    "tarkistettu_ehdotus_hyvaksytty_kylk",
-                    "toteutunut_kirje_kaupunginhallitukselle",
-                    "kylk_hyvaksymispaatos_pvm",
-                ],
-                date__lte=date,
-            ).order_by("project__pk").distinct("project__pk")]
+                (
+                    Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
+                    Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
+                    Q(attribute_data__kylk_hyvaksymispaatos_pvm__lte=date)
+                ),
+                public=True,
+                pk__in=[p.pk for p in projects_in_range],
+            ).order_by("pk")
             for date in date_range
         }
 
