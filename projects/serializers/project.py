@@ -1071,9 +1071,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
             if path[-1].key_attribute_path:
-                pk_index = path.index(Attribute.objects.get(
-                    identifier=path[-1].key_attribute_path.split(".")[0]
-                )) + 1
+                (pk_index, __, __) = path[
+                    path.index(Attribute.objects.get(
+                        identifier=path[-1].key_attribute_path.split(".")[0]
+                    )) + 1
+                ]
                 value = fetched_data.get(path[-1]).get(
                     list(fetched_data.get(path[-1]).keys())[pk_index]
                 )
