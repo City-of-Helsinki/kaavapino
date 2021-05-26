@@ -1,6 +1,7 @@
 import copy
 import datetime
 import numpy as np
+import re
 import requests
 from typing import List, NamedTuple, Type
 
@@ -1116,6 +1117,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             #   where some_key can be nested (...if some_key.another_key else...)
             #   and if/else value foo,bar will be parsed as ["foo", "bar"]
             #   if operator is "in" or "not in"
+            # - dictionary ("some_key:{"key_1": "value 1", "key_2": "value_2"}")
             last_key = data_source_keys[-1]
             if ";" in last_key:
                 value = " ".join([
@@ -1123,6 +1125,16 @@ class ProjectSerializer(serializers.ModelSerializer):
                     for key in data_source_keys[-1].split(";")
                     if value.get(key)
                 ])
+            elif last_key[0] != "{" and last_key[-1] == "}":
+                last_key, dictionary = last_key.split(":", 1)
+                dictionary = re.split(r"(?<=\")[,:]\s", dictionary[1:-1])
+                dict_keys = dictionary[0::2]
+                dict_vals = dictionary[1::2]
+                dictionary = {
+                    key[1:-1]: val[1:-1]
+                    for key, val in zip(dict_keys, dict_vals)
+                }
+                value = dictionary.get(value.get(last_key))
             elif last_key[0] == "{" and last_key[-1] == "}":
                 last_key = last_key[1:-1]
                 if_value, last_key = last_key.split(" if ", 1)
