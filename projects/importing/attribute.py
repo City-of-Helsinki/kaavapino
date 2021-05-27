@@ -388,7 +388,6 @@ DISPLAY_TYPES = {
     "automaattinen (kokonaisluku), tieto tulee Factasta": Attribute.DISPLAY_READONLY,
     "automaattinen (kokonaisluku), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
     "automaattinen (pvm)": Attribute.DISPLAY_READONLY,
-    "automaattinen (pvm), mutta päivämäärää voi muuttaa": Attribute.DISPLAY_READONLY,
     "automaattinen (spatiaalinen), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
     "automaattinen (teksti), jonka Kaavapino muodostaa": Attribute.DISPLAY_READONLY,
     "automaattinen (teksti), kun projekti luodaan": Attribute.DISPLAY_READONLY,
