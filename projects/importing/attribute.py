@@ -78,7 +78,7 @@ ATTRIBUTE_ERROR_UNIQUE = [
 
 # Attribute object mappings for static Project fields
 STATIC_ATTRIBUTES_MAPPING = {
-     "vastuuhenkilö": "user",
+     "vastuuhenkilo_nimi": "user",
      "luodaanko_nakyvaksi": "public",
      "pinonumero": "pino_number",
      "projektin_nimi": "name",

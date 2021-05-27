@@ -680,9 +680,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not snapshot:
             for static_property in static_properties:
                 try:
-                    identifier = \
-                        Attribute.objects.get(static_property=static_property).identifier
-                    attribute_data[identifier] = getattr(project, static_property)
+                    attribute = \
+                        Attribute.objects.get(static_property=static_property)
+                    value = getattr(project, static_property)
+
+                    if attribute.value_type == Attribute.TYPE_USER:
+                        value = value.uuid
+
+                    attribute_data[attribute.identifier] = value
                 except Attribute.DoesNotExist:
                     continue
 
