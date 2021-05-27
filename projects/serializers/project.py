@@ -1184,7 +1184,13 @@ class ProjectSerializer(serializers.ModelSerializer):
                 else_value = parse_value(else_value)
 
                 def get_result(value):
-                    if equals:
+                    if value is None and type(if_value) is bool:
+                        # Hard-coded special case because property_owner_municipality
+                        # returns null and there's nothing we can do about it.
+                        # Think of a better way to solve this problem if this
+                        # solution ever clashes with some future rule.
+                        return False
+                    elif equals:
                         return if_value if value == equals else else_value
                     elif not_equals:
                         return if_value if value != not_equals else else_value
