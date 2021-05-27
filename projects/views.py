@@ -382,7 +382,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
         valid_filters = self._get_valid_filters("filters_floor_area")
-        query = self._get_query(valid_filters, "project")
+        deadline_query = self._get_query(valid_filters, "project")
+        project_query = self._get_query(valid_filters)
 
         try:
             start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
@@ -430,7 +431,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         projects_by_date = {
             date: [dl.project for dl in ProjectDeadline.objects.filter(
-                query,
+                deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date=date,
@@ -440,7 +441,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         projects_in_range_by_date = {
             date: [dl.project for dl in ProjectDeadline.objects.filter(
-                query,
+                deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
@@ -452,7 +453,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         confirmed_projects_by_date = {
             date: Project.objects.filter(
-                query,
+                project_query,
                 (
                     Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
                     Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
