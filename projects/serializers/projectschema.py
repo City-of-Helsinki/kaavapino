@@ -58,7 +58,8 @@ class ConditionSerializer(serializers.Serializer):
         if value_type[0:4] == "list":
             return_list = re.split(',\s+', value[1:-1])
 
-            if attribute and attribute.value_type == "choice":
+            if attribute and attribute.value_type == "choice" \
+                and attribute.identifier != "kaavaprosessin_kokoluokka":
                 for index, choice in enumerate(return_list):
                     choice = choice.strip("\"")
                     try:
