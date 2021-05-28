@@ -393,7 +393,7 @@ DISPLAY_TYPES = {
     "automaattinen (teksti), kun projekti luodaan": Attribute.DISPLAY_READONLY,
     "automaattinen (teksti), kun valitaan vastuuyksikkö": Attribute.DISPLAY_READONLY,
     "automaattinen (teksti), tieto tulee Factasta": Attribute.DISPLAY_READONLY,
-    "automaattinen (valinta)": Attribute.DISPLAY_READONLY,
+    "automaattinen (valinta)": Attribute.DISPLAY_READONLY_CHECKBOX,
     "automaattinen (valinta), kun projekti luodaan": Attribute.DISPLAY_READONLY,
 }
 
