@@ -379,14 +379,16 @@ class Project(models.Model):
 
             if dependencies:
                 ignore += dependencies
-                self._set_calculated_deadlines(
-                    dependencies,
-                    user,
-                    ignore=ignore,
-                    initial=initial,
-                    preview=preview,
-                    preview_attribute_data=preview_attribute_data,
-                )
+                results = { **results,
+                    **self._set_calculated_deadlines(
+                        dependencies,
+                        user,
+                        ignore=ignore,
+                        initial=initial,
+                        preview=preview,
+                        preview_attribute_data=preview_attribute_data,
+                    )
+                }
 
             results[deadline] = self._set_calculated_deadline(
                 deadline,
