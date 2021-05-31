@@ -5,11 +5,11 @@ from html import escape
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.contrib.postgres.fields import ArrayField, JSONField
+from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 
 from users.models import User, PRIVILEGE_LEVELS
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
@@ -197,7 +197,8 @@ class Attribute(models.Model):
         blank=True,
     )
     visibility_conditions = ArrayField(
-        JSONField(
+        models.JSONField(
+            verbose_name=_("show attribute if any condition applies"),
             default=dict,
             blank=True,
             null=True,
@@ -208,7 +209,8 @@ class Attribute(models.Model):
         blank=True,
     )
     hide_conditions = ArrayField(
-        JSONField(
+        models.JSONField(
+            verbose_name=_("hide attribute if any condition applies"),
             default=dict,
             blank=True,
             null=True,
@@ -278,7 +280,7 @@ class Attribute(models.Model):
     help_link = models.URLField(verbose_name=_("Help link"), blank=True, null=True)
     broadcast_changes = models.BooleanField(default=False)
     autofill_readonly = models.BooleanField(verbose_name=_("read-only autofill field"), null=True)
-    autofill_rule = JSONField(
+    autofill_rule = models.JSONField(
         verbose_name=_("autofill rule"),
         default=dict,
         blank=True,

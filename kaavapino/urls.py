@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.conf.urls import url
+from django.urls import re_path
 from django.conf.urls.static import static
 from helusers.admin_site import admin
 from django.urls import path, include
@@ -36,18 +36,23 @@ urlpatterns = [
     path("v1/targetfloorareas", TargetFloorAreas.as_view(), name="targetfloorareas"),
     path("v1/personnel/", PersonnelList.as_view(), name="personnellist"),
     path("v1/", include(router.urls)),
-    url(r"v1/personnel/(?P<pk>.*)$", PersonnelDetail.as_view(), name="personneldetail"),
-    url(
+    re_path(
+        r"v1/personnel/(?P<pk>.*)$",
+        PersonnelDetail.as_view(),
+        name="personneldetail"
+    ),
+
+    re_path(
         r"{}projects/(?P<path>.*)$".format(MEDIA_URL),
         project_views.ProjectAttributeFileDownloadView.as_view(),
         name="serve_private_project_file",
     ),
-    url(
+    re_path(
         r"{}document_templates/(?P<path>.*)$".format(MEDIA_URL),
         project_views.DocumentTemplateDownloadView.as_view(),
         name="serve_private_document_template_file",
     ),
-    url(
+    re_path(
         "admin/upload_specifications",
         project_views.UploadSpecifications.as_view(),
         name="admin_upload_specifications",
