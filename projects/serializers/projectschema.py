@@ -429,7 +429,11 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
         except AttributeError:
             context = {}
 
-        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            query_params = getattr(self.context["request"], "GET", {})
+        except KeyError:
+            query_params = {}
+
         try:
             project = Project.objects.get(pk=int(query_params.get("project")))
         except (ValueError, TypeError, Project.DoesNotExist):

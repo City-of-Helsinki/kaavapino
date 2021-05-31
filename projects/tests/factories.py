@@ -41,7 +41,6 @@ class AttributeFactory(factory.DjangoModelFactory):
 class FieldSetAttributeFactory(factory.DjangoModelFactory):
     attribute_source = factory.SubFactory(AttributeFactory)
     attribute_target = factory.SubFactory(AttributeFactory)
-    index = factory.Sequence(int)
 
     class Meta:
         model = FieldSetAttribute

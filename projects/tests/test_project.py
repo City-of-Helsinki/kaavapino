@@ -9,28 +9,40 @@ def test_update_attribute_data(f_project, f_project_section_attribute_1):
 
     # Test empty data
     empty_attribute_data = {}
+    attribute_data_before = {**f_project.attribute_data}
     f_project.update_attribute_data(empty_attribute_data)
-    assert f_project.attribute_data == {}
+    assert f_project.attribute_data == attribute_data_before
 
     # Test add non proper attribute
     attribute_data = {"this_is_no_proper": "test"}
+    attribute_data_before = {**f_project.attribute_data}
     f_project.update_attribute_data(attribute_data)
-    assert f_project.attribute_data == {}
+    assert f_project.attribute_data == attribute_data_before
 
     # Test with proper attribute
     attribute_data = {attribute_identifier: "test"}
+    attribute_data_before = {**f_project.attribute_data}
     f_project.update_attribute_data(attribute_data)
-    assert f_project.attribute_data == {attribute_identifier: "test"}
+    assert f_project.attribute_data == {
+        **attribute_data_before,
+        attribute_identifier: "test",
+    }
 
     # Test None value
     attribute_data = None
+    attribute_data_before = {**f_project.attribute_data}
     f_project.update_attribute_data(attribute_data)
-    assert f_project.attribute_data == {attribute_identifier: "test"}
+    assert f_project.attribute_data == {
+        **attribute_data_before,
+        attribute_identifier: "test",
+    }
 
     # Test add empty value
     attribute_data = {attribute_identifier: None}
+    attribute_data_before = {**f_project.attribute_data}
+    attribute_data_before.pop(attribute_identifier)
     f_project.update_attribute_data(attribute_data)
-    assert f_project.attribute_data == {}
+    assert f_project.attribute_data == attribute_data_before
 
 
 @pytest.mark.django_db()

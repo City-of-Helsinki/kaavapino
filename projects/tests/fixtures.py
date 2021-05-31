@@ -108,12 +108,12 @@ def f_file_attribute(f_user):
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_short_string_multi_choice_attribute():
+def f_multi_choice_attribute():
     attribute = Attribute.objects.create(
-        name="Short string multiple choice attribute",
-        value_type=Attribute.TYPE_SHORT_STRING,
-        identifier="short_string_multi_choice_attr",
-        help_text="This is a short string multiple choice attribute",
+        name="Multiple choice attribute",
+        value_type=Attribute.TYPE_CHOICE,
+        identifier="multi_choice_attr",
+        help_text="This is a multiple choice attribute",
         multiple_choice=True,
     )
 
@@ -130,12 +130,12 @@ def f_short_string_multi_choice_attribute():
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_short_string_choice_attribute():
+def f_choice_attribute():
     attribute = Attribute.objects.create(
-        name="Short string choice attribute",
-        value_type=Attribute.TYPE_SHORT_STRING,
-        identifier="short_string_choice_attr",
-        help_text="This is a short string choice attribute",
+        name="Choice attribute",
+        value_type=Attribute.TYPE_CHOICE,
+        identifier="choice_attr",
+        help_text="This is a choice attribute",
         multiple_choice=False,
         generated=False,
         required=False,
@@ -234,9 +234,9 @@ def f_project_section_attribute_3(f_long_string_attribute, f_project_section_2):
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_project_section_attribute_4(f_short_string_choice_attribute, f_project_section_2):
+def f_project_section_attribute_4(f_choice_attribute, f_project_section_2):
     return ProjectPhaseSectionAttribute.objects.create(
-        attribute=f_short_string_choice_attribute,
+        attribute=f_choice_attribute,
         section=f_project_section_2,
         index=3,
     )
