@@ -389,6 +389,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     phase_start_date = serializers.SerializerMethodField()
+    deadlines = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
@@ -411,6 +412,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "create_principles",
             "create_draft",
             "phase_start_date",
+            "deadlines",
         ]
 
     def get_type(self, project):
@@ -447,6 +449,10 @@ class ProjectListSerializer(serializers.ModelSerializer):
                 return_data[identifier] = value
 
         return return_data
+
+    def get_deadlines(self, project):
+        project_schedule_cache = self.context["project_schedule_cache"]
+        return project_schedule_cache.get(project.pk, [])
 
 
 class ProjectExternalDocumentSerializer(serializers.Serializer):
@@ -697,13 +703,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         return project.type.pk
 
     def get_deadlines(self, project):
+        project_schedule_cache = cache.get("serialized_project_schedules", {})
         deadlines = project.deadlines.filter(deadline__subtype=project.subtype)
-        return ProjectDeadlineSerializer(
+        schedule = ProjectDeadlineSerializer(
             deadlines,
             many=True,
             allow_null=True,
             required=False,
         ).data
+        project_schedule_cache[project.pk] = schedule
+        cache.set("serialized_project_schedules", project_schedule_cache, None)
+        return schedule
 
     def get_generated_deadline_attributes(self, project):
         return [

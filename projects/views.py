@@ -2,6 +2,7 @@ import pytz
 from datetime import datetime, timedelta
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import FieldError
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
@@ -216,6 +217,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["action"] = self.action
+
+        if self.action == "list":
+            context["project_schedule_cache"] = \
+                cache.get("serialized_project_schedules", {})
+
         return context
 
     @action(
