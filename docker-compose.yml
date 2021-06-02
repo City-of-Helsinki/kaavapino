@@ -46,5 +46,18 @@ services:
       - db
     container_name: kaavapino-api
 
+  django-q:
+    build: .
+    command: python /code/manage.py qcluster
+    volumes:
+      - .:/code
+    depends_on:
+      - db
+      - api
+    restart: on-failure
+    environment:
+      - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
+    container_name: kaavapino-django-q
+
 volumes:
     db_kaavapino_data:
