@@ -63,3 +63,7 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
     # TODO: hard-coded attribute identifiers are not ideal
     instance.attribute_data["kaavaprosessin_kokoluokka"] = \
         instance.phase.project_subtype.name
+
+    for attr in Attribute.objects.filter(static_property__isnull=False):
+        instance.attribute_data[attr.identifier] = \
+            getattr(instance, attr.static_property)
