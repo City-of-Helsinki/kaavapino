@@ -147,6 +147,17 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             queryset = self._search(search, queryset)
 
         queryset = self._filter_private(queryset, user)
+
+        if self.action == "list":
+            status = self.request.query_params.get("status")
+
+            if status == "active":
+                queryset = queryset.exclude(onhold=True).exclude(archived=True)
+            elif status == "onhold":
+                queryset = queryset.filter(onhold=True)
+            elif status == "archived":
+                queryset = queryset.filter(archived=True)
+
         return queryset
 
     def _string_filter_to_list(self, filter_string):
