@@ -17,3 +17,12 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "privilege",
         ]
+
+
+class PersonnelSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    name = serializers.CharField(source="displayName")
+    phone = serializers.CharField(source="mobilePhone")
+    email = serializers.CharField(source="mail")
+    title = serializers.CharField(source="jobTitle")
+    office = serializers.CharField(source="officeLocation")

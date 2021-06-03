@@ -9,6 +9,7 @@ from projects import views as project_views
 from projects.urls import router as projects_router
 from sitecontent.urls import router as sitecontent_router
 from sitecontent.views import TargetFloorAreas
+from users.views import PersonnelDetail, PersonnelList
 from users.urls import router as users_router
 
 admin.autodiscover()
@@ -32,7 +33,9 @@ urlpatterns = [
     path('pysocial/', include('social_django.urls', namespace='social')),
     path('helauth/', include('helusers.urls')),
     path("v1/targetfloorareas", TargetFloorAreas.as_view(), name="targetfloorareas"),
+    path("v1/personnel/", PersonnelList.as_view(), name="personnellist"),
     path("v1/", include(router.urls)),
+    url(r"v1/personnel/(?P<pk>.*)$", PersonnelDetail.as_view(), name="personneldetail"),
     url(
         r"{}projects/(?P<path>.*)$".format(MEDIA_URL),
         project_views.ProjectAttributeFileDownloadView.as_view(),
