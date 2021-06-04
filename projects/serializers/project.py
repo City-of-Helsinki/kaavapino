@@ -1632,13 +1632,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         return {**static_property_attributes, **valid_attributes}
 
     def _validate_public(self, attrs):
-        public = attrs.get("public", True)
+        public = attrs.get("public")
 
         # Do not validate if this is a new project
-        if not self.instance and public is not None:
-            return public
-        elif not self.instance and public is None:
-            return True
+        if not self.instance:
+            return public or True
 
         # A project is always public if it has exited the starting phase
         try:
@@ -1648,6 +1646,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if not self.instance.public and (phase_index > 1):
             return True
+
+        if public is None:
+            return self.instance.public
 
         return public
 
