@@ -65,5 +65,14 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
         instance.phase.project_subtype.name
 
     for attr in Attribute.objects.filter(static_property__isnull=False):
-        instance.attribute_data[attr.identifier] = \
-            getattr(instance, attr.static_property)
+        value = getattr(instance, attr.static_property)
+
+        # make this a model field if more options are needed
+        if attr.value_type == Attribute.TYPE_USER:
+            value = " ".join([
+                name for name
+                in [value.first_name, value.last_name]
+                if name
+            ])
+
+        instance.attribute_data[attr.identifier] = value
