@@ -649,6 +649,10 @@ class ProjectPhase(models.Model):
     def project_type(self):
         return self.project_subtype.project_type
 
+    @property
+    def prefixed_name(self):
+        return f"{self.list_prefix}. {self.name}"
+
 
 class ProjectPhaseLog(models.Model):
     """Records project phase changes."""

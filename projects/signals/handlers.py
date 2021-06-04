@@ -64,15 +64,14 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
     instance.attribute_data["kaavaprosessin_kokoluokka"] = \
         instance.phase.project_subtype.name
 
+    instance.attribute_data["kaavan_vaihe"] = \
+        instance.phase.prefixed_name
+
     for attr in Attribute.objects.filter(static_property__isnull=False):
         value = getattr(instance, attr.static_property)
 
         # make this a model field if more options are needed
         if attr.value_type == Attribute.TYPE_USER:
-            value = " ".join([
-                name for name
-                in [value.first_name, value.last_name]
-                if name
-            ])
+            value = value.uuid
 
         instance.attribute_data[attr.identifier] = value
