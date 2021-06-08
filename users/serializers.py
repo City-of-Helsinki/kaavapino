@@ -21,8 +21,13 @@ class UserSerializer(serializers.ModelSerializer):
 
 class PersonnelSerializer(serializers.Serializer):
     id = serializers.CharField()
-    name = serializers.CharField(source="displayName")
+    name = serializers.SerializerMethodField()
     phone = serializers.CharField(source="mobilePhone")
     email = serializers.CharField(source="mail")
     title = serializers.CharField(source="jobTitle")
     office = serializers.CharField(source="officeLocation")
+
+    def get_name(self, user):
+        return " ".join([
+            name for name in [user["givenName"], user["surname"]] if name
+        ])
