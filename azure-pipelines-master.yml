@@ -33,5 +33,5 @@ resources:
 extends:
   # Filename in Azure DevOps Repository (note possible -ui or -api)
   # Django example: azure-pipelines-PROJECTNAME-api-master.yml
-  # Drupal example: azure-pipelines-drupal-master.yml
+  # Drupal example: azure-pipelines-drupal-master.yml 
   template: azure-pipelines-kaavapino-api-master.yml@kaavapino-pipelines
