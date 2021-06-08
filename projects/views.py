@@ -216,7 +216,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ] + ['subtype__project_type__name']
         return queryset \
             .annotate(search=SearchVector(*search_fields)) \
-            .filter(Q(search__icontains=search) | Q(search__icontains=search))
+            .filter(Q(search__icontains=search) | Q(search=search))
 
     @staticmethod
     def _filter_private(queryset, user):
