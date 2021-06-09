@@ -108,6 +108,8 @@ EXT_DATA_SOURCE = "tiedon sijainti kaavoitus-api:ssa"
 EXT_DATA_SOURCE_KEY = "tiedon polku kaavoitus-api:n paluudatassa"
 EXT_DATA_KEY_ATTRIBUTE = "tiedon hakuavainkenttä kaavapinossa"
 EXT_DATA_PARENT_KEY_ATTRIBUTE = "vanhemmalta peritty tiedon hakuavainkenttä kaavapinossa"
+EXT_DATA_AD_SOURCE = "automaattisen yhteystiedon lähdekenttä"
+EXT_DATA_AD_KEY = "automaattisen yhteystiedon hakuavain"
 
 class OverviewViews(Enum):
     BY_SUBTYPE = "Kaavaprojektien jakauma"
@@ -326,6 +328,7 @@ SUBTYPE_PHASE_METADATA = {
 
 VALUE_TYPES = {
     "AD-tunnukset": Attribute.TYPE_USER,
+    "AD-tunnukset, koko organisaatio": Attribute.TYPE_PERSONNEL,
     "automaatinen (teksti), kun valitaan henkilö": Attribute.TYPE_SHORT_STRING,
     "automaattinen (desimaaliluku), tieto tulee kaavan tietomallista": Attribute.TYPE_DECIMAL,
     "automaattinen (kokonaisluku), jonka Kaavapino laskee": Attribute.TYPE_INTEGER,
@@ -728,6 +731,7 @@ class AttributeImporter:
             data_source = row[self.column_index[EXT_DATA_SOURCE]]
             data_source_key = row[self.column_index[EXT_DATA_SOURCE_KEY]]
             key_attribute_path = row[self.column_index[EXT_DATA_PARENT_KEY_ATTRIBUTE]]
+            ad_data_key = row[self.column_index[EXT_DATA_AD_KEY]]
 
             attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
@@ -765,6 +769,7 @@ class AttributeImporter:
                     "data_source": data_source,
                     "data_source_key": data_source_key,
                     "key_attribute_path": key_attribute_path,
+                    "ad_data_key": ad_data_key,
                 },
             )
             if created:
@@ -816,14 +821,21 @@ class AttributeImporter:
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
             key_identifier = row[self.column_index[EXT_DATA_KEY_ATTRIBUTE]]
+            ad_key_identifier = row[self.column_index[EXT_DATA_AD_SOURCE]]
             attr = Attribute.objects.get(identifier=identifier)
 
             try:
                 key_attr = Attribute.objects.get(identifier=key_identifier)
+                attr.key_attribute = key_attr
             except Attribute.DoesNotExist:
-                continue
+                pass
 
-            attr.key_attribute = key_attr
+            try:
+                ad_key_attr = Attribute.objects.get(identifier=ad_key_identifier)
+                attr.ad_key_attribute = ad_key_attr
+            except Attribute.DoesNotExist:
+                pass
+
             attr.save()
 
     def _get_generated_calculations(self, row):

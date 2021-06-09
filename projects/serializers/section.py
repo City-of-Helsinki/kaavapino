@@ -39,6 +39,7 @@ FIELD_TYPES = {
     Attribute.TYPE_USER: serializers.PrimaryKeyRelatedField,
     Attribute.TYPE_GEOMETRY: GeometryField,
     Attribute.TYPE_CHOICE: serializers.CharField,
+    Attribute.TYPE_PERSONNEL: serializers.CharField,
 }
 
 

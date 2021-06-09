@@ -111,6 +111,7 @@ class Attribute(models.Model):
     TYPE_BOOLEAN = "boolean"
     TYPE_DATE = "date"
     TYPE_USER = "user"
+    TYPE_PERSONNEL = "personnel"
     TYPE_GEOMETRY = "geometry"
     TYPE_IMAGE = "image"
     TYPE_FILE = "file"
@@ -130,6 +131,7 @@ class Attribute(models.Model):
         (TYPE_BOOLEAN, _("boolean")),
         (TYPE_DATE, _("date")),
         (TYPE_USER, _("user")),
+        (TYPE_PERSONNEL, _("personnel")),
         (TYPE_GEOMETRY, _("geometry")),
         (TYPE_IMAGE, _("image")),
         (TYPE_FILE, _("file")),
@@ -158,6 +160,22 @@ class Attribute(models.Model):
         (SOURCE_PARENT_FIELDSET, _("Same as parent fieldset")),
         (SOURCE_FACTA, _("FACTA")),
         (SOURCE_GEOSERVER, _("Geoserver")),
+    )
+
+    AD_DATA_KEY_ID = "id"
+    AD_DATA_KEY_NAME = "name"
+    AD_DATA_KEY_PHONE = "phone"
+    AD_DATA_KEY_EMAIL = "email"
+    AD_DATA_KEY_TITLE = "title"
+    AD_DATA_KEY_OFFICE = "office"
+
+    AD_DATA_KEY_CHOICES = (
+        (AD_DATA_KEY_ID, "id"),
+        (AD_DATA_KEY_NAME, "name"),
+        (AD_DATA_KEY_PHONE, "phone"),
+        (AD_DATA_KEY_EMAIL, "email"),
+        (AD_DATA_KEY_TITLE, "title"),
+        (AD_DATA_KEY_OFFICE, "office"),
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
@@ -323,7 +341,20 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
-
+    ad_key_attribute = models.ForeignKey(
+        "Attribute",
+        verbose_name=_("key attribute for fetching AD user data"),
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
+    ad_data_key = models.CharField(
+        verbose_name=_("AD user data key"),
+        max_length=6,
+        choices=AD_DATA_KEY_CHOICES,
+        null=True,
+        blank=True,
+    )
     objects = AttributeQuerySet.as_manager()
 
 
@@ -388,7 +419,7 @@ class Attribute(models.Model):
 
     def serialize_value(self, value):
         if self.value_type != Attribute.TYPE_FIELDSET \
-            and self.data_source:
+            and (self.data_source or self.ad_data_key):
             return None
 
         if self.value_type == Attribute.TYPE_CHOICE:
@@ -416,6 +447,7 @@ class Attribute(models.Model):
             Attribute.TYPE_LONG_STRING,
             Attribute.TYPE_LINK,
             Attribute.TYPE_CHOICE,
+            Attribute.TYPE_PERSONNEL,
         ):
             if self.multiple_choice and value is not None:
                 return [
@@ -484,6 +516,7 @@ class Attribute(models.Model):
             Attribute.TYPE_BOOLEAN,
             Attribute.TYPE_LINK,
             Attribute.TYPE_CHOICE,
+            Attribute.TYPE_PERSONNEL,
         ):
             return value
         elif self.value_type in (

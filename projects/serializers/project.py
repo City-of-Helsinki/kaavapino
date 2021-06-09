@@ -14,12 +14,19 @@ from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils.translation import ugettext_lazy as _
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
+from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 from rest_framework_gis.fields import GeometryField
 
 from projects.actions import verbs
+from projects.helpers import (
+    get_fieldset_path,
+    set_attribute_data,
+    get_attribute_data,
+    get_flat_attribute_data,
+)
 from projects.models import (
     Project,
     ProjectSubtype,
@@ -49,7 +56,8 @@ from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
 from sitecontent.models import ListViewAttributeColumn
 from users.models import User
-from users.serializers import UserSerializer
+from users.serializers import PersonnelSerializer, UserSerializer
+from users.helpers import get_graph_api_access_token
 
 
 class SectionData(NamedTuple):
@@ -674,6 +682,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             except Exception:
                 pass
 
+            self._set_ad_data(attribute_data)
+
         static_properties = [
             "user",
             "name",
@@ -794,7 +804,10 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"
-        metadata = {"users": self._get_users(project, list_view=list_view)}
+        metadata = {
+            "users": self._get_users(project, list_view=list_view),
+            "personnel": self._get_personnel(project, list_view=list_view),
+        }
         query_params = getattr(self.context["request"], "GET", {})
         snapshot_param = query_params.get("snapshot")
         if not list_view and not snapshot_param:
@@ -814,24 +827,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             value_type=Attribute.TYPE_FIELDSET,
         )
 
-        def flatten(data, flat={}):
-            for key, val in data.items():
-                flat[key] = flat.get(key, [])
-
-                if type(val) is dict:
-                    flatten(val, flat)
-                elif type(val) is list:
-                    try:
-                        for item in val:
-                            flatten(item, flat)
-                    except AttributeError:
-                        flat[key] += val
-                else:
-                    flat[key].append(val)
-
-            return flat
-
-        flat_attribute_data = flatten(attribute_data)
+        flat_attribute_data = get_flat_attribute_data(attribute_data)
 
         def build_request_paths(attr):
             returns = {}
@@ -889,16 +885,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 else:
                     fetched_data[attr][key] = None
 
-        def get_fieldset_path(attr, attribute_path=[]):
-            if not attr.fieldsets.count():
-                return attribute_path
-            else:
-                parent_fieldset = attr.fieldsets.first()
-                return get_fieldset_path(
-                    parent_fieldset,
-                    [parent_fieldset] + attribute_path,
-                )
-
         def get_deep(source, keys, default=None):
             if not keys:
                 return source
@@ -918,7 +904,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             else:
                 return source.get(keys[0], None)
 
-        def get_in_attribute_data(attribute_path, data=attribute_data):
+        def get_in_attribute_data(attribute_path, data):
             if len(attribute_path) == 2:
                 data = data.get(attribute_path[0].identifier, [])
                 if type(data) is list:
@@ -950,7 +936,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             if current.data_source != Attribute.SOURCE_PARENT_FIELDSET \
                 and current.key_attribute:
                 data_source_keys = get_in_attribute_data(
-                    solved_path + [current, current.key_attribute]
+                    solved_path + [current, current.key_attribute],
+                    attribute_data,
                 )
                 data_items = fetched_data.get(current)
                 item_count = len(data_items)
@@ -1078,7 +1065,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             else:
                 return None
 
-        def set_attribute_data(data, path, value):
+        def set_in_attribute_data(data, path, value):
             try:
                 next_key = path[0].identifier
             except AttributeError:
@@ -1089,12 +1076,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                     if not data.get(next_key):
                         data[next_key] = []
 
-                    set_attribute_data(data.get(next_key), path[1:], value)
+                    set_in_attribute_data(data.get(next_key), path[1:], value)
                 elif type(data) is list:
                     for __ in range(len(data), next_key+1):
                         data.append({})
 
-                    set_attribute_data(data[next_key], path[1:], value)
+                    set_in_attribute_data(data[next_key], path[1:], value)
 
             else:
                 data[next_key] = value
@@ -1227,7 +1214,66 @@ class ProjectSerializer(serializers.ModelSerializer):
             else:
                 value = value.get(data_source_keys[-1])
 
-            set_attribute_data(attribute_data, path, value)
+            set_in_attribute_data(attribute_data, path, value)
+
+    @staticmethod
+    def _set_ad_data(attribute_data):
+        paths = []
+
+        def add_paths(solved_path, remaining_path, parent_data):
+            if remaining_path[0].value_type != Attribute.TYPE_FIELDSET:
+                paths.append(solved_path + [remaining_path[0]])
+                return
+
+            children = parent_data.get(remaining_path[0].identifier, [])
+
+            for i, child in enumerate(children):
+                add_paths(
+                    solved_path + [remaining_path[0], i],
+                    remaining_path[1:],
+                    child,
+                )
+
+        def get_in_personnel_data(id, key):
+            url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}"
+            response = cache.get(url)
+            if not response:
+                token = get_graph_api_access_token()
+                if not token:
+                    return Response(
+                        "Cannot get access token",
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+                response = requests.get(
+                    url, headers={"Authorization": f"Bearer {token}"}
+                )
+
+                if not response:
+                    return None
+
+                cache.set(url, response, 60)
+
+            return PersonnelSerializer(response.json()).data.get(key)
+
+        for attr in Attribute.objects.filter(
+            ad_key_attribute__isnull=False,
+            ad_data_key__isnull=False,
+        ):
+            fieldset_path = get_fieldset_path(attr)
+            add_paths([], fieldset_path+[attr], attribute_data)
+
+        for path in paths:
+            data = get_attribute_data(path[:-1], attribute_data)
+
+            user_id = data.get(attr.ad_key_attribute.identifier)
+
+            if not user_id:
+                continue
+
+            value = get_in_personnel_data(user_id, attr.ad_data_key)
+
+            if value:
+                set_attribute_data(attribute_data, path, value)
 
     @staticmethod
     def _get_users(project, list_view=False):
@@ -1265,6 +1311,53 @@ class ProjectSerializer(serializers.ModelSerializer):
             users += list(User.objects.filter(uuid__in=user_attribute_ids))
 
         return UserSerializer(users, many=True).data
+
+    @staticmethod
+    def _get_personnel(project, list_view=False):
+        if list_view:
+            return []
+
+        flat_data = get_flat_attribute_data(project.attribute_data)
+
+        ids = []
+
+        for attr in Attribute.objects.filter(
+            value_type=Attribute.TYPE_PERSONNEL,
+        ):
+            value = flat_data.get(attr.identifier)
+
+            if not value:
+                continue
+            elif type(value) is list:
+                ids += set(value)
+            else:
+                ids.append(value)
+
+        return_values = []
+
+        for id in set(ids):
+            url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}"
+            response = cache.get(url)
+            if not response:
+                token = get_graph_api_access_token()
+                if not token:
+                    return Response(
+                        "Cannot get access token",
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+                response = requests.get(
+                    url, headers={"Authorization": f"Bearer {token}"}
+                )
+
+                if not response:
+                    return None
+
+                cache.set(url, response, 60)
+
+            data = PersonnelSerializer(response.json()).data
+            return_values.append({"id": id, "name": data["name"]})
+
+        return return_values
 
     @staticmethod
     def _get_fieldset_attribute_values(
