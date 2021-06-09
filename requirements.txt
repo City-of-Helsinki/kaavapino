@@ -9,7 +9,7 @@ cffi==1.14.3              # via cryptography
 chardet==3.0.4            # via requests
 cryptography==3.1.1       # via social-auth-core
 defusedxml==0.6.0         # via python3-openid, social-auth-core
-django==2.2.13
+django==2.2.22
 git+https://github.com/andersinno/django-activity-stream.git#egg=django-activity-stream==0.7.0
 django-admin-sortable2==0.7.6
 django-allauth==0.42.0
