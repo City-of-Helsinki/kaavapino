@@ -8,7 +8,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
-from users.serializers import PersonnelSerializer, UserSerializer
+from users.serializers import (
+    PersonnelDetailSerializer,
+    PersonnelSerializer,
+    UserSerializer,
+)
 from users.helpers import get_graph_api_access_token
 
 
@@ -60,14 +64,14 @@ class PersonnelDetail(APIView):
             )
 
         response = requests.get(
-            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{pk}",
+            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{pk}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,surname",
             headers={
                 "Authorization": f"Bearer {token}",
             },
         )
 
         if response:
-            return Response(PersonnelSerializer(response.json()).data)
+            return Response(PersonnelDetailSerializer(response.json()).data)
         elif response.status_code == 404:
             raise Http404
         elif response.status_code == 401:

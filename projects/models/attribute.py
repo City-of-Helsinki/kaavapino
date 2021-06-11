@@ -168,6 +168,7 @@ class Attribute(models.Model):
     AD_DATA_KEY_EMAIL = "email"
     AD_DATA_KEY_TITLE = "title"
     AD_DATA_KEY_OFFICE = "office"
+    AD_DATA_KEY_COMPANY = "company"
 
     AD_DATA_KEY_CHOICES = (
         (AD_DATA_KEY_ID, "id"),
@@ -176,6 +177,7 @@ class Attribute(models.Model):
         (AD_DATA_KEY_EMAIL, "email"),
         (AD_DATA_KEY_TITLE, "title"),
         (AD_DATA_KEY_OFFICE, "office"),
+        (AD_DATA_KEY_COMPANY, "company"),
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
@@ -350,7 +352,7 @@ class Attribute(models.Model):
     )
     ad_data_key = models.CharField(
         verbose_name=_("AD user data key"),
-        max_length=6,
+        max_length=7,
         choices=AD_DATA_KEY_CHOICES,
         null=True,
         blank=True,

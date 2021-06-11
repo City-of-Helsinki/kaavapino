@@ -31,3 +31,23 @@ class PersonnelSerializer(serializers.Serializer):
         return " ".join([
             name for name in [user["givenName"], user["surname"]] if name
         ])
+
+
+
+class PersonnelDetailSerializer(PersonnelSerializer):
+    def get_fields(self):
+        fields = super(PersonnelDetailSerializer, self).get_fields()
+        fields["company"] = serializers.SerializerMethodField()
+        return fields
+
+    def get_company(self, user):
+        try:
+            return {
+                "KYMP": "Kaupunkiympäristön toimiala",
+                "KUVA": "Kulttuurin ja vapaa-ajan toimiala",
+                "KASKO": "kasvatuksen ja koulutuksen toimiala",
+                "SOTE": "sosiaali- ja terveystoimiala",
+                "KEHA": "Keskushallinto"
+            }[user["companyName"]]
+        except KeyError:
+            return None
