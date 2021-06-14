@@ -1235,7 +1235,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
 
         def get_in_personnel_data(id, key):
-            url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}"
+            url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,surname"
             response = cache.get(url)
             if not response:
                 token = get_graph_api_access_token()
