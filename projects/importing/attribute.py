@@ -818,6 +818,10 @@ class AttributeImporter:
             attr.key_attribute = None
             attr.save()
 
+        for attr in Attribute.objects.filter(ad_key_attribute__isnull=False):
+            attr.ad_key_attribute = None
+            attr.save()
+
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
             key_identifier = row[self.column_index[EXT_DATA_KEY_ATTRIBUTE]]
