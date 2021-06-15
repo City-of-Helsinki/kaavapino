@@ -675,11 +675,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             # quietly than break the whole system when misconfiguration
             # happens. (But maybe make this more granular at some point)
             try:
-                self._set_external_data(attribute_data)
+                set_kaavoitus_api_data_in_attribute_data(attribute_data)
             except Exception:
                 pass
-
-            self._set_ad_data(attribute_data)
+            set_ad_data_in_attribute_data(attribute_data)
 
         static_properties = [
             "user",
