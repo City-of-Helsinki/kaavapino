@@ -35,6 +35,11 @@ services:
       - SOCIAL_AUTH_TUNNISTAMO_SECRET=
       - KAAVOITUS_API_BASE_URL=
       - KAAVOITUS_API_AUTH_TOKEN=
+      - GRAPH_API_LOGIN_BASE_URL=https://login.microsoftonline.com
+      - GRAPH_API_BASE_URL=https://graph.microsoft.com
+      - GRAPH_API_APPLICATION_ID=
+      - GRAPH_API_TENANT_ID=
+      - GRAPH_API_CLIENT_SECRET=
     ports:
       - "8000:8000"
     depends_on:
