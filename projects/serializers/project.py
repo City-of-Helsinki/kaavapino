@@ -854,7 +854,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if list_view:
             return []
 
-        flat_data = get_flat_attribute_data(project.attribute_data)
+        flat_data = get_flat_attribute_data(project.attribute_data, {})
 
         ids = []
 
@@ -887,7 +887,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
 
                 if not response:
-                    return None
+                    continue
 
                 cache.set(url, response, 60)
 

@@ -51,7 +51,7 @@ def get_attribute_data(attribute_path, data):
         data.get(attribute_path[0].identifier, [])[attribute_path[1]]
     )
 
-def get_flat_attribute_data(data, flat={}):
+def get_flat_attribute_data(data, flat):
     for key, val in data.items():
         flat[key] = flat.get(key, [])
 
@@ -60,14 +60,11 @@ def get_flat_attribute_data(data, flat={}):
         except Attribute.DoesNotExist:
             value_type = None
 
-        if type(val) is dict and value_type == Attribute.TYPE_FIELDSET:
-            get_flat_attribute_data(val, flat)
+        if type(val) is list and value_type == Attribute.TYPE_FIELDSET:
+            for item in val:
+                get_flat_attribute_data(item, flat)
         elif type(val) is list:
-            try:
-                for item in val:
-                    get_flat_attribute_data(item, flat)
-            except AttributeError:
-                flat[key] += val
+            flat[key] += val
         else:
             flat[key].append(val)
 
@@ -85,7 +82,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         value_type=Attribute.TYPE_FIELDSET,
     )
 
-    flat_attribute_data = get_flat_attribute_data(attribute_data)
+    flat_attribute_data = get_flat_attribute_data(attribute_data, {})
 
     def build_request_paths(attr):
         returns = {}
