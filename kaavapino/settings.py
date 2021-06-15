@@ -26,6 +26,7 @@ env = environ.Env(
     STATIC_ROOT=(environ.Path, project_root("static")),
     MEDIA_URL=(str, "/media/"),
     STATIC_URL=(str, "/static/"),
+    DOCUMENT_EDIT_URL_FORMAT=(str, ""),
     TOKEN_AUTH_ACCEPTED_AUDIENCE=(str, "AUDIENCE_UNSET"),
     TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX=(str, "SCOPE_PREFIX_UNSET"),
     TOKEN_AUTH_AUTHSERVER_URL=(str, "ISSUER_UNSET"),
@@ -79,6 +80,7 @@ JWT_AUTH = {
     'JWT_AUDIENCE': os.environ.get('JWT_AUDIENCE'),
     'JWT_SECRET_KEY': os.environ.get('JWT_SECRET_KEY'),
 }
+DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
 DATABASES = {"default": env.db()}
 

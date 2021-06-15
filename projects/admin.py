@@ -304,10 +304,6 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "file")
     readonly_fields = ("slug",)
 
-    # Hide this from admin for now
-    def get_model_perms(self, request):
-        return {}
-
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "project_phase":
             return PhaseChoiceField(

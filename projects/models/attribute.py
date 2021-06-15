@@ -585,7 +585,18 @@ class Attribute(models.Model):
     def _get_single_display_value(self, value):
         if value is None or self.value_type == Attribute.TYPE_GEOMETRY:
             return None
-        if isinstance(self.value_type, bool):
+
+        if self.value_type in (
+            Attribute.TYPE_RICH_TEXT_SHORT,
+            Attribute.TYPE_RICH_TEXT,
+        ) and value:
+            try:
+                return ("".join(
+                    [item["insert"] for item in value["ops"]]
+                ).strip())
+            except TypeError:
+                return None
+        elif isinstance(self.value_type, bool):
             return "Kyllä" if value else "Ei"
         elif isinstance(self.value_type, datetime.date):
             return datetime.datetime.strftime(value, "%d.%m.%Y")

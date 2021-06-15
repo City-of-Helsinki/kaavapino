@@ -787,6 +787,9 @@ class DocumentViewSet(ReadOnlyModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         filename = request.query_params.get("filename")
+        preview = \
+            True if request.query_params.get("preview") in ("true", "True", "1") \
+            else False
         document_template = self.get_object()
 
         if filename is None:
@@ -796,7 +799,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
-        output = render_template(self.project, document_template)
+        output = render_template(self.project, document_template, preview)
         response = HttpResponse(
             output,
             content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
