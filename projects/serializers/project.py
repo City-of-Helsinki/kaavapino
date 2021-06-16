@@ -1,5 +1,6 @@
 import copy
 import datetime
+
 import numpy as np
 import requests
 from typing import List, NamedTuple, Type

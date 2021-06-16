@@ -509,7 +509,10 @@ class Attribute(models.Model):
             if self.multiple_choice and value is not None:
                 return [v for v in value_choices.filter(identifier__in=value)]
             else:
-                return value_choices.get(identifier=value)
+                try:
+                    return value_choices.get(identifier=value)
+                except AttributeValueChoice.DoesNotExist:
+                    return None
         elif self.value_type in (
             Attribute.TYPE_INTEGER,
             Attribute.TYPE_DECIMAL,
@@ -528,12 +531,15 @@ class Attribute(models.Model):
             return value
         elif self.value_type == Attribute.TYPE_DATE:
             return (
-                datetime.datetime.strptime(value, DATE_SERIALIZATION_FORMAT)
-                if value
-                else None
+                datetime.datetime.strptime(
+                    value, DATE_SERIALIZATION_FORMAT
+                ).date() if value else None
             )
         elif self.value_type == Attribute.TYPE_USER:
-            return get_user_model().objects.get(uuid=value)
+            try:
+                return get_user_model().objects.get(uuid=value)
+            except get_user_model().DoesNotExist:
+                return None
         elif self.value_type == Attribute.TYPE_FIELDSET:
             return self._get_fieldset_serialization(value, deserialize=True)
         else:
