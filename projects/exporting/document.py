@@ -9,6 +9,10 @@ from docxtpl import DocxTemplate, InlineImage, Listing, RichText
 
 from ..models import Attribute, ProjectPhase
 from ..models.utils import create_identifier
+from projects.helpers import (
+    set_kaavoitus_api_data_in_attribute_data,
+    set_ad_data_in_attribute_data,
+)
 
 IMAGE_WIDTH = Mm(136)
 
@@ -105,7 +109,15 @@ def render_template(project, document_template, preview):
 
         return display_value
 
-    for identifier, value in project.get_attribute_data().items():
+    attribute_data = project.attribute_data
+    try:
+        set_kaavoitus_api_data_in_attribute_data(attribute_data)
+    except Exception:
+        pass
+
+    set_ad_data_in_attribute_data(attribute_data)
+
+    for identifier, value in attribute_data.items():
         attribute = attributes.get(identifier)
         if not attribute:
             continue
