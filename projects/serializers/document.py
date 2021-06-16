@@ -7,13 +7,21 @@ from projects.models import DocumentTemplate
 class DocumentTemplateSerializer(serializers.ModelSerializer):
     file = serializers.SerializerMethodField()
     phase = serializers.PrimaryKeyRelatedField(source="project_phase", read_only=True)
-    phase_name = serializers.SlugField(source="project_phase.name", read_only=True)
+    phase_name = serializers.SlugField(source="project_phase.prefixed_name", read_only=True)
     phase_index = serializers.SerializerMethodField()
 
     class Meta:
         model = DocumentTemplate
-        fields = ["id", "name", "file", "phase", "phase_name", "phase_index"]
-        read_only_fields = ["id", "name"]
+        fields = [
+            "id",
+            "name",
+            "image_template",
+            "file",
+            "phase",
+            "phase_name",
+            "phase_index",
+        ]
+        read_only_fields = ["id", "name", "image_template"]
 
     def get_file(self, document_template):
         request = self.context["request"]
