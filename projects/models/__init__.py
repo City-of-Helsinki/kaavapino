@@ -40,6 +40,7 @@ from .project import (  # noqa
     PhaseAttributeMatrixCell,
     ProjectAttributeFileFieldsetPathLocation,
     FieldCommentFieldsetPathLocation,
+    CommonProjectPhase,
 )
 from .projectcomment import (  # noqa
     ProjectComment,

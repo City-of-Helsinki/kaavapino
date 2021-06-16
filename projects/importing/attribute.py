@@ -32,6 +32,7 @@ from ..models import (
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectPhase,
+    CommonProjectPhase,
     ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
@@ -1431,16 +1432,25 @@ class AttributeImporter:
         for i, phase_name in enumerate(phase_names, start=1):
             phase = PROJECT_PHASES[phase_name]
             metadata = SUBTYPE_PHASE_METADATA[subtype.name.upper()][phase_name]
-            project_phase, created = ProjectPhase.objects.update_or_create(
+            common_phase, _ = CommonProjectPhase.objects.get_or_create(
                 name=phase["name"],
-                project_subtype=subtype,
                 defaults={
                     "index": i,
                     "color": phase["color"],
                     "color_code": phase["color_code"],
                     "list_prefix": phase["list_prefix"],
-                    "metadata": metadata,
+                }
+            )
 
+            if i > common_phase.index:
+                common_phase.index = i
+                common_phase.save()
+
+            project_phase, created = ProjectPhase.objects.update_or_create(
+                project_subtype=subtype,
+                common_project_phase=common_phase,
+                defaults={
+                    "metadata": metadata,
                 },
             )
             if project_phase.id in old_phases:

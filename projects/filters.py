@@ -16,5 +16,5 @@ class ProjectFilter(django_filters.FilterSet):
             "name": ["exact", "iexact", "icontains"],
             "subtype__name": ["exact", "iexact"],
             "phase__index": ["exact", "in"],
-            "phase__name": ["exact", "iexact"],
+            "phase__common_project_phase__name": ["exact", "iexact"],
         }

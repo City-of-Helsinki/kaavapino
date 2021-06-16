@@ -30,6 +30,7 @@ from .exporting import get_document_response
 from .models import (
     Attribute,
     AttributeValueChoice,
+    CommonProjectPhase,
     DataRetentionPlan,
     DocumentTemplate,
     Project,
@@ -244,6 +245,12 @@ class OverviewFilterAdmin(admin.ModelAdmin):
     inlines = (OverviewFilterAttributeInline,)
 
 
+@admin.register(CommonProjectPhase)
+class CommonProjectPhaseAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    ordering = ("index",)
+
+
 class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectPhaseSection
     extra = 0
@@ -251,7 +258,7 @@ class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(ProjectPhase)
 class ProjectPhaseAdmin(admin.ModelAdmin):
-    list_display = ("name", "project_type", "project_subtype")
+    list_display = ("common_project_phase", "project_type", "project_subtype")
     exclude = ("index",)
     inlines = (ProjectPhaseSectionInline,)
     ordering = ("project_subtype__id", "index")

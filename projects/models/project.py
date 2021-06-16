@@ -310,7 +310,7 @@ class Project(models.Model):
             for deadline in list(
                 Deadline.objects \
                     .filter(subtype=subtype or self.subtype) \
-                    .exclude(phase__name__in=excluded_phases)
+                    .exclude(phase__common_project_phase__name__in=excluded_phases)
             )
             if self._check_condition(deadline, preview_attributes)
         ]
@@ -610,15 +610,9 @@ class ProjectFloorAreaSectionAttributeMatrixCell(BaseAttributeMatrixCell):
         return f"{self.structure} {self.attribute} ({self.row}, {self.column})"
 
 
-class ProjectPhase(models.Model):
-    """Describes a phase of a certain project subtype."""
+class CommonProjectPhase(models.Model):
+    """Describes common, subtype-agnostic properties for a ProjectPhase."""
 
-    project_subtype = models.ForeignKey(
-        ProjectSubtype,
-        verbose_name=_("project subtype"),
-        on_delete=models.CASCADE,
-        related_name="phases",
-    )
     name = models.CharField(max_length=255, verbose_name=_("name"))
     color = models.CharField(max_length=64, verbose_name=_("color"), blank=True)
     color_code = models.CharField(
@@ -626,6 +620,42 @@ class ProjectPhase(models.Model):
     )
     list_prefix = models.CharField(
         max_length=2, verbose_name=_("list prefix"), blank=True, null=True
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+
+    class Meta:
+        verbose_name = _("common project phase")
+        verbose_name_plural = _("common project phases")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.name}"
+
+    @property
+    def subtypes(self):
+        return ProjectSubtype.objects.filter(
+            phases__in=self.phases.all(),
+        )
+
+    @property
+    def prefixed_name(self):
+        return f"{self.list_prefix}. {self.name}"
+
+
+class ProjectPhase(models.Model):
+    """Describes a phase of a certain project subtype."""
+
+    common_project_phase = models.ForeignKey(
+        CommonProjectPhase,
+        verbose_name=_("common project phase"),
+        on_delete=models.PROTECT,
+        related_name="phases",
+    )
+    project_subtype = models.ForeignKey(
+        ProjectSubtype,
+        verbose_name=_("project subtype"),
+        on_delete=models.CASCADE,
+        related_name="phases",
     )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
@@ -643,7 +673,23 @@ class ProjectPhase(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return f"{self.name} ({self.project_subtype.name})"
+        return f"{self.common_project_phase} ({self.project_subtype.name})"
+
+    @property
+    def name(self):
+        return self.common_project_phase.name
+
+    @property
+    def color(self):
+        return self.common_project_phase.color
+
+    @property
+    def color_code(self):
+        return self.common_project_phase.color_code
+
+    @property
+    def list_prefix(self):
+        return self.common_project_phase.list_prefix
 
     @property
     def project_type(self):
@@ -651,7 +697,7 @@ class ProjectPhase(models.Model):
 
     @property
     def prefixed_name(self):
-        return f"{self.list_prefix}. {self.name}"
+        return self.common_project_phase.prefixed_name
 
 
 class ProjectPhaseLog(models.Model):
