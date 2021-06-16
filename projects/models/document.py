@@ -37,6 +37,10 @@ class DocumentTemplate(models.Model):
         upload_subfolder=get_upload_subfolder,
         max_length=255,
     )
+    image_template = models.BooleanField(
+        verbose_name=_("image template"),
+        default=False,
+    )
 
     class Meta:
         verbose_name = _("document template")
