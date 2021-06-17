@@ -6,6 +6,10 @@ from collections import OrderedDict
 from django.utils.translation import ugettext_lazy as _
 
 from projects.models import Report, Project
+from projects.helpers import (
+    set_kaavoitus_api_data_in_attribute_data,
+    set_ad_data_in_attribute_data,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +74,11 @@ def render_report_to_response(report: Report, projects, response):
     for project in projects:
         data = copy.deepcopy(project.attribute_data)
         data.update(get_project_data_for_report(report, project))
+        try:
+            set_kaavoitus_api_data_in_attribute_data(data)
+        except Exception:
+            pass
+        set_ad_data_in_attribute_data(data)
 
         # Raw values into display values
         for attribute in attributes:
