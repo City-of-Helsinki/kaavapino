@@ -777,6 +777,11 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         context["project"] = self.project
         return context
 
+    def get_queryset(self):
+        return DocumentTemplate.objects.filter(
+            common_project_phase__phases__project_subtype=self.project.subtype
+        )
+
     def get_project(self):
         project_id = self.kwargs.get("project_pk")
         project = Project.objects.filter(pk=project_id).first()

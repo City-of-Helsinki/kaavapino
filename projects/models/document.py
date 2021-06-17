@@ -5,7 +5,7 @@ from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
 
 from projects.models.utils import KaavapinoPrivateStorage
-from .project import ProjectPhase
+from .project import CommonProjectPhase
 
 
 class DocumentTemplate(models.Model):
@@ -15,8 +15,8 @@ class DocumentTemplate(models.Model):
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
     slug = models.SlugField()
-    project_phase = models.ForeignKey(
-        ProjectPhase,
+    common_project_phase = models.ForeignKey(
+        CommonProjectPhase,
         verbose_name=_("project phase"),
         related_name="document_templates",
         on_delete=models.CASCADE,

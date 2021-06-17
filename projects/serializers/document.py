@@ -6,8 +6,7 @@ from projects.models import DocumentTemplate
 
 class DocumentTemplateSerializer(serializers.ModelSerializer):
     file = serializers.SerializerMethodField()
-    phase = serializers.PrimaryKeyRelatedField(source="project_phase", read_only=True)
-    phase_name = serializers.SlugField(source="project_phase.prefixed_name", read_only=True)
+    phase_name = serializers.SlugField(source="common_project_phase.prefixed_name", read_only=True)
     phase_index = serializers.SerializerMethodField()
     phase_ended = serializers.SerializerMethodField()
 
@@ -18,7 +17,6 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
             "name",
             "image_template",
             "file",
-            "phase",
             "phase_name",
             "phase_index",
             "phase_ended",
@@ -36,8 +34,14 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
         return absolute_url
 
     def get_phase_ended(self, document_template):
-        return document_template.project_phase.index < \
+        project_phase = document_template.common_project_phase.phases.get(
+            project_subtype=self.context["project"].subtype,
+        )
+        return project_phase.index < \
             self.context["project"].phase.index
 
     def get_phase_index(self, document_template):
-        return document_template.project_phase.index
+        project_phase = document_template.common_project_phase.phases.get(
+            project_subtype=self.context["project"].subtype,
+        )
+        return project_phase.index

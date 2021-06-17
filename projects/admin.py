@@ -301,9 +301,9 @@ class ProjectTypeAdmin(admin.ModelAdmin):
     inlines = (ProjectProjectSubtypeInline,)
 
 
-class PhaseChoiceField(forms.ModelChoiceField):
+class CommonPhaseChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.project_subtype.name}: {obj.name}"
+        return obj.name
 
 
 @admin.register(DocumentTemplate)
@@ -312,10 +312,10 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     readonly_fields = ("slug",)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "project_phase":
-            return PhaseChoiceField(
-                queryset=ProjectPhase.objects.all().order_by(
-                    "project_subtype__index", "index"
+        if db_field.name == "common_project_phase":
+            return CommonPhaseChoiceField(
+                queryset=CommonProjectPhase.objects.all().order_by(
+                    "index",
                 )
             )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
