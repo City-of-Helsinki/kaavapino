@@ -189,49 +189,49 @@ DEFAULT_DATA_RETENTION_PLAN = DATA_RETENTION_PLANS["tieto tallennetaan pysyväst
 PROJECT_PHASES = {
     Phases.START.value: {
         "name": Phases.START.value,
-        "color": "#02d7a7",
+        "color": "color-tram",
         "color_code": "#02d7a7",
         "list_prefix": "1",
     },  # None
     Phases.PRINCIPLES.value: {
         "name": Phases.PRINCIPLES.value,
-        "color": '#009142',
-        "color_code": '#009142',
+        "color": 'color-silver',
+        "color_code": '#dedfe1',
         "list_prefix": "XL",
     },
     Phases.OAS.value: {
         "name": Phases.OAS.value,
-        "color": "#ffc61e",
+        "color": "color-summer",
         "color_code": "#ffc61e",
         "list_prefix": "2",
     },  # 01, 03
     Phases.DRAFT.value: {
         "name": Phases.DRAFT.value,
-        "color": '#ffd600',
-        "color_code": '#ffd600',
+        "color": 'color-suomenlinna',
+        "color_code": '#f5a3c7',
         "list_prefix": "XL",
     },
     Phases.PROPOSAL.value: {
         "name": Phases.PROPOSAL.value,
-        "color": "#fd4f00",
+        "color": "color-metro",
         "color_code": "#fd4f00",
         "list_prefix": "3",
     },  # 02, 04
     Phases.REVISED_PROPOSAL.value: {
         "name": Phases.REVISED_PROPOSAL.value,
-        "color": "#0000bf",
+        "color": "color-bus",
         "color_code": "#0000bf",
         "list_prefix": "4",
     },  # 05, 07
     Phases.APPROVAL.value: {
         "name": Phases.APPROVAL.value,
-        "color": "#bd9650",
+        "color": "color-gold",
         "color_code": "#bd9650",
         "list_prefix": "5",
     },  # 06, 07 <- Kvsto
     Phases.GOING_INTO_EFFECT.value: {
         "name": Phases.GOING_INTO_EFFECT.value,
-        "color": "#9ec8eb",
+        "color": "color-fog",
         "color_code": "#9ec8eb",
         "list_prefix": "6",
     },
@@ -1364,7 +1364,9 @@ class AttributeImporter:
 
                 try:
                     phase = ProjectPhase.objects.get(
-                        name=re.findall(phase_name_regex, section_string)[0],
+                        common_project_phase__name=re.findall(
+                            phase_name_regex, section_string
+                        )[0],
                         project_subtype=subtype,
                     )
                 except (IndexError, ProjectPhase.DoesNotExist):
@@ -1432,7 +1434,7 @@ class AttributeImporter:
         for i, phase_name in enumerate(phase_names, start=1):
             phase = PROJECT_PHASES[phase_name]
             metadata = SUBTYPE_PHASE_METADATA[subtype.name.upper()][phase_name]
-            common_phase, _ = CommonProjectPhase.objects.get_or_create(
+            common_phase, _ = CommonProjectPhase.objects.update_or_create(
                 name=phase["name"],
                 defaults={
                     "index": i,
