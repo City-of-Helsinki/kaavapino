@@ -29,6 +29,7 @@ from projects.helpers import (
 from projects.models import (
     Project,
     ProjectSubtype,
+    CommonProjectPhase,
     ProjectPhase,
     ProjectPhaseLog,
     ProjectPhaseSection,
@@ -1743,6 +1744,16 @@ class AdminProjectSerializer(ProjectSerializer):
         fields["onhold"] = serializers.NullBooleanField(required=False)
 
         return fields
+
+
+class CommonProjectPhaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CommonProjectPhase
+        fields = [
+            "name",
+            "color",
+            "color_code",
+        ]
 
 
 class ProjectPhaseSerializer(serializers.ModelSerializer):
