@@ -1,9 +1,30 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from users.models import privilege_as_label
+
 
 class UserSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="uuid")
+    privilege_name = serializers.SerializerMethodField()
+    role_name = serializers.SerializerMethodField()
+
+    def get_privilege_name(self, user):
+        return privilege_as_label(user.privilege)
+
+    def get_role_name(self, user):
+        if not user.all_groups.count():
+            return None
+
+        role = user.all_groups[0]
+        for group in user.all_groups:
+            if role.groupprivilege.as_int < group.groupprivilege.as_int:
+                role = group
+
+        if not role:
+            return None
+
+        return role.name
 
     class Meta:
         model = get_user_model()
@@ -16,6 +37,8 @@ class UserSerializer(serializers.ModelSerializer):
             "is_staff",
             "email",
             "privilege",
+            "privilege_name",
+            "role_name",
         ]
 
 

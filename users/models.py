@@ -21,6 +21,13 @@ def privilege_as_int(privilege):
     except ValueError:
         return -1
 
+def privilege_as_label(name):
+    return {
+        name: None,
+        **{p[0]: p[1] for p in PRIVILEGE_LEVELS}
+    }[name]
+
+
 class User(AbstractUser):
     additional_groups = models.ManyToManyField(
         Group,
@@ -41,6 +48,10 @@ class User(AbstractUser):
         if isinstance(groups[0], Group):
             return self.groups.filter(group__in=groups).exists()
         return self.groups.filter(name__in=groups).exists()
+
+    @property
+    def all_groups(self):
+        return self.groups.all().union(self.additional_groups.all())
 
     @property
     def privilege(self):
@@ -77,6 +88,10 @@ class GroupPrivilege(models.Model):
         Group, primary_key=True, on_delete=models.CASCADE)
     privilege_level = models.CharField( \
         default=None, null=True, max_length=6, choices=PRIVILEGE_LEVELS)
+
+    @property
+    def as_int(self):
+        return privilege_as_int(self.privilege_level)
 
     def __str__(self):
         return '%s: %s' % (
