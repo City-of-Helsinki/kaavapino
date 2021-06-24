@@ -1,4 +1,4 @@
-from projects.models import ProjectType, Report, Attribute, ReportAttribute
+from projects.models import ProjectType, Report, Attribute, ReportColumn
 
 
 class ReportTypeCreator:
@@ -20,4 +20,5 @@ class ReportTypeCreator:
         all_attributes.report_attributes.all().delete()
 
         for attribute in Attribute.objects.report_friendly():
-            ReportAttribute.objects.create(report=all_attributes, attribute=attribute)
+            column = ReportColumn.objects.create(report=all_attributes)
+            columns.attributes.set([attribute])

@@ -47,4 +47,8 @@ from .projectcomment import (  # noqa
     LastReadTimestamp,
     FieldComment,
 )
-from .report import Report, ReportAttribute  # noqa
+from .report import (  # noqa
+    Report,
+    ReportColumn,
+    ReportColumnPostfix,
+)

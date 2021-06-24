@@ -8,7 +8,6 @@ from django.utils.translation import ugettext_lazy as _
 from projects.models import (
     ProjectComment,
     Report,
-    ReportAttribute,
     Deadline,
     AutomaticDate,
     DateType,

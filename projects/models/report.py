@@ -1,6 +1,9 @@
+import re
+
 from django.contrib.gis.db import models
 from django.utils.translation import ugettext_lazy as _
-from projects.models import Attribute
+
+from projects.models import Attribute, CommonProjectPhase
 
 
 class Report(models.Model):
@@ -48,27 +51,79 @@ class Report(models.Model):
         return Attribute.objects.filterable().filter(report_attributes__report=self)
 
 
-class ReportAttribute(models.Model):
-
+class ReportColumn(models.Model):
     report = models.ForeignKey(
         Report,
         verbose_name=_("report"),
         on_delete=models.CASCADE,
-        related_name="report_attributes",
+        related_name="columns",
+    )
+    attributes = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("attributes"),
+        related_name="report_columns",
+    )
+    condition = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("condition"),
+        related_name="report_column_conditions",
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
     )
 
-    attribute = models.ForeignKey(
-        Attribute,
-        verbose_name=_("attribute"),
-        related_name="report_attributes",
+    def generate_postfix(self, project, attribute_data=None):
+        postfix = self.postfixes.filter(
+            phases__in=[project.phase.common_project_phase],
+        ).first()
+
+        # Fallback doesn't include data from external APIs
+        attribute_data = attribute_data or project.attribute_data
+
+        if not postfix:
+            return ""
+
+        postfix = postfix.formatting
+
+        identifiers = re.findall(r"\{([a-zA-Z_]*)\}", postfix)
+        for identifier in identifiers:
+            postfix.replace(
+                f"{{identifier}}", attribute_data.get(identifier, ""),
+            )
+
+        return postfix
+
+    class Meta:
+        verbose_name = _("report column")
+        verbose_name_plural = _("report columns")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.report} ({', '.join([attr.name for attr in self.attributes])})"
+
+
+class ReportColumnPostfix(models.Model):
+    report_column = models.ForeignKey(
+        ReportColumn,
+        verbose_name=_("report column"),
         on_delete=models.CASCADE,
+        related_name="postfixes",
+    )
+    phases = models.ManyToManyField(
+        CommonProjectPhase,
+        verbose_name=_(""),
+        related_name="report_columns",
+    )
+    formatting = models.CharField(
+        max_length=255,
+        verbose_name=_("formatting"),
     )
 
     class Meta:
-        verbose_name = _("report attribute")
-        verbose_name_plural = _("report attributes")
-        unique_together = ("report", "attribute")
+        verbose_name = _("report column postfix")
+        verbose_name_plural = _("report column postfixes")
         ordering = ("id",)
 
     def __str__(self):
-        return f"{self.report.name} ({self.attribute.name})"
+        return f"{self.formatting} ({', '.join(self.phases)})"
