@@ -1,3 +1,4 @@
+import datetime
 import io
 from html import escape
 
@@ -7,7 +8,7 @@ from django.utils import timezone
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
 
-from ..models import Attribute, ProjectPhase
+from ..models import Attribute, ProjectPhase, ProjectAttributeFile
 from ..models.utils import create_identifier
 from projects.helpers import (
     set_kaavoitus_api_data_in_attribute_data,
@@ -16,6 +17,57 @@ from projects.helpers import (
 
 IMAGE_WIDTH = Mm(136)
 
+
+# TODO: Copied from serializers/utils.py, move under helpers at some point
+def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value):
+    parent_id = path[i]["parent"].identifier
+    index = path[i]["index"]
+
+    try:
+        next_obj = parent_obj[parent_id][index]
+    except KeyError:
+        parent_obj[parent_id] = [None] * (index + 1)
+        parent_obj[parent_id][index] = {}
+        next_obj = parent_obj[parent_id][index]
+    except IndexError:
+        parent_obj[parent_id] += [None] * (index + 1 - len(parent_obj[parent_id]))
+        next_obj = parent_obj[parent_id][index]
+
+
+    # TODO multi-level fieldset image uploads not needed/supported for now
+    if False and i < len(path) - 1:
+        if next_obj is None:
+            if fieldset_content:
+                parent_obj[parent_id][index] = {**fieldset_content}
+            else:
+                parent_obj[parent_id][index] = {}
+
+            next_obj = parent_obj[parent_id][index]
+
+        # TODO Handle fieldset_content within multi-level fieldsets later
+        _set_fieldset_path(
+            None,
+            path,
+            next_obj,
+            i+1,
+            identifier,
+            value
+        )
+
+    else:
+        if next_obj is None:
+            if fieldset_content:
+                parent_obj[parent_id][index] = {
+                    **fieldset_content,
+                    identifier: value,
+                }
+            else:
+                parent_obj[parent_id][index] = {identifier: value}
+        else:
+            for k, v in fieldset_content.items():
+                next_obj[k] = v
+
+            next_obj[identifier] = value
 
 def render_template(project, document_template, preview):
     doc = DocxTemplate(document_template.file)
@@ -117,14 +169,89 @@ def render_template(project, document_template, preview):
 
     set_ad_data_in_attribute_data(attribute_data)
 
-    for identifier, value in attribute_data.items():
-        attribute = attributes.get(identifier)
-        if not attribute:
-            continue
+    full_attribute_data = [
+        (attr, attribute_data.get(attr.identifier))
+        for attr in Attribute.objects.all()
+    ]
 
+    for attribute, value in full_attribute_data:
+        identifier = attribute.identifier
         display_value = get_display_value(attribute, value)
 
         attribute_data_display[identifier] = display_value
+        if attribute.value_type == Attribute.TYPE_DATE and isinstance(value, str):
+            attribute_data_display[identifier + "__raw"] = \
+                datetime.datetime.strptime(value, "%Y-%m-%d").date()
+        else:
+            attribute_data_display[identifier + "__raw"] = value
+
+    attribute_files = ProjectAttributeFile.objects \
+        .filter(project=project, archived_at=None) \
+        .order_by(
+            "fieldset_path_str",
+            "attribute__pk",
+            "project__pk",
+            "-created_at",
+        ) \
+        .distinct("fieldset_path_str", "attribute__pk", "project__pk")
+
+    for attribute_file in attribute_files:
+        # only image formats supported by docx can be used
+        image_formats = [
+            "bmp",
+            "emf",
+            "emz",
+            "eps",
+            "fpix", "fpx",
+            "gif",
+            "jpeg", "jfif", "jpeg-2000",
+            "pdf",
+            "pict", "pct",
+            "png",
+            "pntg",
+            "psd",
+            "qtif",
+            "sgi",
+            "tga", "tpic",
+            "tiff", "tif",
+            "wmf",
+            "wmz",
+        ]
+
+        file_format_is_supported = \
+            attribute_file.file.path.split('.')[-1].lower() in image_formats
+
+        if file_format_is_supported:
+            display_value = get_display_value(
+                attribute_file.attribute,
+                attribute_file.file.path,
+            )
+        elif preview:
+            display_value = f"Kuvan tiedostotyyppiä ei tueta"
+        else:
+            continue
+
+        if not attribute_file.fieldset_path:
+            attribute_data_display[
+                attribute_file.attribute.identifier
+            ] = display_value
+        else:
+            try:
+                fieldset_content = attribute_data.get(
+                    attribute_file.fieldset_path[0]["parent"].identifier, []
+                )[attribute_file.fieldset_path[0]["index"]]
+            except (KeyError, IndexError, TypeError):
+                fieldset_content = {}
+
+            _set_fieldset_path(
+                fieldset_content,
+                attribute_file.fieldset_path,
+                attribute_data_display,
+                0,
+                attribute_file.attribute.identifier,
+                display_value,
+            )
+
 
     doc.render(attribute_data_display)
     output = io.BytesIO()

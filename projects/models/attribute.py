@@ -602,10 +602,22 @@ class Attribute(models.Model):
                 ).strip())
             except TypeError:
                 return None
-        elif isinstance(self.value_type, bool):
+        # remove checking type should pinonumero attribute (and possible others) be
+        # fixed in the attribute excel
+        elif self.value_type == Attribute.TYPE_INTEGER and isinstance(value, int):
+            return '{:,}'.format(value).replace(',', ' ')
+        elif self.value_type == Attribute.TYPE_DECIMAL and self.unit in ["ha", "k-m2"]:
+            return '{:,}'.format(int(float(value))).replace(',', ' ')
+        elif self.value_type == Attribute.TYPE_DATE:
+            date_value = datetime.datetime.strptime(value, "%Y-%m-%d")
+            return '{d.day}.{d.month}.{d.year}'.format(d=date_value)
+        elif self.value_type == Attribute.TYPE_CHOICE:
+            try:
+                return self.value_choices.get(identifier=value).value
+            except AttributeValueChoice.DoesNotExist:
+                return None
+        elif isinstance(value, bool):
             return "Kyllä" if value else "Ei"
-        elif isinstance(self.value_type, datetime.date):
-            return datetime.datetime.strftime(value, "%d.%m.%Y")
         elif isinstance(value, User):
             return value.get_full_name()
         else:
