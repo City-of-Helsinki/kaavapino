@@ -58,6 +58,12 @@ class ReportColumn(models.Model):
         on_delete=models.CASCADE,
         related_name="columns",
     )
+    title = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name=_("title"),
+    )
     attributes = models.ManyToManyField(
         Attribute,
         verbose_name=_("attributes"),
@@ -88,8 +94,8 @@ class ReportColumn(models.Model):
 
         identifiers = re.findall(r"\{([a-zA-Z_]*)\}", postfix)
         for identifier in identifiers:
-            postfix.replace(
-                f"{{identifier}}", attribute_data.get(identifier, ""),
+            postfix = postfix.replace(
+                "{"+identifier+"}", attribute_data.get(identifier, ""),
             )
 
         return postfix
@@ -100,7 +106,7 @@ class ReportColumn(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return f"{self.report} ({', '.join([attr.name for attr in self.attributes])})"
+        return f"{self.report} ({', '.join([attr.name for attr in self.attributes.all()])})"
 
 
 class ReportColumnPostfix(models.Model):
@@ -126,4 +132,4 @@ class ReportColumnPostfix(models.Model):
         ordering = ("id",)
 
     def __str__(self):
-        return f"{self.formatting} ({', '.join(self.phases)})"
+        return f"{self.formatting} ({', '.join(self.phases.all())})"

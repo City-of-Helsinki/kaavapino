@@ -8,7 +8,7 @@ class ProjectFilter(django_filters.FilterSet):
         model = Project
         fields = {
             "id": ["exact", "in"],
-            "identifier": ["exact", "in"],
+            "pino_number": ["exact", "in"],
             "user": ["isnull"],
             "user__uuid": ["exact", "in"],
             "created_at": ["lt", "gt", "date__exact", "date__lte", "date__gte"],
