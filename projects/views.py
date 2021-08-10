@@ -423,7 +423,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # Dates should be Tuesdays
         start_date += timedelta((1-start_date.weekday()) % 7)
-        end_date += timedelta((1-end_date.weekday()) % 7)
+        if end_date.weekday != 1:
+            end_date += timedelta(((1-end_date.weekday()) % 7) - 7)
 
         date_range = [
             start_date + timedelta(days=i)
