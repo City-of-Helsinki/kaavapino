@@ -501,6 +501,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             }
         }
 
+        floor_area_by_date[start_date]["total"] = \
+            sum(floor_area_by_date[start_date].values())
+
         for date, prev in zip(date_range[1:], date_range[:-1]):
             if date < today:
                 new_projects = set(confirmed_projects_by_date[date]) - \
@@ -519,6 +522,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                         project.attribute_data.get(attr, 0)))
 
                 floor_area_by_date[date][attr] = total
+
+            floor_area_by_date[date]["total"] = \
+                sum(floor_area_by_date[date].values())
 
         total_predicted = sum(floor_area_by_date[date_range[-1]].values())
 
