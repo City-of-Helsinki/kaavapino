@@ -32,13 +32,4 @@
             </form>
         </div>
     </div>
-    <div class="extra-action">
-        <div class="report-module">
-            <h2>{% trans 'Create default reports' %}</h2>
-            <form action="{% url 'admin_setup_default_reports' %}" method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
-                <button type="submit" class="action button">{% trans 'Create' %}</button>
-            </form>
-        </div>
-    </div>
 {% endblock %}

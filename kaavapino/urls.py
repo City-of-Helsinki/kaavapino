@@ -52,11 +52,6 @@ urlpatterns = [
         project_views.UploadSpecifications.as_view(),
         name="admin_upload_specifications",
     ),
-    url(
-        "admin/setup_default_reports",
-        project_views.SetupDefaultReports.as_view(),
-        name="admin_setup_default_reports",
-    ),
 ]
 
 if settings.DEBUG:
