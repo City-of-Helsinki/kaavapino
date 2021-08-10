@@ -99,6 +99,7 @@ CARD_SECTION_DATE_FORMAT = "tieto näkyy projektikortissa; päivämäärän yhte
 CARD_EXTERNAL_DOCUMENT_FIELDS = "tieto näkyy projektikortissa; valmiit dokumentit nimi ja linkki"
 CARD_EXTERNAL_DOCUMENT_SECTION = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien otsikot"
 CARD_EXTERNAL_DOCUMENT_SECTION_INDEX = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien järjestys"
+CARD_SHOW_ON_MOBILE = "tieto näkyy näkymässä, joka on sovitettu mobiiliversioon"
 
 # Overview-related columns
 OVERVIEW_FILTER_NAME = "yleisnäkymä;\nsuodattimen nimi"
@@ -1067,6 +1068,7 @@ class AttributeImporter:
                 continue
 
             location = row[self.column_index[CARD_SECTION_LOCATION]]
+            show_on_mobile = row[self.column_index[CARD_SHOW_ON_MOBILE]] == "kyllä"
             date_format = row[self.column_index[CARD_SECTION_DATE_FORMAT]]
             attribute = Attribute.objects.get(
                 identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
@@ -1092,6 +1094,7 @@ class AttributeImporter:
                 section=section,
                 date_format=date_format or None,
                 index=attr_index,
+                show_on_mobile=show_on_mobile,
             )
 
     def _create_overview_filters(self, rows):

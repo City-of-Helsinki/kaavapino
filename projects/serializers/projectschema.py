@@ -683,6 +683,7 @@ class ProjectCardSchemaSerializer(serializers.ModelSerializer):
             "section_name",
             "choices",
             "date_format",
+            "show_on_mobile",
         ]
 
     @staticmethod

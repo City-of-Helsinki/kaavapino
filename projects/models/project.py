@@ -835,6 +835,10 @@ class ProjectCardSectionAttribute(models.Model):
         verbose_name=_("index"),
         default=0,
     )
+    show_on_mobile = models.BooleanField(
+        verbose_name=_("show on mobile"),
+        default=True,
+    )
 
     class Meta:
         verbose_name = _("project card section attribute")
