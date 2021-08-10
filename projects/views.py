@@ -115,7 +115,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     permission_classes = (ProjectPermissions,)
     filter_backends = (filters.OrderingFilter,)
-    ordering_fields = ("name", "identifier", "created_at", "modified_at")
+    ordering_fields = [
+        "name", "pino_number", "created_at", "modified_at",
+    ] + [
+        f"attribute_data__{attribute.identifier}"
+        for attribute in Attribute.objects.filter(searchable=True)
+    ]
 
     def get_serializer_class(self):
         if self.action == "list":
