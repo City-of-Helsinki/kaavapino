@@ -19,9 +19,11 @@ def add_admin_group_post_user_creation(sender, instance, created, *args, **kwarg
         instance.groups.add(admin_group)
     elif not instance.is_staff and instance.has_privilege('admin'):
         instance.is_staff = True
+        instance.is_superuser = True
         instance.save()
     elif instance.is_staff and not instance.has_privilege('admin'):
         instance.is_staff = False
+        instance.is_superuser = True
         instance.save()
 
 @receiver(m2m_changed, sender=User.additional_groups.through)
