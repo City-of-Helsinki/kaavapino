@@ -765,6 +765,27 @@ class ProjectSerializer(serializers.ModelSerializer):
                         "description": attribute_file.description,
                     }
                 else:
+                    file_fs_index = attribute_file.fieldset_path[0]["index"]
+                    file_fs_parent_identifier = \
+                        attribute_file.fieldset_path[0]["parent"].identifier
+                    indices_set = len(file_attributes.get(
+                        file_fs_parent_identifier, [],
+                    ))
+                    # include in-between fieldset children with no files
+                    # that otherwise get removed in this step
+                    if not file_attributes.get(file_fs_parent_identifier):
+                        file_attributes[file_fs_parent_identifier] = []
+
+                    for i in range(indices_set, file_fs_index):
+                        try:
+                            file_attributes[file_fs_parent_identifier].append(
+                                attribute_data.get(
+                                    file_fs_parent_identifier, [],
+                                )[i]
+                            )
+                        except IndexError:
+                            file_attributes[file_fs_parent_identifier].append({})
+
                     try:
                         fieldset_content = self.instance.attribute_data.get(
                             attribute_file.fieldset_path[0]["parent"].identifier, []
