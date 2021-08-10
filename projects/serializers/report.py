@@ -21,7 +21,7 @@ class ReportSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Report
-        fields = ["id", "project_type", "name", "filters"]
+        fields = ["id", "project_type", "name", "previewable", "filters"]
 
     def get_filters(self, obj):
         filters = []

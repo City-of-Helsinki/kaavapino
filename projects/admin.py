@@ -8,6 +8,8 @@ from django.utils.translation import ugettext_lazy as _
 from projects.models import (
     ProjectComment,
     Report,
+    ReportColumn,
+    ReportColumnPostfix,
     Deadline,
     AutomaticDate,
     DateType,
@@ -303,6 +305,30 @@ class ProjectTypeAdmin(admin.ModelAdmin):
 class CommonPhaseChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
         return obj.name
+
+
+class ReportColumnInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ReportColumn
+    extra = 0
+    show_change_link = True
+    exclude = ("condition",)
+
+
+class ReportColumnPostfixInline(admin.TabularInline):
+    model = ReportColumnPostfix
+    extra = 0
+
+
+@admin.register(ReportColumn)
+class ReportColumnAdmin(admin.ModelAdmin):
+    list_display = ("__str__",)
+    inlines = (ReportColumnPostfixInline,)
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (ReportColumnInline,)
 
 
 @admin.register(DocumentTemplate)

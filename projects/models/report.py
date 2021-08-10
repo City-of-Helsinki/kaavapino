@@ -18,24 +18,14 @@ class Report(models.Model):
     is_admin_report = models.BooleanField(
         verbose_name=_("can only be fetched by admin"), default=False
     )
-
-    show_name = models.BooleanField(
-        verbose_name=_("show name on report"), default=False
-    )
     show_created_at = models.BooleanField(
         verbose_name=_("show created at on report"), default=False
     )
     show_modified_at = models.BooleanField(
         verbose_name=_("show modified at on report"), default=False
     )
-    show_user = models.BooleanField(
-        verbose_name=_("show user on report"), default=False
-    )
-    show_phase = models.BooleanField(
-        verbose_name=_("show phase on report"), default=False
-    )
-    show_subtype = models.BooleanField(
-        verbose_name=_("show subtype on report"), default=False
+    previewable = models.BooleanField(
+        verbose_name=_("report can be previewed"), default=False
     )
 
     class Meta:
@@ -73,10 +63,15 @@ class ReportColumn(models.Model):
         Attribute,
         verbose_name=_("condition"),
         related_name="report_column_conditions",
+        blank=True,
     )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
         default=0,
+    )
+    preview = models.BooleanField(
+        verbose_name=_("include in preview"),
+        default=True,
     )
 
     def generate_postfix(self, project, attribute_data=None):
@@ -118,7 +113,7 @@ class ReportColumnPostfix(models.Model):
     )
     phases = models.ManyToManyField(
         CommonProjectPhase,
-        verbose_name=_(""),
+        verbose_name=_("phases"),
         related_name="report_columns",
     )
     formatting = models.CharField(

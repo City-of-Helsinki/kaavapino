@@ -836,7 +836,7 @@ class DocumentTemplateDownloadView(
         return self.model.objects.all()
 
     def can_access_file(self, private_file):
-        return self.request.user.is_superuser
+        return self.request.user.has_privilege("admin")
 
 
 class UploadSpecifications(APIView):
@@ -872,7 +872,7 @@ class ReportViewSet(ReadOnlyModelViewSet):
         user = self.request.user
         queryset = self.queryset
 
-        if not user.is_superuser:
+        if not user.has_privilege('admin'):
             queryset = queryset.exclude(is_admin_report=True)
 
         return queryset
@@ -890,6 +890,13 @@ class ReportViewSet(ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         filename = request.query_params.get("filename")
         report = self.get_object()
+        preview = self.request.query_params.get("preview", None) in [
+            "True", "true", "1",
+        ]
+        try:
+            limit = int(self.request.query_params.get("limit", None))
+        except (ValueError, TypeError):
+            limit = None
 
         projects = self.get_project_queryset(report)
 
@@ -905,7 +912,9 @@ class ReportViewSet(ReadOnlyModelViewSet):
         response["Access-Control-Expose-Headers"] = "content-disposition"
         response["Access-Control-Allow-Origin"] = "*"
 
-        return render_report_to_response(report, projects, response)
+        return render_report_to_response(
+            report, projects, response, preview, limit,
+        )
 
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
