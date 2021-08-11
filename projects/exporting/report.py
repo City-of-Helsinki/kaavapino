@@ -71,12 +71,13 @@ def _get_fieldset_display(data, path, indent, index):
                         index+i,
                     )
                 else:
+                    attr_display = attribute.get_attribute_display(value) or ""
                     if j == 0:
-                        return_items.append(f"{' '*indent}{i}. {attribute.name}: {attribute.get_attribute_display(value)}\n")
+                        return_items.append(f"{' '*indent}{i}. {attribute.name}: {attr_display}\n")
                     elif j < len(obj.keys()):
-                        return_items.append(f"{' '*(indent+len(str(i))+1)} {attribute.name}: {attribute.get_attribute_display(value)}\n")
+                        return_items.append(f"{' '*(indent+len(str(i))+1)} {attribute.name}: {attr_display}\n")
                     else:
-                        return_items.append(f"{' '*(indent+len(str(i))+1)} {attribute.name}: {attribute.get_attribute_display(value)}")
+                        return_items.append(f"{' '*(indent+len(str(i))+1)} {attribute.name}: {attr_display}")
 
     else:
         items = data.get(path[0])
@@ -92,7 +93,7 @@ def _get_fieldset_display(data, path, indent, index):
 
 def _get_fieldset_children_display(items, attribute, offset=1):
     items = [
-        f"{i}. {attribute.get_attribute_display(item)}"
+        f"{i}. {attribute.get_attribute_display(item) or ''}"
         for i, item in enumerate(items, start=offset)
         if item
     ]
@@ -200,16 +201,16 @@ def render_report_to_response(
                             display_values[attr.identifier] = \
                                 attr.get_attribute_display(
                                     data[attr.identifier],
-                                )
+                                ) or ""
 
                 except AssertionError:
                     logger.exception(
-                        f"Could not handle attribute {attribute} for project {project}."
+                        f"Could not handle attribute {attr} for project {project}."
                     )
 
             # combine attribute display values into one string
             data[col.id] = ", ".join([
-                str(display_values.get(attr.identifier))
+                str(display_values.get(attr.identifier, ""))
                 for attr in col.attributes.all()
             ])
 
