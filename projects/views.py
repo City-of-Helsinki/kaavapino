@@ -117,6 +117,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = [
         "name", "pino_number", "created_at", "modified_at",
+        "user__first_name", "user__last_name",
     ] + [
         f"attribute_data__{attribute.identifier}"
         for attribute in Attribute.objects.filter(searchable=True)
