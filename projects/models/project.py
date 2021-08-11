@@ -923,8 +923,9 @@ class ProjectAttributeFile(models.Model):
         try:
             # resize to 200dpi print size
             image = Image.open(self.file.path)
+            exif = image.getexif()
             image.thumbnail(paper_size_in_pixels, Image.ANTIALIAS)
-            image.save(self.file.path, quality=100, optimize=True)
+            image.save(self.file.path, quality=100, optimize=True, exif=exif)
         except IOError:
             # not an image
             pass
