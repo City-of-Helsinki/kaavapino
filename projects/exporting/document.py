@@ -204,7 +204,7 @@ def render_template(project, document_template, preview):
             "eps",
             "fpix", "fpx",
             "gif",
-            "jpeg", "jfif", "jpeg-2000",
+            "jpg", "jpeg", "jfif", "jpeg-2000",
             "pdf",
             "pict", "pct",
             "png",
