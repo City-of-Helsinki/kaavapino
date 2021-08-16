@@ -18,7 +18,8 @@ from projects.models import (
 logger = logging.getLogger(__name__)
 
 # Sheets
-REPORT_SHEET_NAME = ""
+REPORT_SHEET_NAME = "Sheet1"
+EXPECTED_A1_VALUE = "rivi nro"
 
 # Report sheet column titles
 REPORT_NAME = "raportin nimi"
@@ -60,7 +61,7 @@ class ReportImporter:
             "This does not seem to be a valid report type sheet."
         )
         try:
-            if report_sheet_a1_value.lower() != REPORT_NAME:
+            if report_sheet_a1_value.lower() != EXPECTED_A1_VALUE:
                 raise invalid_sheet_exception
         except AttributeError:
             raise invalid_sheet_exception
@@ -119,33 +120,41 @@ class ReportImporter:
                 index=row[self.column_index[COLUMN_INDEX]] or 0,
             )
 
-            attributes = row[self.column_index[COLUMN_ATTRIBUTES]].split(",")
-            conditions = row[self.column_index[COLUMN_CONDITIONS]].split(",")
+            attributes = \
+                (row[self.column_index[COLUMN_ATTRIBUTES]] or "").split(",")
+            conditions = \
+                (row[self.column_index[COLUMN_CONDITIONS]] or "").split(",")
 
             column.attributes.set(
                 Attribute.objects.filter(identifier__in=attributes)
             )
-            column.conditions.set(
+            column.condition.set(
                 Attribute.objects.filter(identifier__in=conditions)
             )
 
-            postfixes = zip(
-                re.findall(
-                    r"\[([X,S,M,L]*)\]",
-                    row[self.column_index[COLUMN_POSTFIX]],
-                ),
-                re.findall(
-                    r'"([^"]*)"',
-                    row[self.column_index[COLUMN_POSTFIX]],
-                ),
-            )
-            for phases, formatting in postfixes:
-                ReportColumnPostfix.objects.create(
-                    report_column=column,
-                    phases=CommonProjectPhase.objects.filter(
-                        name__in=phases.split(","),
+            try:
+                postfixes = zip(
+                    re.findall(
+                        r"\[([X,S,M,L]*)\]",
+                        row[self.column_index[COLUMN_POSTFIX]],
                     ),
+                    re.findall(
+                        r'"([^"]*)"',
+                        row[self.column_index[COLUMN_POSTFIX]],
+                    ),
+                )
+            except TypeError:
+                postfixes = []
+
+            for phases, formatting in postfixes:
+                postfix = ReportColumnPostfix.objects.create(
+                    report_column=column,
                     formatting=formatting,
+                )
+                postfix.phases.set(
+                    CommonProjectPhase.objects.filter(
+                        name__in=phases.split(","),
+                    )
                 )
 
     @transaction.atomic
@@ -158,6 +167,8 @@ class ReportImporter:
         data_rows = \
             self._extract_data_from_workbook(self.workbook)
         header_row = data_rows.pop(0)
+        # the second row is reserved for column descriptions, remove it as well
+        data_rows.pop(0)
         self._set_row_indexes(header_row)
         data_rows = [
             row for row in data_rows
