@@ -28,12 +28,10 @@ COLUMN_CONDITIONS = "näyttöehto"
 COLUMN_POSTFIX = "loppuliite"
 COLUMN_INDEX = "sarakkeiden järjestys"
 COLUMN_TITLE = "sarakkeen otsikko"
+COLUMN_PREVIEW = ""
+COLUMN_PREVIEW_ONLY = ""
 COLUMN_CUSTOM_VALUE_MAPPING = ""
 
-# Hard-coded for now because only one report type is
-# previewable at this point
-# TODO check its name
-PREVIEWABLE_REPORTS = []
 
 class ReportImporterException(Exception):
     pass
@@ -111,9 +109,15 @@ class ReportImporter:
                     "is_admin_report": True,
                     "show_created_at": True,
                     "show_modified_at": True,
-                    "previewable": report_name in PREVIEWABLE_REPORTS,
+                    "previewable": False,
                 }
             )
+
+            preview = row[self.column_index[COLUMN_PREVIEW]] == "kyllä"
+            preview_only = row[self.column_index[COLUMN_PREVIEW_ONLY]] == "kyllä"
+            if not report.previewable and (preview or preview_only):
+                report.previewable = True
+                report.save()
 
             mappings = row[self.column_index[COLUMN_CUSTOM_VALUE_MAPPING]]
             if mappings:
@@ -128,6 +132,8 @@ class ReportImporter:
 
             column = ReportColumn.objects.create(
                 report=report,
+                preview=preview,
+                preview_only=preview_only,
                 title=row[self.column_index[COLUMN_TITLE]],
                 index=row[self.column_index[COLUMN_INDEX]] or 0,
                 custom_display_mapping=custom_display_mapping,

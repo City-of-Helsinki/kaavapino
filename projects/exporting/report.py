@@ -3,6 +3,7 @@ import csv
 import logging
 from collections import OrderedDict
 
+from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
 
 from projects.models import Attribute, Report, Project
@@ -120,7 +121,9 @@ def render_report_to_response(
 ):
     cols = report.columns.order_by("index")
     if preview:
-        cols = cols.filter(preview=True)
+        cols = cols.filter(Q(preview=True) | Q(preview_only=True))
+    else:
+        cols = cols.filter(preview_only=False)
 
 
     if limit:
