@@ -31,6 +31,18 @@ def project_data_headers(report: Report, limit):
 def _format_date(value):
     return '{d.day}.{d.month}.{d.year}'.format(d=value)
 
+def _get_display_value(attribute, column, value):
+    attr_display = attribute.get_attribute_display(value) or ""
+
+    if column.custom_display_mapping:
+        try:
+            return column.custom_display_mapping[attr_display]
+        except KeyError:
+            pass
+
+    return attr_display
+
+
 def get_project_data_for_report(report: Report, project: Project, limit):
     data = {}
 
@@ -51,7 +63,7 @@ def _flatten_fieldset_data(data, path, values={}, index=0):
 
     return index, values
 
-def _get_fieldset_display(data, path, indent, index):
+def _get_fieldset_display(data, path, indent, index, column):
     return_items = []
     if len(path) == 1:
         for i, obj in enumerate(data, start=1):
@@ -71,9 +83,10 @@ def _get_fieldset_display(data, path, indent, index):
                         [attribute],
                         indent+4,
                         index+i,
+                        column,
                     )
                 else:
-                    attr_display = attribute.get_attribute_display(value) or ""
+                    attr_display = _get_display_value(attribute, column, value)
                     if j == 0:
                         return_items.append(f"{' '*indent}{i}. {attribute.name}: {attr_display}\n")
                     elif j < len(obj.keys()):
@@ -89,13 +102,14 @@ def _get_fieldset_display(data, path, indent, index):
                 path[1:],
                 indent,
                 i + (len(items[i-1]) if i > 0 else 0),
+                column,
             )
 
     return "".join(return_items)
 
-def _get_fieldset_children_display(items, attribute, offset=1):
+def _get_fieldset_children_display(items, attribute, column, offset=1):
     items = [
-        f"{i}. {attribute.get_attribute_display(item) or ''}"
+        f"{i}. {_get_display_value(attribute, column, item)}"
         for i, item in enumerate(items, start=offset)
         if item
     ]
@@ -190,20 +204,22 @@ def render_report_to_response(
 
                         display_values[attr.identifier] = \
                             _get_fieldset_display(
-                                fieldset_data, path, 0, 1,
+                                fieldset_data, path, 0, 1, col,
                             )
                     elif attr.fieldsets.count():
                         if attr.identifier in flat_data:
                             display_values[attr.identifier] = \
                                 _get_fieldset_children_display(
-                                    flat_data[attr.identifier], attr,
+                                    flat_data[attr.identifier], attr, col,
                                 )
                     else:
                         if attr.identifier in data:
                             display_values[attr.identifier] = \
-                                attr.get_attribute_display(
+                                _get_display_value(
+                                    attr,
+                                    col,
                                     data[attr.identifier],
-                                ) or ""
+                                )
 
                 except AssertionError:
                     logger.exception(

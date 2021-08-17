@@ -28,6 +28,7 @@ COLUMN_CONDITIONS = "näyttöehto"
 COLUMN_POSTFIX = "loppuliite"
 COLUMN_INDEX = "sarakkeiden järjestys"
 COLUMN_TITLE = "sarakkeen otsikko"
+COLUMN_CUSTOM_VALUE_MAPPING = ""
 
 # Hard-coded for now because only one report type is
 # previewable at this point
@@ -114,10 +115,22 @@ class ReportImporter:
                 }
             )
 
+            mappings = row[self.column_index[COLUMN_CUSTOM_VALUE_MAPPING]]
+            if mappings:
+                custom_display_mapping = {
+                    key: value for key, value in zip(
+                        re.findall(r'"([^"]*)":', mappings),
+                        re.findall(r':[\s]*"([^"]*)"', mappings),
+                    )
+                }
+            else:
+                custom_display_mapping = None
+
             column = ReportColumn.objects.create(
                 report=report,
                 title=row[self.column_index[COLUMN_TITLE]],
                 index=row[self.column_index[COLUMN_INDEX]] or 0,
+                custom_display_mapping=custom_display_mapping,
             )
 
             attributes = \

@@ -2,6 +2,8 @@ import re
 
 from django.contrib.gis.db import models
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.postgres.fields import JSONField
+from django.core.serializers.json import DjangoJSONEncoder
 
 from projects.models import Attribute, CommonProjectPhase
 
@@ -72,6 +74,13 @@ class ReportColumn(models.Model):
     preview = models.BooleanField(
         verbose_name=_("include in preview"),
         default=True,
+    )
+    custom_display_mapping = JSONField(
+        default=dict,
+        blank=True,
+        null=True,
+        encoder=DjangoJSONEncoder,
+        verbose_name=_("map automatic display value strings to custom display values"),
     )
 
     def generate_postfix(self, project, attribute_data=None):
