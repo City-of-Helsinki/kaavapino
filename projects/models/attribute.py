@@ -618,8 +618,13 @@ class Attribute(models.Model):
                 return None
         elif isinstance(value, bool):
             return "Kyllä" if value else "Ei"
-        elif isinstance(value, User):
-            return value.get_full_name()
+        elif self.value_type == Attribute.TYPE_USER:
+            if not isinstance(value, User):
+                user = User.objects.get(uuid=value)
+            else:
+                user = value
+
+            return user.get_full_name()
         else:
             return escape(str(value))
 

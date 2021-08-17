@@ -28,14 +28,16 @@ def project_data_headers(report: Report, limit):
 
     return headers
 
+def _format_date(value):
+    return '{d.day}.{d.month}.{d.year}'.format(d=value)
 
 def get_project_data_for_report(report: Report, project: Project, limit):
     data = {}
 
     if report.show_created_at:
-        data[f"{prefix}-created_at"] = project.created_at.isoformat()
+        data[f"{prefix}-created_at"] = _format_date(project.created_at)
     if report.show_modified_at and (not limit or limit > 1):
-        data[f"{prefix}-modified_at"] = project.modified_at.isoformat()
+        data[f"{prefix}-modified_at"] = _format_date(project.modified_at)
 
     return data
 
@@ -212,6 +214,7 @@ def render_report_to_response(
             data[col.id] = ", ".join([
                 str(display_values.get(attr.identifier, ""))
                 for attr in col.attributes.all()
+                if display_values.get(attr.identifier)
             ])
 
             # append postfix if any
