@@ -8,17 +8,23 @@ from django.db import transaction
 from projects.models import (
     ProjectType,
     Report,
+    ReportFilter,
+    ReportFilterAttributeChoice,
     Attribute,
     CommonProjectPhase,
     Report,
     ReportColumn,
     ReportColumnPostfix,
 )
+from ..models.utils import create_identifier, truncate_identifier
 
 logger = logging.getLogger(__name__)
 
+IDENTIFIER_MAX_LENGTH = 50
+
 # Sheets
 REPORT_SHEET_NAME = "Sheet1"
+FILTER_SHEET_NAME = "Sheet2"
 EXPECTED_A1_VALUE = "rivi nro"
 
 # Report sheet column titles
@@ -31,6 +37,22 @@ COLUMN_TITLE = "sarakkeen otsikko"
 COLUMN_PREVIEW = "näytetään esikatselussa"
 COLUMN_PREVIEW_ONLY = "vain esikatselussa"
 COLUMN_CUSTOM_VALUE_MAPPING = "korvaavat arvot vakioarvoille"
+
+# Filter sheet column titles
+FILTER_NAME = "suodattimen nimi"
+FILTER_REPORTS = "raportit joita koskee"
+FILTER_ATTRIBUTES = "kenttätunnisteet"
+FILTER_TYPE = "suodattimen tyyppi"
+FILTER_ATTRIBUTES_AS_CHOICES = "kenttätunnisteen valinta"
+FILTER_ATTRIBUTE_CHOICE_VALUES = "kenttätunnisteen valinta, lisävalinta"
+
+FILTER_TYPE_MAPPING = {
+    "tarkka arvo": ReportFilter.TYPE_EXACT,
+    "monivalinta": ReportFilter.TYPE_MULTIPLE,
+    "arvoväli": ReportFilter.TYPE_RANGE,
+    "arvo asetettu": ReportFilter.TYPE_SET,
+    "arvoa ei asetettu": ReportFilter.TYPE_NOT_SET,
+}
 
 
 class ReportImporterException(Exception):
@@ -52,6 +74,7 @@ class ReportImporter:
     def _extract_data_from_workbook(self, workbook):
         try:
             report_sheet = workbook[REPORT_SHEET_NAME]
+            filter_sheet = workbook[FILTER_SHEET_NAME]
         except KeyError as e:
             raise ReportImporterException(e)
 
@@ -65,32 +88,52 @@ class ReportImporter:
         except AttributeError:
             raise invalid_sheet_exception
 
-        return self._rows_for_report_sheet(report_sheet)
+        return (
+            self._rows_for_sheet(report_sheet),
+            self._rows_for_sheet(filter_sheet),
+        )
 
-    def _rows_for_report_sheet(self, sheet):
+    def _rows_for_sheet(self, sheet):
         data = []
 
         for row in list(sheet.iter_rows()):
-            if not row[1].value:
+            if not row[0].value:
                 break
             data.append([col.value for col in row])
 
         return data
 
-    def _set_row_indexes(self, header_row: Iterable[str]):
+    def _set_row_indexes(self, report_header_row, filter_header_row):
         """Determine index number for all columns."""
-        self.column_index: dict = {}
+        self.report_column_index: dict = {}
+        self.filter_column_index: dict = {}
 
-        for index, column in enumerate(header_row):
+        for index, column in enumerate(report_header_row):
             if column:
-                self.column_index[column.lower()] = index
+                self.report_column_index[column.lower()] = index
 
-    def _check_if_row_valid(self, row: Sequence) -> bool:
+        for index, column in enumerate(filter_header_row):
+            if column:
+                self.filter_column_index[column.lower()] = index
+
+    def _check_if_report_row_valid(self, row: Sequence) -> bool:
         """Check if the row has all required data."""
         try:
-            assert(row[self.column_index[REPORT_NAME]])
+            assert(row[self.report_column_index[REPORT_NAME]])
         except AssertionError:
             logger.info(f"Invalid row missing report name not imported.")
+            return False
+
+        return True
+
+    def _check_if_filter_row_valid(self, row: Sequence) -> bool:
+        """Check if the row has all required data."""
+        try:
+            assert(row[self.filter_column_index[FILTER_NAME]])
+            assert(row[self.filter_column_index[FILTER_TYPE]])
+            assert(row[self.filter_column_index[FILTER_ATTRIBUTES]])
+        except AssertionError:
+            logger.info(f"Invalid row missing filter name, type, or attribute(s) not imported.")
             return False
 
         return True
@@ -101,7 +144,7 @@ class ReportImporter:
         ReportColumnPostfix.objects.all().delete()
 
         for row in rows:
-            report_name = row[self.column_index[REPORT_NAME]]
+            report_name = row[self.report_column_index[REPORT_NAME]]
             report, _ = Report.objects.get_or_create(
                 name=report_name,
                 project_type=project_type,
@@ -113,13 +156,13 @@ class ReportImporter:
                 }
             )
 
-            preview = row[self.column_index[COLUMN_PREVIEW]] == "kyllä"
-            preview_only = row[self.column_index[COLUMN_PREVIEW_ONLY]] == "kyllä"
+            preview = row[self.report_column_index[COLUMN_PREVIEW]] == "kyllä"
+            preview_only = row[self.report_column_index[COLUMN_PREVIEW_ONLY]] == "kyllä"
             if not report.previewable and (preview or preview_only):
                 report.previewable = True
                 report.save()
 
-            mappings = row[self.column_index[COLUMN_CUSTOM_VALUE_MAPPING]]
+            mappings = row[self.report_column_index[COLUMN_CUSTOM_VALUE_MAPPING]]
             if mappings:
                 custom_display_mapping = {
                     key: value for key, value in zip(
@@ -134,15 +177,15 @@ class ReportImporter:
                 report=report,
                 preview=preview,
                 preview_only=preview_only,
-                title=row[self.column_index[COLUMN_TITLE]],
-                index=row[self.column_index[COLUMN_INDEX]] or 0,
+                title=row[self.report_column_index[COLUMN_TITLE]],
+                index=row[self.report_column_index[COLUMN_INDEX]] or 0,
                 custom_display_mapping=custom_display_mapping,
             )
 
             attributes = \
-                (row[self.column_index[COLUMN_ATTRIBUTES]] or "").split(",")
+                (row[self.report_column_index[COLUMN_ATTRIBUTES]] or "").split(",")
             conditions = \
-                (row[self.column_index[COLUMN_CONDITIONS]] or "").split(",")
+                (row[self.report_column_index[COLUMN_CONDITIONS]] or "").split(",")
 
             column.attributes.set(
                 Attribute.objects.filter(identifier__in=attributes)
@@ -155,11 +198,11 @@ class ReportImporter:
                 postfixes = zip(
                     re.findall(
                         r"\[([X,S,M,L]*)\]",
-                        row[self.column_index[COLUMN_POSTFIX]],
+                        row[self.report_column_index[COLUMN_POSTFIX]],
                     ),
                     re.findall(
                         r'"([^"]*)"',
-                        row[self.column_index[COLUMN_POSTFIX]],
+                        row[self.report_column_index[COLUMN_POSTFIX]],
                     ),
                 )
             except TypeError:
@@ -176,6 +219,99 @@ class ReportImporter:
                     )
                 )
 
+    def _clean_value_list(self, value):
+        try:
+            return value[0].strip(" ")
+        except IndexError:
+            return None
+
+    def _create_report_filters(self, rows):
+        ReportFilterAttributeChoice.objects.all().delete()
+        ReportFilter.objects.all().delete()
+
+        for row in rows:
+            report_names = re.findall(
+                r'"([^"]*)"',
+                row[self.filter_column_index[FILTER_REPORTS]] or "",
+            )
+            reports = Report.objects.filter(name__in=report_names)
+
+            attribute_identifiers = \
+                row[self.filter_column_index[FILTER_ATTRIBUTES]].split(",")
+            attributes = \
+                Attribute.objects.filter(identifier__in=attribute_identifiers)
+
+            name = row[self.filter_column_index[FILTER_NAME]]
+            identifier = truncate_identifier(
+                create_identifier(name.strip(" \t:.")),
+                length=IDENTIFIER_MAX_LENGTH,
+            )
+            filter_type = \
+                FILTER_TYPE_MAPPING[row[self.filter_column_index[FILTER_TYPE]]]
+
+            if row[self.filter_column_index[FILTER_ATTRIBUTE_CHOICE_VALUES]]:
+                attributes_as_choices = True
+                attr_vc_string = \
+                    row[self.filter_column_index[FILTER_ATTRIBUTE_CHOICE_VALUES]]
+                # import format:
+                # ("attribute_identifier", "label head"): [("label tail", value, value), ...]
+                attribute_choice_values = [
+                    {
+                        "identifier": re.findall(r'"([^"]*)"', key)[0],
+                        "label_head": re.findall(r'"([^"]*)"', key)[1],
+                        "value_choices": [
+                            {
+                                "label_tail": (re.findall(r'"([^"]*)"', val) + [""])[0],
+                                "value": self._clean_value_list(
+                                    re.findall(r'"[^"]*",\s*(.*)', val)
+                                )
+                            }
+                            for val in re.findall(r'\(([^\(^\)]*)\)', values)
+                        ],
+                    }
+                    for key, values in zip(
+                        re.findall(r'\(([^\(^\)]*)\):', attr_vc_string),
+                        re.findall(r'\([^\(^\)]*\):\s*\[([^\[^\]]*)\]', attr_vc_string),
+                    )
+                    if len(re.findall(r'"([^"]*)"', key)) == 2 and values
+                ]
+
+            elif row[self.filter_column_index[FILTER_ATTRIBUTES_AS_CHOICES]] == "kyllä":
+                attributes_as_choices = True
+                attribute_choice_values = []
+            else:
+                attributes_as_choices = False
+                attribute_choice_values = []
+
+            report_filter = ReportFilter.objects.create(
+                name=name,
+                identifier=identifier,
+                type=filter_type,
+                attributes_as_choices=attributes_as_choices,
+            )
+
+            report_filter.reports.set(reports)
+            report_filter.attributes.set(attributes)
+
+
+            for attribute_choice in attribute_choice_values:
+                for i, value_choice in enumerate(attribute_choice["value_choices"]):
+                    if not value_choice["value"]:
+                        continue
+
+                    try:
+                        ReportFilterAttributeChoice.objects.create(
+                            report_filter=report_filter,
+                            attribute=Attribute.objects.get(
+                                identifier=attribute_choice["identifier"],
+                            ),
+                            name=f'{attribute_choice["label_head"]} {value_choice["label_tail"]}',
+                            identifier=f'{attribute_choice["identifier"]}_{i}',
+                            value=value_choice["value"],
+                        )
+                    except Attribute.DoesNotExist:
+                        continue
+
     @transaction.atomic
     def run(self):
         filename = self.options.get("filename")
@@ -183,14 +319,21 @@ class ReportImporter:
 
         self.workbook = self._open_workbook(filename)
 
-        data_rows = \
+        report_data_rows, filter_data_rows = \
             self._extract_data_from_workbook(self.workbook)
-        header_row = data_rows.pop(0)
+        report_header_row = report_data_rows.pop(0)
+        filter_header_row = filter_data_rows.pop(0)
         # the second row is reserved for column descriptions, remove it as well
-        data_rows.pop(0)
-        self._set_row_indexes(header_row)
-        data_rows = [
-            row for row in data_rows
-            if self._check_if_row_valid(row)
+        report_data_rows.pop(0)
+        filter_data_rows.pop(0)
+        self._set_row_indexes(report_header_row, filter_header_row)
+        report_data_rows = [
+            row for row in report_data_rows
+            if self._check_if_report_row_valid(row)
         ]
-        self._create_report_columns(data_rows)
+        filter_data_rows = [
+            row for row in filter_data_rows
+            if self._check_if_filter_row_valid(row)
+        ]
+        self._create_report_columns(report_data_rows)
+        self._create_report_filters(filter_data_rows)

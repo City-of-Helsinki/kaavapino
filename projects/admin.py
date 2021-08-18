@@ -10,6 +10,8 @@ from projects.models import (
     Report,
     ReportColumn,
     ReportColumnPostfix,
+    ReportFilter,
+    ReportFilterAttributeChoice,
     Deadline,
     AutomaticDate,
     DateType,
@@ -329,6 +331,17 @@ class ReportColumnAdmin(admin.ModelAdmin):
 class ReportAdmin(admin.ModelAdmin):
     list_display = ("name",)
     inlines = (ReportColumnInline,)
+
+
+class ReportFilterAttributeChoiceInline(admin.TabularInline):
+    model = ReportFilterAttributeChoice
+    extra = 0
+
+
+@admin.register(ReportFilter)
+class ReportFilterAdmin(admin.ModelAdmin):
+    list_display = ("name", "type")
+    inlines = (ReportFilterAttributeChoiceInline,)
 
 
 @admin.register(DocumentTemplate)

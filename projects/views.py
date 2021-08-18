@@ -20,7 +20,6 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
-from projects.filters import ProjectFilter
 from projects.importing import AttributeImporter
 from projects.models import (
     FieldComment,
@@ -37,6 +36,7 @@ from projects.models import (
     DocumentTemplate,
     Attribute,
     Report,
+    ReportFilter,
     Deadline,
     DocumentLinkFieldSet,
     DocumentLinkSection,
@@ -879,14 +879,17 @@ class ReportViewSet(ReadOnlyModelViewSet):
         return queryset
 
     def get_project_queryset(self, report):
-        pf = ProjectFilter(
-            self.request.query_params,
-            queryset=Project.objects.filter(
-                subtype__project_type=report.project_type, public=True
-            ),
-            request=self.request,
+        params = self.request.query_params
+        filters = report.filters.filter(
+            identifier__in=params.keys()
         )
-        return pf.qs
+        projects = Project.objects.all()
+        for report_filter in filters:
+            projects = report_filter.filter_projects(
+                params.get(report_filter.identifier),
+                queryset=projects,
+            )
+        return projects
 
     def retrieve(self, request, *args, **kwargs):
         filename = request.query_params.get("filename")
