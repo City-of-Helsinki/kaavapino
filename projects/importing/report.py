@@ -28,9 +28,9 @@ COLUMN_CONDITIONS = "näyttöehto"
 COLUMN_POSTFIX = "loppuliite"
 COLUMN_INDEX = "sarakkeiden järjestys"
 COLUMN_TITLE = "sarakkeen otsikko"
-COLUMN_PREVIEW = ""
-COLUMN_PREVIEW_ONLY = ""
-COLUMN_CUSTOM_VALUE_MAPPING = ""
+COLUMN_PREVIEW = "näytetään esikatselussa"
+COLUMN_PREVIEW_ONLY = "vain esikatselussa"
+COLUMN_CUSTOM_VALUE_MAPPING = "korvaavat arvot vakioarvoille"
 
 
 class ReportImporterException(Exception):
