@@ -13,6 +13,7 @@ from django.utils.translation import ugettext_lazy as _
 
 from users.models import User, PRIVILEGE_LEVELS
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
+from projects.helpers import get_ad_user
 
 
 class AttributeQuerySet(models.QuerySet):
@@ -618,6 +619,11 @@ class Attribute(models.Model):
                 return None
         elif isinstance(value, bool):
             return "Kyllä" if value else "Ei"
+        elif self.value_type == Attribute.TYPE_PERSONNEL:
+            try:
+                return get_ad_user(value).get("first_name")
+            except AttributeError:
+                return value
         elif self.value_type == Attribute.TYPE_USER:
             if not isinstance(value, User):
                 user = User.objects.get(uuid=value)

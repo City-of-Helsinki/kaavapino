@@ -6,7 +6,6 @@ from django.core.cache import cache
 from rest_framework import status
 from rest_framework.response import Response
 
-from projects.models import Attribute
 from users.helpers import get_graph_api_access_token
 from users.serializers import PersonnelSerializer
 
@@ -52,6 +51,7 @@ def get_attribute_data(attribute_path, data):
     )
 
 def get_flat_attribute_data(data, flat):
+    from projects.models import Attribute
     for key, val in data.items():
         flat[key] = flat.get(key, [])
 
@@ -70,8 +70,8 @@ def get_flat_attribute_data(data, flat):
 
     return flat
 
-
 def set_kaavoitus_api_data_in_attribute_data(attribute_data):
+    from projects.models import Attribute
     external_data_attrs = Attribute.objects.filter(
         data_source__isnull=False,
     )
@@ -471,7 +471,29 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
         set_in_attribute_data(attribute_data, path, value)
 
+def get_ad_user(id):
+    url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,surname"
+    response = cache.get(url)
+    if not response:
+        token = get_graph_api_access_token()
+        if not token:
+            return Response(
+                "Cannot get access token",
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        response = requests.get(
+            url, headers={"Authorization": f"Bearer {token}"}
+        )
+
+        if not response:
+            return None
+
+        cache.set(url, response, 60)
+
+    return response.json()
+
 def set_ad_data_in_attribute_data(attribute_data):
+    from projects.models import Attribute
     paths = []
 
     def add_paths(solved_path, remaining_path, parent_data):
@@ -489,25 +511,8 @@ def set_ad_data_in_attribute_data(attribute_data):
             )
 
     def get_in_personnel_data(id, key):
-        url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,surname"
-        response = cache.get(url)
-        if not response:
-            token = get_graph_api_access_token()
-            if not token:
-                return Response(
-                    "Cannot get access token",
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-            response = requests.get(
-                url, headers={"Authorization": f"Bearer {token}"}
-            )
-
-            if not response:
-                return None
-
-            cache.set(url, response, 60)
-
-        return PersonnelSerializer(response.json()).data.get(key)
+        user = get_ad_user(id)
+        return PersonnelSerializer(user).data.get(key)
 
     for attr in Attribute.objects.filter(
         ad_key_attribute__isnull=False,
