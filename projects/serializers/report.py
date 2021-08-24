@@ -1,6 +1,5 @@
 from rest_framework import serializers
 
-from projects.filters import ProjectFilter
 from projects.models import Report, ReportFilter
 
 FILTER_TYPE_DEFINITIONS = {
