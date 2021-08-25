@@ -43,7 +43,6 @@ def _get_display_value(attribute, column, value):
 
     return attr_display
 
-
 def get_project_data_for_report(report: Report, project: Project, limit):
     data = {}
 
@@ -117,8 +116,9 @@ def _get_fieldset_children_display(items, attribute, column, offset=1):
     return "\n".join(items)
 
 def render_report_to_response(
-    report: Report, projects, response, preview=False, limit=None,
+    report: Report, project_ids, response, preview=False, limit=None,
 ):
+    projects = Project.objects.filter(pk__in=project_ids)
     cols = report.columns.order_by("index")
     if preview:
         cols = cols.filter(Q(preview=True) | Q(preview_only=True))

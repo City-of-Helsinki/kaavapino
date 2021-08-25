@@ -1,5 +1,7 @@
 import pytz
 from datetime import datetime, timedelta
+import time
+
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import FieldError
 from django.core.cache import cache
@@ -8,6 +10,8 @@ from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
+from django_q.tasks import async_task, result as async_result
+from django_q.models import OrmQ
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
@@ -903,7 +907,32 @@ class ReportViewSet(ReadOnlyModelViewSet):
             )
         return projects
 
+    def _remove_from_queue(self, *args, **kwargs):
+        pass
+
+
     def retrieve(self, request, *args, **kwargs):
+        task_id = request.query_params.get("task")
+
+        if task_id:
+            result = async_result(task_id)
+            if result:
+                return result
+
+            queued_ids = [
+                ormq.task_id() for ormq in OrmQ.objects.all()
+            ]
+            if task_id in queued_ids:
+                return Response(
+                    {"detail": task_id},
+                    status=status.HTTP_202_ACCEPTED,
+                )
+            else:
+                return Response(
+                    {"detail": "Requested task not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
         filename = request.query_params.get("filename")
         report = self.get_object()
         preview = self.request.query_params.get("preview", None) in [
@@ -914,7 +943,9 @@ class ReportViewSet(ReadOnlyModelViewSet):
         except (ValueError, TypeError):
             limit = None
 
-        projects = self.get_project_queryset(report)
+        project_ids = [
+            project.pk for project in self.get_project_queryset(report)
+        ]
 
         if filename is None:
             filename = "{}-{}".format(
@@ -928,9 +959,20 @@ class ReportViewSet(ReadOnlyModelViewSet):
         response["Access-Control-Expose-Headers"] = "content-disposition"
         response["Access-Control-Allow-Origin"] = "*"
 
-        return render_report_to_response(
-            report, projects, response, preview, limit,
+        report_task = async_task(
+            render_report_to_response,
+            report, project_ids, response, preview, limit,
         )
+        time.sleep(1)
+        result = async_result(report_task)
+
+        if result:
+            return result
+        else:
+            return Response(
+                {"detail": report_task},
+                status=status.HTTP_202_ACCEPTED,
+            )
 
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
