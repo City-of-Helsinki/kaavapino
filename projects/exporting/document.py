@@ -17,6 +17,11 @@ from projects.helpers import (
 
 IMAGE_WIDTH = Mm(136)
 
+def _get_raw_value(value, attribute):
+    if attribute.value_type == Attribute.TYPE_DATE and isinstance(value, str):
+        return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+    else:
+        return value
 
 # TODO: Copied from serializers/utils.py, move under helpers at some point
 def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value):
@@ -93,19 +98,29 @@ def render_template(project, document_template, preview):
         phase = phases.filter(index__gte=project.phase.index).first()
         return phase or phases.reverse().first()
 
-    def get_display_value(attribute, value):
+    def get_display_and_raw_value(attribute, value):
         empty = False
 
         if attribute.value_type == Attribute.TYPE_FIELDSET:
-            return [
-                {
-                    k: get_display_value(attributes.get(k), v)
-                    for k, v in fieldset_item.items()
-                    if attributes.get(k)
-                }
-                for fieldset_item in value or []
-                if not fieldset_item.get("_deleted")
-            ]
+            result = []
+            for fieldset_item in value or []:
+                fieldset_object = {}
+                for k, v in fieldset_item.items():
+                    item_attr = attributes.get(k)
+                    if fieldset_item.get("_deleted") or not item_attr:
+                        continue
+
+                    display_value, raw_value = \
+                        get_display_and_raw_value(item_attr, v)
+
+                    fieldset_object[k] = display_value
+
+                    if item_attr.value_type != Attribute.TYPE_FIELDSET:
+                        fieldset_object[f"{k}__raw"] = raw_value
+
+                result.append(fieldset_object)
+
+            return (result, value)
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             display_value = InlineImage(doc, value, width=IMAGE_WIDTH)
@@ -159,7 +174,7 @@ def render_template(project, document_template, preview):
 
             display_value = RichText(display_value, **rich_text_args)
 
-        return display_value
+        return (display_value, _get_raw_value(value, attribute))
 
     attribute_data = project.attribute_data
     try:
@@ -176,14 +191,12 @@ def render_template(project, document_template, preview):
 
     for attribute, value in full_attribute_data:
         identifier = attribute.identifier
-        display_value = get_display_value(attribute, value)
+        display_value, raw_value = get_display_and_raw_value(attribute, value)
 
         attribute_data_display[identifier] = display_value
-        if attribute.value_type == Attribute.TYPE_DATE and isinstance(value, str):
-            attribute_data_display[identifier + "__raw"] = \
-                datetime.datetime.strptime(value, "%Y-%m-%d").date()
-        else:
-            attribute_data_display[identifier + "__raw"] = value
+
+        if attribute.value_type != Attribute.TYPE_FIELDSET:
+            attribute_data_display[identifier + "__raw"] = raw_value
 
     attribute_files = ProjectAttributeFile.objects \
         .filter(project=project, archived_at=None) \
@@ -222,12 +235,12 @@ def render_template(project, document_template, preview):
             attribute_file.file.path.split('.')[-1].lower() in image_formats
 
         if file_format_is_supported:
-            display_value = get_display_value(
+            display_value, __ = get_display_and_raw_value(
                 attribute_file.attribute,
                 attribute_file.file.path,
             )
         elif preview:
-            display_value = f"Kuvan tiedostotyyppiä ei tueta"
+            display_value = "Kuvan tiedostotyyppiä ei tueta"
         else:
             continue
 
@@ -251,7 +264,6 @@ def render_template(project, document_template, preview):
                 attribute_file.attribute.identifier,
                 display_value,
             )
-
 
     doc.render(attribute_data_display)
     output = io.BytesIO()
