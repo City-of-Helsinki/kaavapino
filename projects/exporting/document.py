@@ -218,7 +218,6 @@ def render_template(project, document_template, preview):
             "fpix", "fpx",
             "gif",
             "jpg", "jpeg", "jfif", "jpeg-2000",
-            "pdf",
             "pict", "pct",
             "png",
             "pntg",
