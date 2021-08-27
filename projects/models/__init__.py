@@ -16,7 +16,10 @@ from .deadline import (  # noqa
     DeadlineDistance,
     DeadlineDateCalculation,
 )
-from .document import DocumentTemplate  # noqa
+from .document import (  #noqa
+    DocumentTemplate,
+    ProjectDocumentDownloadLog,
+)
 from .project import (  # noqa
     Project,
     ProjectAttributeFile,

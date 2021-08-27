@@ -44,6 +44,7 @@ from projects.models import (
     DeadlineDateCalculation,
     ProjectAttributeFileFieldsetPathLocation,
     OverviewFilter,
+    DocumentTemplate,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -545,6 +546,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     onhold = serializers.NullBooleanField(required=False, read_only=True)
     generated_deadline_attributes = serializers.SerializerMethodField()
     geoserver_data = serializers.SerializerMethodField()
+    phase_documents_created = serializers.SerializerMethodField()
+    phase_documents_creation_started = serializers.SerializerMethodField()
 
     _metadata = serializers.SerializerMethodField()
 
@@ -554,6 +557,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "user",
             "created_at",
             "modified_at",
+            "phase_documents_created",
+            "phase_documents_creation_started",
             "name",
             "identifier",
             "pino_number",
@@ -729,6 +734,32 @@ class ProjectSerializer(serializers.ModelSerializer):
             for dl in project.deadlines.filter(generated=True)
             if dl.deadline.attribute
         ]
+
+    def get_phase_documents_created(self, project):
+        # True if all documents in current phase have been downloaded at least once
+        for template in DocumentTemplate.objects.filter(
+            common_project_phases=project.phase.common_project_phase
+        ):
+            if not project.document_download_log.filter(
+                document_template=template,
+                phase=project.phase.common_project_phase,
+            ).first():
+                return False
+
+        return True
+
+    def get_phase_documents_creation_started(self, project):
+        # True if any documents in current phase has been downloaded at least once
+        for template in DocumentTemplate.objects.filter(
+            common_project_phases=project.phase.common_project_phase
+        ):
+            if project.document_download_log.filter(
+                document_template=template,
+                phase=project.phase.common_project_phase,
+            ).first():
+                return True
+
+        return False
 
     def _set_file_attributes(self, attribute_data, project, snapshot):
         request = self.context["request"]

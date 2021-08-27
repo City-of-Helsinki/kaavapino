@@ -14,6 +14,8 @@ from projects.helpers import (
     set_kaavoitus_api_data_in_attribute_data,
     set_ad_data_in_attribute_data,
 )
+from projects.models import ProjectDocumentDownloadLog
+
 
 IMAGE_WIDTH = Mm(136)
 
@@ -267,6 +269,14 @@ def render_template(project, document_template, preview):
     doc.render(attribute_data_display)
     output = io.BytesIO()
     doc.save(output)
+
+    if not preview:
+        ProjectDocumentDownloadLog.objects.create(
+            project=project,
+            document_template=document_template,
+            phase=project.phase.common_project_phase,
+        )
+
     return output.getvalue()
 
 

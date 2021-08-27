@@ -51,3 +51,27 @@ class DocumentTemplate(models.Model):
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
         return super().save(*args, **kwargs)
+
+
+class ProjectDocumentDownloadLog(models.Model):
+    """Logs a document download not including preview downloads"""
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    project = models.ForeignKey(
+        "Project",
+        verbose_name=_("project"),
+        related_name="document_download_log",
+        on_delete=models.CASCADE,
+    )
+    document_template = models.ForeignKey(
+        "DocumentTemplate",
+        verbose_name=_("document template"),
+        related_name="document_download_log",
+        on_delete=models.CASCADE,
+    )
+    phase = models.ForeignKey(
+        "CommonProjectPhase",
+        verbose_name=_("phase"),
+        related_name="document_download_log",
+        on_delete=models.CASCADE,
+    )

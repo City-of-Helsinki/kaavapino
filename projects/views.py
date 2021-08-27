@@ -793,7 +793,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         )
         return DocumentTemplate.objects.filter(
             common_project_phases__in=phases
-        )
+        ).distinct()
 
     def get_project(self):
         project_id = self.kwargs.get("project_pk")
