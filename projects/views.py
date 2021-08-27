@@ -25,20 +25,18 @@ from projects.models import (
     FieldComment,
     ProjectComment,
     ProjectDeadline,
-    ProjectFloorAreaSection,
     LastReadTimestamp,
     Project,
     ProjectCardSectionAttribute,
     ProjectPhase,
+    CommonProjectPhase,
     ProjectType,
     ProjectSubtype,
     ProjectAttributeFile,
     DocumentTemplate,
     Attribute,
     Report,
-    ReportFilter,
     Deadline,
-    DocumentLinkFieldSet,
     DocumentLinkSection,
     OverviewFilter,
     OverviewFilterAttribute,
@@ -790,8 +788,11 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         return context
 
     def get_queryset(self):
+        phases = CommonProjectPhase.objects.filter(
+            phases__project_subtype=self.project.subtype,
+        )
         return DocumentTemplate.objects.filter(
-            common_project_phase__phases__project_subtype=self.project.subtype
+            common_project_phases__in=phases
         )
 
     def get_project(self):

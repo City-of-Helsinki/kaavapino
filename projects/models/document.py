@@ -15,15 +15,14 @@ class DocumentTemplate(models.Model):
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
     slug = models.SlugField()
-    common_project_phase = models.ForeignKey(
+    common_project_phases = models.ManyToManyField(
         CommonProjectPhase,
         verbose_name=_("project phase"),
         related_name="document_templates",
-        on_delete=models.CASCADE,
     )
 
     def get_upload_subfolder(self):
-        phase_name = slugify(self.common_project_phase.name)
+        phase_name = slugify(self.common_project_phases.first().name)
         return ["document_templates", phase_name, self.slug]
 
     file = PrivateFileField(
