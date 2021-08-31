@@ -522,6 +522,32 @@ class Project(models.Model):
     def type(self):
         return self.subtype.project_type
 
+    @property
+    def phase_documents_creation_started(self):
+        # True if any documents in current phase has been downloaded at least once
+        for template in \
+            self.phase.common_project_phase.document_templates.all():
+            if self.document_download_log.filter(
+                document_template=template,
+                phase=self.phase.common_project_phase,
+            ).first():
+                return True
+
+        return False
+
+    @property
+    def phase_documents_created(self):
+        # True if all documents in current phase have been downloaded at least once
+        for template in \
+            self.phase.common_project_phase.document_templates.all():
+            if not self.document_download_log.filter(
+                document_template=template,
+                phase=self.phase.common_project_phase,
+            ).first():
+                return False
+
+        return True
+
     def save(self, *args, **kwargs):
         super(Project, self).save(*args, **kwargs)
         if not self.pino_number:

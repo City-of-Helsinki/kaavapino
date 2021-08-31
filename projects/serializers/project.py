@@ -736,30 +736,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
     def get_phase_documents_created(self, project):
-        # True if all documents in current phase have been downloaded at least once
-        for template in DocumentTemplate.objects.filter(
-            common_project_phases=project.phase.common_project_phase
-        ):
-            if not project.document_download_log.filter(
-                document_template=template,
-                phase=project.phase.common_project_phase,
-            ).first():
-                return False
-
-        return True
+        return project.phase_documents_created
 
     def get_phase_documents_creation_started(self, project):
-        # True if any documents in current phase has been downloaded at least once
-        for template in DocumentTemplate.objects.filter(
-            common_project_phases=project.phase.common_project_phase
-        ):
-            if project.document_download_log.filter(
-                document_template=template,
-                phase=project.phase.common_project_phase,
-            ).first():
-                return True
-
-        return False
+        return project.phase_documents_creation_started
 
     def _set_file_attributes(self, attribute_data, project, snapshot):
         request = self.context["request"]
@@ -1613,7 +1593,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             new_value=new_value,
             labels=labels,
         )
-        if attribute.broadcast_changes:
+        if attribute.broadcast_changes or project.phase_documents_creation_started:
             if not old_value and not new_value:
                 change_string = ""
             else:
