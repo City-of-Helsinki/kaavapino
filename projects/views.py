@@ -884,7 +884,7 @@ class ReportViewSet(ReadOnlyModelViewSet):
         filters = report.filters.filter(
             identifier__in=params.keys()
         )
-        projects = Project.objects.all()
+        projects = Project.objects.filter(onhold=False)
         for report_filter in filters:
             projects = report_filter.filter_projects(
                 params.get(report_filter.identifier),
