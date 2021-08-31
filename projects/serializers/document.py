@@ -6,6 +6,7 @@ from projects.models import DocumentTemplate, ProjectPhase
 
 class DocumentTemplateSerializer(serializers.ModelSerializer):
     file = serializers.SerializerMethodField()
+    preview_file = serializers.SerializerMethodField()
     last_downloaded = serializers.SerializerMethodField()
     phases = serializers.SerializerMethodField()
 
@@ -16,6 +17,7 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
             "name",
             "image_template",
             "file",
+            "preview_file",
             "last_downloaded",
             "phases",
         ]
@@ -30,6 +32,9 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
         )
         absolute_url = request.build_absolute_uri(url)
         return absolute_url
+
+    def get_preview_file(self, document_template):
+        return self.get_file(document_template) + "?preview=true"
 
     def get_last_downloaded(self, document_template):
         try:
