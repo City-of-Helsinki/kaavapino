@@ -371,6 +371,7 @@ VALUE_TYPES = {
     "Kyllä/Ei (readonly)": Attribute.TYPE_BOOLEAN,
     "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.TYPE_BOOLEAN,
     "Kokonaisluku (readonly)": Attribute.TYPE_INTEGER,
+    "Kokonaisluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
 }
 
 DISPLAY_TYPES = {
@@ -400,6 +401,7 @@ DISPLAY_TYPES = {
     "automaattinen (teksti), tieto tulee Factasta": Attribute.DISPLAY_READONLY,
     "automaattinen (valinta)": Attribute.DISPLAY_READONLY_CHECKBOX,
     "automaattinen (valinta), kun projekti luodaan": Attribute.DISPLAY_READONLY,
+    "Kokonaisluku ilman tuhaterotinta": Attribute.DISPLAY_SIMPLE_INTEGER,
 }
 
 

@@ -144,6 +144,7 @@ class Attribute(models.Model):
     DISPLAY_CHECKBOX = "checkbox"
     DISPLAY_READONLY = "readonly"
     DISPLAY_READONLY_CHECKBOX = "readonly_checkbox"
+    DISPLAY_SIMPLE_INTEGER = "simple_integer"
 
     DISPLAY_CHOICES = (
         (None, _("default")),
@@ -151,6 +152,7 @@ class Attribute(models.Model):
         (DISPLAY_CHECKBOX, _("checkbox")),
         (DISPLAY_READONLY, _("read only")),
         (DISPLAY_READONLY_CHECKBOX, _("read only checkbox")),
+        (DISPLAY_SIMPLE_INTEGER, _("integer without thousand separator")),
     )
 
     SOURCE_PARENT_FIELDSET = "fieldset"
@@ -606,7 +608,10 @@ class Attribute(models.Model):
         # remove checking type should pinonumero attribute (and possible others) be
         # fixed in the attribute excel
         elif self.value_type == Attribute.TYPE_INTEGER and isinstance(value, int):
-            return '{:,}'.format(value).replace(',', ' ')
+            if self.display == Attribute.DISPLAY_SIMPLE_INTEGER:
+                return '{:,}'.format(value).replace(',', ' ')
+            else:
+                return str(value)
         elif self.value_type == Attribute.TYPE_DECIMAL and self.unit in ["ha", "k-m2"]:
             return '{:,}'.format(int(float(value))).replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DATE:
