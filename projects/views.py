@@ -320,6 +320,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     # Only supports one-fieldset-deep queries for now
                     attr = attr.attribute
 
+                    # Manipulate search parameter
                     if attr.value_type == Attribute.TYPE_BOOLEAN:
                         param_parsed = \
                             False if param in ["false", "False"] else bool(param)
@@ -356,17 +357,24 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     else:
                         param_parsed = param
 
+                    # Handle search criteria special cases
+                    if attr.value_type == Attribute.TYPE_USER:
+                        postfix = "__ad_id"
+                    else:
+                        postfix = ""
+
+                    # Add to query
                     if attr.fieldsets.first():
                         q |= Q(**{
-                            f"{prefix}attribute_data__{attr.fieldsets.first().identifier}__contains": \
+                            f"{prefix}attribute_data__{attr.fieldsets.first().identifier}{postfix}__contains": \
                                 [{attr.identifier: param_parsed}]
                         })
                     elif attr.static_property:
-                        q |= Q(**{f"{prefix}{attr.static_property}": param_parsed})
+                        q |= Q(**{f"{prefix}{attr.static_property}{postfix}": param_parsed})
                     else:
                         # TODO: __iexact is no longer needed if kaavaprosessin_kokoluokka
                         # ever gets refactored
-                        q |= Q(**{f"{prefix}attribute_data__{attr.identifier}__iexact": param_parsed})
+                        q |= Q(**{f"{prefix}attribute_data__{attr.identifier}{postfix}__iexact": param_parsed})
 
                 return q
 
