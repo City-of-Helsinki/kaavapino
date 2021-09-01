@@ -36,6 +36,13 @@ class User(AbstractUser):
         blank=True,
     )
 
+    ad_id = models.CharField(
+        max_length=255,
+        verbose_name=_("AD user id"),
+        null=True,
+        blank=True,
+    )
+
     def is_in_group(self, group):
         if isinstance(group, Group):
             return self.groups.filter(group=group).exists()
