@@ -22,8 +22,7 @@ class DocumentTemplate(models.Model):
     )
 
     def get_upload_subfolder(self):
-        phase_name = slugify(self.common_project_phases.first().name)
-        return ["document_templates", phase_name, self.slug]
+        return ["document_templates", self.slug]
 
     file = PrivateFileField(
         "File",
