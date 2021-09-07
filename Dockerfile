@@ -1,32 +1,45 @@
-FROM python:3.6.6-slim-stretch AS base
+FROM registry.access.redhat.com/ubi8/python-39 as base
 
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND noninteractive
 ENV APP_NAME kaavapino
 
+USER root
 
 RUN mkdir /code
 RUN mkdir /entrypoint
 WORKDIR /code
 
-# Install the appropriate Ubuntu packages
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libyaml-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    libpq-dev \
+ARG LOCAL_REDHAT_USERNAME
+ARG LOCAL_REDHAT_PASSWORD
+ARG BUILD_MODE
+
+RUN if [ "x$BUILD_MODE" = "xlocal" ] ;\
+    then \
+        subscription-manager register --username $LOCAL_REDHAT_USERNAME --password $LOCAL_REDHAT_PASSWORD --auto-attach; \
+    else \
+        subscription-manager register --username ${REDHAT_USERNAME} --password ${REDHAT_PASSWORD} --auto-attach; \
+    fi
+# TODO POISTA
+# RUN subscription-manager register --username eskenu --password mPawxi23hmzad9C --auto-attach
+
+RUN subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms
+
+RUN yum -y update
+
+RUN rpm -Uvh https://download.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+
+RUN yum install -y \
     git \
-    libgeos-dev \
     binutils \
-    libproj-dev \
-    gdal-bin \
-    netcat \
+    gdal \
+    nc \
     vim
 
 # Upgrade pip
 RUN pip install -U pip
 
+RUN useradd kaavapinouser && groupadd kaavapinogroup
 FROM base AS test
 
 # Install python dependencies
@@ -48,4 +61,5 @@ RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 COPY . .
 COPY deploy/mime.types /etc/
 
+USER kaavapinouser:kaavapinogroup
 CMD deploy/server.sh

@@ -16,6 +16,10 @@ services:
     build:
       target: "test"
       context: "."
+      args:
+        BUILD_MODE: ${BUILD_MODE}
+        LOCAL_REDHAT_USERNAME: ${REDHAT_USERNAME}
+        LOCAL_REDHAT_PASSWORD: ${REDHAT_PASSWORD}
     entrypoint: /entrypoint/docker-entrypoint.sh
     image: kaavapino
     volumes:
