@@ -1,8 +1,10 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 
 from projects.models import (
     Attribute,
+    CommonProjectPhase,
     ProjectType,
     ProjectSubtype,
     ProjectPhase,
@@ -10,7 +12,22 @@ from projects.models import (
     ProjectPhaseSectionAttribute,
     AttributeValueChoice,
     Project,
+    Report,
+    ReportColumn,
+    ReportFilter,
 )
+from users.models import GroupPrivilege
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_admin_group():
+    group = Group.objects.create(name="Admin group")
+    GroupPrivilege.objects.create(
+        group=group,
+        privilege_level="admin",
+    )
+    return group
 
 
 @pytest.fixture()
@@ -23,10 +40,11 @@ def f_user():
 
 @pytest.fixture()
 @pytest.mark.django_db()
-def f_admin(f_user):
+def f_admin(f_user, f_admin_group):
     f_user.is_superuser = True
     f_user.is_staff = True
     f_user.save()
+    f_user.additional_groups.set([f_admin_group])
     return f_user
 
 
@@ -167,24 +185,30 @@ def f_project_subtype(f_project_type):
 @pytest.fixture()
 @pytest.mark.django_db()
 def f_project_phase_1(f_project_subtype):
-    return ProjectPhase.objects.create(
+    common_phase = CommonProjectPhase.objects.create(
         name="Käynnistys",
         color="color--tram",
-        index=0,
-        project_subtype=f_project_subtype,
         color_code="#009246",
+    )
+    return ProjectPhase.objects.create(
+        common_project_phase=common_phase,
+        project_subtype=f_project_subtype,
+        index=0,
     )
 
 
 @pytest.fixture()
 @pytest.mark.django_db()
 def f_project_phase_2(f_project_subtype):
-    return ProjectPhase.objects.create(
+    common_phase = CommonProjectPhase.objects.create(
         name="OAS",
         color="color--summer",
-        index=1,
-        project_subtype=f_project_subtype,
         color_code="#ffc61e",
+    )
+    return ProjectPhase.objects.create(
+        common_project_phase=common_phase,
+        project_subtype=f_project_subtype,
+        index=1,
     )
 
 
@@ -324,3 +348,30 @@ def f_comment_user1(comment_factory, f_user):
 def f_comment_user2(comment_factory, f_user2):
     comment = comment_factory(user=f_user2)
     return comment
+
+
+@pytest.fixture()
+@pytest.mark.django_db()
+def f_report(f_project_type):
+    attribute = Attribute.objects.create(
+        name="Project name",
+        value_type=Attribute.TYPE_SHORT_STRING,
+        identifier="project_name",
+        static_property="name",
+    )
+    report = Report.objects.create(
+        project_type=f_project_type,
+        name="Report with project names",
+    )
+    column = ReportColumn.objects.create(report=report)
+    column.attributes.set([attribute])
+    column.save()
+    report_filter = ReportFilter.objects.create(
+        name="Name filter",
+        identifier="name_filter",
+        type=ReportFilter.TYPE_EXACT,
+    )
+    report_filter.attributes.set([attribute])
+    report_filter.reports.set([report])
+
+    return report

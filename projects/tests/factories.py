@@ -3,6 +3,7 @@ from factory import fuzzy
 
 from projects.models import (
     Attribute,
+    CommonProjectPhase,
     FieldSetAttribute,
     Project,
     ProjectType,
@@ -12,11 +13,13 @@ from projects.models import (
     ProjectPhaseSectionAttribute,
     ProjectComment,
     Report,
+    ReportFilter,
 )
 from users.tests.factories import UserFactory
 
 __all__ = (
     "AttributeFactory",
+    "CommonProjectPhaseFactory",
     "FieldSetAttributeFactory",
     "ProjectTypeFactory",
     "ProjectSubtypeFactory",
@@ -25,6 +28,7 @@ __all__ = (
     "ProjectPhaseSectionAttributeFactory",
     "ProjectFactory",
     "ReportFactory",
+    "ReportFilterFactory",
 )
 
 
@@ -64,9 +68,16 @@ class ProjectSubtypeFactory(factory.DjangoModelFactory):
         django_get_or_create = ("name", "project_type")
 
 
-class ProjectPhaseFactory(factory.DjangoModelFactory):
-    project_subtype = factory.SubFactory(ProjectSubtypeFactory)
+class CommonProjectPhaseFactory(factory.DjangoModelFactory):
     name = fuzzy.FuzzyText()
+
+    class Meta:
+        model = CommonProjectPhase
+
+
+class ProjectPhaseFactory(factory.DjangoModelFactory):
+    common_project_phase = factory.SubFactory(CommonProjectPhaseFactory)
+    project_subtype = factory.SubFactory(ProjectSubtypeFactory)
     index = factory.Sequence(int)
 
     class Meta:
@@ -115,7 +126,16 @@ class CommentFactory(factory.DjangoModelFactory):
 class ReportFactory(factory.DjangoModelFactory):
     project_type = factory.SubFactory(ProjectTypeFactory)
     name = fuzzy.FuzzyText()
-    show_name = True
+    show_created_at = True
 
     class Meta:
         model = Report
+
+
+class ReportFilterFactory(factory.DjangoModelFactory):
+    name = fuzzy.FuzzyText()
+    identifier = fuzzy.FuzzyText(prefix="attribute", length=16)
+    type = "exact"
+
+    class Meta:
+        model = ReportFilter

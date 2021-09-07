@@ -85,7 +85,10 @@ def test_get_attribute_data(request_data, project, attribute_data):
     assert get_attribute_data(request, project) == {
         **attribute_data,
         **(
-            {"kaavaprosessin_kokoluokka": project.subtype.name}
+            {
+                "kaavaprosessin_kokoluokka": project.subtype.name,
+                "kaavan_vaihe": project.phase.prefixed_name,
+            }
             if project else {}
         ),
     }

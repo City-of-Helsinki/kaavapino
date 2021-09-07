@@ -11,8 +11,8 @@ class TestListingReportTypes:
         self, f_user, report_factory
     ):
         self.client.force_authenticate(user=f_user)
-        report_factory()
-        report = report_factory()
+        report_factory(is_admin_report=False)
+        report = report_factory(is_admin_report=False)
         url = reverse("report-list")
 
         response = self.client.get(url)
@@ -48,26 +48,23 @@ class TestListingReportTypes:
         assert len(response.json()["results"]) == 0
 
     def test_when_fetching_report_types__should_include_available_filters(
-        self, f_user, report_factory
+        self, f_user, report_factory, report_filter_factory
     ):
-        """Filters for default project fields are included"""
         self.client.force_authenticate(user=f_user)
-        report_factory()
+        report = report_factory()
+        report_filter = report_filter_factory()
+        report_filter.reports.set([report])
         url = reverse("report-list")
 
         response = self.client.get(url)
 
         report_definition = response.json()["results"][0]
-        user_filter = None
-        for f in report_definition["filters"]:
-            if f["identifier"] == "user__uuid":
-                user_filter = f
-
-        assert user_filter == {
-            "identifier": "user__uuid",
-            "type": "uuid",
-            "lookup": "exact",
-        }
+        assert report_definition["filters"] == [{
+            "name": report_filter.name,
+            "identifier": report_filter.identifier,
+            "type": report_filter.type,
+            "choices": None,
+        }]
 
 
 @pytest.mark.django_db()
@@ -103,9 +100,9 @@ class TestFetchingReport:
         assert response.status_code == 404
 
     @pytest.mark.parametrize("project__public", [True])
-    def test_fetching_report__contains_public_projects(self, f_user, report, project):
+    def test_fetching_report__contains_public_projects(self, f_user, f_report, project):
         self.client.force_authenticate(user=f_user)
-        url = reverse("report-detail", kwargs={"pk": report.pk})
+        url = reverse("report-detail", kwargs={"pk": f_report.pk})
 
         response = self.client.get(url)
 
@@ -113,23 +110,23 @@ class TestFetchingReport:
 
     @pytest.mark.parametrize("project__public", [False])
     def test_fetching_report__doesnt_contain_private_projects(
-        self, f_user, report, project
+        self, f_user, f_report, project
     ):
         self.client.force_authenticate(user=f_user)
-        url = reverse("report-detail", kwargs={"pk": report.pk})
+        url = reverse("report-detail", kwargs={"pk": f_report.pk})
 
         response = self.client.get(url)
 
         assert project.name not in response.content.decode("utf-8")
 
     def test_fetching_report__should_be_able_to_filter_projects(
-        self, f_user, f_user2, report, project_factory
+        self, f_user, f_report, project_factory
     ):
         self.client.force_authenticate(user=f_user)
-        project = project_factory(user=f_user)
-        project_filtered = project_factory(user=f_user2)
-        url = reverse("report-detail", kwargs={"pk": report.pk})
-        url = f"{url}?user__uuid={f_user.uuid}"
+        project = project_factory()
+        project_filtered = project_factory()
+        url = reverse("report-detail", kwargs={"pk": f_report.pk})
+        url = f"{url}?name_filter={project.name}"
 
         response = self.client.get(url)
         content = response.content.decode("utf-8")
