@@ -251,7 +251,7 @@ def render_template(project, document_template, preview):
             ] = display_value
         else:
             try:
-                fieldset_content = attribute_data.get(
+                fieldset_content = attribute_data_display.get(
                     attribute_file.fieldset_path[0]["parent"].identifier, []
                 )[attribute_file.fieldset_path[0]["index"]]
             except (KeyError, IndexError, TypeError):
