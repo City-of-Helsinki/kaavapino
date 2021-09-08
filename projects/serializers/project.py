@@ -816,6 +816,19 @@ class ProjectSerializer(serializers.ModelSerializer):
                         }
                     )
 
+                    current_fs_len = len(file_attributes.get(
+                        file_fs_parent_identifier
+                    ) or [])
+                    total_fs_len = len(attribute_data.get(
+                        file_fs_parent_identifier
+                    ) or [])
+
+                    if current_fs_len < total_fs_len:
+                        file_attributes[file_fs_parent_identifier] += \
+                            attribute_data[file_fs_parent_identifier][
+                                current_fs_len:total_fs_len
+                            ]
+
         attribute_data.update(file_attributes)
 
     @staticmethod
