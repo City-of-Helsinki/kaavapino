@@ -305,7 +305,7 @@ class ReportFilter(models.Model):
         else:
             try:
                 choice = \
-                    ReportFilterAttributeChoice.objects.get(identifier=value)
+                    self.attribute_choices.get(identifier=value)
             except ReportFilterAttributeChoice.DoesNotExist:
                 return Project.objects.none()
 
