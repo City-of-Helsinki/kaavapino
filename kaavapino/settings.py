@@ -143,6 +143,7 @@ INSTALLED_APPS = [
     "django_filters",
     "rest_framework_gis",
     "users",
+    "django_q",
 ]
 
 if RAVEN_CONFIG["dsn"]:
@@ -253,3 +254,10 @@ ACTSTREAM_SETTINGS = {"USE_JSONFIELD": True}
 USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST")
 CSRF_COOKIE_DOMAIN = env.str("CSRF_COOKIE_DOMAIN")
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
+
+Q_CLUSTER = {
+    "name": "projects",
+    "orm": "default",
+    "retry": 3600,
+    "timeout": 1800,
+}

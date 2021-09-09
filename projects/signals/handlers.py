@@ -9,6 +9,7 @@ from django.db.models.signals import (
     m2m_changed,
 )
 from django.dispatch import receiver
+from django_q.tasks import async_task
 
 from projects.models import (
     ProjectAttributeFile,
@@ -33,6 +34,8 @@ from projects.models import (
     Deadline,
     Project,
 )
+from projects.tasks import refresh_project_schedule_cache \
+    as refresh_project_schedule_cache_task
 
 
 @receiver([post_save, post_delete, m2m_changed], sender=Attribute)
@@ -75,3 +78,7 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
             value = value.uuid
 
         instance.attribute_data[attr.identifier] = value
+
+@receiver([post_save, post_delete, m2m_changed], sender=Deadline)
+def refresh_project_schedule_cache(sender, instance, *args, **kwargs):
+    async_task(refresh_project_schedule_cache_task)
