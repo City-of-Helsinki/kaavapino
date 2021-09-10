@@ -100,7 +100,7 @@ def render_template(project, document_template, preview):
         phase = phases.filter(index__gte=project.phase.index).first()
         return phase or phases.reverse().first()
 
-    def get_display_and_raw_value(attribute, value):
+    def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
 
         if attribute.value_type == Attribute.TYPE_FIELDSET:
@@ -123,6 +123,17 @@ def render_template(project, document_template, preview):
                 result.append(fieldset_object)
 
             return (result, value)
+        elif attribute.multiple_choice and not ignore_multiple_choice:
+            value = value or []
+            display_list = [
+                get_display_and_raw_value(
+                    attribute, i, ignore_multiple_choice=True
+                )[0] for i in value
+            ]
+            raw_list = [
+                _get_raw_value(i, attribute) for i in value
+            ]
+            return (display_list, raw_list)
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             display_value = InlineImage(doc, value, width=IMAGE_WIDTH)
