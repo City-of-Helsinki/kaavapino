@@ -8,9 +8,11 @@ stages:
 - name: Publish image
   steps:
   - publishImageConfig:
-      dockerfilePath: ./Dockerfile
+      dockerfilePath: ./Dockerfile_unikie_dev_cluster
       buildContext: .
-      tag: api:${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+      tag: kleklekle/spia:kaavapino-api-${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+      pushRemote: true
+      registry: index.docker.io
 - name: Deploy
   steps:
   - applyYamlConfig:
