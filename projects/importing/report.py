@@ -43,6 +43,7 @@ FILTER_NAME = "suodattimen nimi"
 FILTER_REPORTS = "raportit joita koskee"
 FILTER_ATTRIBUTES = "kenttätunnisteet"
 FILTER_TYPE = "suodattimen tyyppi"
+FILTER_INPUT_TYPE = "hakuarvon tyyppi"
 FILTER_ATTRIBUTES_AS_CHOICES = "kenttätunnisteen valinta"
 FILTER_ATTRIBUTE_CHOICE_VALUES = "kenttätunnisteen valinta, lisävalinta"
 
@@ -52,6 +53,14 @@ FILTER_TYPE_MAPPING = {
     "arvoväli": ReportFilter.TYPE_RANGE,
     "arvo asetettu": ReportFilter.TYPE_SET,
     "arvoa ei asetettu": ReportFilter.TYPE_NOT_SET,
+}
+
+FILTER_INPUT_TYPE_MAPPING = {
+    "teksti": ReportFilter.INPUT_TYPE_STRING,
+    "oletus": ReportFilter.INPUT_TYPE_STRING,
+    "henkilö (ad)": ReportFilter.INPUT_TYPE_STRING,
+    "päivämäärä": ReportFilter.INPUT_TYPE_DATE,
+    "kokonaisluku": ReportFilter.INPUT_TYPE_INTEGER,
 }
 
 
@@ -248,6 +257,8 @@ class ReportImporter:
             )
             filter_type = \
                 FILTER_TYPE_MAPPING[row[self.filter_column_index[FILTER_TYPE]]]
+            filter_input_type = \
+                FILTER_INPUT_TYPE_MAPPING[row[self.filter_column_index[FILTER_INPUT_TYPE]]]
 
             if row[self.filter_column_index[FILTER_ATTRIBUTE_CHOICE_VALUES]]:
                 attributes_as_choices = True
@@ -287,6 +298,7 @@ class ReportImporter:
                 name=name,
                 identifier=identifier,
                 type=filter_type,
+                input_type=filter_input_type,
                 attributes_as_choices=attributes_as_choices,
             )
 

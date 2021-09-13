@@ -54,6 +54,7 @@ class ReportFilterSerializer(serializers.ModelSerializer):
             "name",
             "identifier",
             "type",
+            "input_type",
             "choices",
         ]
 
