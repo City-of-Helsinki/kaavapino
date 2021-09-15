@@ -159,8 +159,6 @@ class ReportImporter:
                 project_type=project_type,
                 defaults={
                     "is_admin_report": True,
-                    "show_created_at": True,
-                    "show_modified_at": True,
                     "previewable": False,
                 }
             )
