@@ -14,6 +14,7 @@ from django.utils.translation import ugettext_lazy as _
 from users.models import User, PRIVILEGE_LEVELS
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 from projects.helpers import get_ad_user
+from users.serializers import PersonnelSerializer
 
 
 class AttributeQuerySet(models.QuerySet):
@@ -626,7 +627,7 @@ class Attribute(models.Model):
             return "Kyllä" if value else "Ei"
         elif self.value_type == Attribute.TYPE_PERSONNEL:
             try:
-                return get_ad_user(value).get("first_name")
+                return PersonnelSerializer(get_ad_user(value)).data.get("name")
             except AttributeError:
                 return value
         elif self.value_type == Attribute.TYPE_USER:
