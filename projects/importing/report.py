@@ -37,6 +37,7 @@ COLUMN_TITLE = "sarakkeen otsikko"
 COLUMN_PREVIEW = "näytetään esikatselussa"
 COLUMN_PREVIEW_ONLY = "vain esikatselussa"
 COLUMN_CUSTOM_VALUE_MAPPING = "korvaavat arvot vakioarvoille"
+COLUMN_PREVIEW_TITLE_COLUMN = "saraketta käytetään esikatselun otsikkoina"
 
 # Filter sheet column titles
 FILTER_NAME = "suodattimen nimi"
@@ -186,6 +187,9 @@ class ReportImporter:
                 preview_only=preview_only,
                 title=row[self.report_column_index[COLUMN_TITLE]],
                 index=row[self.report_column_index[COLUMN_INDEX]] or 0,
+                preview_title_column=\
+                    [self.report_column_index[COLUMN_PREVIEW_TITLE_COLUMN]] == \
+                    "kyllä",
                 custom_display_mapping=custom_display_mapping,
             )
 

@@ -84,6 +84,10 @@ class ReportColumn(models.Model):
         verbose_name=_("only show in preview"),
         default=False,
     )
+    preview_title_column = models.BooleanField(
+        verbose_name=_("use column values as titles in preview"),
+        default=False,
+    )
     custom_display_mapping = JSONField(
         default=dict,
         blank=True,

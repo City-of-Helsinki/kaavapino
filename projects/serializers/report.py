@@ -61,6 +61,7 @@ class ReportFilterSerializer(serializers.ModelSerializer):
 
 class ReportSerializer(serializers.ModelSerializer):
     filters = serializers.SerializerMethodField()
+    preview_title_column = serializers.SerializerMethodField()
 
     def get_filters(self, report):
         return [
@@ -68,6 +69,21 @@ class ReportSerializer(serializers.ModelSerializer):
             for report_filter in report.filters.all()
         ]
 
+    def get_preview_title_column(self, report):
+        try:
+            return report.objects.filter(
+                preview_title_column=True
+            ).first().title
+        except AttributeError:
+            return None
+
     class Meta:
         model = Report
-        fields = ["id", "project_type", "name", "previewable", "filters"]
+        fields = [
+            "id",
+            "project_type",
+            "name",
+            "previewable",
+            "filters",
+            "preview_title_column",
+        ]
