@@ -125,17 +125,6 @@ def render_report_to_response(
     else:
         cols = cols.filter(preview_only=False)
 
-    includes_kaavoitus_api = cols.filter(
-        Q(attributes__data_source__isnull=False) | \
-        Q(attributes__data_source_key__isnull=False) | \
-        Q(attributes__key_attribute_path__isnull=False) | \
-        Q(attributes__key_attribute__isnull=False)
-    ).count()
-    includes_ad = cols.filter(
-        Q(attributes__ad_data_key__isnull=False) | \
-        Q(attributes__ad_key_attribute__isnull=False)
-    ).count()
-
     if limit:
         extra_cols_sum = sum([report.show_created_at, report.show_modified_at])
         extra_cols_limit = min(extra_cols_sum, limit)
@@ -174,14 +163,12 @@ def render_report_to_response(
     for project in projects:
         data = copy.deepcopy(project.attribute_data)
 
-        if includes_kaavoitus_api:
-            try:
-                set_kaavoitus_api_data_in_attribute_data(data)
-            except Exception:
-                pass
+        try:
+            set_kaavoitus_api_data_in_attribute_data(data)
+        except Exception:
+            pass
 
-        if includes_ad:
-            set_ad_data_in_attribute_data(data)
+        set_ad_data_in_attribute_data(data)
 
         data.update(get_project_data_for_report(
             report, project, extra_cols_limit,
