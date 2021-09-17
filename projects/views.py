@@ -883,7 +883,7 @@ class UploadSpecifications(APIView):
 
 
 class ReportViewSet(ReadOnlyModelViewSet):
-    queryset = Report.objects.all()
+    queryset = Report.objects.filter(hidden=False)
 
     def get_queryset(self):
         user = self.request.user

@@ -34,6 +34,9 @@ class Report(models.Model):
     previewable = models.BooleanField(
         verbose_name=_("report can be previewed"), default=False
     )
+    hidden = models.BooleanField(
+        verbose_name=_("hide report from other views"), default=False
+    )
 
     class Meta:
         verbose_name = _("report")
