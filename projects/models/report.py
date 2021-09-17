@@ -213,10 +213,16 @@ class ReportFilter(models.Model):
         default=False,
     )
 
+    def _parse_filter_input(self, value, value_type):
+        if self.input_type == ReportFilter.INPUT_TYPE_DATE:
+            return datetime.strptime(value, '%Y-%m-%d').date()
+
+        return value_type(value)
+
     def _get_query(self, value, key, value_type):
         if self.type == ReportFilter.TYPE_EXACT:
             try:
-                value = value_type(value)
+                value = self._parse_filter_input(value, value_type)
             except (ValueError, TypeError):
                 return Q()
 
@@ -224,7 +230,7 @@ class ReportFilter(models.Model):
         elif self.type == ReportFilter.TYPE_MULTIPLE:
             try:
                 value = [
-                    value_type(val.strip(" "))
+                    self._parse_filter_input(val.strip(" "), value_type)
                     for val in value.split(",")
                 ]
             except (ValueError, TypeError):
@@ -234,7 +240,7 @@ class ReportFilter(models.Model):
         elif self.type == ReportFilter.TYPE_RANGE:
             try:
                 value = [
-                    value_type(val.strip(" "))
+                    self._parse_filter_input(val.strip(" "), value_type)
                     for val in value.split(",")
                 ]
             except (ValueError, TypeError):
