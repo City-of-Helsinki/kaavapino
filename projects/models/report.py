@@ -220,7 +220,9 @@ class ReportFilter(models.Model):
         return value_type(value)
 
     def _get_query(self, value, key, value_type):
-        if self.type == ReportFilter.TYPE_EXACT:
+        if value is None:
+            return Q()
+        elif self.type == ReportFilter.TYPE_EXACT:
             try:
                 value = self._parse_filter_input(value, value_type)
             except (ValueError, TypeError):
