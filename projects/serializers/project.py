@@ -25,6 +25,7 @@ from projects.helpers import (
     get_flat_attribute_data,
     set_kaavoitus_api_data_in_attribute_data,
     set_ad_data_in_attribute_data,
+    set_automatic_attributes,
 )
 from projects.models import (
     Project,
@@ -686,6 +687,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             except Exception:
                 pass
             set_ad_data_in_attribute_data(attribute_data)
+            set_automatic_attributes(attribute_data)
 
         static_properties = [
             "user",

@@ -1,5 +1,7 @@
 from .attribute import (  # noqa
     Attribute,
+    AttributeAutoValue,
+    AttributeAutoValueMapping,
     AttributeValueChoice,
     DataRetentionPlan,
     FieldSetAttribute,

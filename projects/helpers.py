@@ -45,6 +45,9 @@ def get_attribute_data(attribute_path, data):
     if len(attribute_path) == 0:
         return data
 
+    if len(attribute_path) == 1:
+        return data.get(attribute_path[0].identifier)
+
     return get_attribute_data(
         attribute_path[2:],
         data.get(attribute_path[0].identifier, [])[attribute_path[1]]
@@ -492,23 +495,25 @@ def get_ad_user(id):
 
     return response.json()
 
+def _add_paths(paths, solved_path, remaining_path, parent_data):
+    from projects.models import Attribute
+    if remaining_path[0].value_type != Attribute.TYPE_FIELDSET:
+        paths.append(solved_path + [remaining_path[0]])
+        return
+
+    children = parent_data.get(remaining_path[0].identifier, [])
+
+    for i, child in enumerate(children):
+        _add_paths(
+            paths,
+            solved_path + [remaining_path[0], i],
+            remaining_path[1:],
+            child,
+        )
+
 def set_ad_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
     paths = []
-
-    def add_paths(solved_path, remaining_path, parent_data):
-        if remaining_path[0].value_type != Attribute.TYPE_FIELDSET:
-            paths.append(solved_path + [remaining_path[0]])
-            return
-
-        children = parent_data.get(remaining_path[0].identifier, [])
-
-        for i, child in enumerate(children):
-            add_paths(
-                solved_path + [remaining_path[0], i],
-                remaining_path[1:],
-                child,
-            )
 
     def get_in_personnel_data(id, key):
         user = get_ad_user(id)
@@ -519,7 +524,7 @@ def set_ad_data_in_attribute_data(attribute_data):
         ad_data_key__isnull=False,
     ):
         fieldset_path = get_fieldset_path(attr)
-        add_paths([], fieldset_path+[attr], attribute_data)
+        _add_paths(paths, [], fieldset_path+[attr], attribute_data)
 
     for path in paths:
         attr = path[-1]
@@ -533,3 +538,62 @@ def set_ad_data_in_attribute_data(attribute_data):
 
         if value:
             set_attribute_data(attribute_data, path, value)
+
+def _find_closest_path(target_path, path_behind, path_ahead):
+    if len(target_path) == 1:
+        return path_behind + target_path
+
+    # traverse fieldset structure until a common node is found
+    while len(path_behind):
+        if type(path_behind[-1]) == int:
+            path_ahead.append(path_behind.pop())
+            continue
+
+        current_attr = path_behind.pop()
+
+        try:
+            target_index = target_path.index(current_attr)
+            target_path = target_path[target_index:]
+            break
+        except ValueError:
+            continue
+
+    # find a path matching the attribute we're trying to set
+    while len(target_path) > 1:
+        try:
+            next_i = path_ahead.pop()
+        except IndexError:
+            next_i = 0
+
+        path_behind += [target_path.pop(0), next_i]
+
+    return path_behind + target_path
+
+def set_automatic_attributes(attribute_data):
+    from projects.models import AttributeAutoValue
+
+    paths = []
+
+    for auto_attr in AttributeAutoValue.objects.all():
+        key_attr_path = \
+            get_fieldset_path(auto_attr.key_attribute) + [auto_attr.key_attribute]
+        new_paths = []
+        _add_paths(
+            new_paths,
+            [],
+            key_attr_path,
+            attribute_data,
+        )
+        for path in new_paths:
+            key_path = _find_closest_path(
+                key_attr_path,
+                path,
+                [],
+            )
+            paths.append((path+[auto_attr.value_attribute], key_path, auto_attr))
+
+    for (target, source, auto_attr) in paths:
+        key = get_attribute_data(source, attribute_data)
+        value = auto_attr.get_value(key)
+        if value:
+            set_attribute_data(attribute_data, target, value)

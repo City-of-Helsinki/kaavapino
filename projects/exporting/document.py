@@ -13,6 +13,7 @@ from ..models.utils import create_identifier
 from projects.helpers import (
     set_kaavoitus_api_data_in_attribute_data,
     set_ad_data_in_attribute_data,
+    set_automatic_attributes,
 )
 from projects.models import ProjectDocumentDownloadLog
 
@@ -196,6 +197,7 @@ def render_template(project, document_template, preview):
         pass
 
     set_ad_data_in_attribute_data(attribute_data)
+    set_automatic_attributes(attribute_data)
 
     full_attribute_data = [
         (attr, attribute_data.get(attr.identifier))

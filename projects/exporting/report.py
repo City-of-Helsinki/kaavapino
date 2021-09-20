@@ -12,6 +12,7 @@ from projects.helpers import (
     get_flat_attribute_data,
     set_kaavoitus_api_data_in_attribute_data,
     set_ad_data_in_attribute_data,
+    set_automatic_attributes,
 )
 
 logger = logging.getLogger(__name__)
@@ -169,6 +170,7 @@ def render_report_to_response(
             pass
 
         set_ad_data_in_attribute_data(data)
+        set_automatic_attributes(data)
 
         data.update(get_project_data_for_report(
             report, project, extra_cols_limit,

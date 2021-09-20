@@ -692,6 +692,60 @@ class AttributeValueChoice(models.Model):
         return self.value
 
 
+class AttributeAutoValue(models.Model):
+    """
+    Automatic, dynamic value that gets injected into attribute data based on another
+    attribute value
+
+    Differs from autofill rules in that these are not calculated in frontend,
+    will update the contents of all projects' fields if database changes are made,
+    and will not generate log entries whereas autofill rule based field contents only
+    change when frontend sends updated values, and they do generate log entries.
+    """
+
+    value_attribute = models.OneToOneField(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="automatic_value",
+        verbose_name=_("automatic attribute"),
+    )
+    key_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="automatically_sets",
+        verbose_name=_("key attribute"),
+    )
+
+    def get_value(self, key):
+        try:
+            return self.value_map.get(key_str=str(key)).value
+        except AttributeAutoValueMapping.DoesNotExist:
+            return None
+
+
+class AttributeAutoValueMapping(models.Model):
+    """A single key-value pair related to an auto value attribute pair"""
+    auto_attr = models.ForeignKey(
+        AttributeAutoValue,
+        on_delete=models.CASCADE,
+        related_name="value_map",
+        verbose_name=_("attribute link"),
+    )
+    key_str = models.TextField(verbose_name=_("key"))
+    value_str = models.TextField(verbose_name=_("value"))
+
+    @property
+    def key(self):
+        return self.auto_attr.key_attribute.deserialize_value(self.key_str)
+
+    @property
+    def value(self):
+        return self.auto_attr.value_attribute.deserialize_value(self.value_str)
+
+    class Meta:
+        unique_together = ('auto_attr', 'key_str')
+
+
 class FieldSetAttribute(models.Model):
 
     attribute_source = models.ForeignKey(
