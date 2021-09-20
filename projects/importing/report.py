@@ -349,5 +349,6 @@ class ReportImporter:
             row for row in filter_data_rows
             if self._check_if_filter_row_valid(row)
         ]
+        Report.objects.all().delete()
         self._create_report_columns(report_data_rows)
         self._create_report_filters(filter_data_rows)
