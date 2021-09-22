@@ -240,11 +240,16 @@ def render_report_to_response(
                 if display_values.get(attr.identifier)
             ])
 
-            # append postfix if any
-            data[col.id] = " ".join([
-                data[col.id],
-                col.generate_postfix(project, data),
-            ])
+            # append postfix if any for non-empty fields
+            if not data[col.id]:
+                pass
+            elif col.postfix_only:
+                data[col.id] = col.generate_postfix(project, data)
+            else:
+                data[col.id] = "".join([
+                    data[col.id],
+                    col.generate_postfix(project, data),
+                ])
 
         writer.writerow(data)
 

@@ -7,11 +7,11 @@ from django.db import transaction
 
 from projects.models import (
     ProjectType,
+    ProjectSubtype,
     Report,
     ReportFilter,
     ReportFilterAttributeChoice,
     Attribute,
-    CommonProjectPhase,
     Report,
     ReportColumn,
     ReportColumnPostfix,
@@ -32,6 +32,7 @@ REPORT_NAME = "raportin nimi"
 COLUMN_ATTRIBUTES = "kentät"
 COLUMN_CONDITIONS = "näyttöehto"
 COLUMN_POSTFIX = "loppuliite"
+COLUMN_POSTFIX_ONLY = "piilota kentän arvo"
 COLUMN_INDEX = "sarakkeiden järjestys"
 COLUMN_TITLE = "sarakkeen otsikko"
 COLUMN_PREVIEW = "näytetään esikatselussa"
@@ -164,6 +165,7 @@ class ReportImporter:
                 }
             )
 
+            postfix_only = row[self.report_column_index[COLUMN_POSTFIX_ONLY]] == "kyllä"
             preview = row[self.report_column_index[COLUMN_PREVIEW]] == "kyllä"
             preview_only = row[self.report_column_index[COLUMN_PREVIEW_ONLY]] == "kyllä"
             if not report.previewable and (preview or preview_only):
@@ -183,6 +185,7 @@ class ReportImporter:
 
             column = ReportColumn.objects.create(
                 report=report,
+                postfix_only=postfix_only,
                 preview=preview,
                 preview_only=preview_only,
                 title=row[self.report_column_index[COLUMN_TITLE]],
@@ -208,25 +211,52 @@ class ReportImporter:
             try:
                 postfixes = zip(
                     re.findall(
-                        r"\[([X,S,M,L]*)\]",
+                        r"\[([a-zA-Z_0-9!,]*)\]",
                         row[self.report_column_index[COLUMN_POSTFIX]],
                     ),
                     re.findall(
                         r'"([^"]*)"',
                         row[self.report_column_index[COLUMN_POSTFIX]],
-                    ),
+                    ) or row[self.report_column_index[COLUMN_POSTFIX]],
                 )
-            except TypeError:
+            except TypeError as e:
                 postfixes = []
 
-            for phases, formatting in postfixes:
+            for rules, formatting in postfixes:
+                rules = rules.split(",")
+                subtype_options = ["XS", "S", "M", "L", "XL"]
+                subtypes = []
+                conditions = []
+                hide_conditions = []
+
+                for rule in rules:
+                    if rule in subtype_options:
+                        subtypes.append(rule)
+                    elif len(rule) and rule[0] == '!':
+                        hide_conditions.append(rule[1:])
+                    else:
+                        conditions.append(rule)
+
+                if not subtypes:
+                    subtypes = subtype_options
+
                 postfix = ReportColumnPostfix.objects.create(
                     report_column=column,
                     formatting=formatting,
                 )
-                postfix.phases.set(
-                    CommonProjectPhase.objects.filter(
-                        name__in=phases.split(","),
+                postfix.subtypes.set(
+                    ProjectSubtype.objects.filter(
+                        name__in=subtypes,
+                    )
+                )
+                postfix.condition.set(
+                    Attribute.objects.filter(
+                        identifier__in=conditions,
+                    )
+                )
+                postfix.hide_condition.set(
+                    Attribute.objects.filter(
+                        identifier__in=hide_conditions,
                     )
                 )
 

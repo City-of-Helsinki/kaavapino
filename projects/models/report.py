@@ -10,7 +10,7 @@ from django.contrib.postgres.fields import JSONField
 from django.contrib.postgres.fields.jsonb import KeyTextTransform
 from django.core.serializers.json import DjangoJSONEncoder
 
-from projects.models import Attribute, CommonProjectPhase, Project
+from projects.models import Attribute, Project, ProjectSubtype
 
 
 class Report(models.Model):
@@ -79,6 +79,10 @@ class ReportColumn(models.Model):
         verbose_name=_("index"),
         default=0,
     )
+    postfix_only = models.BooleanField(
+        verbose_name=_("only show postfix as field value"),
+        default=False,
+    )
     preview = models.BooleanField(
         verbose_name=_("include in preview"),
         default=True,
@@ -100,23 +104,54 @@ class ReportColumn(models.Model):
     )
 
     def generate_postfix(self, project, attribute_data=None):
-        postfix = self.postfixes.filter(
-            phases__in=[project.phase.common_project_phase],
-        ).first()
+        postfixes = self.postfixes.filter(
+            subtypes__in=[project.subtype],
+        )
+        postfix = None
+
+        if not postfixes.count():
+            return ""
 
         # Fallback doesn't include data from external APIs
         attribute_data = attribute_data or project.attribute_data
+
+        for pf in postfixes:
+            # if no conditions are specified, use postfix
+            if not pf.hide_condition.count() and not pf.condition.count():
+                postfix = pf
+                break
+
+            # do not use this postfix if any hide condition is fulfilled
+            for cond_attr in pf.hide_condition.all():
+                if project.attribute_data.get(cond_attr.identifier):
+                    continue
+
+            # use this postfix if at least one condition is fulfilled
+            for cond_attr in pf.condition.all():
+                if project.attribute_data.get(cond_attr.identifier):
+                    postfix = pf
+                    break
+
+            if postfix:
+                break
 
         if not postfix:
             return ""
 
         postfix = postfix.formatting
 
-        identifiers = re.findall(r"\{([a-zA-Z_]*)\}", postfix)
+        identifiers = re.findall(r"\{([a-zA-Z_0-9]*)\}", postfix)
         for identifier in identifiers:
-            postfix = postfix.replace(
-                "{"+identifier+"}", attribute_data.get(identifier, ""),
-            )
+            try:
+                attribute = Attribute.objects.get(identifier=identifier)
+                postfix = postfix.replace(
+                    "{"+identifier+"}",
+                    attribute.get_attribute_display(
+                        attribute_data.get(identifier, "")
+                    ),
+                )
+            except Attribute.DoesNotExist:
+                pass
 
         return postfix
 
@@ -136,14 +171,26 @@ class ReportColumnPostfix(models.Model):
         on_delete=models.CASCADE,
         related_name="postfixes",
     )
-    phases = models.ManyToManyField(
-        CommonProjectPhase,
-        verbose_name=_("phases"),
+    subtypes = models.ManyToManyField(
+        ProjectSubtype,
+        verbose_name=_("subtypes"),
         related_name="report_columns",
     )
     formatting = models.CharField(
         max_length=255,
         verbose_name=_("formatting"),
+    )
+    condition = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("condition"),
+        related_name="report_column_postfix_conditions",
+        blank=True,
+    )
+    hide_condition = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("hide condition"),
+        related_name="report_column_postfix_hide_conditions",
+        blank=True,
     )
 
     class Meta:
@@ -152,7 +199,7 @@ class ReportColumnPostfix(models.Model):
         ordering = ("id",)
 
     def __str__(self):
-        return f"{self.formatting} ({', '.join(self.phases.all())})"
+        return f"{self.formatting} ({', '.join([s.name for s in self.subtypes.all()])})"
 
 
 class ReportFilter(models.Model):
@@ -198,6 +245,7 @@ class ReportFilter(models.Model):
         max_length=7,
         choices=INPUT_TYPE_CHOICES,
         verbose_name=_("filter input type"),
+        default=INPUT_TYPE_STRING,
     )
     reports = models.ManyToManyField(
         Report,
