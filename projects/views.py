@@ -120,7 +120,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     try:
         ordering_fields = [
             "name", "pino_number", "created_at", "modified_at",
-            "user__first_name", "user__last_name",
+            "user__first_name", "user__last_name", "user__ad_id",
         ] + [
             f"attribute_data__{attribute.identifier}"
             for attribute in Attribute.objects.filter(searchable=True)
@@ -223,7 +223,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         search_fields = [
             search_field_for_attribute(attr)
             for attr in Attribute.objects.filter(searchable=True)
-        ] + ['subtype__project_type__name']
+        ] + ['subtype__project_type__name', 'user__ad_id']
         return queryset \
             .annotate(search=SearchVector(*search_fields)) \
             .filter(Q(search__icontains=search) | Q(search=search))
