@@ -717,10 +717,14 @@ class AttributeAutoValue(models.Model):
     )
 
     def get_value(self, key):
+        key = str(key)
         try:
-            return self.value_map.get(key_str=str(key)).value
+            return self.value_map.get(key_str=key).value
         except AttributeAutoValueMapping.DoesNotExist:
             return None
+
+    def __str__(self):
+        return f"{self.key_attribute.name} -> {self.value_attribute.name}"
 
 
 class AttributeAutoValueMapping(models.Model):

@@ -15,6 +15,8 @@ from openpyxl import load_workbook
 
 from ..models import (
     Attribute,
+    AttributeAutoValue,
+    AttributeAutoValueMapping,
     AttributeValueChoice,
     DataRetentionPlan,
     Deadline,
@@ -76,6 +78,8 @@ ATTRIBUTE_ERROR_UNIQUE = [
     "Virhe. Nimi on jo käytössä",
     "Virhe. Diaarinumero on jo toisen projektin käytössä. Samalle diaarínumerolle ei voi luoda uutta projektia.",
 ]
+ATTRIBUTE_AUTO_VALUE_KEY_FIELD = "yhteystietojen automaattisen täytön lähdekenttä"
+ATTRIBUTE_AUTO_VALUE_MAPPING = "yhteystietojen automaattisen täytön avain-arvoparit"
 
 # Attribute object mappings for static Project fields
 STATIC_ATTRIBUTES_MAPPING = {
@@ -828,10 +832,28 @@ class AttributeImporter:
             attr.ad_key_attribute = None
             attr.save()
 
+        AttributeAutoValue.objects.all().delete()
+
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
             key_identifier = row[self.column_index[EXT_DATA_KEY_ATTRIBUTE]]
             ad_key_identifier = row[self.column_index[EXT_DATA_AD_SOURCE]]
+            auto_value_key_identifier = \
+                row[self.column_index[ATTRIBUTE_AUTO_VALUE_KEY_FIELD]]
+
+            auto_value_mapping = {}
+            if row[self.column_index[ATTRIBUTE_AUTO_VALUE_MAPPING]]:
+                for item in re.split(
+                    r',\s*',
+                    row[self.column_index[ATTRIBUTE_AUTO_VALUE_MAPPING]],
+                ):
+                    try:
+                        [key, value] = \
+                            [i.strip('"') for i in re.split(r':\s*', item)]
+                        auto_value_mapping[key] = value
+                    except ValueError:
+                        continue
+
             attr = Attribute.objects.get(identifier=identifier)
 
             try:
@@ -843,6 +865,30 @@ class AttributeImporter:
             try:
                 ad_key_attr = Attribute.objects.get(identifier=ad_key_identifier)
                 attr.ad_key_attribute = ad_key_attr
+            except Attribute.DoesNotExist:
+                pass
+
+            try:
+                auto_value_key_attr = Attribute.objects.get(
+                    identifier=auto_value_key_identifier,
+                )
+                auto_attr = AttributeAutoValue.objects.create(
+                    value_attribute = attr,
+                    key_attribute = auto_value_key_attr,
+                )
+                for (key, value) in auto_value_mapping.items():
+                    if auto_attr.key_attribute.value_choices.count():
+                        try:
+                            key = auto_attr.key_attribute.value_choices \
+                                .get(value=key).identifier
+                        except AttributeValueChoice.DoesNotExist:
+                            pass
+
+                    AttributeAutoValueMapping.objects.create(
+                        auto_attr=auto_attr,
+                        key_str=key,
+                        value_str=value,
+                    )
             except Attribute.DoesNotExist:
                 pass
 

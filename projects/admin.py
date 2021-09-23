@@ -33,6 +33,8 @@ from .exporting import get_document_response
 from .models import (
     Attribute,
     AttributeValueChoice,
+    AttributeAutoValue,
+    AttributeAutoValueMapping,
     CommonProjectPhase,
     DataRetentionPlan,
     DocumentTemplate,
@@ -74,6 +76,17 @@ class UpdateCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
     def get_queryset(self, request):
         deadline_id = request.resolver_match.kwargs['object_id']
         return Deadline.objects.get(id=deadline_id).update_calculations
+
+
+class AttributeAutoValueMappingInline(admin.TabularInline):
+    model = AttributeAutoValueMapping
+    fields = ("key_str", "value_str")
+    extra = 0
+
+
+@admin.register(AttributeAutoValue)
+class AttributeAutoValueAdmin(admin.ModelAdmin):
+    inlines = (AttributeAutoValueMappingInline,)
 
 
 @admin.register(DateCalculation)
