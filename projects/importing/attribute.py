@@ -377,6 +377,7 @@ VALUE_TYPES = {
     "Kokonaisluku (readonly)": Attribute.TYPE_INTEGER,
     "Vuosiluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
     "Kokonaisluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
+    "muotoilematon tekstikenttä": Attribute.TYPE_SHORT_STRING,
 }
 
 DISPLAY_TYPES = {
