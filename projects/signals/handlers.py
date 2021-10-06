@@ -10,6 +10,7 @@ from django.db.models.signals import (
 )
 from django.dispatch import receiver
 from django_q.tasks import async_task
+from django_q.models import OrmQ
 
 from projects.models import (
     ProjectAttributeFile,
@@ -81,4 +82,11 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
 
 @receiver([post_save, post_delete, m2m_changed], sender=Deadline)
 def refresh_project_schedule_cache(sender, instance, *args, **kwargs):
-    async_task(refresh_project_schedule_cache_task)
+    for task in OrmQ.objects.all():
+        if task.name() == "refresh_project_schedule_cache":
+            task.delete()
+
+    async_task(
+        refresh_project_schedule_cache_task,
+        task_name="refresh_project_schedule_cache",
+    )
