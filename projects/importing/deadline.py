@@ -414,7 +414,10 @@ class DeadlineImporter:
                     )
 
             try:
-                phase = subtype.phases.get(name=row[self.column_index[DEADLINE_PHASE]])
+                phase = subtype.phases.get(
+                    common_project_phase__name=\
+                        row[self.column_index[DEADLINE_PHASE]]
+                )
             except ProjectPhase.DoesNotExist:
                 logger.warning(
                     f"Invalid phase {row[self.column_index[DEADLINE_PHASE]]} for deadline {abbreviation} in {subtype}, skipping."
