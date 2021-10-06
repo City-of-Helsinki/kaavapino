@@ -48,7 +48,7 @@ services:
 
   django-q:
     build: .
-    entrypoint: /entrypoint/docker-entrypoint.sh
+    command: python /code/manage.py qcluster
     volumes:
       - .:/code
     depends_on:
@@ -57,7 +57,6 @@ services:
     restart: on-failure
     environment:
       - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
-      - IS_DJANGO_Q=yes
     container_name: kaavapino-django-q
 
 volumes:
