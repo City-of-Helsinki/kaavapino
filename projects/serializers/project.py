@@ -858,6 +858,23 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not list_view and not snapshot_param:
             metadata["updates"] = self._get_updates(project)
 
+        created = project.target_actions.filter(verb=verbs.CREATED_PROJECT) \
+            .prefetch_related("actor").first()
+
+        try:
+            metadata["created"] = {
+                "user": created.actor.uuid,
+                "user_name": created.actor.get_display_name(),
+                "timestamp": created.timestamp,
+            }
+        # Some older projects may be missing created log info
+        except AttributeError:
+            metadata["created"] = {
+                "user": None,
+                "user_name": None,
+                "timestamp": project.created_at,
+            }
+
         return metadata
 
     @staticmethod
@@ -1414,6 +1431,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             attribute_data = validated_data.pop("attribute_data", {})
             project: Project = super().create(validated_data)
+            user = self.context["request"].user
+            action.send(
+                user,
+                verb=verbs.CREATED_PROJECT,
+                action_object=project,
+                target=project,
+            )
             self.log_updates_attribute_data(attribute_data, project)
 
             # Update attribute data after saving the initial creation has
