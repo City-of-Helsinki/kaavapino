@@ -190,7 +190,7 @@ class ReportImporter:
                 preview_only=preview_only,
                 title=row[self.report_column_index[COLUMN_TITLE]],
                 index=row[self.report_column_index[COLUMN_INDEX]] or 0,
-                preview_title_column=\
+                preview_title_column=row \
                     [self.report_column_index[COLUMN_PREVIEW_TITLE_COLUMN]] == \
                     "kyllä",
                 custom_display_mapping=custom_display_mapping,

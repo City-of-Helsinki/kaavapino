@@ -71,7 +71,7 @@ class ReportSerializer(serializers.ModelSerializer):
 
     def get_preview_title_column(self, report):
         try:
-            return report.objects.filter(
+            return report.columns.filter(
                 preview_title_column=True
             ).first().title
         except AttributeError:
