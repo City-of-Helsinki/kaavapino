@@ -150,3 +150,53 @@ spec:
               secretKeyRef:
                 name: api
                 key: GRAPH_API_CLIENT_SECRET
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: api-django-q
+spec:
+  selector:
+    app: api-django-q
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      name: api-django-q
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-django-q
+  labels:
+    app: api-django-q
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-django-q
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: api-django-q
+    spec:
+      imagePullSecrets:
+      - name: dockerhub-kaavapino
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: media-data
+      containers:
+      - name: api
+        image: kleklekle/spia:kaavapino-api-${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        env:
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: DATABASE_URL
+          - name: IS_DJANGO_Q
+            value: yes

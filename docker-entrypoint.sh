@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if ($IS_DJANGO_Q == "yes"); then
+  python /code/manage.py qcluster
+  exit 0
+fi
+
 echo "Checking for database on host 'db', port 5432"
 until nc -z -v -w30 "db" 5432
 do
@@ -24,3 +29,5 @@ set -e
 # Start server
 echo "Starting server"
 python manage.py runserver 0.0.0.0:8000
+
+exit 0
