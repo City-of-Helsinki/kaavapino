@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if ($IS_DJANGO_Q == "yes"); then
+if test "$IS_DJANGO_Q" = "yes"; then
   python /code/manage.py qcluster
   exit 0
 fi
