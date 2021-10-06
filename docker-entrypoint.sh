@@ -1,8 +1,7 @@
 #!/bin/bash
 
 if test "$IS_DJANGO_Q" = "yes"; then
-  echo "starting in django q..."
-  python /code/manage.py qcluster
+  echo "starting in django q... entry point won't do anything"
   exit 0
 fi
 
