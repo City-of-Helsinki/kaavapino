@@ -199,4 +199,9 @@ spec:
                 name: api
                 key: DATABASE_URL
           - name: IS_DJANGO_Q
-            value: yes
+            value: "yes"
+          - name: ALLOWED_HOSTS
+            value: ""
+          - name: CSRF_TRUSTED_ORIGINS
+            value: ""
+
