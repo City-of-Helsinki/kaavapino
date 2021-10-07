@@ -171,13 +171,22 @@ def render_template(project, document_template, preview):
                 # attribute: editable attribute field
                 # phase: closest phase where attribute field is located
                 # property: editable project model field
+                # view: default | deadlines | floorarea
                 edit_url = settings.DOCUMENT_EDIT_URL_FORMAT.replace(
                     "<pk>", str(project.pk),
                 )
+
+                if attribute.projectphasedeadlinesectionattribute_set.count():
+                    view = "deadlines"
+                elif attribute.projectfloorareasectionattribute_set.count():
+                    view = "floorarea"
+                else:
+                    view = "default"
+
                 if target_identifier and target_phase_id:
-                    edit_url += f"?attribute={target_identifier}&phase={target_phase_id}"
+                    edit_url += f"?attribute={target_identifier}&phase={target_phase_id}&view={view}"
                 elif target_property:
-                    edit_url += f"?property={target_property}"
+                    edit_url += f"?property={target_property}&view={view}"
 
                 rich_text_args = {
                     "color": "#d0c873" if empty else "#79a6b5",
