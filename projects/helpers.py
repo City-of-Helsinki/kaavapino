@@ -476,7 +476,11 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
 def get_ad_user(id):
     url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,surname"
-    response = cache.get(url)
+    try:
+        response = cache.get(url)
+    except TypeError:
+        return None
+
     if not response:
         token = get_graph_api_access_token()
         if not token:
