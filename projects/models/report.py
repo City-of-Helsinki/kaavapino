@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.db.models.functions import Cast
 from django.db.models.fields.related import ForeignKey
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import JSONField
 from django.contrib.postgres.fields.jsonb import KeyTextTransform
 from django.core.serializers.json import DjangoJSONEncoder
@@ -361,7 +362,15 @@ class ReportFilter(models.Model):
                     for attr in self.attributes.all()
                 })
             query = Q()
+            User = get_user_model()
+
             for attr in self.attributes.all():
+                if attr.value_type == Attribute.TYPE_USER:
+                    try:
+                        value = str(User.objects.get(ad_id=value).uuid)
+                    except User.DoesNotExist:
+                        pass
+
                 query |= self._get_query(
                     value,
                     f"attribute_data__{attr.identifier}",
