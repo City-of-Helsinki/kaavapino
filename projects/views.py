@@ -952,12 +952,15 @@ class ReportViewSet(ReadOnlyModelViewSet):
                 create_identifier(report.name), timezone.now().date()
             )
 
-        response = HttpResponse(content_type="text/csv; header=present; charset=UTF-8")
+        if not preview:
+            response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            response["Access-Control-Expose-Headers"] = "content-disposition"
+            response["Content-Disposition"] = "attachment; filename={}.xlsx".format(filename)
+        else:
+            response = HttpResponse(content_type="text/csv; header=present; charset=UTF-8")
+
         # Since we are not using DRFs response here, we set a custom CORS control header
         response["Access-Control-Allow-Origin"] = "*"
-        if not preview:
-            response["Access-Control-Expose-Headers"] = "content-disposition"
-            response["Content-Disposition"] = "attachment; filename={}.csv".format(filename)
 
         report_task = async_task(
             render_report_to_response,

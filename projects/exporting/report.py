@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 from django.db.models import Q
 from django.utils.translation import ugettext_lazy as _
+from openpyxl import Workbook
 
 from projects.models import Attribute, Report, Project
 from projects.helpers import (
@@ -153,12 +154,19 @@ def render_report_to_response(
         fieldnames[col.id] = \
         col.title or ", ".join([attr.name for attr in col.attributes.all()])
 
-    writer = csv.DictWriter(
-        response, fieldnames.keys(), restval="", extrasaction="ignore"
-    )
+    if preview:
+        writer = csv.DictWriter(
+            response, fieldnames.keys(), restval="", extrasaction="ignore"
+        )
+    else:
+        workbook = Workbook(write_only=True)
+        sheet = workbook.create_sheet()
 
     # Write header
-    writer.writerow(fieldnames)
+    if preview:
+        writer.writerow(fieldnames)
+    else:
+        sheet.append([i[1] for i in fieldnames.items()])
 
     # Write data
     for project in projects:
@@ -251,6 +259,15 @@ def render_report_to_response(
                     col.generate_postfix(project, data),
                 ])
 
-        writer.writerow(data)
+        if preview:
+            writer.writerow(data)
+        else:
+            sheet.append([
+                i[1] for i in data.items()
+                if i[0] in [j[0] for j in fieldnames.items()]
+            ])
+
+    if not preview:
+        workbook.save(response)
 
     return response
