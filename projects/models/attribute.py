@@ -610,9 +610,9 @@ class Attribute(models.Model):
         # fixed in the attribute excel
         elif self.value_type == Attribute.TYPE_INTEGER and isinstance(value, int):
             if self.display == Attribute.DISPLAY_SIMPLE_INTEGER:
-                return '{:,}'.format(value).replace(',', ' ')
-            else:
                 return str(value)
+            else:
+                return '{:,}'.format(value).replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DECIMAL and self.unit in ["ha", "k-m2"]:
             return '{:,}'.format(int(float(value))).replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DATE:
