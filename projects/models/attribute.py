@@ -632,7 +632,10 @@ class Attribute(models.Model):
                 return value
         elif self.value_type == Attribute.TYPE_USER:
             if not isinstance(value, User):
-                user = User.objects.get(uuid=value)
+                try:
+                    user = User.objects.get(uuid=value)
+                except ValidationError:
+                    return value
             else:
                 user = value
 
