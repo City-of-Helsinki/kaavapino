@@ -194,6 +194,46 @@ spec:
               secretKeyRef:
                 name: api
                 key: DATABASE_URL
+          - name: KAAVOITUS_API_AUTH_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: KAAVOITUS_API_AUTH_TOKEN
+          - name: KAAVOITUS_API_BASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: KAAVOITUS_API_BASE_URL
+          - name: DOCUMENT_EDIT_URL_FORMAT
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: DOCUMENT_EDIT_URL_FORMAT
+          - name: GRAPH_API_LOGIN_BASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: GRAPH_API_LOGIN_BASE_URL
+          - name: GRAPH_API_BASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: GRAPH_API_BASE_URL
+          - name: GRAPH_API_APPLICATION_ID
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: GRAPH_API_APPLICATION_ID
+          - name: GRAPH_API_TENANT_ID
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: GRAPH_API_TENANT_ID
+          - name: GRAPH_API_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: api
+                key: GRAPH_API_CLIENT_SECRET
           - name: IS_DJANGO_Q
             value: "yes"
           - name: ALLOWED_HOSTS
