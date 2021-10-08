@@ -622,7 +622,7 @@ class Attribute(models.Model):
             try:
                 return self.value_choices.get(identifier=value).value
             except AttributeValueChoice.DoesNotExist:
-                return None
+                return value
         elif isinstance(value, bool):
             return "Kyllä" if value else "Ei"
         elif self.value_type == Attribute.TYPE_PERSONNEL:
