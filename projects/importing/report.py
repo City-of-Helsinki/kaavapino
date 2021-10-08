@@ -222,7 +222,7 @@ class ReportImporter:
             except TypeError as e:
                 postfixes = []
 
-            for rules, formatting in postfixes:
+            for i, (rules, formatting) in enumerate(postfixes):
                 rules = rules.split(",")
                 subtype_options = ["XS", "S", "M", "L", "XL"]
                 subtypes = []
@@ -243,6 +243,7 @@ class ReportImporter:
                 postfix = ReportColumnPostfix.objects.create(
                     report_column=column,
                     formatting=formatting,
+                    index = i,
                 )
                 postfix.subtypes.set(
                     ProjectSubtype.objects.filter(

@@ -193,11 +193,15 @@ class ReportColumnPostfix(models.Model):
         related_name="report_column_postfix_hide_conditions",
         blank=True,
     )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
 
     class Meta:
         verbose_name = _("report column postfix")
         verbose_name_plural = _("report column postfixes")
-        ordering = ("id",)
+        ordering = ("index",)
 
     def __str__(self):
         return f"{self.formatting} ({', '.join([s.name for s in self.subtypes.all()])})"

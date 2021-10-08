@@ -249,7 +249,7 @@ def render_report_to_response(
             ])
 
             # append postfix if any for non-empty fields
-            if not data[col.id]:
+            if data[col.id] is None:
                 pass
             elif col.postfix_only:
                 data[col.id] = col.generate_postfix(project, data)
