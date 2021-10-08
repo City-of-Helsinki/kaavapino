@@ -118,18 +118,36 @@ class ReportColumn(models.Model):
 
         for pf in postfixes:
             # if no conditions are specified, use postfix
-            if not pf.hide_condition.count() and not pf.condition.count():
+            if not pf.hide_conditions.count() \
+                and not pf.hide_not_conditions.count() \
+                and not pf.show_conditions.count() \
+                and not pf.show_not_conditions.count():
                 postfix = pf
                 break
 
             # do not use this postfix if any hide condition is fulfilled
-            for cond_attr in pf.hide_condition.all():
+            hide = False
+            for cond_attr in pf.hide_conditions.all():
                 if project.attribute_data.get(cond_attr.identifier):
-                    continue
+                    hide = True
+                    break
+
+            for cond_attr in pf.hide_not_conditions.all():
+                if not project.attribute_data.get(cond_attr.identifier):
+                    hide = True
+                    break
+
+            if hide:
+                continue
 
             # use this postfix if at least one condition is fulfilled
-            for cond_attr in pf.condition.all():
+            for cond_attr in pf.show_conditions.all():
                 if project.attribute_data.get(cond_attr.identifier):
+                    postfix = pf
+                    break
+
+            for cond_attr in pf.show_not_conditions.all():
+                if not project.attribute_data.get(cond_attr.identifier):
                     postfix = pf
                     break
 
@@ -181,16 +199,28 @@ class ReportColumnPostfix(models.Model):
         max_length=255,
         verbose_name=_("formatting"),
     )
-    condition = models.ManyToManyField(
+    show_conditions = models.ManyToManyField(
         Attribute,
-        verbose_name=_("condition"),
-        related_name="report_column_postfix_conditions",
+        verbose_name=_("conditions: show if..."),
+        related_name="report_column_postfix_show_conditions",
         blank=True,
     )
-    hide_condition = models.ManyToManyField(
+    show_not_conditions = models.ManyToManyField(
         Attribute,
-        verbose_name=_("hide condition"),
+        verbose_name=_("conditions: show if not..."),
+        related_name="report_column_postfix_show_not_conditions",
+        blank=True,
+    )
+    hide_conditions = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("conditions: hide if..."),
         related_name="report_column_postfix_hide_conditions",
+        blank=True,
+    )
+    hide_not_conditions = models.ManyToManyField(
+        Attribute,
+        verbose_name=_("conditions: hide if not..."),
+        related_name="report_column_postfix_hide_not_conditions",
         blank=True,
     )
     index = models.PositiveIntegerField(

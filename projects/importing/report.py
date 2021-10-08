@@ -226,16 +226,26 @@ class ReportImporter:
                 rules = rules.split(",")
                 subtype_options = ["XS", "S", "M", "L", "XL"]
                 subtypes = []
-                conditions = []
+                show_conditions = []
+                show_not_conditions = []
                 hide_conditions = []
+                hide_not_conditions = []
 
                 for rule in rules:
                     if rule in subtype_options:
                         subtypes.append(rule)
-                    elif len(rule) and rule[0] == '!':
-                        hide_conditions.append(rule[1:])
+                    elif len(rule) >= 5 and rule[0:5] == "SHOW!":
+                        show_not_conditions.append(rule[5:])
+                    elif len(rule) >= 5 and rule[0:5] == "HIDE!":
+                        hide_not_conditions.append(rule[5:])
+                    elif len(rule) >= 4 and rule[0:4] == "SHOW":
+                        show_conditions.append(rule[4:])
+                    elif len(rule) >= 4 and rule[0:4] == "HIDE":
+                        hide_conditions.append(rule[4:])
+                    elif len(rule) and rule[0] == "!":
+                        show_not_conditions.append(rule[1:])
                     else:
-                        conditions.append(rule)
+                        show_conditions.append(rule)
 
                 if not subtypes:
                     subtypes = subtype_options
@@ -250,14 +260,24 @@ class ReportImporter:
                         name__in=subtypes,
                     )
                 )
-                postfix.condition.set(
+                postfix.show_conditions.set(
                     Attribute.objects.filter(
-                        identifier__in=conditions,
+                        identifier__in=show_conditions,
                     )
                 )
-                postfix.hide_condition.set(
+                postfix.hide_conditions.set(
                     Attribute.objects.filter(
                         identifier__in=hide_conditions,
+                    )
+                )
+                postfix.show_not_conditions.set(
+                    Attribute.objects.filter(
+                        identifier__in=show_not_conditions,
+                    )
+                )
+                postfix.hide_not_conditions.set(
+                    Attribute.objects.filter(
+                        identifier__in=hide_not_conditions,
                     )
                 )
 
