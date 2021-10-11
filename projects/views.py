@@ -966,16 +966,11 @@ class ReportViewSet(ReadOnlyModelViewSet):
             render_report_to_response,
             report, project_ids, response, preview, limit,
         )
-        time.sleep(1)
-        result = async_result(report_task)
 
-        if result:
-            return result
-        else:
-            return Response(
-                {"detail": report_task},
-                status=status.HTTP_202_ACCEPTED,
-            )
+        return Response(
+            {"detail": report_task},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
