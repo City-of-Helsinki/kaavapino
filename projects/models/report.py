@@ -253,11 +253,13 @@ class ReportFilter(models.Model):
         (TYPE_NOT_SET, _("value is not set")),
     )
 
+    INPUT_TYPE_PERSONNEL = "personnel"
     INPUT_TYPE_STRING = "string"
     INPUT_TYPE_DATE = "date"
     INPUT_TYPE_INTEGER = "integer"
 
     INPUT_TYPE_CHOICES = (
+        (INPUT_TYPE_PERSONNEL, _("personnel")),
         (INPUT_TYPE_STRING, _("string")),
         (INPUT_TYPE_DATE, _("date")),
         (INPUT_TYPE_INTEGER, _("integer")),
@@ -277,7 +279,7 @@ class ReportFilter(models.Model):
         verbose_name=_("filter type"),
     )
     input_type = models.CharField(
-        max_length=7,
+        max_length=9,
         choices=INPUT_TYPE_CHOICES,
         verbose_name=_("filter input type"),
         default=INPUT_TYPE_STRING,

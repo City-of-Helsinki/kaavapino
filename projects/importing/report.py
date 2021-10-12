@@ -60,7 +60,7 @@ FILTER_TYPE_MAPPING = {
 FILTER_INPUT_TYPE_MAPPING = {
     "teksti": ReportFilter.INPUT_TYPE_STRING,
     "oletus": ReportFilter.INPUT_TYPE_STRING,
-    "henkilö (ad)": ReportFilter.INPUT_TYPE_STRING,
+    "henkilö (ad)": ReportFilter.INPUT_TYPE_PERSONNEL,
     "päivämäärä": ReportFilter.INPUT_TYPE_DATE,
     "kokonaisluku": ReportFilter.INPUT_TYPE_INTEGER,
 }
