@@ -405,6 +405,25 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         queryset = OverviewFilter.objects.all()
         return Response(OverviewFilterSerializer(queryset, many=True).data)
 
+    def _parse_date_range(
+        self, start_date_str, end_date_str, today=datetime.now().date()
+    ):
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            start_date = datetime(today.year, 1, 1).date()
+
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            end_date = datetime(start_date.year, 12, 31).date()
+
+        # Can't go backwards in time
+        if start_date > end_date:
+            [start_date, end_date] = [start_date, end_date]
+
+        return (start_date, end_date)
+
     @action(
         methods=["get"],
         detail=False,
@@ -420,25 +439,17 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         deadline_query = self._get_query(valid_filters, "project")
         project_query = self._get_query(valid_filters)
 
-        try:
-            start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
-        except (TypeError, ValueError):
-            start_date = datetime(today.year, 1, 1).date()
-
-        try:
-            end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
-        except (TypeError, ValueError):
-            end_date = datetime(start_date.year, 12, 31).date()
+        start_date, end_date = self._parse_date_range(
+            start_date,
+            end_date,
+            today=today,
+        )
 
         if (end_date-start_date).days > 366:
             return Response(
                 {"detail": "Date range has to be 366 days or less"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        # Can't go backwards in time
-        if start_date > end_date:
-            [start_date, end_date] = [start_date, end_date]
 
         # Dates should be Tuesdays
         start_date += timedelta((1-start_date.weekday()) % 7)
@@ -589,8 +600,33 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     )
     def overview_by_subtype(self, request):
         valid_filters = self._get_valid_filters("filters_by_subtype")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
         query = self._get_query(valid_filters)
         queryset = ProjectSubtype.objects.all()
+
+        # TODO hard-coded for now; consider a new field for Attribute
+        date_range_attrs = [
+            "toteutunut_kirje_kaupunginhallitukselle",
+            "tarkistettu_ehdotus_hyvaksytty_kylk",
+            "milloin_tarkistettu_ehdotus_lautakunnassa",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_2",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_3",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_4",
+        ]
+
+        if start_date or end_date:
+            start_date, end_date = self._parse_date_range(start_date, end_date)
+            print(start_date, end_date)
+            start_query = Q()
+            end_query = Q()
+            for attr in date_range_attrs:
+                start_query |= Q(**{f"attribute_data__{attr}__gte": start_date})
+                end_query |= Q(**{f"attribute_data__{attr}__lte": end_date})
+            query = start_query & end_query
+        else:
+            query = Q()
+
         return Response({
             "subtypes": ProjectSubtypeOverviewSerializer(
                 queryset, many=True, context={"query": query},
