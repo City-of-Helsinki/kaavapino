@@ -185,6 +185,8 @@ def render_template(project, document_template, preview):
 
                 if target_identifier and target_phase_id:
                     edit_url += f"?attribute={target_identifier}&phase={target_phase_id}&view={view}"
+                elif target_identifier:
+                    edit_url += f"?attribute={target_identifier}&view={view}"
                 elif target_property:
                     edit_url += f"?property={target_property}&view={view}"
 
