@@ -11,7 +11,12 @@ from django.contrib.postgres.fields import JSONField
 from django.contrib.postgres.fields.jsonb import KeyTextTransform
 from django.core.serializers.json import DjangoJSONEncoder
 
-from projects.models import Attribute, Project, ProjectSubtype
+from projects.models import (
+    Attribute,
+    Project,
+    ProjectSubtype,
+    AttributeValueChoice,
+)
 
 
 class Report(models.Model):
@@ -318,12 +323,12 @@ class ReportFilter(models.Model):
             try:
                 value = [
                     self._parse_filter_input(val.strip(" "), value_type)
-                    for val in value.split(",")
+                    for val in value
                 ]
             except (ValueError, TypeError):
                 return Q()
 
-            return Q(**{f"{key}__in": value})
+            return Q(**{f"{key}__contained_by": value})
         elif self.type == ReportFilter.TYPE_RANGE:
             try:
                 value = [
@@ -380,7 +385,17 @@ class ReportFilter(models.Model):
                 for choice in attr.value_choices.all():
                     choices[choice.identifier] = choice.value
 
-            if choices:
+            if self.type in [
+                ReportFilter.TYPE_MULTIPLE,
+                ReportFilter.TYPE_RANGE,
+                ReportFilter.TYPE_SET,
+                ReportFilter.TYPE_NOT_SET,
+            ]:
+                value = value.split(",")
+                # hard-coded special case for phase and subtype
+                if choices and self.identifier in ["kaavan_vaihe", "kaavaprosessi"]:
+                    value = [choices.get(v) for v in value if choices.get(v)]
+            elif choices:
                 value = choices.get(value)
 
             queryset = queryset \
@@ -401,9 +416,18 @@ class ReportFilter(models.Model):
             User = get_user_model()
 
             for attr in self.attributes.all():
-                if attr.value_type == Attribute.TYPE_USER:
+                # hard-coded special case for phase and subtype
+                if choices and self.identifier in ["kaavan_vaihe", "kaavaprosessi"]:
                     try:
-                        value = str(User.objects.get(ad_id=value).uuid)
+                        value = attr.value_choices.get(identifier=value).value
+                    except AttributeValueChoice.DoesNotExist:
+                        pass
+                elif attr.value_type == Attribute.TYPE_USER:
+                    try:
+                        value = [
+                            str(User.objects.get(ad_id=val).uuid)
+                            for val in value
+                        ]
                     except User.DoesNotExist:
                         pass
 
@@ -416,38 +440,51 @@ class ReportFilter(models.Model):
             return queryset.filter(query)
 
         if not self.attribute_choices.count():
-            queryset = queryset.annotate(
-                search_key=KeyTextTransform(value, "attribute_data")
-            )
-            if self.type == ReportFilter.TYPE_SET:
-                return queryset.filter(search_key__isnull=False)
-            elif self.type == ReportFilter.TYPE_NOT_SET:
-                return queryset.filter(search_key__isnull=True)
-            else:
-                return queryset.none()
+            query = Q()
+            return_qs = queryset.none()
+            for val in value.split(","):
+                queryset = queryset.annotate(
+                    search_key=KeyTextTransform(val, "attribute_data")
+                )
+                if self.type == ReportFilter.TYPE_SET:
+                    return_qs = return_qs.union(
+                        queryset.filter(search_key__isnull=False)
+                    )
+                elif self.type == ReportFilter.TYPE_NOT_SET:
+                    return_qs = return_qs.union(
+                        queryset.filter(search_key__isnull=True)
+                    )
+
+            return return_qs
         else:
             try:
-                choice = \
-                    self.attribute_choices.get(identifier=value)
+                choices = [
+                    self.attribute_choices.get(identifier=val)
+                    for val in value.split(",")
+                ]
             except ReportFilterAttributeChoice.DoesNotExist:
                 return Project.objects.none()
 
-            queryset = queryset.annotate(
-                search_key=KeyTextTransform(
-                    choice.attribute.identifier, "attribute_data"
+            return_qs = queryset.none()
+            for choice in choices:
+                queryset = queryset.annotate(
+                    search_key=KeyTextTransform(
+                        choice.attribute.identifier, "attribute_data"
+                    )
+                ).annotate(
+                    search_key=Cast(
+                        "search_key",
+                        type_field_mapping[choice.attribute.value_type],
+                    )
                 )
-            ).annotate(
-                search_key=Cast(
+                query = self._get_query(
+                    choice.value,
                     "search_key",
-                    type_field_mapping[choice.attribute.value_type],
+                    value_type_mapping[choice.attribute.value_type],
                 )
-            )
-            query = self._get_query(
-                choice.value,
-                "search_key",
-                value_type_mapping[choice.attribute.value_type],
-            )
-            return queryset.filter(query)
+                return_qs = return_qs.union(queryset.filter(query))
+
+            return return_qs
 
     class Meta:
         verbose_name = _("report filter")
