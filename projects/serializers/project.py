@@ -718,12 +718,16 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_deadlines(self, project):
         project_schedule_cache = cache.get("serialized_project_schedules", {})
         deadlines = project.deadlines.filter(deadline__subtype=project.subtype)
-        schedule = ProjectDeadlineSerializer(
-            deadlines,
-            many=True,
-            allow_null=True,
-            required=False,
-        ).data
+        schedule = project_schedule_cache.get(project.pk)
+        if self.context.get('should_update_deadlines') or not schedule:
+            schedule = ProjectDeadlineSerializer(
+                deadlines,
+                many=True,
+                allow_null=True,
+                required=False,
+            ).data
+            cache.set(cache_key, schedule, 600)
+
         project_schedule_cache[project.pk] = schedule
         cache.set("serialized_project_schedules", project_schedule_cache, None)
         return schedule
@@ -1430,6 +1434,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         ).first()
 
         with transaction.atomic():
+            self.context['should_update_deadlines'] = True
             attribute_data = validated_data.pop("attribute_data", {})
             project: Project = super().create(validated_data)
             user = self.context["request"].user
@@ -1479,6 +1484,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         should_update_deadlines = self._get_should_update_deadlines(
             subtype_changed, instance, attribute_data,
         )
+        self.context['should_update_deadlines'] = should_generate_deadlines
 
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
