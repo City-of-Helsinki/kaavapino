@@ -1,5 +1,6 @@
 import copy
 import datetime
+import re
 
 import numpy as np
 import requests
@@ -1038,6 +1039,15 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
         return serializers.BooleanField().to_internal_value(validate_field_data)
 
+    def _get_keys(self):
+        try:
+            return self.context["request"].data.get('attribute_data').keys()
+        except AttributeError:
+            return re.findall(
+                r'"([a-zA-Z0-9_]*)":',
+                self.context["request"].data.get('attribute_data'),
+            )
+
     def generate_sections_data(
         self,
         phase: ProjectPhase,
@@ -1045,7 +1055,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         validation: bool = True,
     ) -> List[SectionData]:
         sections = []
-        for section in phase.sections.order_by("index"):
+        sections_to_serialize = phase.sections \
+            .filter(attributes__identifier__in=self._get_keys()) \
+            .order_by("index")
+        for section in sections_to_serialize:
             serializer_class = create_section_serializer(
                 section,
                 context=self.context,
@@ -1062,7 +1075,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         self, floor_area_sections, preview, validation: bool = True
     ) -> List[SectionData]:
         sections = []
-        for section in floor_area_sections.order_by("index"):
+        sections_to_serialize = floor_area_sections \
+            .filter(attributes__identifier__in=self._get_keys()) \
+            .order_by("index")
+        for section in sections_to_serialize:
             serializer_class = create_section_serializer(
                 section,
                 context=self.context,
@@ -1077,7 +1093,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def generate_schedule_sections_data(self, phase, preview, validation=True):
         sections = []
-        deadline_sections = phase.deadline_sections.all()
+        deadline_sections = phase.deadline_sections.filter(
+            attributes__identifier__in=self._get_keys()
+        )
         for section in deadline_sections:
             serializer_class = create_section_serializer(
                 section,
