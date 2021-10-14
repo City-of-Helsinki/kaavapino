@@ -80,7 +80,7 @@ def get_unique_validator(attribute, project_id):
 
     return validate
 
-def get_deadline_validator(attribute, project_dls, subtype, preview):
+def get_deadline_validator(attribute, subtype, preview):
     def validate(value):
         if not preview:
             return
@@ -140,7 +140,6 @@ def create_attribute_field_data(attribute, validation, project, preview):
     if attribute.deadline.count():
         field_arguments["validators"] += [get_deadline_validator(
             attribute,
-            project.deadlines,
             project.phase.project_subtype,
             preview,
         )]
