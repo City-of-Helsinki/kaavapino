@@ -664,9 +664,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         self._set_file_attributes(attribute_data, project, snapshot)
 
-        # TODO handle snapshot case
-        self._set_geometry_attributes(attribute_data, project)
-
         if snapshot:
             try:
                 subtype = ProjectPhaseLog.objects.filter(
@@ -833,20 +830,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                             ]
 
         attribute_data.update(file_attributes)
-
-    @staticmethod
-    def _set_geometry_attributes(attribute_data, project):
-        attribute_geometries = ProjectAttributeMultipolygonGeometry.objects.filter(
-            project=project
-        )
-
-        geometry_attributes = {
-            attribute_geometry.attribute.identifier: GeometryField().to_representation(
-                value=attribute_geometry.geometry
-            )
-            for attribute_geometry in attribute_geometries
-        }
-        attribute_data.update(geometry_attributes)
 
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"
