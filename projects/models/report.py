@@ -333,7 +333,7 @@ class ReportFilter(models.Model):
             try:
                 value = [
                     self._parse_filter_input(val.strip(" "), value_type)
-                    for val in value.split(",")
+                    for val in value
                 ]
             except (ValueError, TypeError):
                 return Q()
