@@ -623,9 +623,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             for attr in date_range_attrs:
                 start_query |= Q(**{f"attribute_data__{attr}__gte": start_date})
                 end_query |= Q(**{f"attribute_data__{attr}__lte": end_date})
-            query = start_query & end_query
-        else:
-            query = Q()
+            query &= start_query & end_query
 
         return Response({
             "subtypes": ProjectSubtypeOverviewSerializer(
