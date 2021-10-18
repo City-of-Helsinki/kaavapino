@@ -482,6 +482,9 @@ def get_ad_user(id):
         return None
 
     if not response:
+        if response is not None:
+            return None
+
         token = get_graph_api_access_token()
         if not token:
             return Response(
@@ -492,10 +495,10 @@ def get_ad_user(id):
             url, headers={"Authorization": f"Bearer {token}"}
         )
 
+        cache.set(url, response, 3600)
+
         if not response:
             return None
-
-        cache.set(url, response, 60)
 
     return response.json()
 
