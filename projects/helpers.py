@@ -10,14 +10,23 @@ from users.helpers import get_graph_api_access_token
 from users.serializers import PersonnelSerializer
 
 
-def get_fieldset_path(attr, attribute_path=[]):
+def get_fieldset_path(attr, attribute_path=[], cached=True, orig_attr=None):
+    orig_attr = orig_attr or attr
+    cache_key = f'projects.helpers.get_fieldset_path.{orig_attr.identifier}'
+    if cached:
+        cache_value = cache.get(cache_key)
+        if cache_value:
+            return cache_value
+
     if not attr.fieldsets.count():
+        cache.set(cache_key, attribute_path, None)
         return attribute_path
     else:
         parent_fieldset = attr.fieldsets.first()
         return get_fieldset_path(
             parent_fieldset,
             [parent_fieldset] + attribute_path,
+            orig_attr = orig_attr,
         )
 
 def set_attribute_data(data, path, value):

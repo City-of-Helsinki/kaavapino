@@ -12,6 +12,7 @@ from django.dispatch import receiver
 from django_q.tasks import async_task
 from django_q.models import OrmQ
 
+from projects.helpers import get_fieldset_path
 from projects.models import (
     ProjectAttributeFile,
     Attribute,
@@ -61,6 +62,10 @@ from projects.tasks import refresh_project_schedule_cache \
 def delete_cached_sections(*args, **kwargs):
     cache.delete("serialized_phase_sections")
     cache.delete("serialized_deadline_sections")
+
+@receiver([post_save, m2m_changed], sender=Attribute)
+def cache_fieldset_path_for_attribute(sender, instance, *args, **kwargs):
+    get_fieldset_path(instance, cached=False)
 
 @receiver([pre_save], sender=Project)
 def save_attribute_data_subtype(sender, instance, *args, **kwargs):
