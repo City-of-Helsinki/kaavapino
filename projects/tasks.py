@@ -3,8 +3,10 @@ import requests
 
 from django.conf import settings
 from django.core.cache import cache
+from django.http import HttpResponse
 
-from projects.models import Project
+from projects.exporting.report import render_report_to_response
+from projects.models import Project, Report
 from projects.serializers.project import ProjectDeadlineSerializer
 
 logger = logging.getLogger(__name__)
@@ -45,3 +47,21 @@ def refresh_project_schedule_cache():
         project_schedule_cache[project.pk] = schedule
 
     cache.set("serialized_project_schedules", project_schedule_cache, None)
+
+# generate all reports to make sure as much freshly cached data as possible
+# is available when users request reports
+def cache_report_data():
+    project_ids = [
+            project.pk for project in Project.objects.filter(
+                onhold=False, public=True,
+            )
+        ]
+    for report in Report.objects.all():
+        if report.previewable:
+            render_report_to_response(
+                report, project_ids, HttpResponse(), True,
+            )
+
+        render_report_to_response(
+            report, project_ids, HttpResponse(), False,
+        )

@@ -23,6 +23,13 @@ class Command(BaseCommand):
                     "cron": "0 0 * * *",
                 }
             },
+            {
+                "func": "projects.tasks.cache_report_data",
+                "defaults": {
+                    "schedule_type": Schedule.CRON,
+                    "cron": "0 */8 * * *"
+                }
+            }
         ]
         for schedule in schedules:
             if options.get("overwrite"):
