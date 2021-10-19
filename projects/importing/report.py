@@ -160,7 +160,7 @@ class ReportImporter:
                 name=report_name,
                 project_type=project_type,
                 defaults={
-                    "is_admin_report": True,
+                    "is_admin_report": False,
                     "previewable": False,
                 }
             )
