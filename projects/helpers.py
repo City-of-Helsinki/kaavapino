@@ -1,5 +1,7 @@
+from collections import OrderedDict
 import re
 import requests
+import json
 
 from django.conf import settings
 from django.core.cache import cache
@@ -62,7 +64,18 @@ def get_attribute_data(attribute_path, data):
         data.get(attribute_path[0].identifier, [])[attribute_path[1]]
     )
 
-def get_flat_attribute_data(data, flat):
+def get_flat_attribute_data(data, flat, first_run=True, flat_key=None):
+    if first_run:
+        cache_key = 'projects.helpers.get_flat_attribute_data'
+        flats = cache.get_or_set(cache_key, OrderedDict())
+        flat_key = str(data)
+        cached_flat = flats.get(flat_key)
+
+        if cached_flat:
+            flats.move_to_end(flat_key, last=False)
+            cache.set(cache_key, flats, None)
+            return cached_flat
+
     from projects.models import Attribute
     for key, val in data.items():
         flat[key] = flat.get(key, [])
@@ -74,11 +87,21 @@ def get_flat_attribute_data(data, flat):
 
         if type(val) is list and value_type == Attribute.TYPE_FIELDSET:
             for item in val:
-                get_flat_attribute_data(item, flat)
+                get_flat_attribute_data(
+                    item, flat, first_run=False, flat_key=flat_key,
+                )
         elif type(val) is list:
             flat[key] += val
         else:
             flat[key].append(val)
+
+    if first_run:
+        if len(flats) > 500:
+            flats.popitem(last=False)
+
+        flats[flat_key] = flat
+        flats.move_to_end(flat_key, last=False)
+        cache.set(cache_key, flats, None)
 
     return flat
 
