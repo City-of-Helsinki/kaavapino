@@ -142,7 +142,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
                     url,
                     headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
                 )
-                if response.status_code == 200:
+                if response.status_code in [200, 400, 404]:
                     cache.set(url, response, 28800)
                 else:
                     cache.set(url, response, 180)
