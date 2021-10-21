@@ -11,7 +11,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
-from PIL import Image
+from PIL import Image, ImageOps
 
 from projects.actions import verbs
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
@@ -949,6 +949,7 @@ class ProjectAttributeFile(models.Model):
         try:
             # resize to 200dpi print size
             image = Image.open(self.file.path)
+            image = ImageOps.exif_transpose(image)
             exif = image.getexif()
             image.thumbnail(paper_size_in_pixels, Image.ANTIALIAS)
             image.save(self.file.path, quality=100, optimize=True, exif=exif)
