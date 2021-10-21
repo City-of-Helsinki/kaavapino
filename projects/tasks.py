@@ -50,8 +50,9 @@ def refresh_project_schedule_cache():
 
 # generate all reports to make sure as much freshly cached data as possible
 # is available when users request reports
-def cache_report_data():
-    project_ids = [
+def cache_report_data(project_ids=None):
+    if not project_ids:
+        project_ids = [
             project.pk for project in Project.objects.filter(
                 onhold=False, public=True,
             )
@@ -65,3 +66,11 @@ def cache_report_data():
         render_report_to_response(
             report, project_ids, HttpResponse(), False,
         )
+
+def cache_queued_project_report_data():
+    cache_key = 'projects.tasks.cache_selected_report_data.queue'
+    queue = cache.get(cache_key)
+    cache.set(cache_key, [], None)
+
+    if queue:
+        cache_report_data(queue)

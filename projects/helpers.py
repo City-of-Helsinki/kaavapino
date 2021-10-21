@@ -66,13 +66,14 @@ def get_attribute_data(attribute_path, data):
 
 def get_flat_attribute_data(data, flat, first_run=True, flat_key=None):
     if first_run:
+        id = data.get("pinonumero")
         cache_key = 'projects.helpers.get_flat_attribute_data'
         flats = cache.get_or_set(cache_key, OrderedDict())
         flat_key = str(data)
-        cached_flat = flats.get(flat_key)
+        cached_flat = flats.get((id, flat_key))
 
         if cached_flat:
-            flats.move_to_end(flat_key, last=False)
+            flats.move_to_end((id, flat_key), last=True)
             cache.set(cache_key, flats, None)
             return cached_flat
 
@@ -96,11 +97,18 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None):
             flat[key].append(val)
 
     if first_run:
+        for key, item in [
+            (k, v) for (k, v) in flats.items() if k[0] == id
+        ]:
+            flats.move_to_end(key, last=False)
+            flats.popitem(last=False)
+
+        # max cache size
         if len(flats) > 500:
             flats.popitem(last=False)
 
-        flats[flat_key] = flat
-        flats.move_to_end(flat_key, last=False)
+        flats[(id, flat_key)] = flat
+        flats.move_to_end((id, flat_key), last=False)
         cache.set(cache_key, flats, None)
 
     return flat

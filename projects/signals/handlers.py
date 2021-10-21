@@ -85,6 +85,12 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
 
         instance.attribute_data[attr.identifier] = value
 
+@receiver([post_save], sender=Project)
+def add_to_report_cache_queue(sender, instance, *args, **kwargs):
+    cache_key = 'projects.tasks.cache_selected_report_data.queue'
+    queue = cache.get(cache_key, [])
+    cache.set(cache_key, list(set(queue + [instance.id])), None)
+
 @receiver([post_save, post_delete, m2m_changed], sender=Deadline)
 def refresh_project_schedule_cache(sender, instance, *args, **kwargs):
     for task in OrmQ.objects.all():
