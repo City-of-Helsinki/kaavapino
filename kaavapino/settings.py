@@ -87,6 +87,9 @@ DATABASES = {"default": env.db()}
 CACHES = {"default": {
     "BACKEND": "django.core.cache.backends.db.DatabaseCache",
     "LOCATION": "kaavapino_api_cache_table",
+    "OPTIONS": {
+        "MAX_ENTRIES": 1500,
+    }
 }}
 
 vars().update(env.email_url())  # EMAIL_BACKEND etc.
