@@ -11,6 +11,7 @@ from django.contrib.postgres.fields import JSONField
 from django.contrib.postgres.fields.jsonb import KeyTextTransform
 from django.core.serializers.json import DjangoJSONEncoder
 
+from projects.helpers import get_fieldset_path
 from projects.models import (
     Attribute,
     Project,
@@ -402,7 +403,7 @@ class ReportFilter(models.Model):
                 .annotate(**{
                     f"search_key__{attr.identifier}": \
                         KeyTextTransform(attr.identifier, "attribute_data")
-                    for attr in self.attributes.all()
+                    for attr in self.attributes.all() if not attr.fieldsets.count()
                 }) \
                 .annotate(**{
                     f"search_key__{attr.identifier}": \
@@ -410,32 +411,58 @@ class ReportFilter(models.Model):
                             f"search_key__{attr.identifier}",
                             type_field_mapping[attr.value_type],
                         )
-                    for attr in self.attributes.all()
+                    for attr in self.attributes.all() if not attr.fieldsets.count()
                 })
             query = Q()
             User = get_user_model()
 
             for attr in self.attributes.all():
                 # hard-coded special case for phase and subtype
+                q_value = value
                 if choices and self.identifier in ["kaavan_vaihe", "kaavaprosessi"]:
                     try:
-                        value = attr.value_choices.get(identifier=value).value
+                        q_value = attr.value_choices.get(identifier=value).value
                     except AttributeValueChoice.DoesNotExist:
                         pass
                 elif attr.value_type == Attribute.TYPE_USER:
-                    try:
-                        value = [
-                            str(User.objects.get(ad_id=val).uuid)
-                            for val in value
-                        ]
-                    except User.DoesNotExist:
-                        pass
+                    for i, qv in enumerate(q_value):
+                        try:
+                            q_value[i] = str(User.objects.get(ad_id=qv).uuid)
+                        except User.DoesNotExist:
+                            pass
 
-                query |= self._get_query(
-                    value,
-                    f"attribute_data__{attr.identifier}",
-                    value_type_mapping[attr.value_type],
-                )
+                if not attr.fieldsets.count():
+                    query |= self._get_query(
+                        q_value,
+                        f"attribute_data__{attr.identifier}",
+                        value_type_mapping[attr.value_type],
+                    )
+                else:
+                    if not isinstance(q_value, list):
+                        q_value = [q_value]
+
+                    for qv in q_value:
+                        qv = self._parse_filter_input(
+                            qv,
+                            value_type_mapping[attr.value_type],
+                        )
+                        qv = [{attr.identifier: qv}]
+                        qv_deleted = [{
+                            attr.identifier: qv,
+                            "_deleted": True,
+                        }]
+                        path = get_fieldset_path(attr)
+                        for step in path[1:]:
+                            qv = [{step.identifier: qv}]
+                            qv_deleted = [{step.identifier: qv_deleted}]
+
+                        query |= (
+                            Q(**{
+                                f"attribute_data__{path[0].identifier}__contains": qv,
+                            }) & ~Q(**{
+                                f"attribute_data__{path[0].identifier}__contains": qv_deleted,
+                            })
+                        )
 
             return queryset.filter(query)
 
