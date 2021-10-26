@@ -726,7 +726,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 allow_null=True,
                 required=False,
             ).data
-            cache.set(cache_key, schedule, 600)
 
         project_schedule_cache[project.pk] = schedule
         cache.set("serialized_project_schedules", project_schedule_cache, None)
