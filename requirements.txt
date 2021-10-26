@@ -14,7 +14,7 @@ cryptography==3.1.1       # via social-auth-core
 defusedxml==0.6.0         # via python3-openid, social-auth-core
 django==2.2.13
 git+https://github.com/andersinno/django-activity-stream.git#egg=django-activity-stream==0.7.0
-django-admin-sortable2==0.7.6
+django-admin-sortable2==1.0.2
 django-allauth==0.42.0
 django-cors-headers==3.4.0
 django-environ==0.4.5
@@ -68,7 +68,6 @@ skyfield-data==1.1.0      # via workalendar
 social-auth-app-django==4.0.0
 social-auth-core==3.3.3   # via social-auth-app-django
 sqlparse==0.3.1           # via django
-typing-extensions==3.10.0.0  # via arrow
 urllib3==1.25.9           # via requests
 wcwidth==0.2.5            # via blessed
 workalendar==11.0.1
