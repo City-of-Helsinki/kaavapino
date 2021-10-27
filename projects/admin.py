@@ -157,6 +157,10 @@ class AttributeAdmin(admin.ModelAdmin):
         "data_retention_plan",
         "highlight_group",
     )
+    search_fields = (
+        "name",
+        "identifier",
+    )
     inlines = (AttributeValueChoiceInline,)
     prepopulated_fields = {"identifier": ("name",)}
 
@@ -338,6 +342,7 @@ class ReportColumnPostfixInline(admin.TabularInline):
 class ReportColumnAdmin(admin.ModelAdmin):
     list_display = ("__str__",)
     inlines = (ReportColumnPostfixInline,)
+    filter_horizontal = ("condition", "attributes")
 
 
 @admin.register(Report)
@@ -355,6 +360,7 @@ class ReportFilterAttributeChoiceInline(admin.TabularInline):
 class ReportFilterAdmin(admin.ModelAdmin):
     list_display = ("name", "type")
     inlines = (ReportFilterAttributeChoiceInline,)
+    filter_horizontal = ("attributes",)
 
 
 @admin.register(DocumentTemplate)
