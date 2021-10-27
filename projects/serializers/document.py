@@ -20,6 +20,7 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
             "preview_file",
             "last_downloaded",
             "phases",
+            "silent_downloads",
         ]
         read_only_fields = ["id", "name", "image_template"]
 

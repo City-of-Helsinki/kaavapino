@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2021-10-22 06:10+0300\n"
+"POT-Creation-Date: 2021-10-27 11:08+0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -34,16 +34,16 @@ msgstr "päivityslaskutoimitus"
 msgid "update calculations"
 msgstr "päivityslaskutoimitukset"
 
-#: projects/admin.py:174
+#: projects/admin.py:178
 msgid "Please select only one project."
 msgstr "Valitse vain yksi projekti"
 
-#: projects/admin.py:179
+#: projects/admin.py:183
 msgid "Create document {}"
 msgstr "Luo dokumentti {}"
 
 #: projects/exporting/report.py:28 projects/models/project.py:97
-#: projects/models/project.py:751 projects/models/project.py:909
+#: projects/models/project.py:755 projects/models/project.py:913
 #: projects/models/projectcomment.py:30 projects/models/projectcomment.py:75
 msgid "created at"
 msgstr "luotu"
@@ -97,7 +97,7 @@ msgstr "ajanjakson yksikkö"
 msgid "fieldset"
 msgstr "kenttäryhmä"
 
-#: projects/models/attribute.py:127 projects/models/report.py:270
+#: projects/models/attribute.py:127 projects/models/report.py:272
 msgid "integer"
 msgstr "kokonaisluku"
 
@@ -125,17 +125,17 @@ msgstr "lyhyt muotoiltu teksti"
 msgid "boolean"
 msgstr "totuusarvo"
 
-#: projects/models/attribute.py:134 projects/models/report.py:269
+#: projects/models/attribute.py:134 projects/models/report.py:271
 msgid "date"
 msgstr "päivämäärä"
 
 #: projects/models/attribute.py:135 projects/models/project.py:92
-#: projects/models/project.py:746 projects/models/projectcomment.py:20
+#: projects/models/project.py:750 projects/models/projectcomment.py:20
 #: projects/models/projectcomment.py:66 projects/models/projectcomment.py:102
 msgid "user"
 msgstr "käyttäjä"
 
-#: projects/models/attribute.py:136 projects/models/report.py:267
+#: projects/models/attribute.py:136 projects/models/report.py:269
 msgid "personnel"
 msgstr "henkilökunta"
 
@@ -199,10 +199,10 @@ msgstr "Geoserver"
 #: projects/models/attribute.py:846 projects/models/deadline.py:474
 #: projects/models/document.py:16 projects/models/project.py:42
 #: projects/models/project.py:68 projects/models/project.py:103
-#: projects/models/project.py:567 projects/models/project.py:642
-#: projects/models/project.py:772 projects/models/project.py:826
-#: projects/models/report.py:30 projects/models/report.py:275
-#: projects/models/report.py:511
+#: projects/models/project.py:571 projects/models/project.py:646
+#: projects/models/project.py:776 projects/models/project.py:830
+#: projects/models/report.py:31 projects/models/report.py:277
+#: projects/models/report.py:539
 msgid "name"
 msgstr "nimi"
 
@@ -236,7 +236,7 @@ msgstr "julkinen tieto"
 msgid "searchable field"
 msgstr "hakukenttä"
 
-#: projects/models/attribute.py:226 projects/models/project.py:1024
+#: projects/models/attribute.py:226 projects/models/project.py:1032
 #: projects/models/projectcomment.py:27 projects/models/projectcomment.py:72
 msgid "generated"
 msgstr "automaattisesti generoitu"
@@ -249,7 +249,7 @@ msgstr "datan säilytysaika"
 msgid "required"
 msgstr "pakollinen"
 
-#: projects/models/attribute.py:242 projects/models/report.py:255
+#: projects/models/attribute.py:242 projects/models/report.py:257
 msgid "multiple choice"
 msgstr "monivalinta"
 
@@ -271,7 +271,7 @@ msgstr "virheilmoitus"
 
 #: projects/models/attribute.py:265 projects/models/attribute.py:682
 #: projects/models/attribute.py:850 projects/models/project.py:109
-#: projects/models/report.py:279 projects/models/report.py:515
+#: projects/models/report.py:281 projects/models/report.py:543
 msgid "identifier"
 msgstr "tunniste"
 
@@ -337,16 +337,16 @@ msgstr "AD-käyttäjätiedon avain"
 
 #: projects/models/attribute.py:369 projects/models/attribute.py:675
 #: projects/models/attribute.py:869 projects/models/deadline.py:44
-#: projects/models/project.py:592 projects/models/project.py:797
-#: projects/models/project.py:845 projects/models/project.py:897
-#: projects/models/project.py:993 projects/models/project.py:1055
-#: projects/models/report.py:506
+#: projects/models/project.py:596 projects/models/project.py:801
+#: projects/models/project.py:849 projects/models/project.py:901
+#: projects/models/project.py:1001 projects/models/project.py:1063
+#: projects/models/report.py:534
 msgid "attribute"
 msgstr "kenttä"
 
-#: projects/models/attribute.py:370 projects/models/project.py:571
-#: projects/models/project.py:776 projects/models/project.py:1094
-#: projects/models/report.py:75
+#: projects/models/attribute.py:370 projects/models/project.py:575
+#: projects/models/project.py:780 projects/models/project.py:1102
+#: projects/models/report.py:77
 msgid "attributes"
 msgstr "kentät"
 
@@ -357,13 +357,13 @@ msgstr "arvo"
 #: projects/models/attribute.py:686 projects/models/attribute.py:786
 #: projects/models/deadline.py:132 projects/models/deadline.py:305
 #: projects/models/deadline.py:842 projects/models/project.py:76
-#: projects/models/project.py:568 projects/models/project.py:599
-#: projects/models/project.py:650 projects/models/project.py:686
-#: projects/models/project.py:773 projects/models/project.py:802
-#: projects/models/project.py:829 projects/models/project.py:861
-#: projects/models/project.py:879 projects/models/project.py:1071
-#: projects/models/project.py:1091 projects/models/project.py:1120
-#: projects/models/report.py:85 projects/models/report.py:232
+#: projects/models/project.py:572 projects/models/project.py:603
+#: projects/models/project.py:654 projects/models/project.py:690
+#: projects/models/project.py:777 projects/models/project.py:806
+#: projects/models/project.py:833 projects/models/project.py:865
+#: projects/models/project.py:883 projects/models/project.py:1079
+#: projects/models/project.py:1099 projects/models/project.py:1128
+#: projects/models/report.py:87 projects/models/report.py:234
 #: sitecontent/models.py:12 sitecontent/models.py:32
 msgid "index"
 msgstr "indeksi"
@@ -505,9 +505,9 @@ msgstr "päivämäärän tyyppi"
 msgid "show if any attribute is set"
 msgstr "näytä jos mikä tahansa kentistä on täytetty"
 
-#: projects/models/deadline.py:85 projects/models/document.py:73
-#: projects/models/project.py:141 projects/models/project.py:740
-#: projects/models/project.py:768 projects/models/project.py:1087
+#: projects/models/deadline.py:85 projects/models/document.py:77
+#: projects/models/project.py:141 projects/models/project.py:744
+#: projects/models/project.py:772 projects/models/project.py:1095
 msgid "phase"
 msgstr "vaihe"
 
@@ -538,7 +538,7 @@ msgstr ""
 "määritelty"
 
 #: projects/models/deadline.py:278 projects/models/deadline.py:820
-#: projects/models/project.py:1008
+#: projects/models/project.py:1016
 msgid "deadline"
 msgstr "määräaika"
 
@@ -672,25 +672,29 @@ msgstr "käytä sääntöä jos kentän arvo on tosi tai asetettu"
 msgid "use rule if any attribute is falsy"
 msgstr "käytä sääntöä jos kentän arvo on epätosi tai tyhjä"
 
-#: projects/models/document.py:20 projects/models/project.py:697
+#: projects/models/document.py:20 projects/models/project.py:701
 msgid "project phase"
 msgstr "projektin vaihe"
 
-#: projects/models/document.py:39
+#: projects/models/document.py:25
+msgid "Downloading document doesn't trigger warnings"
+msgstr "Dokumentin lataus ei aiheuta varoitusta"
+
+#: projects/models/document.py:43
 msgid "image template"
 msgstr "kuvadokumenttipohja"
 
-#: projects/models/document.py:44 projects/models/document.py:67
+#: projects/models/document.py:48 projects/models/document.py:71
 msgid "document template"
 msgstr "dokumenttipohja"
 
-#: projects/models/document.py:45
+#: projects/models/document.py:49
 msgid "document templates"
 msgstr "dokumenttipohjat"
 
-#: projects/models/document.py:61 projects/models/project.py:160
-#: projects/models/project.py:734 projects/models/project.py:903
-#: projects/models/project.py:999 projects/models/project.py:1014
+#: projects/models/document.py:65 projects/models/project.py:160
+#: projects/models/project.py:738 projects/models/project.py:907
+#: projects/models/project.py:1007 projects/models/project.py:1022
 #: projects/models/projectcomment.py:13 projects/models/projectcomment.py:52
 #: projects/models/projectcomment.py:109
 msgid "project"
@@ -705,12 +709,12 @@ msgstr ""
 "alaviivoja."
 
 #: projects/models/project.py:44 projects/models/project.py:70
-#: projects/models/project.py:689
+#: projects/models/project.py:693
 msgid "metadata"
 msgstr "metadata"
 
 #: projects/models/project.py:52 projects/models/project.py:63
-#: projects/models/report.py:25
+#: projects/models/report.py:26
 msgid "project type"
 msgstr "projektin tyyppi"
 
@@ -718,8 +722,8 @@ msgstr "projektin tyyppi"
 msgid "project types"
 msgstr "projektin tyypit"
 
-#: projects/models/project.py:79 projects/models/project.py:563
-#: projects/models/project.py:682
+#: projects/models/project.py:79 projects/models/project.py:567
+#: projects/models/project.py:686
 msgid "project subtype"
 msgstr "projektin kokoluokka"
 
@@ -751,172 +755,172 @@ msgstr "luo luonnos"
 msgid "projects"
 msgstr "projektit"
 
-#: projects/models/project.py:577
+#: projects/models/project.py:581
 msgid "project floor area section"
 msgstr "projektin kerrosalatietojen osio"
 
-#: projects/models/project.py:578
+#: projects/models/project.py:582
 msgid "project floor area sections"
 msgstr "projektin kerrosalatietojen osiot"
 
-#: projects/models/project.py:596
+#: projects/models/project.py:600
 msgid "floor area section"
 msgstr "kerrosalatietojen osio"
 
-#: projects/models/project.py:603 projects/models/project.py:806
+#: projects/models/project.py:607 projects/models/project.py:810
 msgid "relies on"
 msgstr "riippuvainen"
 
-#: projects/models/project.py:610
+#: projects/models/project.py:614
 msgid "project floor area section attribute"
 msgstr "projektin kerrosalatieto-osion kenttä"
 
-#: projects/models/project.py:611
+#: projects/models/project.py:615
 msgid "project floor area section attributes"
 msgstr "projektin kerrosalatieto-osion kentät"
 
-#: projects/models/project.py:620 projects/models/project.py:800
-#: projects/models/project.py:970
+#: projects/models/project.py:624 projects/models/project.py:804
+#: projects/models/project.py:978
 msgid "phase section"
 msgstr "vaiheen osio"
 
-#: projects/models/project.py:643
+#: projects/models/project.py:647
 msgid "color"
 msgstr "väri"
 
-#: projects/models/project.py:645
+#: projects/models/project.py:649
 msgid "color code"
 msgstr "värikoodi"
 
-#: projects/models/project.py:648
+#: projects/models/project.py:652
 msgid "list prefix"
 msgstr "listaetuliite"
 
-#: projects/models/project.py:653 projects/models/project.py:676
+#: projects/models/project.py:657 projects/models/project.py:680
 msgid "common project phase"
 msgstr "yleinen projektin vaihe"
 
-#: projects/models/project.py:654
+#: projects/models/project.py:658
 msgid "common project phases"
 msgstr "yleiset projektin vaiheet"
 
-#: projects/models/project.py:698
+#: projects/models/project.py:702
 msgid "project phases"
 msgstr "projektin vaiheet"
 
-#: projects/models/project.py:755
+#: projects/models/project.py:759
 msgid "project phase log entry"
 msgstr "projektivaiheen lokikirjaus"
 
-#: projects/models/project.py:756
+#: projects/models/project.py:760
 msgid "project phase log entries"
 msgstr "projektivaiheen lokikirjaukset"
 
-#: projects/models/project.py:782
+#: projects/models/project.py:786
 msgid "project phase section"
 msgstr "projektivaiheen osio"
 
-#: projects/models/project.py:783
+#: projects/models/project.py:787
 msgid "project phase sections"
 msgstr "projektivaiheen osiot"
 
-#: projects/models/project.py:813
+#: projects/models/project.py:817
 msgid "project phase section attribute"
 msgstr "projektivaiheosion kenttä"
 
-#: projects/models/project.py:814
+#: projects/models/project.py:818
 msgid "project phase section attributes"
 msgstr "projektivaiheosion kentät"
 
-#: projects/models/project.py:834 projects/models/project.py:850
+#: projects/models/project.py:838 projects/models/project.py:854
 msgid "project card section"
 msgstr "projektikortin osio"
 
-#: projects/models/project.py:835
+#: projects/models/project.py:839
 msgid "project card sections"
 msgstr "projektikortin osiot"
 
-#: projects/models/project.py:856
+#: projects/models/project.py:860
 msgid "date format and text"
 msgstr "päivämääräformaatti ja teksti"
 
-#: projects/models/project.py:865
+#: projects/models/project.py:869
 msgid "show on mobile"
 msgstr "näytä mobiilissa"
 
-#: projects/models/project.py:870
+#: projects/models/project.py:874
 msgid "project card section attribute"
 msgstr "projektikortin osion kenttä"
 
-#: projects/models/project.py:871
+#: projects/models/project.py:875
 msgid "project card section attributes"
 msgstr "projektikortin osion kentät"
 
-#: projects/models/project.py:907
+#: projects/models/project.py:911
 msgid "description"
 msgstr "kuvaus"
 
-#: projects/models/project.py:912
+#: projects/models/project.py:916
 msgid "archived at"
 msgstr "arkistoitu"
 
-#: projects/models/project.py:917
+#: projects/models/project.py:921
 msgid "fieldset path string"
 msgstr "kenttäryhmän polku merkkijonona"
 
-#: projects/models/project.py:961
+#: projects/models/project.py:969
 msgid "project attribute file"
 msgstr "projektikentän tiedosto"
 
-#: projects/models/project.py:962
+#: projects/models/project.py:970
 msgid "project attribute files"
 msgstr "projektikentän tiedostot"
 
-#: projects/models/project.py:1019
+#: projects/models/project.py:1027
 msgid "deadline date"
 msgstr "määräajan päivämäärä"
 
-#: projects/models/project.py:1060
+#: projects/models/project.py:1068
 msgid "deadline phase section"
 msgstr "aikataulun vaiheen osio"
 
-#: projects/models/project.py:1065
+#: projects/models/project.py:1073
 msgid "show for project owner"
 msgstr "näytä projektin vastuuhenkilölle"
 
-#: projects/models/project.py:1069
+#: projects/models/project.py:1077
 msgid "show for administrator"
 msgstr "näytä pääkäyttäjälle"
 
-#: projects/models/project.py:1074
+#: projects/models/project.py:1082
 msgid "project phase deadline section item"
 msgstr "aikataulun vaiheen osion kenttä"
 
-#: projects/models/project.py:1075
+#: projects/models/project.py:1083
 msgid "project phase deadline section items"
 msgstr "aikataulun vaiheen osion kentät"
 
-#: projects/models/project.py:1104
+#: projects/models/project.py:1112
 msgid "project phase deadline section"
 msgstr "aikataulun vaiheen osio"
 
-#: projects/models/project.py:1105
+#: projects/models/project.py:1113
 msgid "project phase deadline sections"
 msgstr "aikataulun vaiheen osiot"
 
-#: projects/models/project.py:1114
+#: projects/models/project.py:1122
 msgid "child index"
 msgstr "lapsen indeksi"
 
-#: projects/models/project.py:1117
+#: projects/models/project.py:1125
 msgid "parent fieldset"
 msgstr "emokenttäryhmä"
 
-#: projects/models/project.py:1130
+#: projects/models/project.py:1138
 msgid "target file"
 msgstr "kohdetiedosto"
 
-#: projects/models/project.py:1142
+#: projects/models/project.py:1150
 msgid "target comment"
 msgstr "kohdekommentti"
 
@@ -956,171 +960,171 @@ msgstr "viimeksi luettu"
 msgid "last read timestamps"
 msgstr "viimeksi luettu"
 
-#: projects/models/report.py:32
+#: projects/models/report.py:33
 msgid "can only be fetched by admin"
 msgstr "vain pääkäyttäjän haettavissa"
 
-#: projects/models/report.py:35
+#: projects/models/report.py:36
 msgid "show created at on report"
 msgstr "näytä luontiaika raportissa"
 
-#: projects/models/report.py:38
+#: projects/models/report.py:39
 msgid "show modified at on report"
 msgstr "näytä muokkausaika raportissa"
 
-#: projects/models/report.py:41
+#: projects/models/report.py:42
 msgid "report can be previewed"
 msgstr "raporttia voidaan esikatsella"
 
-#: projects/models/report.py:44
+#: projects/models/report.py:45
 msgid "hide report from other views"
 msgstr "piilota raportti muista näkymistä"
 
-#: projects/models/report.py:48 projects/models/report.py:63
+#: projects/models/report.py:49 projects/models/report.py:65
 msgid "report"
 msgstr "raportti"
 
-#: projects/models/report.py:49
+#: projects/models/report.py:50
 msgid "reports"
 msgstr "raportit"
 
-#: projects/models/report.py:71 sitecontent/models.py:31
+#: projects/models/report.py:73 sitecontent/models.py:31
 msgid "title"
 msgstr "otsikko"
 
-#: projects/models/report.py:80
+#: projects/models/report.py:82
 msgid "condition"
 msgstr "ehto"
 
-#: projects/models/report.py:89
+#: projects/models/report.py:91
 msgid "only show postfix as field value"
 msgstr "näytä pelkkä jälkiliite kentän arvona"
 
-#: projects/models/report.py:93
+#: projects/models/report.py:95
 msgid "include in preview"
 msgstr "näytä esikatselussa"
 
-#: projects/models/report.py:97
+#: projects/models/report.py:99
 msgid "only show in preview"
 msgstr "näytä vain esikatselussa"
 
-#: projects/models/report.py:101
+#: projects/models/report.py:103
 msgid "use column values as titles in preview"
 msgstr "käytä sarakkeen arvoja otsikkoina esikatselussa"
 
-#: projects/models/report.py:109
+#: projects/models/report.py:111
 msgid "map automatic display value strings to custom display values"
 msgstr "muunna automaattiset näyttöarvot muokattuihin näyttöarvoihin"
 
-#: projects/models/report.py:183 projects/models/report.py:194
+#: projects/models/report.py:185 projects/models/report.py:196
 msgid "report column"
 msgstr "raporttisarake"
 
-#: projects/models/report.py:184
+#: projects/models/report.py:186
 msgid "report columns"
 msgstr "raporttisarakkeet"
 
-#: projects/models/report.py:200
+#: projects/models/report.py:202
 msgid "subtypes"
 msgstr "kokoluokat"
 
-#: projects/models/report.py:205
+#: projects/models/report.py:207
 msgid "formatting"
 msgstr "muotoilu"
 
-#: projects/models/report.py:209
+#: projects/models/report.py:211
 msgid "conditions: show if..."
 msgstr "ehdot: näytä jos..."
 
-#: projects/models/report.py:215
+#: projects/models/report.py:217
 msgid "conditions: show if not..."
 msgstr "ehdot: näytä jos ei..."
 
-#: projects/models/report.py:221
+#: projects/models/report.py:223
 msgid "conditions: hide if..."
 msgstr "ehdot: piilota jos..."
 
-#: projects/models/report.py:227
+#: projects/models/report.py:229
 msgid "conditions: hide if not..."
 msgstr "ehdot: piilota jos ei..."
 
-#: projects/models/report.py:237
+#: projects/models/report.py:239
 msgid "report column postfix"
 msgstr "raporttisarakkeen jälkiliite"
 
-#: projects/models/report.py:238
+#: projects/models/report.py:240
 msgid "report column postfixes"
 msgstr "raporttisarakkeen jälkiliitteet"
 
-#: projects/models/report.py:254
+#: projects/models/report.py:256
 msgid "exact value"
 msgstr "tarkka arvo"
 
-#: projects/models/report.py:256
+#: projects/models/report.py:258
 msgid "value range"
 msgstr "arvoväli"
 
-#: projects/models/report.py:257
+#: projects/models/report.py:259
 msgid "value is set"
 msgstr "arvo on asetettu"
 
-#: projects/models/report.py:258
+#: projects/models/report.py:260
 msgid "value is not set"
 msgstr "arvoa ei ole asetettu"
 
-#: projects/models/report.py:268
+#: projects/models/report.py:270
 msgid "string"
 msgstr "teksti"
 
-#: projects/models/report.py:284
+#: projects/models/report.py:286
 msgid "filter type"
 msgstr "suodattimen tyyppi"
 
-#: projects/models/report.py:289
+#: projects/models/report.py:291
 msgid "filter input type"
 msgstr "suodattimen syöttöarvon tyyppi"
 
-#: projects/models/report.py:294
+#: projects/models/report.py:296
 msgid "usable with reports"
 msgstr "käytettävissä raporttien kanssa"
 
-#: projects/models/report.py:299
+#: projects/models/report.py:301
 msgid "target attributes"
 msgstr "kohdekentät"
 
-#: projects/models/report.py:302
+#: projects/models/report.py:304
 msgid "use attributes as choices"
 msgstr "käytä kenttiä vaihtoehtoina"
 
-#: projects/models/report.py:490
+#: projects/models/report.py:518
 msgid "report filter"
 msgstr "raporttisuodatin"
 
-#: projects/models/report.py:491
+#: projects/models/report.py:519
 msgid "report filters"
 msgstr "raporttisuodattimet"
 
-#: projects/models/report.py:500
+#: projects/models/report.py:528
 msgid "filter"
 msgstr "suodatin"
 
-#: projects/models/report.py:519
+#: projects/models/report.py:547
 msgid "search value, values or value range"
 msgstr "hakuvaihtoehdon arvo, arvot tai arvoväli"
 
-#: projects/models/report.py:523
+#: projects/models/report.py:551
 msgid "attribute choice for report filter"
 msgstr "raporttisuodattimen hakuvaihtoehto"
 
-#: projects/models/report.py:524
+#: projects/models/report.py:552
 msgid "attribute choices for report filters"
 msgstr "raporttisuodattimen hakuvaihtoehdot"
 
-#: projects/serializers/project.py:615
+#: projects/serializers/project.py:616
 msgid "Project data at selected phase start cannot be found"
 msgstr "Projektin tietoja valitun vaiheen alkuhetkenä ei löydy"
 
-#: projects/serializers/project.py:631
+#: projects/serializers/project.py:632
 msgid ""
 "Incorrect snapshot datetime format, use one of the following:\n"
 "%Y-%m-%dT%H:%M:%S.%fZ%z\n"
@@ -1132,35 +1136,35 @@ msgstr ""
 "\n"
 "vaiheen id"
 
-#: projects/serializers/project.py:634
+#: projects/serializers/project.py:635
 msgid "Project data at selected date cannot be found"
 msgstr "Projektin tietoja valittuna ajankohtana ei löydy"
 
-#: projects/serializers/project.py:1100
+#: projects/serializers/project.py:1105
 msgid "Archived projects cannot be edited"
 msgstr "Arkistoitua projektia ei voi muokata"
 
-#: projects/serializers/project.py:1119
+#: projects/serializers/project.py:1124
 msgid "Principles and drafts can only be created for XL projects."
 msgstr "Periaatteet ja luonnos voidaan luoda vain XL-projekteille."
 
-#: projects/serializers/project.py:1123
+#: projects/serializers/project.py:1128
 msgid "Principles and/or draft needs to be created for XL projects."
 msgstr "Periaatteet ja/tai luonnos on luotava XL-projektille."
 
-#: projects/serializers/project.py:1299
+#: projects/serializers/project.py:1303
 msgid "Cannot edit field."
 msgstr "Kenttää ei voi muokata."
 
-#: projects/serializers/project.py:1406
+#: projects/serializers/project.py:1410
 msgid "Invalid phase for project subtype, no substitute found"
 msgstr "Epäkelpo vaihe projektin kokoluokalle, vastaavaa vaihetta ei löydy"
 
-#: projects/serializers/project.py:1421
+#: projects/serializers/project.py:1425
 msgid "Selected user does not have the required role"
 msgstr "Valitulla käyttäjällä ei ole vaadittua roolia"
 
-#: projects/serializers/project.py:1909
+#: projects/serializers/project.py:1915
 #, python-brace-format
 msgid "Object with {slug_name}={value} does not exist."
 msgstr "Kohdetta jonka {slug_name}={value} ei ole."
@@ -1195,10 +1199,6 @@ msgstr ""
 #: projects/templates/admin/kaavapino_index.html:31
 msgid "Import"
 msgstr ""
-
-#: sitecontent/apps.py:6
-msgid "site content"
-msgstr "sivuston sisältö"
 
 #: sitecontent/models.py:10
 msgid "link text"
@@ -1251,6 +1251,9 @@ msgstr "lisätyt ryhmät"
 #: users/models.py:41
 msgid "AD user id"
 msgstr "AD-käyttäjä-ID"
+
+#~ msgid "site content"
+#~ msgstr "sivuston sisältö"
 
 #~ msgid "show name on report"
 #~ msgstr "näytä nimi raportissa"

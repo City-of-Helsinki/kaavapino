@@ -526,7 +526,9 @@ class Project(models.Model):
     def phase_documents_creation_started(self):
         # True if any documents in current phase has been downloaded at least once
         for template in \
-            self.phase.common_project_phase.document_templates.all():
+            self.phase.common_project_phase.document_templates.filter(
+                silent_downloads=False,
+            ):
             if self.document_download_log.filter(
                 document_template=template,
                 phase=self.phase.common_project_phase,
@@ -539,7 +541,9 @@ class Project(models.Model):
     def phase_documents_created(self):
         # True if all documents in current phase have been downloaded at least once
         for template in \
-            self.phase.common_project_phase.document_templates.all():
+            self.phase.common_project_phase.document_templates.filter(
+                silent_downloads=False,
+            ):
             if not self.document_download_log.filter(
                 document_template=template,
                 phase=self.phase.common_project_phase,

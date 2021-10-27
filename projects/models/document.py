@@ -20,6 +20,10 @@ class DocumentTemplate(models.Model):
         verbose_name=_("project phase"),
         related_name="document_templates",
     )
+    silent_downloads = models.BooleanField(
+        default=False,
+        verbose_name=_("Downloading document doesn't trigger warnings"),
+    )
 
     def get_upload_subfolder(self):
         return ["document_templates", self.slug]
