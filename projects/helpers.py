@@ -4,6 +4,7 @@ import requests
 import json
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from rest_framework import status
 from rest_framework.response import Response
@@ -560,9 +561,16 @@ def _add_paths(paths, solved_path, remaining_path, parent_data):
 
 def set_ad_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
+    User = get_user_model()
     paths = []
 
-    def get_in_personnel_data(id, key):
+    def get_in_personnel_data(id, key, is_kaavapino_user):
+        if is_kaavapino_user:
+            try:
+                id = User.objects.get(uuid=id).ad_id
+            except User.DoesNotExist:
+                return None
+
         user = get_ad_user(id)
         return PersonnelSerializer(user).data.get(key)
 
@@ -581,7 +589,8 @@ def set_ad_data_in_attribute_data(attribute_data):
         if not user_id:
             continue
 
-        value = get_in_personnel_data(user_id, attr.ad_data_key)
+        is_kaavapino_user = attr.ad_key_attribute.value_type == Attribute.TYPE_USER
+        value = get_in_personnel_data(user_id, attr.ad_data_key, is_kaavapino_user)
 
         if value:
             set_attribute_data(attribute_data, path, value)
