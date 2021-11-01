@@ -721,8 +721,6 @@ class AttributeImporter:
                 value_type = Attribute.TYPE_SHORT_STRING
 
             generated, calculations = self._get_generated_calculations(row)
-            if generated:
-                value_type = Attribute.TYPE_DECIMAL
 
             owner_editable = len(re.findall(
                 "Projektin vastuuhenkilö",
