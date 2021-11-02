@@ -95,7 +95,7 @@ class ConditionSerializer(serializers.Serializer):
 
 
 class AutofillRuleSerializer(serializers.Serializer):
-    condition = ConditionSerializer()
+    conditions = serializers.ListField(child=ConditionSerializer())
     then_branch = serializers.CharField()
     else_branch = serializers.CharField()
     variables = serializers.ListField(child=serializers.CharField())
