@@ -853,11 +853,8 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         return project
 
     def retrieve(self, request, *args, **kwargs):
+        task_id = request.query_params.get("task")
         filename = request.query_params.get("filename")
-        preview = \
-            True if request.query_params.get("preview") in ("true", "True", "1") \
-            else False
-        document_template = self.get_object()
 
         if filename is None:
             filename = "{}-{}-{}".format(
@@ -866,19 +863,50 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
-        output = render_template(self.project, document_template, preview)
-        response = HttpResponse(
-            output,
-            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-        response["Content-Disposition"] = "attachment; filename={}.docx".format(
-            filename
+        if task_id:
+            result = async_result(task_id)
+            if result:
+                response = HttpResponse(
+                    result,
+                    content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+                response["Content-Disposition"] = "attachment; filename={}.docx".format(
+                    filename
+                )
+
+                # Since we are not using DRFs response here, we set a custom CORS control header
+                response["Access-Control-Expose-Headers"] = "content-disposition"
+                response["Access-Control-Allow-Origin"] = "*"
+                return response
+
+            queued_ids = [
+                ormq.task_id() for ormq in OrmQ.objects.all()
+            ]
+            if task_id in queued_ids:
+                return Response(
+                    {"detail": task_id},
+                    status=status.HTTP_202_ACCEPTED,
+                )
+            else:
+                return Response(
+                    {"detail": "Requested task not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        preview = \
+            True if request.query_params.get("preview") in ("true", "True", "1") \
+            else False
+        document_template = self.get_object()
+
+        document_task = async_task(
+            render_template,
+            self.project, document_template, preview,
         )
 
-        # Since we are not using DRFs response here, we set a custom CORS control header
-        response["Access-Control-Expose-Headers"] = "content-disposition"
-        response["Access-Control-Allow-Origin"] = "*"
-        return response
+        return Response(
+            {"detail": document_task},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     def list(self, request, *args, **kwargs):
         self.serializer_class = DocumentTemplateSerializer
