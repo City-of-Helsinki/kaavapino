@@ -479,6 +479,8 @@ class Attribute(models.Model):
             else:
                 return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
+            if isinstance(value, str):
+                return value
             return (
                 datetime.datetime.strftime(
                     value, DATE_SERIALIZATION_FORMAT
