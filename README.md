@@ -124,6 +124,10 @@ To clear or generate missing schedules, use:
 * `python manage.py clear_all_project_deadlines [--id project id]`
 * `python manage.py generate_missing_project_deadlines [--id project id]`
 
+If at any point attribute_data breaks for example due to changes in attribute types between imports, use following to fix one or all projects:
+
+* `python manage.py repair_attribute_data [--id project id]`
+
 ## Deploy staging
 
 Install kubectl locally. Check version to deploy and run:
