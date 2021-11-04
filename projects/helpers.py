@@ -6,6 +6,7 @@ import json
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -567,8 +568,13 @@ def set_ad_data_in_attribute_data(attribute_data):
     def get_in_personnel_data(id, key, is_kaavapino_user):
         if is_kaavapino_user:
             try:
+                id = id.uuid
+            except AttributeError:
+                pass
+
+            try:
                 id = User.objects.get(uuid=id).ad_id
-            except User.DoesNotExist:
+            except (User.DoesNotExist, ValidationError):
                 return None
 
         user = get_ad_user(id)
