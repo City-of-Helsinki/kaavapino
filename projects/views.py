@@ -855,6 +855,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
         filename = request.query_params.get("filename")
+        document_template = self.get_object()
 
         if filename is None:
             filename = "{}-{}-{}".format(
@@ -896,7 +897,6 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         preview = \
             True if request.query_params.get("preview") in ("true", "True", "1") \
             else False
-        document_template = self.get_object()
 
         document_task = async_task(
             render_template,
