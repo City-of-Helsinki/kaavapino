@@ -27,7 +27,7 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN pip install -U pip
 
-FROM base AS test
+#FROM base AS test
 
 # Install python dependencies
 COPY requirements.txt /code/
@@ -40,7 +40,7 @@ RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY docker-entrypoint.sh /entrypoint/
 RUN chmod +x /entrypoint/docker-entrypoint.sh
 
-FROM base AS deploy
+#FROM base AS deploy
 COPY requirements.txt /code/
 COPY deploy/requirements.txt ./deploy/requirements.txt
 RUN pip install --no-cache-dir -r ./deploy/requirements.txt
