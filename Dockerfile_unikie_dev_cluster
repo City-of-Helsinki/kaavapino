@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y \
 
 # Upgrade pip
 #RUN pip install -U pip
-RUN python -m pip install --upgrade pip
+#RUN python -m pip install --upgrade pip
 
 #FROM base AS test
 
