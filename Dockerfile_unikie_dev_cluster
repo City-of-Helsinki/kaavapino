@@ -30,7 +30,8 @@ RUN apt-get update && apt-get install -y \
     vim
 
 # Upgrade pip
-RUN pip install -U pip
+#RUN pip install -U pip
+RUN python -m pip install --upgrade pip
 
 #FROM base AS test
 
