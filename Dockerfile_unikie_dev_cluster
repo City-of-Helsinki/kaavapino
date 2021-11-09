@@ -35,6 +35,8 @@ RUN pip install -U pip
 #FROM base AS test
 
 
+RUN chown -R root:root /code
+
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
