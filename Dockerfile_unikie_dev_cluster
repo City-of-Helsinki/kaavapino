@@ -10,6 +10,10 @@ RUN chown root:root /code
 RUN mkdir /entrypoint
 WORKDIR /code
 
+# Install python dependencies
+COPY requirements.txt /code/
+COPY requirements-dev.txt /code/
+
 # Install the appropriate Ubuntu packages
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -30,9 +34,6 @@ RUN pip install -U pip
 
 #FROM base AS test
 
-# Install python dependencies
-COPY requirements.txt /code/
-COPY requirements-dev.txt /code/
 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements-dev.txt
