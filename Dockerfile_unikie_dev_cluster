@@ -6,6 +6,7 @@ ENV APP_NAME kaavapino
 
 
 RUN mkdir /code
+RUN chown root:root /code
 RUN mkdir /entrypoint
 WORKDIR /code
 
