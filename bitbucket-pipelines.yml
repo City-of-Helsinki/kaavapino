@@ -12,3 +12,30 @@ pipelines:
           - pip
         script: # Modify the commands below to build your repository.
           - pip install -r requirements.txt
+  branches:
+    master:
+      - step:
+          name: Build docker image
+          caches:
+            - docker
+          script:
+          - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
+          - docker build -t kleklekle/spia:kaavapino-api-$BITBUCKET_BUILD_NUMBER-$BITBUCKET_COMMIT .
+          - docker push kleklekle/spia:kaavapino-api-$BITBUCKET_BUILD_NUMBER-$BITBUCKET_COMMIT
+          services:
+          - docker
+      - step:
+          name: Deploy
+          caches:
+            - docker
+          deployment: production
+          script:
+            - sed -i 's|${CICD_EXECUTION_SEQUENCE}|'$BITBUCKET_BUILD_NUMBER'|g' deploy/rancher/deployment.yaml
+            - sed -i 's|${CICD_GIT_COMMIT}|'$BITBUCKET_COMMIT'|g' deploy/rancher/deployment.yaml
+            - pipe: atlassian/kubectl-run:3.1.2
+              variables:
+                KUBE_CONFIG: $KUBE_CONFIG
+                KUBECTL_COMMAND: 'apply'
+                RESOURCE_PATH: 'deploy/rancher/deployment.yaml'
+                KUBECTL_ARGS:
+                  - '--namespace=p-c94d9-pipeline'
