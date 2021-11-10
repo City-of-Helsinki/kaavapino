@@ -185,9 +185,17 @@ spec:
     spec:
       imagePullSecrets:
       - name: dockerhub-kaavapino
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: media-data
       containers:
       - name: api
         image: kleklekle/spia:kaavapino-api-${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
+        volumeMounts:
+        - mountPath: "/code/media"
+          name: media
+          readOnly: true
         env:
           - name: DATABASE_URL
             valueFrom:
