@@ -15,4 +15,4 @@ python ./manage.py migrate --noinput
 gzip --keep --best --force --recursive $STATIC_ROOT
 
 echo "Starting uwsgi..."
-exec uwsgi --ini /$APP_NAME/deploy/uwsgi.ini --wsgi-file deploy/wsgi.py --check-static $STATIC_ROOT
+exec uwsgi --ini /$APP_NAME/deploy/uwsgi.ini --wsgi-file deploy/wsgi.py
