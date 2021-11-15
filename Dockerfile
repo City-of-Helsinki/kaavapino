@@ -14,7 +14,7 @@ RUN mkdir /entrypoint
 WORKDIR /$APP_NAME
 
 RUN mkdir -p /srv/static /srv/media
-RUN chgrp 0 /srv/static /srv/media
+RUN chgrp 0 /srv/static /srv/media && chmod g+w /srv/static /srv/media
 
 # Install the appropriate Ubuntu packages
 RUN apt-get update && apt-get install -y \
