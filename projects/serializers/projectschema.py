@@ -95,10 +95,16 @@ class ConditionSerializer(serializers.Serializer):
 
 
 class AutofillRuleSerializer(serializers.Serializer):
-    condition = ConditionSerializer()
+    condition = serializers.SerializerMethodField()
+    conditions = serializers.ListField(child=ConditionSerializer())
     then_branch = serializers.CharField()
     else_branch = serializers.CharField()
     variables = serializers.ListField(child=serializers.CharField())
+
+    # TODO remove once frontend fully supports multiple conditions
+    def get_condition(self, autofill_rule):
+        if len(autofill_rule.get("conditions")) == 1:
+            return autofill_rule.get("conditions")[0]
 
 
 class SimpleAttributeSerializer(serializers.Serializer):

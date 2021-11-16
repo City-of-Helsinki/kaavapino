@@ -567,7 +567,11 @@ class AttributeImporter:
                 new_branches = [
                     {
                         "variables": variables,
-                        "condition": parse_condition(condition_or),
+                        "conditions": [
+                            parse_condition(condition_and)
+                            for condition_and
+                            in re.split(r"\sand+\s", condition_or)
+                        ],
                         "then_branch": then,
                         "else_branch": None
                     }
