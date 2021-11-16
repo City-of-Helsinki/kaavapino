@@ -9,11 +9,11 @@ done
 echo "Database found!"
 
 # Create cache table
-python /code/manage.py createcachetable
+python manage.py createcachetable
 
 # Apply database migrations
 echo "Applying database migrations"
-python /code/manage.py migrate --noinput
+python manage.py migrate --noinput
 
 set -e
 # Start server
