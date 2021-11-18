@@ -1,6 +1,7 @@
 import datetime
 import io
 from html import escape
+import logging
 
 from django.conf import settings
 from django.http import HttpResponse
@@ -17,6 +18,7 @@ from projects.helpers import (
 )
 from projects.models import ProjectDocumentDownloadLog
 
+log = logging.getLogger(__name__)
 
 IMAGE_WIDTH = Mm(136)
 
@@ -121,7 +123,8 @@ def render_template(project, document_template, preview):
                     if item_attr.value_type != Attribute.TYPE_FIELDSET:
                         fieldset_object[f"{k}__raw"] = raw_value
 
-                result.append(fieldset_object)
+                if fieldset_object:
+                    result.append(fieldset_object)
 
             return (result, value)
         elif attribute.multiple_choice and not ignore_multiple_choice:
