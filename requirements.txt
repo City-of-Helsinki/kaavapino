@@ -60,7 +60,7 @@ pytz==2020.1              # via django, workalendar
 raven==6.10.0
 requests==2.24.0          # via django-allauth, django-helusers, pyjwkest, requests-oauthlib, social-auth-core
 requests-oauthlib==1.3.0  # via django-allauth, social-auth-core
-rsa==4.6                  # via python-jose
+rsa==4.7                  # via python-jose
 sgp4==2.13                # via skyfield
 six==1.15.0               # via blessed, cryptography, django-extended-choices, docxtpl, ecdsa, pyjwkest, python-dateutil, python-jose, social-auth-app-django, social-auth-core
 skyfield==1.30            # via workalendar
