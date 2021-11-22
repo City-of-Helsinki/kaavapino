@@ -35,7 +35,7 @@ et-xmlfile==1.0.1         # via openpyxl
 future==0.18.2            # via pyjwkest
 idna==2.9                 # via requests
 jdcal==1.4.1              # via openpyxl
-jinja2==2.11.2            # via docxtpl
+jinja2==2.11.3            # via docxtpl
 jplephem==2.15            # via skyfield
 lunardate==0.2.0          # via workalendar
 lxml==4.5.1               # via docxtpl, python-docx
