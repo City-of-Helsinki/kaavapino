@@ -4,7 +4,9 @@ from rest_framework_extensions.routers import ExtendedSimpleRouter
 from projects.views import (
     ProjectViewSet,
     ProjectPhaseViewSet,
+    AttributeViewSet,
     ProjectTypeSchemaViewSet,
+    ProjectCardSchemaViewSet,
     ProjectTypeViewSet,
     ProjectSubtypeViewSet,
     FieldCommentViewSet,
@@ -37,6 +39,8 @@ router.register(r"projecttypes", ProjectTypeViewSet)
 router.register(r"projectsubtypes", ProjectSubtypeViewSet)
 router.register(r"phases", ProjectPhaseViewSet)
 router.register(r"schemas", ProjectTypeSchemaViewSet)
+router.register(r"attributes", AttributeViewSet)
+router.register(r"cardschema", ProjectCardSchemaViewSet)
 router.register(r"reports", ReportViewSet)
 router.register(r"projects/(?P<project_pk>[^/.]+)/documents", DocumentViewSet)
 router.register(r"deadlines", DeadlineSchemaViewSet)

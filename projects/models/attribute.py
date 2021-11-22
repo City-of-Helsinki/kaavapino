@@ -13,6 +13,8 @@ from django.utils.translation import ugettext_lazy as _
 
 from users.models import User, PRIVILEGE_LEVELS
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
+from projects.helpers import get_ad_user
+from users.serializers import PersonnelSerializer
 
 
 class AttributeQuerySet(models.QuerySet):
@@ -45,6 +47,7 @@ class AttributeQuerySet(models.QuerySet):
                 Attribute.TYPE_CHOICE,
             ]
         )
+
 
 class DataRetentionPlan(models.Model):
     """Defines a data retention plan for an attribute"""
@@ -110,6 +113,7 @@ class Attribute(models.Model):
     TYPE_BOOLEAN = "boolean"
     TYPE_DATE = "date"
     TYPE_USER = "user"
+    TYPE_PERSONNEL = "personnel"
     TYPE_GEOMETRY = "geometry"
     TYPE_IMAGE = "image"
     TYPE_FILE = "file"
@@ -129,6 +133,7 @@ class Attribute(models.Model):
         (TYPE_BOOLEAN, _("boolean")),
         (TYPE_DATE, _("date")),
         (TYPE_USER, _("user")),
+        (TYPE_PERSONNEL, _("personnel")),
         (TYPE_GEOMETRY, _("geometry")),
         (TYPE_IMAGE, _("image")),
         (TYPE_FILE, _("file")),
@@ -140,6 +145,7 @@ class Attribute(models.Model):
     DISPLAY_CHECKBOX = "checkbox"
     DISPLAY_READONLY = "readonly"
     DISPLAY_READONLY_CHECKBOX = "readonly_checkbox"
+    DISPLAY_SIMPLE_INTEGER = "simple_integer"
 
     DISPLAY_CHOICES = (
         (None, _("default")),
@@ -147,6 +153,35 @@ class Attribute(models.Model):
         (DISPLAY_CHECKBOX, _("checkbox")),
         (DISPLAY_READONLY, _("read only")),
         (DISPLAY_READONLY_CHECKBOX, _("read only checkbox")),
+        (DISPLAY_SIMPLE_INTEGER, _("integer without thousand separator")),
+    )
+
+    SOURCE_PARENT_FIELDSET = "fieldset"
+    SOURCE_FACTA = "/facta/v1/kiinteisto/<pk>/all"
+    SOURCE_GEOSERVER = "/geoserver/v1/kiinteisto/<pk>/all"
+
+    SOURCE_CHOICES = (
+        (SOURCE_PARENT_FIELDSET, _("Same as parent fieldset")),
+        (SOURCE_FACTA, _("FACTA")),
+        (SOURCE_GEOSERVER, _("Geoserver")),
+    )
+
+    AD_DATA_KEY_ID = "id"
+    AD_DATA_KEY_NAME = "name"
+    AD_DATA_KEY_PHONE = "phone"
+    AD_DATA_KEY_EMAIL = "email"
+    AD_DATA_KEY_TITLE = "title"
+    AD_DATA_KEY_OFFICE = "office"
+    AD_DATA_KEY_COMPANY = "company"
+
+    AD_DATA_KEY_CHOICES = (
+        (AD_DATA_KEY_ID, "id"),
+        (AD_DATA_KEY_NAME, "name"),
+        (AD_DATA_KEY_PHONE, "phone"),
+        (AD_DATA_KEY_EMAIL, "email"),
+        (AD_DATA_KEY_TITLE, "title"),
+        (AD_DATA_KEY_OFFICE, "office"),
+        (AD_DATA_KEY_COMPANY, "company"),
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
@@ -285,6 +320,47 @@ class Attribute(models.Model):
     # attributes which are linked to static Project fields
     static_property = models.CharField(max_length=255, blank=True, null=True)
 
+    # attributes whose data is fetched from an external source
+    data_source = models.CharField(
+        max_length=255,
+        verbose_name=_("external data source"),
+        choices=SOURCE_CHOICES,
+        null=True,
+        blank=True,
+    )
+    data_source_key = models.CharField(
+        verbose_name=_("field key for external data source"),
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    key_attribute = models.ForeignKey(
+        "Attribute",
+        verbose_name=_("key attribute for fetching external data"),
+        related_name="key_for_attributes",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
+    key_attribute_path = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+    )
+    ad_key_attribute = models.ForeignKey(
+        "Attribute",
+        verbose_name=_("key attribute for fetching AD user data"),
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+    )
+    ad_data_key = models.CharField(
+        verbose_name=_("AD user data key"),
+        max_length=7,
+        choices=AD_DATA_KEY_CHOICES,
+        null=True,
+        blank=True,
+    )
     objects = AttributeQuerySet.as_manager()
 
 
@@ -348,6 +424,10 @@ class Attribute(models.Model):
             )
 
     def serialize_value(self, value):
+        if self.value_type != Attribute.TYPE_FIELDSET \
+            and (self.data_source or self.ad_data_key):
+            return None
+
         if self.value_type == Attribute.TYPE_CHOICE:
             value_choices = self.value_choices.all()
         else:
@@ -373,6 +453,7 @@ class Attribute(models.Model):
             Attribute.TYPE_LONG_STRING,
             Attribute.TYPE_LINK,
             Attribute.TYPE_CHOICE,
+            Attribute.TYPE_PERSONNEL,
         ):
             if self.multiple_choice and value is not None:
                 return [
@@ -398,7 +479,13 @@ class Attribute(models.Model):
             else:
                 return bool(value) if value is not None else None
         elif self.value_type == Attribute.TYPE_DATE:
-            return value
+            if isinstance(value, str):
+                return value
+            return (
+                datetime.datetime.strftime(
+                    value, DATE_SERIALIZATION_FORMAT
+                ) if value else None
+            )
         elif self.value_type == Attribute.TYPE_USER:
             # allow saving non-existing users using their names (str) at least for now.
             # actual users are saved using their ids (int).
@@ -432,7 +519,10 @@ class Attribute(models.Model):
             if self.multiple_choice and value is not None:
                 return [v for v in value_choices.filter(identifier__in=value)]
             else:
-                return value_choices.get(identifier=value)
+                try:
+                    return value_choices.get(identifier=value)
+                except AttributeValueChoice.DoesNotExist:
+                    return None
         elif self.value_type in (
             Attribute.TYPE_INTEGER,
             Attribute.TYPE_DECIMAL,
@@ -441,6 +531,7 @@ class Attribute(models.Model):
             Attribute.TYPE_BOOLEAN,
             Attribute.TYPE_LINK,
             Attribute.TYPE_CHOICE,
+            Attribute.TYPE_PERSONNEL,
         ):
             return value
         elif self.value_type in (
@@ -450,12 +541,15 @@ class Attribute(models.Model):
             return value
         elif self.value_type == Attribute.TYPE_DATE:
             return (
-                datetime.datetime.strptime(value, DATE_SERIALIZATION_FORMAT)
-                if value
-                else None
+                datetime.datetime.strptime(
+                    value, DATE_SERIALIZATION_FORMAT
+                ).date() if value else None
             )
         elif self.value_type == Attribute.TYPE_USER:
-            return get_user_model().objects.get(uuid=value)
+            try:
+                return get_user_model().objects.get(uuid=value)
+            except get_user_model().DoesNotExist:
+                return None
         elif self.value_type == Attribute.TYPE_FIELDSET:
             return self._get_fieldset_serialization(value, deserialize=True)
         else:
@@ -491,7 +585,7 @@ class Attribute(models.Model):
                     elif attr.identifier == key:
                         if deserialize:
                             processed_value = attr.deserialize_value(
-                                key
+                                val
                             )
                         else:
                             processed_value = attr.serialize_value(val)
@@ -507,12 +601,51 @@ class Attribute(models.Model):
     def _get_single_display_value(self, value):
         if value is None or self.value_type == Attribute.TYPE_GEOMETRY:
             return None
-        if isinstance(self.value_type, bool):
+
+        if self.value_type in (
+            Attribute.TYPE_RICH_TEXT_SHORT,
+            Attribute.TYPE_RICH_TEXT,
+        ) and value:
+            try:
+                return ("".join(
+                    [item["insert"] for item in value["ops"]]
+                ).strip())
+            except TypeError:
+                return None
+        # remove checking type should pinonumero attribute (and possible others) be
+        # fixed in the attribute excel
+        elif self.value_type == Attribute.TYPE_INTEGER and isinstance(value, int):
+            if self.display == Attribute.DISPLAY_SIMPLE_INTEGER:
+                return str(value)
+            else:
+                return '{:,}'.format(value).replace(',', ' ')
+        elif self.value_type == Attribute.TYPE_DECIMAL and self.unit in ["ha", "k-m2"]:
+            return '{:,}'.format(int(float(value))).replace(',', ' ')
+        elif self.value_type == Attribute.TYPE_DATE:
+            date_value = datetime.datetime.strptime(value, "%Y-%m-%d")
+            return '{d.day}.{d.month}.{d.year}'.format(d=date_value)
+        elif self.value_type == Attribute.TYPE_CHOICE:
+            try:
+                return self.value_choices.get(identifier=value).value
+            except AttributeValueChoice.DoesNotExist:
+                return value
+        elif isinstance(value, bool):
             return "Kyllä" if value else "Ei"
-        elif isinstance(self.value_type, datetime.date):
-            return datetime.datetime.strftime(value, "%d.%m.%Y")
-        elif isinstance(value, User):
-            return value.get_full_name()
+        elif self.value_type == Attribute.TYPE_PERSONNEL:
+            try:
+                return PersonnelSerializer(get_ad_user(value)).data.get("name")
+            except AttributeError:
+                return value
+        elif self.value_type == Attribute.TYPE_USER:
+            if not isinstance(value, User):
+                try:
+                    user = User.objects.get(uuid=value)
+                except ValidationError:
+                    return value
+            else:
+                user = value
+
+            return user.get_full_name()
         else:
             return escape(str(value))
 
@@ -568,6 +701,64 @@ class AttributeValueChoice(models.Model):
         return self.value
 
 
+class AttributeAutoValue(models.Model):
+    """
+    Automatic, dynamic value that gets injected into attribute data based on another
+    attribute value
+
+    Differs from autofill rules in that these are not calculated in frontend,
+    will update the contents of all projects' fields if database changes are made,
+    and will not generate log entries whereas autofill rule based field contents only
+    change when frontend sends updated values, and they do generate log entries.
+    """
+
+    value_attribute = models.OneToOneField(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="automatic_value",
+        verbose_name=_("automatic attribute"),
+    )
+    key_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="automatically_sets",
+        verbose_name=_("key attribute"),
+    )
+
+    def get_value(self, key):
+        key = str(key)
+        try:
+            return self.value_map.get(key_str=key).value
+        except AttributeAutoValueMapping.DoesNotExist:
+            return None
+
+    def __str__(self):
+        return f"{self.key_attribute.name} -> {self.value_attribute.name}"
+
+
+class AttributeAutoValueMapping(models.Model):
+    """A single key-value pair related to an auto value attribute pair"""
+    auto_attr = models.ForeignKey(
+        AttributeAutoValue,
+        on_delete=models.CASCADE,
+        related_name="value_map",
+        verbose_name=_("attribute link"),
+    )
+    key_str = models.TextField(verbose_name=_("key"))
+    value_str = models.TextField(verbose_name=_("value"))
+
+    @property
+    def key(self):
+        return self.auto_attr.key_attribute.deserialize_value(self.key_str)
+
+    @property
+    def value(self):
+        return self.auto_attr.value_attribute.deserialize_value(self.value_str)
+
+    class Meta:
+        unique_together = ('auto_attr', 'key_str')
+
+
 class FieldSetAttribute(models.Model):
 
     attribute_source = models.ForeignKey(
@@ -589,3 +780,122 @@ class FieldSetAttribute(models.Model):
 
     def __str__(self):
         return f"{self.attribute_source} -> {self.attribute_target}"
+
+
+class DocumentLinkSection(models.Model):
+    """Defines a project card document link subsection"""
+    name = models.CharField(
+        max_length=255,
+        verbose_name=_("name"),
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
+
+    class Meta:
+        verbose_name = _("document link section")
+        verbose_name_plural = _("document link sections")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.name}"
+
+
+class DocumentLinkFieldSet(models.Model):
+    """Connects external document link and name within a fieldset"""
+    section = models.ForeignKey(
+        DocumentLinkSection,
+        on_delete=models.CASCADE,
+    )
+    fieldset_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="document_fieldsets",
+        verbose_name=_("fieldset attribute"),
+    )
+    document_name_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="name_in_document_fieldsets",
+        verbose_name=_("document name attribute"),
+        null=True,
+        blank=True,
+    )
+    document_custom_name_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="custom_name_in_document_fieldsets",
+        verbose_name=_("document custom name attribute"),
+        null=True,
+        blank=True,
+    )
+    document_link_attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="link_in_document_fieldsets",
+        verbose_name=_("document link attribute"),
+    )
+
+    class Meta:
+        verbose_name = _("document link fieldset")
+        verbose_name_plural = _("document link fieldsets")
+
+    def __str__(self):
+        return f"{self.fieldset_attribute.name}"
+
+
+class OverviewFilter(models.Model):
+    """Defines a filter on project overview views"""
+    name = models.CharField(
+        max_length=255,
+        verbose_name=_("name"),
+    )
+    identifier = models.CharField(
+        max_length=20,
+        verbose_name=_("identifier"),
+        db_index=True,
+        unique=True,
+        validators=[validate_identifier],
+    )
+
+    class Meta:
+        verbose_name = _("overview filter")
+        verbose_name_plural = _("overview filters")
+
+    def __str__(self):
+        return f"{self.name}"
+
+
+class OverviewFilterAttribute(models.Model):
+    """Defines an attribute in a filter"""
+    attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        verbose_name=_("attribute"),
+    )
+    overview_filter = models.ForeignKey(
+        OverviewFilter,
+        on_delete=models.CASCADE,
+        verbose_name=_("overview filter"),
+        related_name="attributes",
+    )
+    filters_by_subtype = models.BooleanField(
+        verbose_name=_("filters project subtype overview"),
+        default=False,
+    )
+    filters_floor_area = models.BooleanField(
+        verbose_name=_("filters project floor area overview"),
+        default=False,
+    )
+    filters_on_map = models.BooleanField(
+        verbose_name=_("filters project map overview"),
+        default=False,
+    )
+
+    class Meta:
+        verbose_name = _("overview filter attribute")
+        verbose_name_plural = _("overview filter attributes")
+
+    def __str__(self):
+        return f"{self.overview_filter.name}/{self.attribute.name}"

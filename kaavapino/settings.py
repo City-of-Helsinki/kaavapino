@@ -26,6 +26,7 @@ env = environ.Env(
     STATIC_ROOT=(environ.Path, project_root("static")),
     MEDIA_URL=(str, "/media/"),
     STATIC_URL=(str, "/static/"),
+    DOCUMENT_EDIT_URL_FORMAT=(str, ""),
     TOKEN_AUTH_ACCEPTED_AUDIENCE=(str, "AUDIENCE_UNSET"),
     TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX=(str, "SCOPE_PREFIX_UNSET"),
     TOKEN_AUTH_AUTHSERVER_URL=(str, "ISSUER_UNSET"),
@@ -38,11 +39,27 @@ env = environ.Env(
     SOCIAL_AUTH_TUNNISTAMO_SECRET=(str, "SECRET_UNSET"),
     SOCIAL_AUTH_TUNNISTAMO_KEY=(str, "KEY_UNSET"),
     SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT=(str, "OIDC_ENDPOINT_UNSET"),
+    KAAVOITUS_API_BASE_URL=(str, ""),
+    KAAVOITUS_API_AUTH_TOKEN=(str, ""),
+    GRAPH_API_LOGIN_BASE_URL=(str, ""),
+    GRAPH_API_BASE_URL=(str, ""),
+    GRAPH_API_APPLICATION_ID=(str, ""),
+    GRAPH_API_TENANT_ID=(str, ""),
+    GRAPH_API_CLIENT_SECRET=(str, ""),
 )
 
 SOCIAL_AUTH_TUNNISTAMO_SECRET = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_SECRET")
 SOCIAL_AUTH_TUNNISTAMO_KEY = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_KEY")
 SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT")
+
+KAAVOITUS_API_BASE_URL = os.environ.get("KAAVOITUS_API_BASE_URL")
+KAAVOITUS_API_AUTH_TOKEN = os.environ.get("KAAVOITUS_API_AUTH_TOKEN")
+
+GRAPH_API_LOGIN_BASE_URL = os.environ.get("GRAPH_API_LOGIN_BASE_URL")
+GRAPH_API_BASE_URL = os.environ.get("GRAPH_API_BASE_URL")
+GRAPH_API_APPLICATION_ID = os.environ.get("GRAPH_API_APPLICATION_ID")
+GRAPH_API_TENANT_ID = os.environ.get("GRAPH_API_TENANT_ID")
+GRAPH_API_CLIENT_SECRET = os.environ.get("GRAPH_API_CLIENT_SECRET")
 
 SOCIAL_AUTH_TUNNISTAMO_AUTH_EXTRA_ARGUMENTS = {'ui_locales': 'fi'}
 
@@ -63,12 +80,16 @@ JWT_AUTH = {
     'JWT_AUDIENCE': os.environ.get('JWT_AUDIENCE'),
     'JWT_SECRET_KEY': os.environ.get('JWT_SECRET_KEY'),
 }
+DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
 DATABASES = {"default": env.db()}
 
 CACHES = {"default": {
     "BACKEND": "django.core.cache.backends.db.DatabaseCache",
     "LOCATION": "kaavapino_api_cache_table",
+    "OPTIONS": {
+        "MAX_ENTRIES": 1500,
+    }
 }}
 
 vars().update(env.email_url())  # EMAIL_BACKEND etc.
@@ -125,6 +146,7 @@ INSTALLED_APPS = [
     "django_filters",
     "rest_framework_gis",
     "users",
+    "django_q",
 ]
 
 if RAVEN_CONFIG["dsn"]:
@@ -235,3 +257,11 @@ ACTSTREAM_SETTINGS = {"USE_JSONFIELD": True}
 USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST")
 CSRF_COOKIE_DOMAIN = env.str("CSRF_COOKIE_DOMAIN")
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
+
+Q_CLUSTER = {
+    "name": "projects",
+    "orm": "default",
+    "retry": 3600,
+    "timeout": 1800,
+    "max_attempts": 1,
+}

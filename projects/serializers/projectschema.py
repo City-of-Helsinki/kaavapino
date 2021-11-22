@@ -12,6 +12,7 @@ from projects.models import (
     FieldSetAttribute,
     Project,
     ProjectSubtype,
+    ProjectCardSectionAttribute,
 )
 from projects.models.project import (
     PhaseAttributeMatrixCell,
@@ -57,7 +58,8 @@ class ConditionSerializer(serializers.Serializer):
         if value_type[0:4] == "list":
             return_list = re.split(',\s+', value[1:-1])
 
-            if attribute and attribute.value_type == "choice":
+            if attribute and attribute.value_type == "choice" \
+                and attribute.identifier != "kaavaprosessin_kokoluokka":
                 for index, choice in enumerate(return_list):
                     choice = choice.strip("\"")
                     try:
@@ -93,10 +95,21 @@ class ConditionSerializer(serializers.Serializer):
 
 
 class AutofillRuleSerializer(serializers.Serializer):
-    condition = ConditionSerializer()
+    condition = serializers.SerializerMethodField()
+    conditions = serializers.ListField(child=ConditionSerializer())
     then_branch = serializers.CharField()
     else_branch = serializers.CharField()
     variables = serializers.ListField(child=serializers.CharField())
+
+    # TODO remove once frontend fully supports multiple conditions
+    def get_condition(self, autofill_rule):
+        if len(autofill_rule.get("conditions")) == 1:
+            return autofill_rule.get("conditions")[0]
+
+
+class SimpleAttributeSerializer(serializers.Serializer):
+    label = serializers.CharField(source="name")
+    name = serializers.CharField(source="identifier")
 
 
 class AttributeSchemaSerializer(serializers.Serializer):
@@ -125,6 +138,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     highlight_group = serializers.CharField()
     display = serializers.CharField()
     editable = serializers.SerializerMethodField("get_editable")
+    disable_fieldset_delete_add = serializers.SerializerMethodField()
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
@@ -139,6 +153,15 @@ class AttributeSchemaSerializer(serializers.Serializer):
             return True
         else:
             return False
+
+    def get_disable_fieldset_delete_add(self, attribute):
+        if attribute.value_type != Attribute.TYPE_FIELDSET:
+            return None
+
+        if attribute.data_source and not attribute.key_attribute:
+            return True
+
+        return False
 
     def get_fieldset_attributes(self, attribute):
         try:
@@ -412,7 +435,11 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
         except AttributeError:
             context = {}
 
-        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            query_params = getattr(self.context["request"], "GET", {})
+        except KeyError:
+            query_params = {}
+
         try:
             project = Project.objects.get(pk=int(query_params.get("project")))
         except (ValueError, TypeError, Project.DoesNotExist):
@@ -646,3 +673,38 @@ class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
             context=context,
         )
         return serializer.data
+
+
+class ProjectCardSchemaSerializer(serializers.ModelSerializer):
+    choices = serializers.SerializerMethodField()
+    label = serializers.CharField(source="attribute.name")
+    name = serializers.CharField(source="attribute.identifier")
+    section_name = serializers.CharField(source="section.name")
+
+    class Meta:
+        model = ProjectCardSectionAttribute
+        fields = [
+            "label",
+            "name",
+            "section_name",
+            "choices",
+            "date_format",
+            "show_on_mobile",
+        ]
+
+    @staticmethod
+    def get_choices(sect_attr):
+        attribute = sect_attr.attribute
+        foreign_key_choice = FOREIGN_KEY_TYPE_MODELS.get(attribute.value_type, None)
+
+        if foreign_key_choice:
+            choices = AttributeSchemaSerializer._get_foreign_key_choices(
+                foreign_key_choice
+            )
+        else:
+            choices = AttributeSchemaSerializer._get_attribute_choices(attribute)
+
+        if not choices:
+            return None
+
+        return AttributeChoiceSchemaSerializer(choices, many=True).data

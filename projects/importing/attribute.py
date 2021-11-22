@@ -15,10 +15,18 @@ from openpyxl import load_workbook
 
 from ..models import (
     Attribute,
+    AttributeAutoValue,
+    AttributeAutoValueMapping,
     AttributeValueChoice,
     DataRetentionPlan,
     Deadline,
+    DocumentLinkFieldSet,
+    DocumentLinkSection,
     FieldSetAttribute,
+    OverviewFilter,
+    OverviewFilterAttribute,
+    ProjectCardSection,
+    ProjectCardSectionAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
     ProjectFloorAreaSectionAttributeMatrixCell,
@@ -26,6 +34,7 @@ from ..models import (
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
     ProjectPhase,
+    CommonProjectPhase,
     ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
@@ -69,10 +78,12 @@ ATTRIBUTE_ERROR_UNIQUE = [
     "Virhe. Nimi on jo käytössä",
     "Virhe. Diaarinumero on jo toisen projektin käytössä. Samalle diaarínumerolle ei voi luoda uutta projektia.",
 ]
+ATTRIBUTE_AUTO_VALUE_KEY_FIELD = "yhteystietojen automaattisen täytön lähdekenttä"
+ATTRIBUTE_AUTO_VALUE_MAPPING = "yhteystietojen automaattisen täytön avain-arvoparit"
 
 # Attribute object mappings for static Project fields
 STATIC_ATTRIBUTES_MAPPING = {
-     "vastuuhenkilö": "user",
+     "vastuuhenkilo_nimi": "user",
      "luodaanko_nakyvaksi": "public",
      "pinonumero": "pino_number",
      "projektin_nimi": "name",
@@ -84,6 +95,33 @@ PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
 HELP_TEXT = "ohje tiedon syöttäjälle"
 HELP_LINK = "ohjeeseen liittyvä linkki"
+
+# Project card related columns
+CARD_SECTION_NAME = "tieto näkyy projektikortissa; projektikortin osio"
+CARD_SECTION_LOCATION = "tieto näkyy projektikortissa; kenttien järjestys"
+CARD_SECTION_DATE_FORMAT = "tieto näkyy projektikortissa; päivämäärän yhteydessä näkyvä teksti "
+CARD_EXTERNAL_DOCUMENT_FIELDS = "tieto näkyy projektikortissa; valmiit dokumentit nimi ja linkki"
+CARD_EXTERNAL_DOCUMENT_SECTION = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien otsikot"
+CARD_EXTERNAL_DOCUMENT_SECTION_INDEX = "tieto näkyy projektikortissa; valmiit dokumentit ryhmien järjestys"
+CARD_SHOW_ON_MOBILE = "tieto näkyy näkymässä, joka on sovitettu mobiiliversioon"
+
+# Overview-related columns
+OVERVIEW_FILTER_NAME = "yleisnäkymä;\nsuodattimen nimi"
+OVERVIEW_FILTERS = "yleisnäkymä;\nnäkymät joissa suodatinta käytetään"
+
+# External API integration
+EXT_DATA_SOURCE = "tiedon sijainti kaavoitus-api:ssa"
+EXT_DATA_SOURCE_KEY = "tiedon polku kaavoitus-api:n paluudatassa"
+EXT_DATA_KEY_ATTRIBUTE = "tiedon hakuavainkenttä kaavapinossa"
+EXT_DATA_PARENT_KEY_ATTRIBUTE = "vanhemmalta peritty tiedon hakuavainkenttä kaavapinossa"
+EXT_DATA_AD_SOURCE = "automaattisen yhteystiedon lähdekenttä"
+EXT_DATA_AD_KEY = "automaattisen yhteystiedon hakuavain"
+
+class OverviewViews(Enum):
+    BY_SUBTYPE = "Kaavaprojektien jakauma"
+    ON_MAP = "Kaavaprojektit kartalla"
+    FLOOR_AREA = "Kaavoitettu kerrosala"
+
 
 CALCULATIONS_COLUMN = "laskelmat"
 
@@ -156,49 +194,49 @@ DEFAULT_DATA_RETENTION_PLAN = DATA_RETENTION_PLANS["tieto tallennetaan pysyväst
 PROJECT_PHASES = {
     Phases.START.value: {
         "name": Phases.START.value,
-        "color": "#02d7a7",
+        "color": "color-tram",
         "color_code": "#02d7a7",
         "list_prefix": "1",
     },  # None
     Phases.PRINCIPLES.value: {
         "name": Phases.PRINCIPLES.value,
-        "color": '#009142',
-        "color_code": '#009142',
+        "color": 'color-silver',
+        "color_code": '#dedfe1',
         "list_prefix": "XL",
     },
     Phases.OAS.value: {
         "name": Phases.OAS.value,
-        "color": "#ffc61e",
+        "color": "color-summer",
         "color_code": "#ffc61e",
         "list_prefix": "2",
     },  # 01, 03
     Phases.DRAFT.value: {
         "name": Phases.DRAFT.value,
-        "color": '#ffd600',
-        "color_code": '#ffd600',
+        "color": 'color-suomenlinna',
+        "color_code": '#f5a3c7',
         "list_prefix": "XL",
     },
     Phases.PROPOSAL.value: {
         "name": Phases.PROPOSAL.value,
-        "color": "#fd4f00",
+        "color": "color-metro",
         "color_code": "#fd4f00",
         "list_prefix": "3",
     },  # 02, 04
     Phases.REVISED_PROPOSAL.value: {
         "name": Phases.REVISED_PROPOSAL.value,
-        "color": "#0000bf",
+        "color": "color-bus",
         "color_code": "#0000bf",
         "list_prefix": "4",
     },  # 05, 07
     Phases.APPROVAL.value: {
         "name": Phases.APPROVAL.value,
-        "color": "#bd9650",
+        "color": "color-gold",
         "color_code": "#bd9650",
         "list_prefix": "5",
     },  # 06, 07 <- Kvsto
     Phases.GOING_INTO_EFFECT.value: {
         "name": Phases.GOING_INTO_EFFECT.value,
-        "color": "#9ec8eb",
+        "color": "color-fog",
         "color_code": "#9ec8eb",
         "list_prefix": "6",
     },
@@ -296,6 +334,7 @@ SUBTYPE_PHASE_METADATA = {
 
 VALUE_TYPES = {
     "AD-tunnukset": Attribute.TYPE_USER,
+    "AD-tunnukset, koko organisaatio": Attribute.TYPE_PERSONNEL,
     "automaatinen (teksti), kun valitaan henkilö": Attribute.TYPE_SHORT_STRING,
     "automaattinen (desimaaliluku), tieto tulee kaavan tietomallista": Attribute.TYPE_DECIMAL,
     "automaattinen (kokonaisluku), jonka Kaavapino laskee": Attribute.TYPE_INTEGER,
@@ -336,6 +375,9 @@ VALUE_TYPES = {
     "Kyllä/Ei (readonly)": Attribute.TYPE_BOOLEAN,
     "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.TYPE_BOOLEAN,
     "Kokonaisluku (readonly)": Attribute.TYPE_INTEGER,
+    "Vuosiluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
+    "Kokonaisluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
+    "muotoilematon tekstikenttä": Attribute.TYPE_SHORT_STRING,
 }
 
 DISPLAY_TYPES = {
@@ -347,9 +389,26 @@ DISPLAY_TYPES = {
     "Valintaruutu. (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
     "Päivämäärä (readonly)": Attribute.DISPLAY_READONLY,
     "Lyhyt teksti (readonly)": Attribute.DISPLAY_READONLY,
-    "Kyllä/Ei (readonly)": Attribute.DISPLAY_READONLY,
-    "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.DISPLAY_READONLY,
+    "Kyllä/Ei (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
+    "Kyllä/Ei/Tieto puuttuu (readonly)": Attribute.DISPLAY_READONLY_CHECKBOX,
     "Kokonaisluku (readonly)": Attribute.DISPLAY_READONLY,
+    "automaatinen (teksti), kun valitaan henkilö": Attribute.DISPLAY_READONLY,
+    "automaattinen (desimaaliluku), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), jonka Kaavapino laskee": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), kun projekti luodaan": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), kun projekti luodaan, kokonaisluku": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), tieto tulee Factasta": Attribute.DISPLAY_READONLY,
+    "automaattinen (kokonaisluku), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
+    "automaattinen (pvm)": Attribute.DISPLAY_READONLY,
+    "automaattinen (spatiaalinen), tieto tulee kaavan tietomallista": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), jonka Kaavapino muodostaa": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), kun projekti luodaan": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), kun valitaan vastuuyksikkö": Attribute.DISPLAY_READONLY,
+    "automaattinen (teksti), tieto tulee Factasta": Attribute.DISPLAY_READONLY,
+    "automaattinen (valinta)": Attribute.DISPLAY_READONLY_CHECKBOX,
+    "automaattinen (valinta), kun projekti luodaan": Attribute.DISPLAY_READONLY,
+    "Vuosiluku ilman tuhaterotinta": Attribute.DISPLAY_SIMPLE_INTEGER,
+    "Kokonaisluku ilman tuhaterotinta": Attribute.DISPLAY_SIMPLE_INTEGER,
 }
 
 
@@ -508,7 +567,11 @@ class AttributeImporter:
                 new_branches = [
                     {
                         "variables": variables,
-                        "condition": parse_condition(condition_or),
+                        "conditions": [
+                            parse_condition(condition_and)
+                            for condition_and
+                            in re.split(r"\sand+\s", condition_or)
+                        ],
                         "then_branch": then,
                         "else_branch": None
                     }
@@ -662,8 +725,6 @@ class AttributeImporter:
                 value_type = Attribute.TYPE_SHORT_STRING
 
             generated, calculations = self._get_generated_calculations(row)
-            if generated:
-                value_type = Attribute.TYPE_DECIMAL
 
             owner_editable = len(re.findall(
                 "Projektin vastuuhenkilö",
@@ -679,6 +740,11 @@ class AttributeImporter:
                     if match_text in privilege_list:
                         edit_privilege = privilege
                         break
+
+            data_source = row[self.column_index[EXT_DATA_SOURCE]]
+            data_source_key = row[self.column_index[EXT_DATA_SOURCE_KEY]]
+            key_attribute_path = row[self.column_index[EXT_DATA_PARENT_KEY_ATTRIBUTE]]
+            ad_data_key = row[self.column_index[EXT_DATA_AD_KEY]]
 
             attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
@@ -713,6 +779,10 @@ class AttributeImporter:
                     "edit_privilege": edit_privilege,
                     "owner_viewable": True,
                     "view_privilege": "browse",
+                    "data_source": data_source,
+                    "data_source_key": data_source_key,
+                    "key_attribute_path": key_attribute_path,
+                    "ad_data_key": ad_data_key,
                 },
             )
             if created:
@@ -754,6 +824,78 @@ class AttributeImporter:
             "deleted": len(old_attribute_ids),
             "choices": created_choices_count,
         }
+
+    def _create_attribute_key_relations(self, rows):
+        # remove all old relations
+        for attr in Attribute.objects.filter(key_attribute__isnull=False):
+            attr.key_attribute = None
+            attr.save()
+
+        for attr in Attribute.objects.filter(ad_key_attribute__isnull=False):
+            attr.ad_key_attribute = None
+            attr.save()
+
+        AttributeAutoValue.objects.all().delete()
+
+        for row in rows:
+            identifier = self._get_attribute_row_identifier(row)
+            key_identifier = row[self.column_index[EXT_DATA_KEY_ATTRIBUTE]]
+            ad_key_identifier = row[self.column_index[EXT_DATA_AD_SOURCE]]
+            auto_value_key_identifier = \
+                row[self.column_index[ATTRIBUTE_AUTO_VALUE_KEY_FIELD]]
+
+            auto_value_mapping = {}
+            if row[self.column_index[ATTRIBUTE_AUTO_VALUE_MAPPING]]:
+                for item in re.split(
+                    r',\s*',
+                    row[self.column_index[ATTRIBUTE_AUTO_VALUE_MAPPING]],
+                ):
+                    try:
+                        [key, value] = \
+                            [i.strip('"') for i in re.split(r':\s*', item)]
+                        auto_value_mapping[key] = value
+                    except ValueError:
+                        continue
+
+            attr = Attribute.objects.get(identifier=identifier)
+
+            try:
+                key_attr = Attribute.objects.get(identifier=key_identifier)
+                attr.key_attribute = key_attr
+            except Attribute.DoesNotExist:
+                pass
+
+            try:
+                ad_key_attr = Attribute.objects.get(identifier=ad_key_identifier)
+                attr.ad_key_attribute = ad_key_attr
+            except Attribute.DoesNotExist:
+                pass
+
+            try:
+                auto_value_key_attr = Attribute.objects.get(
+                    identifier=auto_value_key_identifier,
+                )
+                auto_attr = AttributeAutoValue.objects.create(
+                    value_attribute = attr,
+                    key_attribute = auto_value_key_attr,
+                )
+                for (key, value) in auto_value_mapping.items():
+                    if auto_attr.key_attribute.value_choices.count():
+                        try:
+                            key = auto_attr.key_attribute.value_choices \
+                                .get(value=key).identifier
+                        except AttributeValueChoice.DoesNotExist:
+                            pass
+
+                    AttributeAutoValueMapping.objects.create(
+                        auto_attr=auto_attr,
+                        key_str=key,
+                        value_str=value,
+                    )
+            except Attribute.DoesNotExist:
+                pass
+
+            attr.save()
 
     def _get_generated_calculations(self, row):
         calculations_string = row[self.column_index[CALCULATIONS_COLUMN]]
@@ -923,6 +1065,121 @@ class AttributeImporter:
                 }
 
         return None
+
+    def _create_document_link_sections(self, rows):
+        logger.info("\nReplacing external document link sections...")
+        DocumentLinkFieldSet.objects.all().delete()
+
+        for row in rows:
+            section_name = row[self.column_index[CARD_EXTERNAL_DOCUMENT_SECTION]]
+            section_index = row[self.column_index[CARD_EXTERNAL_DOCUMENT_SECTION_INDEX]]
+
+            if not (section_name and section_index):
+                continue
+
+            identifiers = row[self.column_index[CARD_EXTERNAL_DOCUMENT_FIELDS]].split(";")
+
+            if len(identifiers) != 3:
+                logger.warning(f"Invalid attribute identifier formatting {fieldset.identifier}, ignoring")
+                continue
+
+            section, __ = DocumentLinkSection.objects.update_or_create(
+                name=section_name,
+                defaults={
+                    "index": int(section_index),
+                },
+            )
+            fieldset = Attribute.objects.get(
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
+            try:
+                [name, custom_name, link] = [
+                    Attribute.objects.get(identifier=identifier)
+                    if identifier else None
+                    for identifier in identifiers
+                ]
+            except Attribute.DoesNotExist:
+                logger.warning(f"Invalid document link attributes specified for {fieldset.identifier}, ignoring")
+
+            DocumentLinkFieldSet.objects.create(
+                section=section,
+                fieldset_attribute=fieldset,
+                document_name_attribute=name,
+                document_custom_name_attribute=custom_name,
+                document_link_attribute=link,
+            )
+
+
+    def _create_card_sections(self, rows):
+        logger.info("\nReplacing project card sections...")
+        ProjectCardSection.objects.all().delete()
+        ProjectCardSectionAttribute.objects.all().delete()
+
+        for row in rows:
+            section_name = row[self.column_index[CARD_SECTION_NAME]]
+            if not section_name or section_name == "ei":
+                continue
+
+            location = row[self.column_index[CARD_SECTION_LOCATION]]
+            show_on_mobile = row[self.column_index[CARD_SHOW_ON_MOBILE]] == "kyllä"
+            date_format = row[self.column_index[CARD_SECTION_DATE_FORMAT]]
+            attribute = Attribute.objects.get(
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
+
+            if not location:
+                location = [0]
+            elif type(location) == str:
+                location = location.split(".")
+            elif type(location) == int:
+                location = [location]
+
+            attr_index = int(location[-1]) if len(location) >= 1 else 0
+
+            section, __ = ProjectCardSection.objects.update_or_create(
+                name=section_name,
+                defaults={
+                    "index": int(location[0]),
+                },
+            )
+            ProjectCardSectionAttribute.objects.create(
+                attribute=attribute,
+                section=section,
+                date_format=date_format or None,
+                index=attr_index,
+                show_on_mobile=show_on_mobile,
+            )
+
+    def _create_overview_filters(self, rows):
+        logger.info("\nReplacing project overview filters...")
+        OverviewFilter.objects.all().delete()
+
+        for row in rows:
+            filter_name = row[self.column_index[OVERVIEW_FILTER_NAME]]
+            filters = row[self.column_index[OVERVIEW_FILTERS]] or ""
+            filters_by_subtype = OverviewViews.BY_SUBTYPE.value in filters
+            filters_on_map = OverviewViews.ON_MAP.value in filters
+            filters_floor_area = OverviewViews.FLOOR_AREA.value in filters
+
+            if not filter_name:
+                continue
+
+            overview_filter, __ = OverviewFilter.objects.get_or_create(
+                name=filter_name,
+                defaults={
+                    "identifier": self._get_identifier_for_value(filter_name)
+                },
+            )
+            attribute = Attribute.objects.get(
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+            )
+            OverviewFilterAttribute.objects.create(
+                attribute=attribute,
+                overview_filter=overview_filter,
+                filters_by_subtype=filters_by_subtype,
+                filters_floor_area=filters_floor_area,
+                filters_on_map=filters_on_map,
+            )
 
     def _create_sections(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing sections...")
@@ -1163,7 +1420,9 @@ class AttributeImporter:
 
                 try:
                     phase = ProjectPhase.objects.get(
-                        name=re.findall(phase_name_regex, section_string)[0],
+                        common_project_phase__name=re.findall(
+                            phase_name_regex, section_string
+                        )[0],
                         project_subtype=subtype,
                     )
                 except (IndexError, ProjectPhase.DoesNotExist):
@@ -1231,16 +1490,25 @@ class AttributeImporter:
         for i, phase_name in enumerate(phase_names, start=1):
             phase = PROJECT_PHASES[phase_name]
             metadata = SUBTYPE_PHASE_METADATA[subtype.name.upper()][phase_name]
-            project_phase, created = ProjectPhase.objects.update_or_create(
+            common_phase, _ = CommonProjectPhase.objects.update_or_create(
                 name=phase["name"],
-                project_subtype=subtype,
                 defaults={
                     "index": i,
                     "color": phase["color"],
                     "color_code": phase["color_code"],
                     "list_prefix": phase["list_prefix"],
-                    "metadata": metadata,
+                }
+            )
 
+            if i > common_phase.index:
+                common_phase.index = i
+                common_phase.save()
+
+            project_phase, created = ProjectPhase.objects.update_or_create(
+                project_subtype=subtype,
+                common_project_phase=common_phase,
+                defaults={
+                    "metadata": metadata,
                 },
             )
             if project_phase.id in old_phases:
@@ -1327,6 +1595,7 @@ class AttributeImporter:
 
         subtypes = self.create_subtypes(data_rows)
         attribute_info = self._create_attributes(data_rows)
+        self._create_attribute_key_relations(data_rows)
         phase_info = {"created": 0, "updated": 0, "deleted": 0}
         # Reset Fieldset relations
         FieldSetAttribute.objects.all().delete()
@@ -1340,6 +1609,7 @@ class AttributeImporter:
         self._validate_generated_attributes()
 
         # Remove all attributes from further processing that were part of a fieldset
+        all_data_rows = data_rows
         data_rows = list(filterfalse(self._row_part_of_fieldset, data_rows))
 
         for subtype in subtypes:
@@ -1349,6 +1619,10 @@ class AttributeImporter:
             self._create_floor_area_sections(data_rows, subtype)
             self._create_floor_area_attribute_section_links(data_rows, subtype)
             self._create_deadline_sections(data_rows, subtype)
+
+        self._create_card_sections(all_data_rows)
+        self._create_document_link_sections(all_data_rows)
+        self._create_overview_filters(all_data_rows)
 
         # Clear cached sections
         cache.delete("serialized_phase_sections")

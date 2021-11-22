@@ -28,15 +28,43 @@ services:
       - REQUIRE_API_SCOPE_FOR_AUTHENTICATION=False
       - TOKEN_AUTH_AUTHSERVER_URL=https://api.hel.fi/sso/openid
       - ALLOWED_HOSTS=localhost
+      - DOCUMENT_EDIT_URL_FORMAT=
       - CSRF_TRUSTED_ORIGINS=
       - SOCIAL_AUTH_TUNNISTAMO_KEY=
       - SOCIAL_AUTH_TUNNISTAMO_OIDC_ENDPOINT=
       - SOCIAL_AUTH_TUNNISTAMO_SECRET=
+      - KAAVOITUS_API_BASE_URL=
+      - KAAVOITUS_API_AUTH_TOKEN=
+      - GRAPH_API_LOGIN_BASE_URL=https://login.microsoftonline.com
+      - GRAPH_API_BASE_URL=https://graph.microsoft.com
+      - GRAPH_API_APPLICATION_ID=
+      - GRAPH_API_TENANT_ID=
+      - GRAPH_API_CLIENT_SECRET=
     ports:
       - "8000:8000"
     depends_on:
       - db
     container_name: kaavapino-api
+
+  django-q:
+    build: .
+    command: python /code/manage.py qcluster
+    volumes:
+      - .:/code
+    depends_on:
+      - db
+      - api
+    restart: on-failure
+    environment:
+      - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
+      - KAAVOITUS_API_BASE_URL=
+      - KAAVOITUS_API_AUTH_TOKEN=
+      - GRAPH_API_LOGIN_BASE_URL=https://login.microsoftonline.com
+      - GRAPH_API_BASE_URL=https://graph.microsoft.com
+      - GRAPH_API_APPLICATION_ID=
+      - GRAPH_API_TENANT_ID=
+      - GRAPH_API_CLIENT_SECRET=
+    container_name: kaavapino-django-q
 
 volumes:
     db_kaavapino_data:

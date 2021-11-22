@@ -55,10 +55,7 @@ def test_create_section_serialized_for_fieldset(
 
     assert serializer(data=data).is_valid()
 
-    del data[f_fieldset_attribute.identifier][0][field1.identifier]
-    assert not serializer(data=data).is_valid()
 
-    assert not serializer(data={"nope": False}).is_valid()
 
 
 @pytest.mark.django_db()
@@ -85,7 +82,16 @@ def test_get_attribute_data(request_data, project, attribute_data):
     http_request = HttpRequest()
     request = Request(http_request)
     request._full_data = {"attribute_data": request_data}
-    assert get_attribute_data(request, project) == attribute_data
+    assert get_attribute_data(request, project) == {
+        **attribute_data,
+        **(
+            {
+                "kaavaprosessin_kokoluokka": project.subtype.name,
+                "kaavan_vaihe": project.phase.prefixed_name,
+            }
+            if project else {}
+        ),
+    }
 
 
 @pytest.mark.django_db()
@@ -107,15 +113,34 @@ def test_is_relevant_attribute(
 def test_create_attribute_field_data(
     f_short_string_attribute,
     f_user_attribute,
-    f_short_string_multi_choice_attribute,
-    f_short_string_choice_attribute,
+    f_multi_choice_attribute,
+    f_choice_attribute,
+    project,
 ):
-    short_string_field = create_attribute_field_data(f_short_string_attribute, True)
-    user_field = create_attribute_field_data(f_user_attribute, True)
-    multi_choice_field = create_attribute_field_data(
-        f_short_string_multi_choice_attribute, True
+    short_string_field = create_attribute_field_data(
+        f_short_string_attribute,
+        True,
+        project,
+        None,
     )
-    choice_field = create_attribute_field_data(f_short_string_choice_attribute, True)
+    user_field = create_attribute_field_data(
+        f_user_attribute,
+        True,
+        project,
+        None,
+    )
+    multi_choice_field = create_attribute_field_data(
+        f_multi_choice_attribute,
+        True,
+        project,
+        None,
+    )
+    choice_field = create_attribute_field_data(
+        f_choice_attribute,
+        True,
+        project,
+        None,
+    )
 
     fields = [short_string_field, user_field, multi_choice_field, choice_field]
     choices_field = [multi_choice_field, choice_field]

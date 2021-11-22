@@ -8,6 +8,8 @@ from rest_framework import routers
 from projects import views as project_views
 from projects.urls import router as projects_router
 from sitecontent.urls import router as sitecontent_router
+from sitecontent.views import Legend, TargetFloorAreas
+from users.views import PersonnelDetail, PersonnelList
 from users.urls import router as users_router
 
 admin.autodiscover()
@@ -30,7 +32,11 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('pysocial/', include('social_django.urls', namespace='social')),
     path('helauth/', include('helusers.urls')),
+    path("v1/legend", Legend.as_view(), name="legend"),
+    path("v1/targetfloorareas", TargetFloorAreas.as_view(), name="targetfloorareas"),
+    path("v1/personnel/", PersonnelList.as_view(), name="personnellist"),
     path("v1/", include(router.urls)),
+    url(r"v1/personnel/(?P<pk>.*)$", PersonnelDetail.as_view(), name="personneldetail"),
     url(
         r"{}projects/(?P<path>.*)$".format(MEDIA_URL),
         project_views.ProjectAttributeFileDownloadView.as_view(),
@@ -45,11 +51,6 @@ urlpatterns = [
         "admin/upload_specifications",
         project_views.UploadSpecifications.as_view(),
         name="admin_upload_specifications",
-    ),
-    url(
-        "admin/setup_default_reports",
-        project_views.SetupDefaultReports.as_view(),
-        name="admin_setup_default_reports",
     ),
 ]
 

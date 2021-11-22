@@ -12,7 +12,7 @@ class ProjectComment(models.Model):
         "Project",
         verbose_name=_("project"),
         related_name="comments",
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
 
     user = models.ForeignKey(
@@ -21,7 +21,7 @@ class ProjectComment(models.Model):
         related_name="comments",
         null=True,
         blank=True,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
 
     generated = models.BooleanField(verbose_name=_("generated"), default=False)
@@ -51,14 +51,14 @@ class FieldComment(models.Model):
         "Project",
         verbose_name=_("project"),
         related_name="field_comments",
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
 
     field = models.ForeignKey(
         "Attribute",
         verbose_name=_("field"),
         related_name="comments",
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
 
     user = models.ForeignKey(
@@ -66,7 +66,7 @@ class FieldComment(models.Model):
         verbose_name=_("user"),
         null=True,
         blank=True,
-        on_delete=models.PROTECT,
+        on_delete=models.CASCADE,
     )
 
     generated = models.BooleanField(verbose_name=_("generated"), default=False)

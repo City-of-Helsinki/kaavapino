@@ -1,4 +1,4 @@
-from adminsortable2.admin import SortableInlineAdminMixin
+from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
@@ -8,12 +8,17 @@ from django.utils.translation import ugettext_lazy as _
 from projects.models import (
     ProjectComment,
     Report,
-    ReportAttribute,
+    ReportColumn,
+    ReportColumnPostfix,
+    ReportFilter,
+    ReportFilterAttributeChoice,
     Deadline,
     AutomaticDate,
     DateType,
     DateCalculation,
     DeadlineDateCalculation,
+    DocumentLinkFieldSet,
+    DocumentLinkSection,
 )
 from projects.models.project import (
     ProjectPhaseLog,
@@ -28,10 +33,15 @@ from .exporting import get_document_response
 from .models import (
     Attribute,
     AttributeValueChoice,
+    AttributeAutoValue,
+    AttributeAutoValueMapping,
+    CommonProjectPhase,
     DataRetentionPlan,
     DocumentTemplate,
     Project,
     ProjectAttributeFile,
+    ProjectCardSection,
+    ProjectCardSectionAttribute,
     ProjectFloorAreaSection,
     ProjectFloorAreaSectionAttribute,
     ProjectPhase,
@@ -40,6 +50,8 @@ from .models import (
     ProjectPhaseDeadlineSection,
     ProjectPhaseDeadlineSectionAttribute,
     ProjectType,
+    OverviewFilter,
+    OverviewFilterAttribute,
 )
 
 class InitialCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -64,6 +76,17 @@ class UpdateCalculationInline(SortableInlineAdminMixin, admin.TabularInline):
     def get_queryset(self, request):
         deadline_id = request.resolver_match.kwargs['object_id']
         return Deadline.objects.get(id=deadline_id).update_calculations
+
+
+class AttributeAutoValueMappingInline(admin.TabularInline):
+    model = AttributeAutoValueMapping
+    fields = ("key_str", "value_str")
+    extra = 0
+
+
+@admin.register(AttributeAutoValue)
+class AttributeAutoValueAdmin(admin.ModelAdmin):
+    inlines = (AttributeAutoValueMappingInline,)
 
 
 @admin.register(DateCalculation)
@@ -133,6 +156,10 @@ class AttributeAdmin(admin.ModelAdmin):
         "public",
         "data_retention_plan",
         "highlight_group",
+    )
+    search_fields = (
+        "name",
+        "identifier",
     )
     inlines = (AttributeValueChoiceInline,)
     prepopulated_fields = {"identifier": ("name",)}
@@ -205,6 +232,45 @@ class ProjectAdmin(OSMGeoAdmin):
         return actions
 
 
+class ProjectCardSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ProjectCardSectionAttribute
+    extra = 0
+
+
+@admin.register(ProjectCardSection)
+class ProjectCardSectionAdmin(SortableAdminMixin, admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (ProjectCardSectionAttributeInline,)
+
+
+class DocumentLinkFieldSetInline(admin.TabularInline):
+    model = DocumentLinkFieldSet
+    extra = 0
+
+
+@admin.register(DocumentLinkSection)
+class DocumentLinkSectionAdmin(SortableAdminMixin, admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (DocumentLinkFieldSetInline,)
+
+
+class OverviewFilterAttributeInline(admin.TabularInline):
+    model = OverviewFilterAttribute
+    extra = 0
+
+
+@admin.register(OverviewFilter)
+class OverviewFilterAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (OverviewFilterAttributeInline,)
+
+
+@admin.register(CommonProjectPhase)
+class CommonProjectPhaseAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    ordering = ("index",)
+
+
 class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectPhaseSection
     extra = 0
@@ -212,7 +278,7 @@ class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
 
 @admin.register(ProjectPhase)
 class ProjectPhaseAdmin(admin.ModelAdmin):
-    list_display = ("name", "project_type", "project_subtype")
+    list_display = ("common_project_phase", "project_type", "project_subtype")
     exclude = ("index",)
     inlines = (ProjectPhaseSectionInline,)
     ordering = ("project_subtype__id", "index")
@@ -255,9 +321,46 @@ class ProjectTypeAdmin(admin.ModelAdmin):
     inlines = (ProjectProjectSubtypeInline,)
 
 
-class PhaseChoiceField(forms.ModelChoiceField):
+class CommonPhaseChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.project_subtype.name}: {obj.name}"
+        return obj.name
+
+
+class ReportColumnInline(SortableInlineAdminMixin, admin.TabularInline):
+    model = ReportColumn
+    extra = 0
+    show_change_link = True
+    exclude = ("condition",)
+
+
+class ReportColumnPostfixInline(admin.TabularInline):
+    model = ReportColumnPostfix
+    extra = 0
+
+
+@admin.register(ReportColumn)
+class ReportColumnAdmin(admin.ModelAdmin):
+    list_display = ("__str__",)
+    inlines = (ReportColumnPostfixInline,)
+    filter_horizontal = ("condition", "attributes")
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    list_display = ("name",)
+    inlines = (ReportColumnInline,)
+
+
+class ReportFilterAttributeChoiceInline(admin.TabularInline):
+    model = ReportFilterAttributeChoice
+    extra = 0
+
+
+@admin.register(ReportFilter)
+class ReportFilterAdmin(admin.ModelAdmin):
+    list_display = ("name", "type")
+    inlines = (ReportFilterAttributeChoiceInline,)
+    filter_horizontal = ("attributes",)
 
 
 @admin.register(DocumentTemplate)
@@ -265,15 +368,11 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ("name", "file")
     readonly_fields = ("slug",)
 
-    # Hide this from admin for now
-    def get_model_perms(self, request):
-        return {}
-
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "project_phase":
-            return PhaseChoiceField(
-                queryset=ProjectPhase.objects.all().order_by(
-                    "project_subtype__index", "index"
+        if db_field.name == "common_project_phase":
+            return CommonPhaseChoiceField(
+                queryset=CommonProjectPhase.objects.all().order_by(
+                    "index",
                 )
             )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)

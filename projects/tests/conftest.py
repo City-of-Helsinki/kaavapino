@@ -10,6 +10,7 @@ from .factories import *
 
 register(UserFactory)
 register(AttributeFactory)
+register(CommonProjectPhaseFactory)
 register(FieldSetAttributeFactory)
 register(ProjectTypeFactory)
 register(ProjectSubtypeFactory)
@@ -19,3 +20,4 @@ register(ProjectPhaseSectionAttributeFactory)
 register(ProjectFactory)
 register(CommentFactory)
 register(ReportFactory)
+register(ReportFilterFactory)

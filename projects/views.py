@@ -1,11 +1,17 @@
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
+import time
+
 from django.contrib.postgres.search import SearchVector
+from django.core.exceptions import FieldError
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
+from django_q.tasks import async_task, result as async_result
+from django_q.models import OrmQ
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
@@ -18,15 +24,16 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
-from projects.filters import ProjectFilter
 from projects.importing import AttributeImporter
-from projects.importing.report import ReportTypeCreator
 from projects.models import (
     FieldComment,
     ProjectComment,
+    ProjectDeadline,
     LastReadTimestamp,
     Project,
+    ProjectCardSectionAttribute,
     ProjectPhase,
+    CommonProjectPhase,
     ProjectType,
     ProjectSubtype,
     ProjectAttributeFile,
@@ -34,6 +41,9 @@ from projects.models import (
     Attribute,
     Report,
     Deadline,
+    DocumentLinkSection,
+    OverviewFilter,
+    OverviewFilterAttribute,
 )
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
@@ -52,17 +62,25 @@ from projects.serializers.project import (
     ProjectSerializer,
     ProjectSnapshotSerializer,
     ProjectListSerializer,
+    ProjectOverviewSerializer,
+    ProjectOnMapOverviewSerializer,
+    ProjectSubtypeOverviewSerializer,
     AdminProjectSerializer,
     ProjectPhaseSerializer,
     ProjectFileSerializer,
+    ProjectExternalDocumentSectionSerializer,
+    OverviewFilterSerializer,
+    SimpleProjectSerializer,
 )
 from projects.serializers.projectschema import (
+    SimpleAttributeSerializer,
     AdminProjectTypeSchemaSerializer,
     CreateProjectTypeSchemaSerializer,
     EditProjectTypeSchemaSerializer,
     BrowseProjectTypeSchemaSerializer,
     AdminOwnerProjectTypeSchemaSerializer,
     CreateOwnerProjectTypeSchemaSerializer,
+    ProjectCardSchemaSerializer,
 )
 from projects.serializers.projecttype import (
     ProjectTypeSerializer,
@@ -99,7 +117,16 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     permission_classes = (ProjectPermissions,)
     filter_backends = (filters.OrderingFilter,)
-    ordering_fields = ("name", "identifier", "created_at", "modified_at")
+    try:
+        ordering_fields = [
+            "name", "pino_number", "created_at", "modified_at",
+            "user__first_name", "user__last_name", "user__ad_id",
+        ] + [
+            f"attribute_data__{attribute.identifier}"
+            for attribute in Attribute.objects.filter(searchable=True)
+        ]
+    except Exception:
+        ordering_fields = []
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -130,6 +157,17 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             queryset = self._search(search, queryset)
 
         queryset = self._filter_private(queryset, user)
+
+        if self.action == "list":
+            status = self.request.query_params.get("status")
+
+            if status == "active":
+                queryset = queryset.exclude(onhold=True).exclude(archived=True)
+            elif status == "onhold":
+                queryset = queryset.filter(onhold=True)
+            elif status == "archived":
+                queryset = queryset.filter(archived=True)
+
         return queryset
 
     def _string_filter_to_list(self, filter_string):
@@ -185,10 +223,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         search_fields = [
             search_field_for_attribute(attr)
             for attr in Attribute.objects.filter(searchable=True)
-        ] + ['subtype__project_type__name']
+        ] + ['subtype__project_type__name', 'user__ad_id']
         return queryset \
             .annotate(search=SearchVector(*search_fields)) \
-            .filter(search=search)
+            .filter(Q(search__icontains=search) | Q(search=search))
 
     @staticmethod
     def _filter_private(queryset, user):
@@ -200,7 +238,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["action"] = self.action
+
+        if self.action == "list":
+            context["project_schedule_cache"] = \
+                cache.get("serialized_project_schedules", {})
+
         return context
+
+    @action(
+        methods=["get"],
+        detail=True,
+        permission_classes=[ProjectPermissions],
+    )
+    def simple(self, request, pk):
+        return Response(SimpleProjectSerializer(self.get_object()).data)
 
     @action(
         methods=["put"],
@@ -224,10 +275,395 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
+    @action(
+        methods=["get"],
+        detail=True,
+        permission_classes=[ProjectPermissions],
+    )
+    def external_documents(self, request, pk):
+        project = self.get_object()
+        return Response({"sections": [
+            ProjectExternalDocumentSectionSerializer(
+                project, context={"section": document_section}
+            ).data
+            for document_section in DocumentLinkSection.objects.all()
+        ]})
+
+    def _get_valid_filters(self, filters_view):
+        try:
+            attrs = OverviewFilterAttribute.objects.filter(
+                **{filters_view: True},
+            )
+        except FieldError:
+            return None
+
+        filters = {}
+
+        for attr in attrs:
+            try:
+                filters[attr.overview_filter].append(attr)
+            except KeyError:
+                filters[attr.overview_filter] = [attr]
+
+        return filters
+
+    def _get_query(self, filters, prefix=""):
+        if prefix:
+            prefix = f"{prefix}__"
+
+        params = self.request.query_params
+        query = Q()
+
+        for filter_obj, attrs in filters.items():
+            try:
+                split_params = params.get(filter_obj.identifier).split(",")
+            except AttributeError:
+                continue
+
+            def get_query_for_filter(param):
+                q = Q()
+
+                for attr in attrs:
+                    # Only supports one-fieldset-deep queries for now
+                    attr = attr.attribute
+
+                    # Manipulate search parameter
+                    if attr.value_type == Attribute.TYPE_BOOLEAN:
+                        param_parsed = \
+                            False if param in ["false", "False"] else bool(param)
+                    elif attr.value_type == Attribute.TYPE_DATE:
+                        try:
+                            param_parsed = \
+                                datetime.strptime(param, "%Y-%m-%d").date()
+                        except (TypeError, ValueError):
+                            # Custom handling if only year is provided, doesn't support fieldsets
+                            if not attr.fieldsets.count():
+                                try:
+                                    year = int(param)
+                                    gte_date = datetime(year=year, month=1, day=1).date()
+                                    lt_date = datetime(year=year+1, month=1, day=1).date()
+                                    if attr.static_property:
+                                        q_gte = Q(**{f"{prefix}{attr.static_property}__gte": gte_date})
+                                        q_lt = Q(**{f"{prefix}{attr.static_property}__lt": lt_date})
+                                        q |= Q(q_gte & q_lt)
+                                    else:
+                                        q_gte = Q(**{f"{prefix}attribute_data__{attr.identifier}__gte": gte_date})
+                                        q_lt = Q(**{f"{prefix}attribute_data__{attr.identifier}__lt": lt_date})
+                                        q |= Q(q_gte & q_lt)
+
+                                except (TypeError, ValueError):
+                                    pass
+
+                            continue
+
+                    elif attr.value_type == Attribute.TYPE_INTEGER:
+                        try:
+                            param_parsed = int(param)
+                        except (TypeError, ValueError):
+                            continue
+                    else:
+                        param_parsed = param
+
+                    # Handle search criteria special cases
+                    if attr.value_type == Attribute.TYPE_USER:
+                        postfix = "__ad_id"
+                    else:
+                        postfix = ""
+
+                    # Add to query
+                    if attr.fieldsets.first():
+                        q |= Q(**{
+                            f"{prefix}attribute_data__{attr.fieldsets.first().identifier}{postfix}__contains": \
+                                [{attr.identifier: param_parsed}]
+                        })
+                    elif attr.static_property:
+                        q |= Q(**{f"{prefix}{attr.static_property}{postfix}": param_parsed})
+                    else:
+                        # TODO: __iexact is no longer needed if kaavaprosessin_kokoluokka
+                        # ever gets refactored
+                        q |= Q(**{f"{prefix}attribute_data__{attr.identifier}{postfix}__iexact": param_parsed})
+
+                return q
+
+            param_queries = Q()
+
+            for param in split_params:
+                param_queries |= get_query_for_filter(param)
+
+            query &= param_queries
+
+        return query
+
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+        url_path="overview/filters",
+        url_name="projects-overview-filters",
+    )
+    def overview_filters(self, request):
+        queryset = OverviewFilter.objects.all()
+        return Response(OverviewFilterSerializer(queryset, many=True).data)
+
+    def _parse_date_range(
+        self, start_date_str, end_date_str, today=datetime.now().date()
+    ):
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            start_date = datetime(today.year, 1, 1).date()
+
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            end_date = datetime(start_date.year, 12, 31).date()
+
+        # Can't go backwards in time
+        if start_date > end_date:
+            [start_date, end_date] = [start_date, end_date]
+
+        return (start_date, end_date)
+
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+        url_path="overview/floor_area",
+        url_name="projects-overview-floor-area"
+    )
+    def overview_floor_area(self, request):
+        today = datetime.now().date()
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        valid_filters = self._get_valid_filters("filters_floor_area")
+        deadline_query = self._get_query(valid_filters, "project")
+        project_query = self._get_query(valid_filters)
+
+        start_date, end_date = self._parse_date_range(
+            start_date,
+            end_date,
+            today=today,
+        )
+
+        if (end_date-start_date).days > 366:
+            return Response(
+                {"detail": "Date range has to be 366 days or less"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Dates should be Tuesdays
+        start_date += timedelta((1-start_date.weekday()) % 7)
+        if end_date.weekday != 1:
+            end_date += timedelta(((1-end_date.weekday()) % 7) - 7)
+
+        date_range = [
+            start_date + timedelta(days=i)
+            for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
+        ]
+
+        # TODO hard-coded for now; consider a new field for Attribute
+        floor_area_attrs = [
+            "kerrosalan_lisays_yhteensa_asuminen",
+            "kerrosalan_lisays_yhteensa_julkinen",
+            "kerrosalan_lisays_yhteensa_muut",
+            "kerrosalan_lisays_yhteensa_toimitila",
+        ]
+        meeting_attrs = [
+            "milloin_tarkistettu_ehdotus_lautakunnassa",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_2",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_3",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_4",
+        ]
+
+        # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
+        projects_by_date = {
+            date: [dl.project for dl in ProjectDeadline.objects.filter(
+                deadline_query,
+                project__public=True,
+                deadline__attribute__identifier__in=meeting_attrs,
+                date=date,
+            ).order_by("project__pk").distinct("project__pk")]
+            for date in date_range
+        }
+
+        projects_in_range_by_date = {
+            date: [dl.project for dl in ProjectDeadline.objects.filter(
+                deadline_query,
+                project__public=True,
+                deadline__attribute__identifier__in=meeting_attrs,
+                date__gte=start_date,
+                date__lte=date,
+            ).order_by("project__pk").distinct("project__pk")]
+            for date in date_range
+        }
+        projects_in_range = projects_in_range_by_date[end_date]
+
+        confirmed_projects_by_date = {
+            date: Project.objects.filter(
+                project_query,
+                (
+                    Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
+                    Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
+                    Q(attribute_data__kylk_hyvaksymispaatos_pvm__lte=date)
+                ),
+                public=True,
+                pk__in=[p.pk for p in projects_in_range],
+            ).order_by("pk")
+            for date in date_range
+        }
+
+        def get_floor_area(date, attr):
+            if date < today:
+                projects = confirmed_projects_by_date[date]
+            else:
+                projects = projects_in_range_by_date[date]
+
+            total = 0
+
+            for project in projects:
+                total += int(float(project.attribute_data.get(attr, 0)))
+
+            return total
+
+        floor_area_by_date = {
+            start_date: {
+                attr: get_floor_area(start_date, attr)
+                for attr in floor_area_attrs
+            }
+        }
+
+        floor_area_by_date[start_date]["total"] = \
+            sum(floor_area_by_date[start_date].values())
+
+        for date, prev in zip(date_range[1:], date_range[:-1]):
+            if date < today:
+                new_projects = set(confirmed_projects_by_date[date]) - \
+                    set(confirmed_projects_by_date[prev])
+            else:
+                new_projects = set(projects_in_range_by_date[date]) - \
+                    set(projects_in_range_by_date[prev])
+
+            floor_area_by_date[date] = {}
+
+            for attr in floor_area_attrs:
+                total = floor_area_by_date[prev][attr]
+
+                for project in new_projects:
+                    total += int(float( \
+                        project.attribute_data.get(attr, 0)))
+
+                floor_area_by_date[date][attr] = total
+
+            floor_area_by_date[date]["total"] = \
+                sum(floor_area_by_date[date].values())
+
+        total_predicted = sum(floor_area_by_date[date_range[-1]].values())
+
+        latest_tuesday = \
+            today - timedelta((today.weekday() - 1) % 7)
+
+        try:
+            total_to_date = sum(floor_area_by_date[latest_tuesday].values())
+        except KeyError:
+            if latest_tuesday > end_date:
+                total_to_date = total_predicted
+            else:
+                total_to_date = 0
+
+        return Response({
+            "date": today,
+            "total_to_date": total_to_date,
+            "total_predicted": total_predicted,
+            "daily_stats": [
+                {
+                    "date": str(date),
+                    "meetings": len(projects_by_date[date]),
+                    "projects": [
+                        ProjectOverviewSerializer(project).data
+                        for project in projects_by_date[date]
+                    ],
+                    "floor_area": {
+                        "is_prediction": date >= today,
+                        **floor_area_by_date[date],
+                    },
+                }
+                for date in date_range
+            ]
+        })
+
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+        url_path="overview/by_subtype",
+        url_name="projects-overview-by-subtype"
+    )
+    def overview_by_subtype(self, request):
+        valid_filters = self._get_valid_filters("filters_by_subtype")
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+        query = self._get_query(valid_filters)
+        queryset = ProjectSubtype.objects.all()
+
+        # TODO hard-coded for now; consider a new field for Attribute
+        date_range_attrs = [
+            "toteutunut_kirje_kaupunginhallitukselle",
+            "tarkistettu_ehdotus_hyvaksytty_kylk",
+            "milloin_tarkistettu_ehdotus_lautakunnassa",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_2",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_3",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_4",
+        ]
+
+        if start_date or end_date:
+            start_date, end_date = self._parse_date_range(start_date, end_date)
+            print(start_date, end_date)
+            start_query = Q()
+            end_query = Q()
+            for attr in date_range_attrs:
+                start_query |= Q(**{f"attribute_data__{attr}__gte": start_date})
+                end_query |= Q(**{f"attribute_data__{attr}__lte": end_date})
+            query &= start_query & end_query
+
+        return Response({
+            "subtypes": ProjectSubtypeOverviewSerializer(
+                queryset, many=True, context={"query": query},
+            ).data
+        })
+
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[ProjectPermissions],
+        url_path="overview/on_map",
+        url_name="projects-overview-on-map"
+    )
+    def overview_on_map(self, request):
+        valid_filters = self._get_valid_filters("filters_on_map")
+        query = self._get_query(valid_filters)
+        queryset = Project.objects.filter(query, public=True)
+        return Response({
+            "projects": ProjectOnMapOverviewSerializer(
+                queryset, many=True, context={"query": query},
+            ).data
+        })
+
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all()
     serializer_class = ProjectPhaseSerializer
+
+
+class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = ProjectCardSectionAttribute.objects.all().order_by(
+        "section__index", "index"
+    )
+    serializer_class = ProjectCardSchemaSerializer
+
+
+class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Attribute.objects.all()
+    serializer_class = SimpleAttributeSerializer
 
 
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
@@ -260,7 +696,6 @@ class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                 "edit": EditProjectTypeSchemaSerializer,
                 "browse": BrowseProjectTypeSchemaSerializer,
             }[user.privilege]
-
 
 
 class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -401,6 +836,14 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         context["project"] = self.project
         return context
 
+    def get_queryset(self):
+        phases = CommonProjectPhase.objects.filter(
+            phases__project_subtype=self.project.subtype,
+        )
+        return DocumentTemplate.objects.filter(
+            common_project_phases__in=phases
+        ).distinct()
+
     def get_project(self):
         project_id = self.kwargs.get("project_pk")
         project = Project.objects.filter(pk=project_id).first()
@@ -410,6 +853,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         return project
 
     def retrieve(self, request, *args, **kwargs):
+        task_id = request.query_params.get("task")
         filename = request.query_params.get("filename")
         document_template = self.get_object()
 
@@ -420,19 +864,49 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
-        output = render_template(self.project, document_template)
-        response = HttpResponse(
-            output,
-            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        )
-        response["Content-Disposition"] = "attachment; filename={}.docx".format(
-            filename
+        if task_id:
+            result = async_result(task_id)
+            if result:
+                response = HttpResponse(
+                    result,
+                    content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+                response["Content-Disposition"] = "attachment; filename={}.docx".format(
+                    filename
+                )
+
+                # Since we are not using DRFs response here, we set a custom CORS control header
+                response["Access-Control-Expose-Headers"] = "content-disposition"
+                response["Access-Control-Allow-Origin"] = "*"
+                return response
+
+            queued_ids = [
+                ormq.task_id() for ormq in OrmQ.objects.all()
+            ]
+            if task_id in queued_ids:
+                return Response(
+                    {"detail": task_id},
+                    status=status.HTTP_202_ACCEPTED,
+                )
+            else:
+                return Response(
+                    {"detail": "Requested task not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        preview = \
+            True if request.query_params.get("preview") in ("true", "True", "1") \
+            else False
+
+        document_task = async_task(
+            render_template,
+            self.project, document_template, preview,
         )
 
-        # Since we are not using DRFs response here, we set a custom CORS control header
-        response["Access-Control-Expose-Headers"] = "content-disposition"
-        response["Access-Control-Allow-Origin"] = "*"
-        return response
+        return Response(
+            {"detail": document_task},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     def list(self, request, *args, **kwargs):
         self.serializer_class = DocumentTemplateSerializer
@@ -452,7 +926,7 @@ class DocumentTemplateDownloadView(
         return self.model.objects.all()
 
     def can_access_file(self, private_file):
-        return self.request.user.is_superuser
+        return self.request.user.has_privilege("admin")
 
 
 class UploadSpecifications(APIView):
@@ -470,58 +944,95 @@ class UploadSpecifications(APIView):
         return redirect(".")
 
 
-class SetupDefaultReports(APIView):
-    parser_classes = (MultiPartParser,)
-    permission_classes = (IsAdminUser,)
-
-    def post(self, request, format=None):
-        report_type_creator = ReportTypeCreator()
-        report_type_creator.run()
-
-        return redirect(".")
-
-
 class ReportViewSet(ReadOnlyModelViewSet):
-    queryset = Report.objects.all()
+    queryset = Report.objects.filter(hidden=False)
 
     def get_queryset(self):
         user = self.request.user
         queryset = self.queryset
 
-        if not user.is_superuser:
+        if not user.has_privilege('admin'):
             queryset = queryset.exclude(is_admin_report=True)
 
         return queryset
 
     def get_project_queryset(self, report):
-        pf = ProjectFilter(
-            self.request.query_params,
-            queryset=Project.objects.filter(
-                subtype__project_type=report.project_type, public=True
-            ),
-            request=self.request,
+        params = self.request.query_params
+        filters = report.filters.filter(
+            identifier__in=params.keys()
         )
-        return pf.qs
+        projects = Project.objects.filter(onhold=False, public=True)
+        for report_filter in filters:
+            projects = report_filter.filter_projects(
+                params.get(report_filter.identifier),
+                queryset=projects,
+            )
+        return projects
+
+    def _remove_from_queue(self, *args, **kwargs):
+        pass
+
 
     def retrieve(self, request, *args, **kwargs):
+        task_id = request.query_params.get("task")
+
+        if task_id:
+            result = async_result(task_id)
+            if result:
+                return result
+
+            queued_ids = [
+                ormq.task_id() for ormq in OrmQ.objects.all()
+            ]
+            if task_id in queued_ids:
+                return Response(
+                    {"detail": task_id},
+                    status=status.HTTP_202_ACCEPTED,
+                )
+            else:
+                return Response(
+                    {"detail": "Requested task not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
         filename = request.query_params.get("filename")
         report = self.get_object()
+        preview = self.request.query_params.get("preview", None) in [
+            "True", "true", "1",
+        ]
+        try:
+            limit = int(self.request.query_params.get("limit", None))
+        except (ValueError, TypeError):
+            limit = None
 
-        projects = self.get_project_queryset(report)
+        project_ids = [
+            project.pk for project in self.get_project_queryset(report)
+        ]
 
         if filename is None:
             filename = "{}-{}".format(
                 create_identifier(report.name), timezone.now().date()
             )
 
-        response = HttpResponse(content_type="text/csv; header=present; charset=UTF-8")
-        response["Content-Disposition"] = "attachment; filename={}.csv".format(filename)
+        if not preview:
+            response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            response["Access-Control-Expose-Headers"] = "content-disposition"
+            response["Content-Disposition"] = "attachment; filename={}.xlsx".format(filename)
+        else:
+            response = HttpResponse(content_type="text/csv; header=present; charset=UTF-8")
 
         # Since we are not using DRFs response here, we set a custom CORS control header
-        response["Access-Control-Expose-Headers"] = "content-disposition"
         response["Access-Control-Allow-Origin"] = "*"
 
-        return render_report_to_response(report, projects, response)
+        report_task = async_task(
+            render_report_to_response,
+            report, project_ids, response, preview, limit,
+        )
+
+        return Response(
+            {"detail": report_task},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer

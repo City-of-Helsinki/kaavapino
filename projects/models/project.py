@@ -11,7 +11,7 @@ from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
-from PIL import Image
+from PIL import Image, ImageOps
 
 from projects.actions import verbs
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
@@ -295,7 +295,7 @@ class Project(models.Model):
 
         return False
 
-    def _get_applicable_deadlines(self, subtype=None, preview_attributes={}):
+    def get_applicable_deadlines(self, subtype=None, preview_attributes={}):
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -310,7 +310,7 @@ class Project(models.Model):
             for deadline in list(
                 Deadline.objects \
                     .filter(subtype=subtype or self.subtype) \
-                    .exclude(phase__name__in=excluded_phases)
+                    .exclude(phase__common_project_phase__name__in=excluded_phases)
             )
             if self._check_condition(deadline, preview_attributes)
         ]
@@ -379,14 +379,16 @@ class Project(models.Model):
 
             if dependencies:
                 ignore += dependencies
-                self._set_calculated_deadlines(
-                    dependencies,
-                    user,
-                    ignore=ignore,
-                    initial=initial,
-                    preview=preview,
-                    preview_attribute_data=preview_attribute_data,
-                )
+                results = { **results,
+                    **self._set_calculated_deadlines(
+                        dependencies,
+                        user,
+                        ignore=ignore,
+                        initial=initial,
+                        preview=preview,
+                        preview_attribute_data=preview_attribute_data,
+                    )
+                }
 
             results[deadline] = self._set_calculated_deadline(
                 deadline,
@@ -401,7 +403,7 @@ class Project(models.Model):
 
     # Generate or update schedule for project
     def update_deadlines(self, values=None, user=None):
-        deadlines = self._get_applicable_deadlines()
+        deadlines = self.get_applicable_deadlines()
 
         # Delete no longer relevant deadlines and create missing
         self.deadlines.exclude(deadline__in=deadlines).delete()
@@ -447,7 +449,7 @@ class Project(models.Model):
         # Update automatic deadlines
         self._set_calculated_deadlines(
             [
-                dl.deadline for dl in project_deadlines
+                dl.deadline for dl in self.deadlines.all()
                 if dl.deadline.update_calculations.count() \
                     or dl.deadline.default_to_created_at \
                     or dl.deadline.attribute
@@ -468,7 +470,7 @@ class Project(models.Model):
         # List deadlines that would be created
         new_dls = {
             dl: None
-            for dl in self._get_applicable_deadlines(
+            for dl in self.get_applicable_deadlines(
                 subtype=subtype,
                 preview_attributes=updated_attributes,
             )
@@ -519,6 +521,36 @@ class Project(models.Model):
     @property
     def type(self):
         return self.subtype.project_type
+
+    @property
+    def phase_documents_creation_started(self):
+        # True if any documents in current phase has been downloaded at least once
+        for template in \
+            self.phase.common_project_phase.document_templates.filter(
+                silent_downloads=False,
+            ):
+            if self.document_download_log.filter(
+                document_template=template,
+                phase=self.phase.common_project_phase,
+            ).first():
+                return True
+
+        return False
+
+    @property
+    def phase_documents_created(self):
+        # True if all documents in current phase have been downloaded at least once
+        for template in \
+            self.phase.common_project_phase.document_templates.filter(
+                silent_downloads=False,
+            ):
+            if not self.document_download_log.filter(
+                document_template=template,
+                phase=self.phase.common_project_phase,
+            ).first():
+                return False
+
+        return True
 
     def save(self, *args, **kwargs):
         super(Project, self).save(*args, **kwargs)
@@ -608,15 +640,9 @@ class ProjectFloorAreaSectionAttributeMatrixCell(BaseAttributeMatrixCell):
         return f"{self.structure} {self.attribute} ({self.row}, {self.column})"
 
 
-class ProjectPhase(models.Model):
-    """Describes a phase of a certain project subtype."""
+class CommonProjectPhase(models.Model):
+    """Describes common, subtype-agnostic properties for a ProjectPhase."""
 
-    project_subtype = models.ForeignKey(
-        ProjectSubtype,
-        verbose_name=_("project subtype"),
-        on_delete=models.CASCADE,
-        related_name="phases",
-    )
     name = models.CharField(max_length=255, verbose_name=_("name"))
     color = models.CharField(max_length=64, verbose_name=_("color"), blank=True)
     color_code = models.CharField(
@@ -624,6 +650,42 @@ class ProjectPhase(models.Model):
     )
     list_prefix = models.CharField(
         max_length=2, verbose_name=_("list prefix"), blank=True, null=True
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+
+    class Meta:
+        verbose_name = _("common project phase")
+        verbose_name_plural = _("common project phases")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.name}"
+
+    @property
+    def subtypes(self):
+        return ProjectSubtype.objects.filter(
+            phases__in=self.phases.all(),
+        )
+
+    @property
+    def prefixed_name(self):
+        return f"{self.list_prefix}. {self.name}"
+
+
+class ProjectPhase(models.Model):
+    """Describes a phase of a certain project subtype."""
+
+    common_project_phase = models.ForeignKey(
+        CommonProjectPhase,
+        verbose_name=_("common project phase"),
+        on_delete=models.PROTECT,
+        related_name="phases",
+    )
+    project_subtype = models.ForeignKey(
+        ProjectSubtype,
+        verbose_name=_("project subtype"),
+        on_delete=models.CASCADE,
+        related_name="phases",
     )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
@@ -641,11 +703,31 @@ class ProjectPhase(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return f"{self.name} ({self.project_subtype.name})"
+        return f"{self.common_project_phase} ({self.project_subtype.name})"
+
+    @property
+    def name(self):
+        return self.common_project_phase.name
+
+    @property
+    def color(self):
+        return self.common_project_phase.color
+
+    @property
+    def color_code(self):
+        return self.common_project_phase.color_code
+
+    @property
+    def list_prefix(self):
+        return self.common_project_phase.list_prefix
 
     @property
     def project_type(self):
         return self.project_subtype.project_type
+
+    @property
+    def prefixed_name(self):
+        return self.common_project_phase.prefixed_name
 
 
 class ProjectPhaseLog(models.Model):
@@ -740,6 +822,63 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
+class ProjectCardSection(models.Model):
+    """Defines a section to be shown on project card view."""
+
+    name = models.CharField(
+        max_length=255,
+        verbose_name=_("name"),
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
+
+    class Meta:
+        verbose_name = _("project card section")
+        verbose_name_plural = _("project card sections")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.name}"
+
+class ProjectCardSectionAttribute(models.Model):
+    """Links an attribute into a project card section."""
+    attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("attribute"),
+        on_delete=models.CASCADE,
+    )
+    section = models.ForeignKey(
+        ProjectCardSection,
+        verbose_name=_("project card section"),
+        related_name="attributes",
+        on_delete=models.CASCADE,
+    )
+    date_format = models.CharField(
+        max_length=255,
+        verbose_name=_("date format and text"),
+        null=True,
+        blank=True,
+    )
+    index = models.PositiveIntegerField(
+        verbose_name=_("index"),
+        default=0,
+    )
+    show_on_mobile = models.BooleanField(
+        verbose_name=_("show on mobile"),
+        default=True,
+    )
+
+    class Meta:
+        verbose_name = _("project card section attribute")
+        verbose_name_plural = _("project card section attributes")
+        ordering = ("index",)
+
+    def __str__(self):
+        return f"{self.attribute} {self.section} {self.index}"
+
+
 class ProjectPhaseFieldSetAttributeIndex(models.Model):
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     phase = models.ForeignKey(
@@ -814,8 +953,13 @@ class ProjectAttributeFile(models.Model):
         try:
             # resize to 200dpi print size
             image = Image.open(self.file.path)
+            image = ImageOps.exif_transpose(image)
+            exif = image.getexif()
             image.thumbnail(paper_size_in_pixels, Image.ANTIALIAS)
-            image.save(self.file.path, quality=100, optimize=True)
+            if image.format == 'JPEG':
+                image.save(self.file.path, quality=100, optimize=True, exif=exif)
+            else:
+                image.save(self.file.path, optimize=True, exif=exif)
         except IOError:
             # not an image
             pass

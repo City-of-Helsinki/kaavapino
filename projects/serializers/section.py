@@ -28,7 +28,7 @@ FIELD_TYPES = {
     Attribute.TYPE_LONG_STRING: serializers.CharField,
     Attribute.TYPE_RICH_TEXT: serializers.JSONField,
     Attribute.TYPE_RICH_TEXT_SHORT: serializers.JSONField,
-    Attribute.TYPE_LINK: serializers.URLField,
+    Attribute.TYPE_LINK: serializers.CharField,
     Attribute.TYPE_INTEGER: serializers.IntegerField,
     Attribute.TYPE_DECIMAL: serializers.DecimalField,
     Attribute.TYPE_BOOLEAN: serializers.NullBooleanField,
@@ -39,6 +39,7 @@ FIELD_TYPES = {
     Attribute.TYPE_USER: serializers.PrimaryKeyRelatedField,
     Attribute.TYPE_GEOMETRY: GeometryField,
     Attribute.TYPE_CHOICE: serializers.CharField,
+    Attribute.TYPE_PERSONNEL: serializers.CharField,
 }
 
 
@@ -79,7 +80,7 @@ def get_unique_validator(attribute, project_id):
 
     return validate
 
-def get_deadline_validator(attribute, project_dls, subtype, preview):
+def get_deadline_validator(attribute, subtype, preview):
     def validate(value):
         if not preview:
             return
@@ -92,6 +93,7 @@ def get_deadline_validator(attribute, project_dls, subtype, preview):
                 pass
             except AssertionError:
                 raise ValidationError(_(
+                    attr_dl.error_date_type_mismatch or \
                     f"Invalid date selection for date type {attr_dl.date_type}"
                 ))
 
@@ -138,7 +140,6 @@ def create_attribute_field_data(attribute, validation, project, preview):
     if attribute.deadline.count():
         field_arguments["validators"] += [get_deadline_validator(
             attribute,
-            project.deadlines,
             project.phase.project_subtype,
             preview,
         )]

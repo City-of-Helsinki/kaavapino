@@ -5,7 +5,7 @@ from django.utils.translation import ugettext_lazy as _
 from private_storage.fields import PrivateFileField
 
 from projects.models.utils import KaavapinoPrivateStorage
-from .project import ProjectPhase
+from .project import CommonProjectPhase
 
 
 class DocumentTemplate(models.Model):
@@ -15,16 +15,18 @@ class DocumentTemplate(models.Model):
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
     slug = models.SlugField()
-    project_phase = models.ForeignKey(
-        ProjectPhase,
+    common_project_phases = models.ManyToManyField(
+        CommonProjectPhase,
         verbose_name=_("project phase"),
         related_name="document_templates",
-        on_delete=models.CASCADE,
+    )
+    silent_downloads = models.BooleanField(
+        default=False,
+        verbose_name=_("Downloading document doesn't trigger warnings"),
     )
 
     def get_upload_subfolder(self):
-        phase_name = slugify(self.project_phase.name)
-        return ["document_templates", phase_name, self.slug]
+        return ["document_templates", self.slug]
 
     file = PrivateFileField(
         "File",
@@ -37,6 +39,10 @@ class DocumentTemplate(models.Model):
         upload_subfolder=get_upload_subfolder,
         max_length=255,
     )
+    image_template = models.BooleanField(
+        verbose_name=_("image template"),
+        default=False,
+    )
 
     class Meta:
         verbose_name = _("document template")
@@ -48,3 +54,27 @@ class DocumentTemplate(models.Model):
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
         return super().save(*args, **kwargs)
+
+
+class ProjectDocumentDownloadLog(models.Model):
+    """Logs a document download not including preview downloads"""
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    project = models.ForeignKey(
+        "Project",
+        verbose_name=_("project"),
+        related_name="document_download_log",
+        on_delete=models.CASCADE,
+    )
+    document_template = models.ForeignKey(
+        "DocumentTemplate",
+        verbose_name=_("document template"),
+        related_name="document_download_log",
+        on_delete=models.CASCADE,
+    )
+    phase = models.ForeignKey(
+        "CommonProjectPhase",
+        verbose_name=_("phase"),
+        related_name="document_download_log",
+        on_delete=models.CASCADE,
+    )

@@ -13,7 +13,7 @@ class FooterLink(models.Model):
     section = models.ForeignKey(
         "FooterSection",
         verbose_name=_("section"),
-        related_name=_("links"),
+        related_name="links",
         null=False,
         on_delete=models.CASCADE,
     )
@@ -50,3 +50,14 @@ class ListViewAttributeColumn(models.Model):
         verbose_name = _("list view attribute column")
         verbose_name_plural = _("list view attribute columns")
         ordering = ("index",)
+
+
+class TargetFloorArea(models.Model):
+    """Defines a yearly floor area target"""
+    year = models.IntegerField(
+        unique=True,
+        verbose_name=_("year"),
+    )
+    target = models.IntegerField(
+        verbose_name=_("area target"),
+    )
