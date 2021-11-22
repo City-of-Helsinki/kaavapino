@@ -12,7 +12,7 @@ chardet==3.0.4            # via requests
 croniter==1.0.13
 cryptography==3.1.1       # via social-auth-core
 defusedxml==0.6.0         # via python3-openid, social-auth-core
-django==2.2.13
+django==2.2.24
 git+https://github.com/andersinno/django-activity-stream.git#egg=django-activity-stream==0.7.0
 django-admin-sortable2==1.0.2
 django-allauth==0.42.0
