@@ -68,7 +68,7 @@ skyfield-data==1.1.0      # via workalendar
 social-auth-app-django==4.0.0
 social-auth-core==3.3.3   # via social-auth-app-django
 sqlparse==0.3.1           # via django
-urllib3==1.25.9           # via requests
+urllib3==1.26.5           # via requests
 wcwidth==0.2.5            # via blessed
 workalendar==11.0.1
 
