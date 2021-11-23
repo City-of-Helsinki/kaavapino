@@ -101,7 +101,7 @@ class ReportColumn(models.Model):
         verbose_name=_("use column values as titles in preview"),
         default=False,
     )
-    custom_display_mapping = JSONField(
+    custom_display_mapping = models.JSONField(
         default=dict,
         blank=True,
         null=True,
