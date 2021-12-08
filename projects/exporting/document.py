@@ -2,6 +2,7 @@ import datetime
 import io
 from html import escape
 import logging
+import jinja2
 
 from django.conf import settings
 from django.http import HttpResponse
@@ -293,7 +294,9 @@ def render_template(project, document_template, preview):
                 display_value,
             )
 
-    doc.render(attribute_data_display)
+    jinja_env = jinja2.Environment()
+    jinja_env.filters['distinct'] = distinct
+    doc.render(attribute_data_display, jinja_env)
     output = io.BytesIO()
     doc.save(output)
 
@@ -305,6 +308,19 @@ def render_template(project, document_template, preview):
         )
 
     return output.getvalue()
+
+
+# Custom filter for filtering objects from list by unique key
+def distinct(value, key):
+    if value and type(value) is list:
+        checked = set()
+        filtered = [e for e in value
+            if e[key] and e[key] not in checked
+            and not checked.add(e[key])
+        ]
+        return filtered
+
+    return value
 
 
 def get_document_response(project, document_template, filename=None):
