@@ -13,7 +13,7 @@ pipelines:
         script: # Modify the commands below to build your repository.
           - pip install -r requirements.txt
   branches:
-    development:
+    '{development,fix/text-search}':
       - step:
           name: Build docker image
           caches:
