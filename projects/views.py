@@ -1,6 +1,7 @@
 import pytz
 from datetime import datetime, timedelta
 import time
+import logging
 
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import FieldError
@@ -88,6 +89,8 @@ from projects.serializers.projecttype import (
 )
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer
+
+log = logging.getLogger(__name__)
 
 
 class PrivateDownloadViewSetMixin:
@@ -220,13 +223,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 field_string = "__".join(fieldset_path)
                 return f"attribute_data__{field_string}"
 
-        search_fields = [
-            search_field_for_attribute(attr)
-            for attr in Attribute.objects.filter(searchable=True)
-        ] + ['subtype__project_type__name', 'user__ad_id']
-        return queryset \
-            .annotate(search=SearchVector(*search_fields)) \
-            .filter(Q(search__icontains=search) | Q(search=search))
+        # search_fields = [
+        #     search_field_for_attribute(attr)
+        #     for attr in Attribute.objects.filter(searchable=True)
+        # ] + ['subtype__project_type__name', 'user__ad_id']
+        # return queryset \
+        #     .annotate(search=SearchVector(*search_fields)) \
+        #     .filter(Q(search__icontains=search) | Q(search=search))
+
+        return queryset.filter(Q(vector_column__icontains=search) | Q(vector_column=search))
 
     @staticmethod
     def _filter_private(queryset, user):
