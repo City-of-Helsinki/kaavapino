@@ -1,7 +1,7 @@
 import copy
 import datetime
 import re
-
+import logging
 import numpy as np
 import requests
 from typing import List, NamedTuple, Type
@@ -60,6 +60,8 @@ from sitecontent.models import ListViewAttributeColumn
 from users.models import User
 from users.serializers import PersonnelSerializer, UserSerializer
 from users.helpers import get_graph_api_access_token
+
+log = logging.getLogger(__name__)
 
 
 class SectionData(NamedTuple):
@@ -975,6 +977,38 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _get_updates(project, cutoff=None):
+        def get_attribute_label(attribute_list, labels):
+            if not attribute_list or type(attribute_list) != list:
+                return
+
+            for attr in attribute_list:
+                for identifier, value in attr.items():
+                    attribute = Attribute.objects.filter(identifier=identifier).first()
+                    if attribute:
+                        labels.update({
+                            attribute.identifier: attribute.name,
+                        })
+                    if type(value) == list:
+                        get_attribute_label(value, labels)
+
+        def get_labels(attribute_identifier, data, labels):
+            if not labels:
+                get_attribute_label(data.get("old_value", None), labels)
+                get_attribute_label(data.get("new_value", None), labels)
+
+            # Check if attribute name contains [] and remove it
+            full_name = re.sub(r'\[(?:[^|\]]*\|)?([^\]]*)]', '', attribute_identifier)
+            names = full_name.split('.')
+            for name in names:
+                attribute = Attribute.objects.filter(identifier=name).first()
+                # log.info('%s: %s' % (name, attribute))
+                if attribute:
+                    labels.update({
+                        name: attribute.name,
+                    })
+
+            return labels
+
         # Get the latest attribute updates for distinct attributes
         if cutoff:
             actions = (
@@ -1026,7 +1060,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "timestamp": _action.timestamp,
                 "new_value": _action.data.get("new_value", None),
                 "old_value": _action.data.get("old_value", None),
-                "labels": _action.data.get("labels", None),
+                "labels":  get_labels(
+                    attribute_identifier,
+                    _action.data,
+                    _action.data.get("labels", {}),
+                ),
             }
 
         return updates
