@@ -5,13 +5,14 @@
 # You can specify a custom docker image from Docker Hub as your build environment.
 image: python:3.9
 
-options:
-  size: 2x
+# Required when compiling from source
+# options:
+#   size: 2x
 
-definitions:
-  services:
-    docker:
-      memory: 4048
+# definitions:
+#   services:
+#     docker:
+#       memory: 4048
 
 pipelines:
   default:
