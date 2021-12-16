@@ -24,7 +24,7 @@ router.registry.extend(users_router.registry)
 # that should not be included when defining a path url.
 MEDIA_URL = (
     settings.MEDIA_URL
-    if settings.MEDIA_URL[0] is not "/"
+    if settings.MEDIA_URL[0] != "/"
     else settings.MEDIA_URL.lstrip("/")
 )
 

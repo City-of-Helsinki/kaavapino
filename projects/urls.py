@@ -20,17 +20,17 @@ app_name = "projects"
 
 router = routers.SimpleRouter()
 projects_router = ExtendedSimpleRouter()
-projects = projects_router.register(r"projects", ProjectViewSet, base_name="projects")
+projects = projects_router.register(r"projects", ProjectViewSet, basename="projects")
 projects.register(
     r"comments/fields",
     FieldCommentViewSet,
-    base_name="project-field-comments",
+    basename="project-field-comments",
     parents_query_lookups=["project"],
 )
 projects.register(
     r"comments",
     CommentViewSet,
-    base_name="project-comments",
+    basename="project-comments",
     parents_query_lookups=["project"],
 )
 

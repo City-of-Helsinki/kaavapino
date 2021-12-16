@@ -31,8 +31,7 @@ RUN dnf install -y \
     vim
 
 # Upgrade pip
-# Note: not working on bitbucket pipeline
-# RUN pip install -U pip
+RUN pip install -U pip
 
 RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapinouser
 RUN mkdir -p $STATIC_ROOT $MEDIA_ROOT

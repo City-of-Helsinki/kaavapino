@@ -16,14 +16,14 @@ services:
     build:
       target: "test"
       context: "."
-      args:
-        BUILD_MODE: ${BUILD_MODE}
-        LOCAL_REDHAT_USERNAME: ${REDHAT_USERNAME}
-        LOCAL_REDHAT_PASSWORD: ${REDHAT_PASSWORD}
-    entrypoint: /entrypoint/docker-entrypoint.sh
+      #dockerfile: Dockerfile_local_with_subscription
+      #args:
+      #  REDHAT_USERNAME:
+      #  REDHAT_PASSWORD:
+    entrypoint: /docker-entrypoint.sh
     image: kaavapino
     volumes:
-      - .:/code
+      - .:/kaavapino
     environment:
       - DEBUG=1
       - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
@@ -51,10 +51,15 @@ services:
     container_name: kaavapino-api
 
   django-q:
-    build: .
-    command: python /code/manage.py qcluster
+    build:
+      context: "."
+      #dockerfile: Dockerfile_local_with_subscription
+      #args:
+      #  REDHAT_USERNAME:
+      #  REDHAT_PASSWORD:
+    command: python /kaavapino/manage.py qcluster
     volumes:
-      - .:/code
+      - .:/kaavapino
     depends_on:
       - db
       - api
@@ -68,6 +73,10 @@ services:
       - GRAPH_API_APPLICATION_ID=
       - GRAPH_API_TENANT_ID=
       - GRAPH_API_CLIENT_SECRET=
+      - ALLOWED_HOSTS=localhost
+      - CSRF_TRUSTED_ORIGINS=
+      - DOCUMENT_EDIT_URL_FORMAT=
+
     container_name: kaavapino-django-q
 
 volumes:
