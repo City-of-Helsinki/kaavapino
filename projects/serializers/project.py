@@ -996,16 +996,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 get_attribute_label(data.get("old_value", None), labels)
                 get_attribute_label(data.get("new_value", None), labels)
 
-            # Check if attribute name contains [] and remove it
-            full_name = re.sub(r'\[(?:[^|\]]*\|)?([^\]]*)]', '', attribute_identifier)
-            names = full_name.split('.')
-            for name in names:
-                attribute = Attribute.objects.filter(identifier=name).first()
-                # log.info('%s: %s' % (name, attribute))
-                if attribute:
-                    labels.update({
-                        name: attribute.name,
-                    })
+            attribute = Attribute.objects.filter(identifier=attribute_identifier).first()
+            # log.info('%s: %s' % (attribute_identifier, attribute))
+            if attribute:
+                labels.update({
+                    attribute_identifier: attribute.name,
+                })
 
             return labels
 
@@ -1054,18 +1050,20 @@ class ProjectSerializer(serializers.ModelSerializer):
                 _action.data.get("attribute_identifier", None)
                 or _action.action_object.identifier
             )
-            updates[attribute_identifier] = {
-                "user": _action.actor.uuid,
-                "user_name": _action.actor.get_display_name(),
-                "timestamp": _action.timestamp,
-                "new_value": _action.data.get("new_value", None),
-                "old_value": _action.data.get("old_value", None),
-                "labels":  get_labels(
-                    attribute_identifier,
-                    _action.data,
-                    _action.data.get("labels", {}),
-                ),
-            }
+            # Filter out fieldset[x].attribute entries
+            if not '].' in attribute_identifier:
+                updates[attribute_identifier] = {
+                    "user": _action.actor.uuid,
+                    "user_name": _action.actor.get_display_name(),
+                    "timestamp": _action.timestamp,
+                    "new_value": _action.data.get("new_value", None),
+                    "old_value": _action.data.get("old_value", None),
+                    "labels":  get_labels(
+                        attribute_identifier,
+                        _action.data,
+                        _action.data.get("labels", {}),
+                    ),
+                }
 
         return updates
 
@@ -1803,7 +1801,11 @@ class ProjectSnapshotSerializer(ProjectSerializer):
             return getattr(project, static_property)
 
     def get_user(self, project):
-        return self._get_static_property(project, "user").uuid
+        value = getattr(project, "user")
+        if value:
+            return value.uuid
+
+        return self._get_static_property(project, "user")  # .uuid
 
     def get_name(self, project):
         return self._get_static_property(project, "name")
