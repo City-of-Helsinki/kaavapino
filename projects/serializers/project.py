@@ -977,33 +977,61 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _get_updates(project, cutoff=None):
-        def get_attribute_label(attribute_list, labels):
+        def get_attribute_schema(attribute_list, schema):
             if not attribute_list or type(attribute_list) != list:
                 return
 
             for attr in attribute_list:
-                for identifier, value in attr.items():
-                    attribute = Attribute.objects.filter(identifier=identifier).first()
+                if type(attr) == str:
+                    attribute = Attribute.objects.filter(identifier=attr).first()
                     if attribute:
-                        labels.update({
-                            attribute.identifier: attribute.name,
+                        schema.update({
+                            attribute.identifier: {
+                                'label': attribute.name,
+                                'type': attribute.value_type,
+                            },
                         })
-                    if type(value) == list:
-                        get_attribute_label(value, labels)
+                elif type(attr) == dict:
+                    for identifier, value in attr.items():
+                        attribute = Attribute.objects.filter(identifier=identifier).first()
+                        if attribute:
+                            schema.update({
+                                attribute.identifier: {
+                                    'label': attribute.name,
+                                    'type': attribute.value_type,
+                                },
+                            })
+                        if type(value) == list:
+                            get_attribute_schema(value, schema)
+                else:
+                    log.warn('Unsupported schema format: %r' % attr)
 
-        def get_labels(attribute_identifier, data, labels):
-            if not labels:
-                get_attribute_label(data.get("old_value", None), labels)
-                get_attribute_label(data.get("new_value", None), labels)
+        def get_schema(attribute_identifier, data, labels):
+            schema = {}
 
             attribute = Attribute.objects.filter(identifier=attribute_identifier).first()
             # log.info('%s: %s' % (attribute_identifier, attribute))
             if attribute:
-                labels.update({
-                    attribute_identifier: attribute.name,
+                schema.update({
+                    attribute_identifier: {
+                        'label': attribute.name,
+                        'type': attribute.value_type,
+                    },
                 })
 
-            return labels
+            get_attribute_schema(data.get("old_value", None), schema)
+            get_attribute_schema(data.get("new_value", None), schema)
+
+            if labels:
+                for key, value in labels.items():
+                    schema.update({
+                        key: {
+                            'label': value,
+                            'type': Attribute.TYPE_LONG_STRING,
+                        },
+                    })
+
+            return schema
 
         # Get the latest attribute updates for distinct attributes
         if cutoff:
@@ -1058,7 +1086,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     "timestamp": _action.timestamp,
                     "new_value": _action.data.get("new_value", None),
                     "old_value": _action.data.get("old_value", None),
-                    "labels":  get_labels(
+                    "schema":  get_schema(
                         attribute_identifier,
                         _action.data,
                         _action.data.get("labels", {}),
