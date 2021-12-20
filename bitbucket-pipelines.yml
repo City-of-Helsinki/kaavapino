@@ -3,7 +3,16 @@
 # Only use spaces to indent your .yml configuration.
 # -----
 # You can specify a custom docker image from Docker Hub as your build environment.
-image: python:3.7.3
+image: python:3.9
+
+# Required when compiling from source
+# options:
+#   size: 2x
+
+# definitions:
+#   services:
+#     docker:
+#       memory: 4048
 
 pipelines:
   default:
@@ -20,7 +29,7 @@ pipelines:
             - docker
           script:
           - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
-          - docker build -f Dockerfile_unikie_dev_cluster -t kleklekle/spia:kaavapino-api-$BITBUCKET_BUILD_NUMBER-$BITBUCKET_COMMIT .
+          - docker build -f Dockerfile_unikie_dev_cluster -t kleklekle/spia:kaavapino-api-$BITBUCKET_BUILD_NUMBER-$BITBUCKET_COMMIT --build-arg REDHAT_USERNAME=$REDHAT_USERNAME --build-arg REDHAT_PASSWORD=$REDHAT_PASSWORD .
           - docker push kleklekle/spia:kaavapino-api-$BITBUCKET_BUILD_NUMBER-$BITBUCKET_COMMIT
           services:
           - docker

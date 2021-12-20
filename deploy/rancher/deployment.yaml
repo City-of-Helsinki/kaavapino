@@ -30,6 +30,9 @@ spec:
       labels:
         app: api
     spec:
+      securityContext:
+        runAsUser: 1002
+        fsGroup: 1003
       imagePullSecrets:
       - name: dockerhub-kaavapino
       volumes:
@@ -40,7 +43,7 @@ spec:
       - name: api
         image: kleklekle/spia:kaavapino-api-${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
         volumeMounts:
-        - mountPath: "/code/media"
+        - mountPath: "/srv/media"
           name: media
         ports:
         - containerPort: 8000
@@ -183,6 +186,9 @@ spec:
       labels:
         app: api-django-q
     spec:
+      securityContext:
+        runAsUser: 1002
+        fsGroup: 1003
       imagePullSecrets:
       - name: dockerhub-kaavapino
       volumes:
@@ -193,7 +199,7 @@ spec:
       - name: api
         image: kleklekle/spia:kaavapino-api-${CICD_EXECUTION_SEQUENCE}-${CICD_GIT_COMMIT}
         volumeMounts:
-        - mountPath: "/code/media"
+        - mountPath: "/srv/media"
           name: media
           readOnly: true
         env:

@@ -590,7 +590,9 @@ class Project(models.Model):
 
         def add_search_field_for_attribute(search_fields, attr):
             if attr.static_property:
-                search_fields.add(attr.static_property)
+                value = getattr(self, attr.static_property, None)
+                if value:
+                    search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
             elif not attr.fieldset_attribute_target.count():
                 value = self.attribute_data.get(attr.identifier)
                 if value and attr.value_type != Attribute.TYPE_FIELDSET:

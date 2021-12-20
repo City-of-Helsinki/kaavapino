@@ -315,9 +315,10 @@ def distinct(value, key):
     if value and type(value) is list:
         checked = set()
         filtered = [e for e in value
-            if e[key] and e[key] not in checked
-            and not checked.add(e[key])
+            if e.get(key) and e.get(key) not in checked
+            and not checked.add(e.get(key))
         ]
+
         return filtered
 
     return value
