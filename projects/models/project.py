@@ -2,20 +2,18 @@ import datetime
 import itertools
 import logging
 
-from django.contrib.postgres.fields.jsonb import KeyTextTransform
-from django.db.models.expressions import Value
-
 from actstream import action
 from django.conf import settings
 from django.contrib.gis.db import models
-from django.contrib.postgres.fields import JSONField, ArrayField
+from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
+from django.db.models.expressions import Value
 from django.urls import reverse_lazy
 from django.utils import timezone
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from private_storage.fields import PrivateFileField
 from PIL import Image, ImageOps
 
@@ -49,7 +47,7 @@ class ProjectType(models.Model):
     """Types of projects that the system supports e.g. asemakaava/city plan."""
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
-    metadata = JSONField(
+    metadata = models.JSONField(
         verbose_name=_("metadata"),
         default=dict,
         blank=True,
@@ -75,7 +73,7 @@ class ProjectSubtype(models.Model):
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
-    metadata = JSONField(
+    metadata = models.JSONField(
         verbose_name=_("metadata"),
         default=dict,
         blank=True,
@@ -133,7 +131,7 @@ class Project(models.Model):
         related_name="projects",
         on_delete=models.PROTECT,
     )
-    attribute_data = JSONField(
+    attribute_data = models.JSONField(
         verbose_name=_("attribute data"),
         default=dict,
         blank=True,
@@ -764,7 +762,7 @@ class ProjectPhase(models.Model):
     )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
-    metadata = JSONField(
+    metadata = models.JSONField(
         verbose_name=_("metadata"),
         default=dict,
         blank=True,

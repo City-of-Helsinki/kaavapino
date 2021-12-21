@@ -2,12 +2,11 @@ import re
 from datetime import datetime
 
 from django.contrib.gis.db import models
-from django.db.models import Q
+from django.db.models import JSONField, Q
 from django.db.models.functions import Cast
 from django.db.models.fields.related import ForeignKey
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
-from django.contrib.postgres.fields import JSONField
 from django.contrib.postgres.fields.jsonb import KeyTextTransform
 from django.core.serializers.json import DjangoJSONEncoder
 
@@ -102,7 +101,7 @@ class ReportColumn(models.Model):
         verbose_name=_("use column values as titles in preview"),
         default=False,
     )
-    custom_display_mapping = JSONField(
+    custom_display_mapping = models.JSONField(
         default=dict,
         blank=True,
         null=True,
