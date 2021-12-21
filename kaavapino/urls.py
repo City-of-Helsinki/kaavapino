@@ -41,7 +41,6 @@ urlpatterns = [
         PersonnelDetail.as_view(),
         name="personneldetail"
     ),
-
     re_path(
         r"{}projects/(?P<path>.*)$".format(MEDIA_URL),
         project_views.ProjectAttributeFileDownloadView.as_view(),

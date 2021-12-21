@@ -138,9 +138,9 @@ INSTALLED_APPS = [
     "projects",
     "sitecontent",
     "social_django",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
+    # "allauth",
+    # "allauth.account",
+    # "allauth.socialaccount",
     "private_storage",
     "corsheaders",
     "actstream",
@@ -185,7 +185,7 @@ TEMPLATES = [
 #
 SITE_ID = 1
 AUTH_USER_MODEL = "users.User"
-SOCIALACCOUNT_PROVIDERS = {"helsinki_oidc": {"VERIFIED_EMAIL": True}}
+# SOCIALACCOUNT_PROVIDERS = {"helsinki_oidc": {"VERIFIED_EMAIL": True}}
 AUTHENTICATION_BACKENDS = [
     'helusers.tunnistamo_oidc.TunnistamoOIDCAuth',
     'django.contrib.auth.backends.ModelBackend',
@@ -193,10 +193,10 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_REDIRECT_URL = "/admin/"
 LOGOUT_REDIRECT_URL = "/admin/"
 ACCOUNT_LOGOUT_ON_GET = True
-SOCIALACCOUNT_ADAPTER = "helusers.adapter.SocialAccountAdapter"
-SOCIALACCOUNT_QUERY_EMAIL = True
-SOCIALACCOUNT_EMAIL_REQUIRED = True
-SOCIALACCOUNT_AUTO_SIGNUP = True
+# SOCIALACCOUNT_ADAPTER = "helusers.adapter.SocialAccountAdapter"
+# SOCIALACCOUNT_QUERY_EMAIL = True
+# SOCIALACCOUNT_EMAIL_REQUIRED = True
+# SOCIALACCOUNT_AUTO_SIGNUP = True
 
 OIDC_AUTH = {"OIDC_LEEWAY": 3600}
 
@@ -266,3 +266,6 @@ Q_CLUSTER = {
     "timeout": 1800,
     "max_attempts": 1,
 }
+
+# TODO: Enable in production
+# HELUSERS_PASSWORD_LOGIN_DISABLED = True
