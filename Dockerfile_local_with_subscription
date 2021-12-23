@@ -5,8 +5,8 @@ ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND noninteractive
 ENV APP_NAME kaavapino
 # Set defaults for Django paths as appropriate for this container
-ENV STATIC_ROOT /srv/static
-ENV MEDIA_ROOT /srv/media
+#ENV STATIC_ROOT /srv/static
+#ENV MEDIA_ROOT /srv/media
 
 USER root
 
@@ -31,43 +31,43 @@ RUN dnf install -y \
     vim
 
 # Upgrade pip
-# Note: not working on bitbucket pipeline
-# RUN pip install -U pip
+RUN pip install -U pip
 
 RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapinouser
-RUN mkdir -p $STATIC_ROOT $MEDIA_ROOT
+#RUN mkdir -p $STATIC_ROOT $MEDIA_ROOT
 
 #RUN subscription-manager remove --all || :
 #RUN subscription-manager unregister || :
 #RUN subscription-manager clean || :
 
+
 ##### Test image #####
 FROM base AS test
 
 # Install python dependencies
-COPY requirements.txt /$APP_NAME/
-COPY requirements-dev.txt /$APP_NAME/
+ADD requirements.txt /$APP_NAME/
+ADD requirements-dev.txt /$APP_NAME/
 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements-dev.txt
 
 # Add entrypoint script
-COPY docker-entrypoint.sh /
+ADD docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
 
 
 ##### Server image #####
 FROM base AS deploy
 
-COPY requirements.txt .
-COPY deploy/requirements.txt ./deploy/requirements.txt
+ADD requirements.txt .
+ADD deploy/requirements.txt ./deploy/requirements.txt
 RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 
 COPY . .
 
-RUN chown -Rh kaavapinouser:kaavapinogroup /$APP_NAME
-RUN chown -Rh kaavapinouser:kaavapinogroup /$STATIC_ROOT
-RUN chown -Rh kaavapinouser:kaavapinogroup /$MEDIA_ROOT
+#RUN chown -Rh kaavapinouser:kaavapinogroup /$APP_NAME
+#RUN chown -Rh kaavapinouser:kaavapinogroup /$STATIC_ROOT
+#RUN chown -Rh kaavapinouser:kaavapinogroup /$MEDIA_ROOT
 
 USER kaavapinouser
 

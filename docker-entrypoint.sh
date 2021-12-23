@@ -15,15 +15,15 @@ echo "Database found!"
 
 # Create cache table
 echo "Creating cache table"
-python /code/manage.py createcachetable
+python manage.py createcachetable
 
 # Apply database migrations
 echo "Applying database migrations"
-python /code/manage.py migrate --noinput
+python manage.py migrate --noinput
 
 # Create missing default task schedules
 echo "Creating task schedules"
-python /code/manage.py schedule_tasks
+python manage.py schedule_tasks
 
 set -e
 # Start server

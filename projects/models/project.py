@@ -1,23 +1,30 @@
 import datetime
 import itertools
+import logging
 
 from actstream import action
 from django.conf import settings
 from django.contrib.gis.db import models
-from django.contrib.postgres.fields import JSONField, ArrayField
+from django.contrib.postgres.fields import ArrayField
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
+from django.db.models.expressions import Value
 from django.urls import reverse_lazy
 from django.utils import timezone
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from private_storage.fields import PrivateFileField
 from PIL import Image, ImageOps
 
 from projects.actions import verbs
+from projects.helpers import get_in_personnel_data, set_ad_data_in_attribute_data
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
 from .projectcomment import FieldComment
+
+log = logging.getLogger(__name__)
 
 
 class BaseAttributeMatrixStructure(models.Model):
@@ -40,7 +47,7 @@ class ProjectType(models.Model):
     """Types of projects that the system supports e.g. asemakaava/city plan."""
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
-    metadata = JSONField(
+    metadata = models.JSONField(
         verbose_name=_("metadata"),
         default=dict,
         blank=True,
@@ -66,7 +73,7 @@ class ProjectSubtype(models.Model):
     )
 
     name = models.CharField(max_length=255, verbose_name=_("name"))
-    metadata = JSONField(
+    metadata = models.JSONField(
         verbose_name=_("metadata"),
         default=dict,
         blank=True,
@@ -124,7 +131,7 @@ class Project(models.Model):
         related_name="projects",
         on_delete=models.PROTECT,
     )
-    attribute_data = JSONField(
+    attribute_data = models.JSONField(
         verbose_name=_("attribute data"),
         default=dict,
         blank=True,
@@ -156,10 +163,14 @@ class Project(models.Model):
     onhold = models.BooleanField(default=False)
     owner_edit_override = models.BooleanField(default=False)
 
+    # For indexing
+    vector_column = SearchVectorField(null=True)
+
     class Meta:
         verbose_name = _("project")
         verbose_name_plural = _("projects")
         ordering = ("name",)
+        indexes = (GinIndex(fields=["vector_column"]),)
 
     def __str__(self):
         return self.name
@@ -553,6 +564,68 @@ class Project(models.Model):
         return True
 
     def save(self, *args, **kwargs):
+        def add_fieldset_field_for_attribute(search_fields, attr, fieldset):
+            key = attr.identifier
+            while attr.fieldset_attribute_target.count():
+                attr = attr.fieldset_attribute_target.get().attribute_source
+                if not fieldset:
+                    fieldset = self.attribute_data.get(attr.identifier)
+                if not fieldset:
+                    return
+
+                for field in fieldset:
+                    value = field.get(key)
+                    # log.info('%s__%s: %s' % (attr.identifier, key, value))
+                    if not value:
+                        continue
+
+                    if type(value) is list and attr.value_type == Attribute.TYPE_FIELDSET:
+                        sources = FieldSetAttribute.objects.filter(attribute_source__identifier=key)
+                        for source in sources:
+                            add_fieldset_field_for_attribute(search_fields, source.attribute_target, value)
+                    else:
+                        search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
+
+        def add_search_field_for_attribute(search_fields, attr):
+            if attr.static_property:
+                value = getattr(self, attr.static_property, None)
+                if value:
+                    search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
+            elif not attr.fieldset_attribute_target.count():
+                value = self.attribute_data.get(attr.identifier)
+                if value and attr.value_type != Attribute.TYPE_FIELDSET:
+                    search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
+            else:
+                add_fieldset_field_for_attribute(search_fields, attr, None)
+
+            return
+
+        def check_get_name(value):
+            if type(value) != str:
+                return value
+
+            from uuid import UUID
+
+            try:
+                _ = UUID(value, version=4)
+            except ValueError:
+                return value
+
+            return get_in_personnel_data(value, 'name', False)
+
+        # TODO: check if required
+        # set_ad_data_in_attribute_data(self.attribute_data)
+        search_fields = set()
+        for attr in Attribute.objects.filter(searchable=True):
+            add_search_field_for_attribute(search_fields, attr)
+
+        search_fields.add(Value(self.subtype, output_field=models.TextField()))
+        search_fields.add(Value(self.user, output_field=models.TextField()))
+
+        # log.info(search_fields)
+
+        self.vector_column = SearchVector(*list(search_fields))
+
         super(Project, self).save(*args, **kwargs)
         if not self.pino_number:
             self.pino_number = str(self.pk).zfill(7)
@@ -689,7 +762,7 @@ class ProjectPhase(models.Model):
     )
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
-    metadata = JSONField(
+    metadata = models.JSONField(
         verbose_name=_("metadata"),
         default=dict,
         blank=True,

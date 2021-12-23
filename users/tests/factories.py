@@ -3,7 +3,7 @@ import factory
 from users.models import User
 
 
-class UserFactory(factory.DjangoModelFactory):
+class UserFactory(factory.django.DjangoModelFactory):
     first_name = factory.Faker("first_name", locale="fi_FI")
     last_name = factory.Faker("last_name", locale="fi_FI")
     username = factory.LazyAttribute(

@@ -560,25 +560,26 @@ def _add_paths(paths, solved_path, remaining_path, parent_data):
             child,
         )
 
+def get_in_personnel_data(id, key, is_kaavapino_user):
+    User = get_user_model()
+
+    if is_kaavapino_user:
+        try:
+            id = id.uuid
+        except AttributeError:
+            pass
+
+        try:
+            id = User.objects.get(uuid=id).ad_id
+        except (User.DoesNotExist, ValidationError):
+            return None
+
+    user = get_ad_user(id)
+    return PersonnelSerializer(user).data.get(key)
+
 def set_ad_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
-    User = get_user_model()
     paths = []
-
-    def get_in_personnel_data(id, key, is_kaavapino_user):
-        if is_kaavapino_user:
-            try:
-                id = id.uuid
-            except AttributeError:
-                pass
-
-            try:
-                id = User.objects.get(uuid=id).ad_id
-            except (User.DoesNotExist, ValidationError):
-                return None
-
-        user = get_ad_user(id)
-        return PersonnelSerializer(user).data.get(key)
 
     for attr in Attribute.objects.filter(
         ad_key_attribute__isnull=False,

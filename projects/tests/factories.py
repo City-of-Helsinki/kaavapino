@@ -32,7 +32,7 @@ __all__ = (
 )
 
 
-class AttributeFactory(factory.DjangoModelFactory):
+class AttributeFactory(factory.django.DjangoModelFactory):
     name = fuzzy.FuzzyText(prefix="Attribute ", length=16)
     help_text = factory.Sequence(lambda n: f"Help for attribute {n}")
     value_type = Attribute.TYPE_SHORT_STRING
@@ -42,7 +42,7 @@ class AttributeFactory(factory.DjangoModelFactory):
         model = Attribute
 
 
-class FieldSetAttributeFactory(factory.DjangoModelFactory):
+class FieldSetAttributeFactory(factory.django.DjangoModelFactory):
     attribute_source = factory.SubFactory(AttributeFactory)
     attribute_target = factory.SubFactory(AttributeFactory)
 
@@ -50,7 +50,7 @@ class FieldSetAttributeFactory(factory.DjangoModelFactory):
         model = FieldSetAttribute
 
 
-class ProjectTypeFactory(factory.DjangoModelFactory):
+class ProjectTypeFactory(factory.django.DjangoModelFactory):
     name = "asemakaava"
 
     class Meta:
@@ -58,7 +58,7 @@ class ProjectTypeFactory(factory.DjangoModelFactory):
         django_get_or_create = ("name",)
 
 
-class ProjectSubtypeFactory(factory.DjangoModelFactory):
+class ProjectSubtypeFactory(factory.django.DjangoModelFactory):
     project_type = factory.SubFactory(ProjectTypeFactory)
     name = factory.fuzzy.FuzzyChoice(["XS", "S", "M", "L", "XL"])
     index = factory.Sequence(int)
@@ -68,14 +68,14 @@ class ProjectSubtypeFactory(factory.DjangoModelFactory):
         django_get_or_create = ("name", "project_type")
 
 
-class CommonProjectPhaseFactory(factory.DjangoModelFactory):
+class CommonProjectPhaseFactory(factory.django.DjangoModelFactory):
     name = fuzzy.FuzzyText()
 
     class Meta:
         model = CommonProjectPhase
 
 
-class ProjectPhaseFactory(factory.DjangoModelFactory):
+class ProjectPhaseFactory(factory.django.DjangoModelFactory):
     common_project_phase = factory.SubFactory(CommonProjectPhaseFactory)
     project_subtype = factory.SubFactory(ProjectSubtypeFactory)
     index = factory.Sequence(int)
@@ -84,7 +84,7 @@ class ProjectPhaseFactory(factory.DjangoModelFactory):
         model = ProjectPhase
 
 
-class ProjectPhaseSectionFactory(factory.DjangoModelFactory):
+class ProjectPhaseSectionFactory(factory.django.DjangoModelFactory):
     phase = factory.SubFactory(ProjectPhaseFactory)
     name = fuzzy.FuzzyText()
     index = factory.Sequence(int)
@@ -93,7 +93,7 @@ class ProjectPhaseSectionFactory(factory.DjangoModelFactory):
         model = ProjectPhaseSection
 
 
-class ProjectPhaseSectionAttributeFactory(factory.DjangoModelFactory):
+class ProjectPhaseSectionAttributeFactory(factory.django.DjangoModelFactory):
     attribute = factory.SubFactory(AttributeFactory)
     section = factory.SubFactory(ProjectPhaseSectionFactory)
     index = factory.Sequence(int)
@@ -102,7 +102,7 @@ class ProjectPhaseSectionAttributeFactory(factory.DjangoModelFactory):
         model = ProjectPhaseSectionAttribute
 
 
-class ProjectFactory(factory.DjangoModelFactory):
+class ProjectFactory(factory.django.DjangoModelFactory):
     identifier = fuzzy.FuzzyText()
     name = factory.Faker("street_name")
     user = factory.SubFactory(UserFactory)
@@ -114,7 +114,7 @@ class ProjectFactory(factory.DjangoModelFactory):
         model = Project
 
 
-class CommentFactory(factory.DjangoModelFactory):
+class CommentFactory(factory.django.DjangoModelFactory):
     content = factory.Faker("sentence")
     user = factory.SubFactory(UserFactory)
     project = factory.SubFactory(ProjectFactory)
@@ -123,7 +123,7 @@ class CommentFactory(factory.DjangoModelFactory):
         model = ProjectComment
 
 
-class ReportFactory(factory.DjangoModelFactory):
+class ReportFactory(factory.django.DjangoModelFactory):
     project_type = factory.SubFactory(ProjectTypeFactory)
     name = fuzzy.FuzzyText()
     show_created_at = True
@@ -132,7 +132,7 @@ class ReportFactory(factory.DjangoModelFactory):
         model = Report
 
 
-class ReportFilterFactory(factory.DjangoModelFactory):
+class ReportFilterFactory(factory.django.DjangoModelFactory):
     name = fuzzy.FuzzyText()
     identifier = fuzzy.FuzzyText(prefix="attribute", length=16)
     type = "exact"

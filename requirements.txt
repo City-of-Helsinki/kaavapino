@@ -4,73 +4,76 @@
 #
 --no-binary psycopg2
 
-arrow==1.1.0              # via django-q
-blessed==1.18.0           # via django-q
-certifi==2020.6.20        # via requests, skyfield
-cffi==1.14.3              # via cryptography
-chardet==3.0.4            # via requests
-croniter==1.0.13
-cryptography==3.1.1       # via social-auth-core
-defusedxml==0.6.0         # via python3-openid, social-auth-core
-django==2.2.13
-git+https://github.com/andersinno/django-activity-stream.git#egg=django-activity-stream==0.7.0
-django-admin-sortable2==1.0.2
-django-allauth==0.42.0
-django-cors-headers==3.4.0
+arrow==1.2.1              # via django-q
+asgiref==3.4.1            # via django
+blessed==1.19.0           # via django-q
+cachetools==4.2.4         # via django-helusers
+certifi==2021.10.8        # via requests
+cffi==1.15.0              # via cryptography
+charset-normalizer==2.0.9  # via requests
+convertdate==2.3.2        # via workalendar
+croniter==1.1.0
+cryptography==36.0.1      # via pyjwt, social-auth-core
+defusedxml==0.7.1         # via python3-openid, social-auth-core
+deprecation==2.1.0        # via django-helusers
+django==3.2.10
+django-activity-stream==0.10.0
+django-admin-sortable2==1.0.3
+django-allauth==0.47.0
+django-cors-headers==3.10.1
 django-environ==0.4.5
 django-extended-choices==1.3.3
-django-filter==2.3.0
-django-helusers==0.5.6
+django-filter==21.1
+django-helusers==0.7.0
 django-jsonfield-compat==0.4.4
 django-picklefield==3.0.1  # via django-q
-django-private-storage==2.2.2
-django-q==1.3.6
-djangorestframework==3.10.0
-djangorestframework-gis==0.15
-docxtpl==0.10.0
-drf-extensions==0.4.0
-drf-oidc-auth==0.10.0     # via django-helusers
-ecdsa==0.14.1             # via python-jose
-et-xmlfile==1.0.1         # via openpyxl
+django-private-storage==3.0
+django-q==1.3.9
+djangorestframework==3.13.1
+djangorestframework-gis==0.17
+docxcompose==1.3.4        # via docxtpl
+docxtpl==0.15.1
+drf-extensions==0.7.1
+drf-oidc-auth==0.10.0
+ecdsa==0.17.0             # via python-jose
+et-xmlfile==1.1.0         # via openpyxl
 future==0.18.2            # via pyjwkest
-idna==2.9                 # via requests
-jdcal==1.4.1              # via openpyxl
-jinja2==2.11.2            # via docxtpl
-jplephem==2.15            # via skyfield
+idna==3.3                 # via requests
+jinja2==3.0.3             # via docxtpl
 lunardate==0.2.0          # via workalendar
-lxml==4.5.1               # via docxtpl, python-docx
-markupsafe==1.1.1         # via jinja2
-numpy==1.19.2             # via jplephem, skyfield
-oauthlib==3.1.0           # via requests-oauthlib, social-auth-core
-openpyxl==3.0.3
-pillow==8.3.1
-psycopg2==2.8.5
+lxml==4.7.1               # via docxcompose, docxtpl, python-docx
+markupsafe==2.0.1         # via jinja2
+numpy==1.21.5
+oauthlib==3.1.1           # via requests-oauthlib, social-auth-core
+openpyxl==3.0.9
+packaging==21.3           # via deprecation
+pillow==8.4.0
+psycopg2==2.9.2
 pyasn1==0.4.8             # via python-jose, rsa
-pycalverter==1.6.1        # via workalendar
-pycparser==2.20           # via cffi
-pycryptodomex==3.9.8      # via pyjwkest
+pycparser==2.21           # via cffi
+pycryptodomex==3.12.0     # via pyjwkest
 pyjwkest==1.4.2           # via drf-oidc-auth
-pyjwt==1.7.1              # via social-auth-core
-pyluach==1.1.1            # via workalendar
-python-dateutil==2.8.1    # via arrow, croniter, workalendar
-python-docx==0.8.10       # via docxtpl
-python-jose==3.2.0        # via django-helusers
+pyjwt[crypto]==2.3.0      # via django-allauth, social-auth-core
+pyluach==1.3.0            # via workalendar
+pymeeus==0.5.11           # via convertdate
+pyparsing==3.0.6          # via packaging
+python-dateutil==2.8.2    # via arrow, croniter, workalendar
+python-docx==0.8.11       # via docxcompose, docxtpl
+python-jose==3.3.0        # via django-helusers
 python3-openid==3.2.0     # via django-allauth, social-auth-core
-pytz==2020.1              # via django, workalendar
+pytz==2021.3              # via django, convertdate, djangorestframework
 raven==6.10.0
-requests==2.24.0          # via django-allauth, django-helusers, pyjwkest, requests-oauthlib, social-auth-core
+redis==3.5.3              # via django-q
+requests==2.26.0          # via django-allauth, django-helusers, pyjwkest, requests-oauthlib, social-auth-core
 requests-oauthlib==1.3.0  # via django-allauth, social-auth-core
-rsa==4.6                  # via python-jose
-sgp4==2.13                # via skyfield
-six==1.15.0               # via blessed, cryptography, django-extended-choices, docxtpl, ecdsa, pyjwkest, python-dateutil, python-jose, social-auth-app-django, social-auth-core
-skyfield==1.30            # via workalendar
-skyfield-data==1.1.0      # via workalendar
-social-auth-app-django==4.0.0
-social-auth-core==3.3.3   # via social-auth-app-django
-sqlparse==0.3.1           # via django
-urllib3==1.25.9           # via requests
+rsa==4.8                  # via python-jose
+six==1.16.0               # via blessed, django-extended-choices, docxcompose, docxtpl, ecdsa, pyjwkest, python-dateutil
+social-auth-app-django==5.0.0
+social-auth-core==4.1.0   # via social-auth-app-django
+sqlparse==0.4.2           # via django
+urllib3==1.26.7           # via requests
 wcwidth==0.2.5            # via blessed
-workalendar==11.0.1
+workalendar==16.2.0
 
 # The following packages are considered to be unsafe in a requirements file:
-# setuptools                # via workalendar
+# setuptools                # via docxcompose

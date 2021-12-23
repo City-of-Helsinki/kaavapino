@@ -14,7 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
 from django.db.models import Prefetch, Q
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from rest_framework.response import Response
@@ -542,10 +542,18 @@ class ProjectSerializer(serializers.ModelSerializer):
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     deadlines = serializers.SerializerMethodField()
-    public = serializers.NullBooleanField(required=False, read_only=True)
-    owner_edit_override = serializers.NullBooleanField(required=False, read_only=True)
-    archived = serializers.NullBooleanField(required=False, read_only=True)
-    onhold = serializers.NullBooleanField(required=False, read_only=True)
+    public = serializers.BooleanField(
+        allow_null=True, required=False, read_only=True,
+    )
+    owner_edit_override = serializers.BooleanField(
+        allow_null=True, required=False, read_only=True,
+    )
+    archived = serializers.BooleanField(
+        allow_null=True, required=False, read_only=True,
+    )
+    onhold = serializers.BooleanField(
+        allow_null=True, required=False, read_only=True,
+    )
     generated_deadline_attributes = serializers.SerializerMethodField()
     geoserver_data = serializers.SerializerMethodField()
     phase_documents_created = serializers.SerializerMethodField()
@@ -644,8 +652,12 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         try:
             if request.user.uuid == self.instance.user.uuid:
-                fields["public"] = serializers.NullBooleanField(required=False)
-                fields["onhold"] = serializers.NullBooleanField(required=False)
+                fields["public"] = serializers.BooleanField(
+                    allow_null=True, required=False,
+                )
+                fields["onhold"] = serializers.BooleanField(
+                    allow_null=True, required=False,
+                )
         except AttributeError:
             pass
 
@@ -1815,10 +1827,18 @@ class AdminProjectSerializer(ProjectSerializer):
         fields = super(AdminProjectSerializer, self).get_fields()
         request = self.context.get('request', None)
 
-        fields["archived"] = serializers.NullBooleanField(required=False)
-        fields["public"] = serializers.NullBooleanField(required=False)
-        fields["owner_edit_override"] = serializers.NullBooleanField(required=False)
-        fields["onhold"] = serializers.NullBooleanField(required=False)
+        fields["archived"] = serializers.BooleanField(
+            allow_null=True, required=False,
+        )
+        fields["public"] = serializers.BooleanField(
+            allow_null=True, required=False,
+        )
+        fields["owner_edit_override"] = serializers.BooleanField(
+            allow_null=True, required=False,
+        )
+        fields["onhold"] = serializers.BooleanField(
+            allow_null=True, required=False,
+        )
 
         return fields
 
