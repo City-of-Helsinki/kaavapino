@@ -29,6 +29,11 @@ MEDIA_URL = (
 )
 
 urlpatterns = [
+    path(
+        "admin/upload_specifications",
+        project_views.UploadSpecifications.as_view(),
+        name="admin_upload_specifications",
+    ),
     path("admin/", admin.site.urls),
     path('pysocial/', include('social_django.urls', namespace='social')),
     path('helauth/', include('helusers.urls')),
@@ -50,11 +55,6 @@ urlpatterns = [
         r"{}document_templates/(?P<path>.*)$".format(MEDIA_URL),
         project_views.DocumentTemplateDownloadView.as_view(),
         name="serve_private_document_template_file",
-    ),
-    re_path(
-        "admin/upload_specifications",
-        project_views.UploadSpecifications.as_view(),
-        name="admin_upload_specifications",
     ),
 ]
 
