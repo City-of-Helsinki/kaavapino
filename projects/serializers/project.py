@@ -1,7 +1,7 @@
 import copy
 import datetime
 import re
-
+import logging
 import numpy as np
 import requests
 from typing import List, NamedTuple, Type
@@ -60,6 +60,8 @@ from sitecontent.models import ListViewAttributeColumn
 from users.models import User
 from users.serializers import PersonnelSerializer, UserSerializer
 from users.helpers import get_graph_api_access_token
+
+log = logging.getLogger(__name__)
 
 
 class SectionData(NamedTuple):
@@ -669,7 +671,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if snapshot:
             attribute_data = {
                 k: v["new_value"]
-                for k, v in self._get_updates(project, cutoff=snapshot).items()
+                for k, v in self._get_updates(project, cutoff=snapshot, request=self.context.get('request', None)).items()
             }
         else:
             attribute_data = getattr(project, "attribute_data", {})
@@ -855,7 +857,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         query_params = getattr(self.context["request"], "GET", {})
         snapshot_param = query_params.get("snapshot")
         if not list_view and not snapshot_param:
-            metadata["updates"] = self._get_updates(project)
+            metadata["updates"] = self._get_updates(project, cutoff=None, request=self.context.get('request', None))
 
         created = project.target_actions.filter(verb=verbs.CREATED_PROJECT) \
             .prefetch_related("actor").first()
@@ -974,7 +976,93 @@ class ProjectSerializer(serializers.ModelSerializer):
         return values
 
     @staticmethod
-    def _get_updates(project, cutoff=None):
+    def _get_updates(project, cutoff=None, request=None):
+        def get_editable(attribute):
+            from users.models import privilege_as_int
+
+            if not request or not request.user:
+                return False
+
+            user = request.user
+            owner = request.query_params.get("owner", False)
+            is_owner = \
+                owner in ["1", "true", "True"] or \
+                project and project.user == user
+
+            privilege = privilege_as_int(user.privilege)
+
+            # owner can edit owner-editable fields regardless of their role
+            if is_owner and attribute.owner_editable:
+                return True
+            # check privilege for others
+            elif attribute.edit_privilege and \
+                privilege >= privilege_as_int(attribute.edit_privilege):
+                return True
+            else:
+                return False
+
+        def get_attribute_schema(attribute_list, schema):
+            if not attribute_list or type(attribute_list) != list:
+                return
+
+            for attr in attribute_list:
+                if type(attr) == str:
+                    attribute = Attribute.objects.filter(identifier=attr).first()
+                    if attribute:
+                        schema.update({
+                            attribute.identifier: {
+                                'label': attribute.name,
+                                'type': attribute.value_type,
+                                'autofill_readonly': bool(attribute.autofill_readonly),
+                                'editable': get_editable(attribute),
+                            },
+                        })
+                elif type(attr) == dict:
+                    for identifier, value in attr.items():
+                        attribute = Attribute.objects.filter(identifier=identifier).first()
+                        if attribute:
+                            schema.update({
+                                attribute.identifier: {
+                                    'label': attribute.name,
+                                    'type': attribute.value_type,
+                                    'autofill_readonly': bool(attribute.autofill_readonly),
+                                    'editable': get_editable(attribute),
+                                },
+                            })
+                        if type(value) == list:
+                            get_attribute_schema(value, schema)
+                else:
+                    log.warn('Unsupported schema format: %r' % attr)
+
+        def get_schema(attribute_identifier, data, labels):
+            schema = {}
+
+            attribute = Attribute.objects.filter(identifier=attribute_identifier).first()
+            # log.info('%s: %s' % (attribute_identifier, attribute))
+            if attribute:
+                schema.update({
+                    attribute_identifier: {
+                        'label': attribute.name,
+                        'type': attribute.value_type,
+                        'autofill_readonly': bool(attribute.autofill_readonly),
+                        'editable': get_editable(attribute),
+                    },
+                })
+
+            get_attribute_schema(data.get("old_value", None), schema)
+            get_attribute_schema(data.get("new_value", None), schema)
+
+            if labels:
+                for key, value in labels.items():
+                    schema.update({
+                        key: {
+                            'label': value,
+                            'type': Attribute.TYPE_LONG_STRING,
+                        },
+                    })
+
+            return schema
+
         # Get the latest attribute updates for distinct attributes
         if cutoff:
             actions = (
@@ -1020,14 +1108,20 @@ class ProjectSerializer(serializers.ModelSerializer):
                 _action.data.get("attribute_identifier", None)
                 or _action.action_object.identifier
             )
-            updates[attribute_identifier] = {
-                "user": _action.actor.uuid,
-                "user_name": _action.actor.get_display_name(),
-                "timestamp": _action.timestamp,
-                "new_value": _action.data.get("new_value", None),
-                "old_value": _action.data.get("old_value", None),
-                "labels": _action.data.get("labels", None),
-            }
+            # Filter out fieldset[x].attribute entries
+            if not '].' in attribute_identifier:
+                updates[attribute_identifier] = {
+                    "user": _action.actor.uuid,
+                    "user_name": _action.actor.get_display_name(),
+                    "timestamp": _action.timestamp,
+                    "new_value": _action.data.get("new_value", None),
+                    "old_value": _action.data.get("old_value", None),
+                    "schema":  get_schema(
+                        attribute_identifier,
+                        _action.data,
+                        _action.data.get("labels", {}),
+                    ),
+                }
 
         return updates
 
@@ -1765,7 +1859,11 @@ class ProjectSnapshotSerializer(ProjectSerializer):
             return getattr(project, static_property)
 
     def get_user(self, project):
-        return self._get_static_property(project, "user").uuid
+        value = getattr(project, "user")
+        if value:
+            return value.uuid
+
+        return self._get_static_property(project, "user")  # .uuid
 
     def get_name(self, project):
         return self._get_static_property(project, "name")
