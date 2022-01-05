@@ -3,7 +3,7 @@ import logging
 from actstream import action
 from django.core.management.base import BaseCommand, CommandError
 from django.core.serializers.json import json
-from django.utils.six.moves import input
+from six.moves import input
 
 from projects.actions import verbs
 from projects.models import Attribute, AttributeValueChoice, Project
