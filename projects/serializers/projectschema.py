@@ -1,4 +1,5 @@
 import re
+import logging
 from collections import namedtuple
 
 from django.db import models
@@ -22,6 +23,9 @@ from projects.models.project import (
 from projects.serializers.deadline import DeadlineSerializer
 from projects.serializers.utils import _is_attribute_required
 from users.models import privilege_as_int
+
+log = logging.getLogger(__name__)
+
 
 FOREIGN_KEY_TYPE_MODELS = {
     Attribute.TYPE_USER: {
@@ -96,7 +100,7 @@ class ConditionSerializer(serializers.Serializer):
 
 class AutofillRuleSerializer(serializers.Serializer):
     condition = serializers.SerializerMethodField()
-    conditions = serializers.ListField(child=ConditionSerializer())
+    conditions = serializers.SerializerMethodField()
     then_branch = serializers.CharField()
     else_branch = serializers.CharField()
     variables = serializers.ListField(child=serializers.CharField())
@@ -105,6 +109,19 @@ class AutofillRuleSerializer(serializers.Serializer):
     def get_condition(self, autofill_rule):
         if len(autofill_rule.get("conditions")) == 1:
             return autofill_rule.get("conditions")[0]
+
+    # Hide conditions if only single condition exists
+    # TODO only `conditions` should be used to allow multiple OR's
+    # but currently frontend does not support it
+    def get_conditions(self, autofill_rule):
+        conditions = autofill_rule.get("conditions", [])
+        if conditions and len(conditions) > 1:
+            serialized = []
+            for condition in conditions:
+                serializer = ConditionSerializer(condition)
+                serialized.append(serializer.data)
+            return serialized
+        return None
 
 
 class SimpleAttributeSerializer(serializers.Serializer):
