@@ -17,7 +17,7 @@ from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -118,7 +118,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
-    permission_classes = (ProjectPermissions,)
+    permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
     try:
         ordering_fields = [
@@ -253,7 +253,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=True,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
     )
     def simple(self, request, pk):
         return Response(SimpleProjectSerializer(self.get_object()).data)
@@ -262,7 +262,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         methods=["put"],
         detail=True,
         parser_classes=[MultiPartParser],
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
     )
     def files(self, request, pk=None):
         project = self.get_object()
@@ -283,7 +283,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=True,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
     )
     def external_documents(self, request, pk):
         project = self.get_object()
@@ -402,7 +402,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/filters",
         url_name="projects-overview-filters",
     )
@@ -432,7 +432,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/floor_area",
         url_name="projects-overview-floor-area"
     )
@@ -599,7 +599,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/by_subtype",
         url_name="projects-overview-by-subtype"
     )
@@ -639,7 +639,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/on_map",
         url_name="projects-overview-on-map"
     )
@@ -729,7 +729,7 @@ class ProjectAttributeFileDownloadView(
 class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = FieldComment.objects.all().select_related("user")
     serializer_class = FieldCommentSerializer
-    permission_classes = (CommentPermissions,)
+    permission_classes = [IsAuthenticated, CommentPermissions]
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ("created_at", "modified_at")
 
@@ -770,7 +770,7 @@ class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = ProjectComment.objects.all().select_related("user")
     serializer_class = CommentSerializer
-    permission_classes = (CommentPermissions,)
+    permission_classes = [IsAuthenticated, CommentPermissions]
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ("created_at", "modified_at")
 
@@ -829,7 +829,7 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
 class DocumentViewSet(ReadOnlyModelViewSet):
     queryset = DocumentTemplate.objects.all()
-    permission_classes = (DocumentPermissions,)
+    permission_classes = [IsAuthenticated, DocumentPermissions]
     lookup_field = "slug"
 
     def initial(self, request, *args, **kwargs):
@@ -936,7 +936,7 @@ class DocumentTemplateDownloadView(
 
 class UploadSpecifications(APIView):
     parser_classes = (MultiPartParser,)
-    permission_classes = (IsAdminUser,)
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def post(self, request, format=None):
         if request.FILES and request.FILES["specifications"]:
