@@ -1126,9 +1126,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         return updates
 
     def should_validate_attributes(self):
-        validate_field_data = self.context["request"].data.get(
-            "validate_attribute_data", False
-        )
+        # Always validate if not explicitly turned off
+        if "validate_attribute_data" in self.context["request"].data:
+            validate_field_data = self.context["request"].data.get(
+                "validate_attribute_data", False
+            )
+        else:
+            validate_field_data = True
+
         return serializers.BooleanField().to_internal_value(validate_field_data)
 
     def _get_keys(self):
@@ -1362,7 +1367,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
-            if not serializer.is_valid(raise_exception=True):
+            if not serializer.is_valid(raise_exception=False):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
 
