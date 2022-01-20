@@ -1355,13 +1355,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
-        if self.should_validate_attributes() and self.instance.attribute_data:
-            # Make a deep copy of the attribute data if we are validating.
-            # Can't assign straight since the values would be a reference
-            # to the instance value. This will cause issues if attributes are
-            # later removed while looping in the Project.update_attribute_data() method,
-            # as it would mutate the dict while looping over it.
-            valid_attributes = copy.deepcopy(self.instance.attribute_data)
+        # if self.should_validate_attributes() and self.instance.attribute_data:
+        #     # Make a deep copy of the attribute data if we are validating.
+        #     # Can't assign straight since the values would be a reference
+        #     # to the instance value. This will cause issues if attributes are
+        #     # later removed while looping in the Project.update_attribute_data() method,
+        #     # as it would mutate the dict while looping over it.
+        #     valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
         errors = {}
         for section_data in sections_data:
