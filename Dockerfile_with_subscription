@@ -37,8 +37,8 @@ RUN rm /etc/rhsm-host && \
         nc \
         vim \
     # Remove entitlements and Subscription Manager configs
-    rm -rf /etc/pki/entitlement && \
-    rm -rf /etc/rhsm
+    rm -rf /etc/pki/entitlement # && \
+    #rm -rf /etc/rhsm
     
 # Upgrade pip
 RUN pip install -U pip
