@@ -127,7 +127,11 @@ def get_deadline_validator(attribute, subtype, preview):
                 elif prev_dl + datetime.timedelta(
                     days=distance.distance_from_previous,
                 ) > value:
-                    valid_date = distance.date_type.get_closest_valid_date(value)
+                    if distance.date_type:
+                        valid_date = distance.date_type.get_closest_valid_date(value)
+                    else:
+                        valid_date = prev_dl + datetime.timedelta(days=distance.distance_from_previous)
+
                     raise ValidationError(
                         (attr_dl.error_min_distance_previous or default_error,
                         _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
