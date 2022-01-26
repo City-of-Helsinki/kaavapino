@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
+from drf_spectacular.utils import extend_schema, inline_serializer
 from sitecontent.models import FooterSection, TargetFloorArea
 from sitecontent.serializers import FooterSectionSerializer
 from projects.models import CommonProjectPhase
@@ -22,6 +23,9 @@ class TargetFloorAreas(APIView):
 
 
 class Legend(APIView):
+    @extend_schema(
+        responses=inline_serializer('Legend', fields={'phases': CommonProjectPhaseSerializer(many=True)})
+    )
     def get(self, __):
         return Response({
             "phases": CommonProjectPhaseSerializer(

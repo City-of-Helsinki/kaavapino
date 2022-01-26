@@ -1,0 +1,2771 @@
+openapi: 3.0.3
+info:
+  title: Helsingin Kaupunki - Kaavapino - API
+  version: 1.0.0
+  description: Kaavapino API for planning data
+paths:
+  /admin/upload_specifications:
+    post:
+      operationId: admin_upload_specifications_create
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /schema/:
+    get:
+      operationId: schema_retrieve
+      description: |-
+        OpenApi3 schema for this API. Format can be selected via content negotiation.
+
+        - YAML: application/vnd.oai.openapi
+        - JSON: application/vnd.oai.openapi+json
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - json
+          - yaml
+      - in: query
+        name: lang
+        schema:
+          type: string
+          enum:
+          - af
+          - ar
+          - ar-dz
+          - ast
+          - az
+          - be
+          - bg
+          - bn
+          - br
+          - bs
+          - ca
+          - cs
+          - cy
+          - da
+          - de
+          - dsb
+          - el
+          - en
+          - en-au
+          - en-gb
+          - eo
+          - es
+          - es-ar
+          - es-co
+          - es-mx
+          - es-ni
+          - es-ve
+          - et
+          - eu
+          - fa
+          - fi
+          - fr
+          - fy
+          - ga
+          - gd
+          - gl
+          - he
+          - hi
+          - hr
+          - hsb
+          - hu
+          - hy
+          - ia
+          - id
+          - ig
+          - io
+          - is
+          - it
+          - ja
+          - ka
+          - kab
+          - kk
+          - km
+          - kn
+          - ko
+          - ky
+          - lb
+          - lt
+          - lv
+          - mk
+          - ml
+          - mn
+          - mr
+          - my
+          - nb
+          - ne
+          - nl
+          - nn
+          - os
+          - pa
+          - pl
+          - pt
+          - pt-br
+          - ro
+          - ru
+          - sk
+          - sl
+          - sq
+          - sr
+          - sr-latn
+          - sv
+          - sw
+          - ta
+          - te
+          - tg
+          - th
+          - tk
+          - tr
+          - tt
+          - udm
+          - uk
+          - ur
+          - uz
+          - vi
+          - zh-hans
+          - zh-hant
+      tags:
+      - schema
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/vnd.oai.openapi:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/vnd.oai.openapi+json:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /v1/attributes/:
+    get:
+      operationId: v1_attributes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSimpleAttributeList'
+          description: ''
+  /v1/attributes/{id}/:
+    get:
+      operationId: v1_attributes_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this kenttä.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleAttribute'
+          description: ''
+  /v1/cardschema/:
+    get:
+      operationId: v1_cardschema_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectCardSchemaList'
+          description: ''
+  /v1/cardschema/{id}/:
+    get:
+      operationId: v1_cardschema_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektikortin osion
+          kenttä.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCardSchema'
+          description: ''
+  /v1/deadlines/:
+    get:
+      operationId: v1_deadlines_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDeadlineList'
+          description: ''
+  /v1/deadlines/{id}/:
+    get:
+      operationId: v1_deadlines_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this deadline.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deadline'
+          description: ''
+  /v1/footer/:
+    get:
+      operationId: v1_footer_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFooterSectionList'
+          description: ''
+  /v1/legend:
+    get:
+      operationId: v1_legend_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Legend'
+          description: ''
+  /v1/personnel/:
+    get:
+      operationId: v1_personnel_list
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Personnel'
+          description: ''
+  /v1/personnel/{id}:
+    get:
+      operationId: v1_personnel_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          pattern: ^.*$
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonnelDetail'
+          description: ''
+  /v1/phases/:
+    get:
+      operationId: v1_phases_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectPhaseList'
+          description: ''
+  /v1/phases/{id}/:
+    get:
+      operationId: v1_phases_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektin vaihe.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPhase'
+          description: ''
+  /v1/projects/:
+    get:
+      operationId: v1_projects_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectListList'
+          description: ''
+    post:
+      operationId: v1_projects_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Project'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Project'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+  /v1/projects/{parent_lookup_project}/comments/:
+    get:
+      operationId: v1_projects_comments_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCommentList'
+          description: ''
+    post:
+      operationId: v1_projects_comments_create
+      parameters:
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Comment'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+  /v1/projects/{parent_lookup_project}/comments/{id}/:
+    get:
+      operationId: v1_projects_comments_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektikommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+    put:
+      operationId: v1_projects_comments_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektikommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Comment'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+    patch:
+      operationId: v1_projects_comments_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektikommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedComment'
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+    delete:
+      operationId: v1_projects_comments_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektikommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+  /v1/projects/{parent_lookup_project}/comments/fields/:
+    get:
+      operationId: v1_projects_comments_fields_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFieldCommentList'
+          description: ''
+    post:
+      operationId: v1_projects_comments_fields_create
+      parameters:
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FieldComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FieldComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FieldComment'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldComment'
+          description: ''
+  /v1/projects/{parent_lookup_project}/comments/fields/{id}/:
+    get:
+      operationId: v1_projects_comments_fields_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this kenttäkommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldComment'
+          description: ''
+    put:
+      operationId: v1_projects_comments_fields_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this kenttäkommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FieldComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FieldComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FieldComment'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldComment'
+          description: ''
+    patch:
+      operationId: v1_projects_comments_fields_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this kenttäkommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFieldComment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFieldComment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFieldComment'
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldComment'
+          description: ''
+    delete:
+      operationId: v1_projects_comments_fields_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this kenttäkommentti.
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+  /v1/projects/{parent_lookup_project}/comments/fields/field/{field_identifier}/:
+    get:
+      operationId: v1_projects_comments_fields_field_retrieve
+      parameters:
+      - in: path
+        name: field_identifier
+        schema:
+          type: string
+          pattern: ^\w+$
+        required: true
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldComment'
+          description: ''
+  /v1/projects/{parent_lookup_project}/comments/mark_as_read/:
+    post:
+      operationId: v1_projects_comments_mark_as_read_create
+      parameters:
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Comment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Comment'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+  /v1/projects/{parent_lookup_project}/comments/unread/:
+    get:
+      operationId: v1_projects_comments_unread_retrieve
+      parameters:
+      - in: path
+        name: parent_lookup_project
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+          description: ''
+  /v1/projects/{id}/:
+    get:
+      operationId: v1_projects_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    put:
+      operationId: v1_projects_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Project'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Project'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    patch:
+      operationId: v1_projects_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProject'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProject'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProject'
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: ''
+    delete:
+      operationId: v1_projects_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+  /v1/projects/{id}/external_documents/:
+    get:
+      operationId: v1_projects_external_documents_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalDocuments'
+          description: ''
+  /v1/projects/{id}/files/:
+    put:
+      operationId: v1_projects_files_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectFile'
+        required: true
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectFile'
+          description: ''
+  /v1/projects/{id}/simple/:
+    get:
+      operationId: v1_projects_simple_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleProject'
+          description: ''
+  /v1/projects/{project_pk}/documents/:
+    get:
+      operationId: v1_projects_documents_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - in: path
+        name: project_pk
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDocumentTemplateList'
+          description: ''
+  /v1/projects/{project_pk}/documents/{slug}/:
+    get:
+      operationId: v1_projects_documents_retrieve
+      parameters:
+      - in: path
+        name: project_pk
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /v1/projects/overview/by_subtype/:
+    get:
+      operationId: v1_projects_overview_by_subtype_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /v1/projects/overview/filters/:
+    get:
+      operationId: v1_projects_overview_filters_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOverviewFilterList'
+          description: ''
+  /v1/projects/overview/floor_area/:
+    get:
+      operationId: v1_projects_overview_floor_area_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /v1/projects/overview/on_map/:
+    get:
+      operationId: v1_projects_overview_on_map_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectOnMapOverviewList'
+          description: ''
+  /v1/projectsubtypes/:
+    get:
+      operationId: v1_projectsubtypes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectSubtypeList'
+          description: ''
+  /v1/projectsubtypes/{id}/:
+    get:
+      operationId: v1_projectsubtypes_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektin kokoluokka.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectSubtype'
+          description: ''
+  /v1/projecttypes/:
+    get:
+      operationId: v1_projecttypes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectTypeList'
+          description: ''
+  /v1/projecttypes/{id}/:
+    get:
+      operationId: v1_projecttypes_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektin tyyppi.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectType'
+          description: ''
+  /v1/reports/:
+    get:
+      operationId: v1_reports_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReportList'
+          description: ''
+  /v1/reports/{id}/:
+    get:
+      operationId: v1_reports_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this raportti.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /v1/schemas/:
+    get:
+      operationId: v1_schemas_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /v1/schemas/{id}/:
+    get:
+      operationId: v1_schemas_retrieve_2
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projektin tyyppi.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /v1/targetfloorareas:
+    get:
+      operationId: v1_targetfloorareas_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          description: No response body
+  /v1/users/:
+    get:
+      operationId: v1_users_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+  /v1/users/{uuid}/:
+    get:
+      operationId: v1_users_retrieve
+      parameters:
+      - in: path
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+components:
+  schemas:
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project:
+          type: integer
+          readOnly: true
+          title: Projekti
+        user:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        content:
+          type: string
+          title: Sisältö
+        generated:
+          type: boolean
+          readOnly: true
+          title: Automaattisesti generoitu
+        _metadata:
+          type: string
+          readOnly: true
+          title: ' metadata'
+      required:
+      - _metadata
+      - content
+      - created_at
+      - generated
+      - id
+      - modified_at
+      - project
+      - user
+    CommonProjectPhase:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        color:
+          type: string
+          title: Väri
+          maxLength: 64
+        color_code:
+          type: string
+          title: Värikoodi
+          maxLength: 10
+      required:
+      - name
+    Deadline:
+      type: object
+      properties:
+        abbreviation:
+          type: string
+        attribute:
+          type: string
+          readOnly: true
+        deadline_types:
+          type: array
+          items:
+            type: string
+        date_type:
+          type: string
+        phase_id:
+          type: integer
+        phase_name:
+          type: string
+        phase_color:
+          type: string
+        phase_color_code:
+          type: string
+        index:
+          type: integer
+        error_past_due:
+          type: string
+        error_date_type_mismatch:
+          type: string
+        error_min_distance_previous:
+          type: string
+        warning_min_distance_next:
+          type: string
+      required:
+      - abbreviation
+      - attribute
+      - date_type
+      - deadline_types
+      - error_date_type_mismatch
+      - error_min_distance_previous
+      - error_past_due
+      - index
+      - phase_color
+      - phase_color_code
+      - phase_id
+      - phase_name
+      - warning_min_distance_next
+    DocumentTemplate:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+          title: Nimi
+        image_template:
+          type: boolean
+          readOnly: true
+          title: Kuvadokumenttipohja
+        file:
+          type: string
+          readOnly: true
+        preview_file:
+          type: string
+          readOnly: true
+        last_downloaded:
+          type: string
+          readOnly: true
+        phases:
+          type: string
+          readOnly: true
+        silent_downloads:
+          type: boolean
+          title: Dokumentin lataus ei aiheuta varoitusta
+      required:
+      - file
+      - id
+      - image_template
+      - last_downloaded
+      - name
+      - phases
+      - preview_file
+    ExternalDocuments:
+      type: object
+      properties:
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectExternalDocumentSection'
+      required:
+      - sections
+    FieldComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project:
+          type: integer
+          readOnly: true
+          title: Projekti
+        user:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        content:
+          type: string
+          title: Sisältö
+        generated:
+          type: boolean
+          readOnly: true
+          title: Automaattisesti generoitu
+        _metadata:
+          type: string
+          readOnly: true
+          title: ' metadata'
+        field:
+          type: string
+        fieldset_path:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldsetPath'
+      required:
+      - _metadata
+      - content
+      - created_at
+      - field
+      - generated
+      - id
+      - modified_at
+      - project
+      - user
+    FieldsetPath:
+      type: object
+      properties:
+        parent:
+          type: string
+        index:
+          type: integer
+      required:
+      - index
+      - parent
+    FooterLink:
+      type: object
+      properties:
+        link_text:
+          type: string
+          title: Linkin teksti
+          maxLength: 255
+        url:
+          type: string
+          maxLength: 255
+      required:
+      - link_text
+      - url
+    FooterSection:
+      type: object
+      properties:
+        title:
+          type: string
+          title: Otsikko
+          maxLength: 255
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/FooterLink'
+      required:
+      - links
+      - title
+    Legend:
+      type: object
+      properties:
+        phases:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommonProjectPhase'
+      required:
+      - phases
+    OverviewFilter:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        parameter:
+          type: string
+        filters_by_subtype:
+          type: string
+          readOnly: true
+        filters_on_map:
+          type: string
+          readOnly: true
+        filters_floor_area:
+          type: string
+          readOnly: true
+        value_type:
+          type: string
+          readOnly: true
+        accepts_year:
+          type: string
+          readOnly: true
+        choices:
+          type: string
+          readOnly: true
+      required:
+      - accepts_year
+      - choices
+      - filters_by_subtype
+      - filters_floor_area
+      - filters_on_map
+      - name
+      - parameter
+      - value_type
+    PaginatedCommentList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+    PaginatedDeadlineList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deadline'
+    PaginatedDocumentTemplateList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentTemplate'
+    PaginatedFieldCommentList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldComment'
+    PaginatedFooterSectionList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/FooterSection'
+    PaginatedOverviewFilterList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OverviewFilter'
+    PaginatedProjectCardSchemaList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectCardSchema'
+    PaginatedProjectListList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectList'
+    PaginatedProjectOnMapOverviewList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectOnMapOverview'
+    PaginatedProjectPhaseList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectPhase'
+    PaginatedProjectSubtypeList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectSubtype'
+    PaginatedProjectTypeList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectType'
+    PaginatedReportList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Report'
+    PaginatedSimpleAttributeList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimpleAttribute'
+    PaginatedUserList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PatchedComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project:
+          type: integer
+          readOnly: true
+          title: Projekti
+        user:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        content:
+          type: string
+          title: Sisältö
+        generated:
+          type: boolean
+          readOnly: true
+          title: Automaattisesti generoitu
+        _metadata:
+          type: string
+          readOnly: true
+          title: ' metadata'
+    PatchedFieldComment:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project:
+          type: integer
+          readOnly: true
+          title: Projekti
+        user:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        content:
+          type: string
+          title: Sisältö
+        generated:
+          type: boolean
+          readOnly: true
+          title: Automaattisesti generoitu
+        _metadata:
+          type: string
+          readOnly: true
+          title: ' metadata'
+        field:
+          type: string
+        fieldset_path:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldsetPath'
+    PatchedProject:
+      type: object
+      properties:
+        user:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        phase_documents_created:
+          type: string
+          readOnly: true
+        phase_documents_creation_started:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        identifier:
+          type: string
+          nullable: true
+          title: Tunniste
+          maxLength: 50
+        pino_number:
+          type: string
+          nullable: true
+          title: Pinonumero
+          maxLength: 7
+        type:
+          type: string
+          readOnly: true
+        subtype:
+          type: integer
+          title: Kokoluokka
+        attribute_data:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        phase:
+          type: integer
+          nullable: true
+          title: Vaihe
+        id:
+          type: integer
+          readOnly: true
+        public:
+          type: boolean
+          readOnly: true
+          nullable: true
+        owner_edit_override:
+          type: boolean
+          readOnly: true
+          nullable: true
+        archived:
+          type: boolean
+          readOnly: true
+          nullable: true
+        onhold:
+          type: boolean
+          readOnly: true
+          nullable: true
+        deadlines:
+          type: string
+          readOnly: true
+        create_principles:
+          type: boolean
+          title: Luo periaatteet
+        create_draft:
+          type: boolean
+          title: Luo luonnos
+        generated_deadline_attributes:
+          type: string
+          readOnly: true
+        geoserver_data:
+          type: string
+          readOnly: true
+        _metadata:
+          type: string
+          readOnly: true
+          title: ' metadata'
+    Personnel:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          readOnly: true
+        phone:
+          type: string
+        email:
+          type: string
+        title:
+          type: string
+        office:
+          type: string
+      required:
+      - email
+      - id
+      - name
+      - office
+      - phone
+      - title
+    PersonnelDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+          readOnly: true
+        phone:
+          type: string
+        email:
+          type: string
+        title:
+          type: string
+        office:
+          type: string
+        company:
+          type: string
+          readOnly: true
+      required:
+      - company
+      - email
+      - id
+      - name
+      - office
+      - phone
+      - title
+    Project:
+      type: object
+      properties:
+        user:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        phase_documents_created:
+          type: string
+          readOnly: true
+        phase_documents_creation_started:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        identifier:
+          type: string
+          nullable: true
+          title: Tunniste
+          maxLength: 50
+        pino_number:
+          type: string
+          nullable: true
+          title: Pinonumero
+          maxLength: 7
+        type:
+          type: string
+          readOnly: true
+        subtype:
+          type: integer
+          title: Kokoluokka
+        attribute_data:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        phase:
+          type: integer
+          nullable: true
+          title: Vaihe
+        id:
+          type: integer
+          readOnly: true
+        public:
+          type: boolean
+          readOnly: true
+          nullable: true
+        owner_edit_override:
+          type: boolean
+          readOnly: true
+          nullable: true
+        archived:
+          type: boolean
+          readOnly: true
+          nullable: true
+        onhold:
+          type: boolean
+          readOnly: true
+          nullable: true
+        deadlines:
+          type: string
+          readOnly: true
+        create_principles:
+          type: boolean
+          title: Luo periaatteet
+        create_draft:
+          type: boolean
+          title: Luo luonnos
+        generated_deadline_attributes:
+          type: string
+          readOnly: true
+        geoserver_data:
+          type: string
+          readOnly: true
+        _metadata:
+          type: string
+          readOnly: true
+          title: ' metadata'
+      required:
+      - _metadata
+      - archived
+      - created_at
+      - deadlines
+      - generated_deadline_attributes
+      - geoserver_data
+      - id
+      - modified_at
+      - name
+      - onhold
+      - owner_edit_override
+      - phase_documents_created
+      - phase_documents_creation_started
+      - public
+      - subtype
+      - type
+      - user
+    ProjectCardSchema:
+      type: object
+      properties:
+        label:
+          type: string
+        name:
+          type: string
+        section_name:
+          type: string
+        choices:
+          type: string
+          readOnly: true
+        date_format:
+          type: string
+          nullable: true
+          title: Päivämääräformaatti ja teksti
+          maxLength: 255
+        show_on_mobile:
+          type: boolean
+          title: Näytä mobiilissa
+      required:
+      - choices
+      - label
+      - name
+      - section_name
+    ProjectExternalDocumentSection:
+      type: object
+      properties:
+        section_name:
+          type: string
+          readOnly: true
+        documents:
+          type: string
+          readOnly: true
+      required:
+      - documents
+      - section_name
+    ProjectFile:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+        attribute:
+          type: string
+        project:
+          type: integer
+        description:
+          type: string
+          nullable: true
+          title: Kuvaus
+        fieldset_path:
+          type: object
+          additionalProperties: {}
+      required:
+      - attribute
+      - file
+      - project
+    ProjectList:
+      type: object
+      properties:
+        user:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        identifier:
+          type: string
+          nullable: true
+          title: Tunniste
+          maxLength: 50
+        pino_number:
+          type: string
+          nullable: true
+          title: Pinonumero
+          maxLength: 7
+        type:
+          type: string
+          readOnly: true
+        subtype:
+          type: integer
+          title: Kokoluokka
+        attribute_data:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        phase:
+          type: integer
+          nullable: true
+          title: Vaihe
+        id:
+          type: integer
+          readOnly: true
+        public:
+          type: boolean
+        owner_edit_override:
+          type: boolean
+        archived:
+          type: boolean
+        onhold:
+          type: boolean
+        create_principles:
+          type: boolean
+          title: Luo periaatteet
+        create_draft:
+          type: boolean
+          title: Luo luonnos
+        phase_start_date:
+          type: string
+          readOnly: true
+        deadlines:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - deadlines
+      - id
+      - modified_at
+      - name
+      - phase_start_date
+      - subtype
+      - type
+      - user
+    ProjectOnMapOverview:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        pk:
+          type: integer
+          readOnly: true
+          title: ID
+        phase_color:
+          type: string
+        geoserver_data:
+          type: string
+          readOnly: true
+        user:
+          type: integer
+          title: Käyttäjä
+        user_name:
+          type: string
+          readOnly: true
+        pino_number:
+          type: string
+          nullable: true
+          title: Pinonumero
+          maxLength: 7
+        subtype:
+          type: string
+          readOnly: true
+        phase:
+          type: string
+          readOnly: true
+      required:
+      - geoserver_data
+      - name
+      - phase
+      - phase_color
+      - pk
+      - subtype
+      - user
+      - user_name
+    ProjectPhase:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project_type:
+          type: string
+          readOnly: true
+        project_subtype:
+          type: integer
+          title: Projektin kokoluokka
+        name:
+          type: string
+          readOnly: true
+        color:
+          type: string
+          readOnly: true
+        color_code:
+          type: string
+          readOnly: true
+        list_prefix:
+          type: string
+          readOnly: true
+        index:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          title: Indeksi
+      required:
+      - color
+      - color_code
+      - id
+      - list_prefix
+      - name
+      - project_subtype
+      - project_type
+    ProjectSubtype:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        metadata:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        project_type:
+          type: integer
+          title: Projektin tyyppi
+      required:
+      - id
+      - name
+      - project_type
+    ProjectType:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        metadata:
+          $ref: '#/components/schemas/ProjectTypeMetadata'
+        subtypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectSubtype'
+      required:
+      - id
+      - metadata
+      - name
+      - subtypes
+    ProjectTypeMetadata:
+      type: object
+      properties:
+        normal_project_card_attributes:
+          type: string
+          readOnly: true
+        extended_project_card_attributes:
+          type: string
+          readOnly: true
+      required:
+      - extended_project_card_attributes
+      - normal_project_card_attributes
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        project_type:
+          type: integer
+          title: Projektin tyyppi
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        previewable:
+          type: boolean
+          title: Raporttia voidaan esikatsella
+        filters:
+          type: string
+          readOnly: true
+        preview_title_column:
+          type: string
+          readOnly: true
+      required:
+      - filters
+      - id
+      - name
+      - preview_title_column
+      - project_type
+    SimpleAttribute:
+      type: object
+      properties:
+        label:
+          type: string
+        name:
+          type: string
+      required:
+      - label
+      - name
+    SimpleProject:
+      type: object
+      properties:
+        user:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Luotu
+        modified_at:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Muokattu
+        name:
+          type: string
+          title: Nimi
+          maxLength: 255
+        identifier:
+          type: string
+          nullable: true
+          title: Tunniste
+          maxLength: 50
+        pino_number:
+          type: string
+          nullable: true
+          title: Pinonumero
+          maxLength: 7
+        type:
+          type: string
+        subtype:
+          type: integer
+          title: Kokoluokka
+        attribute_data:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          title: Kentän data
+        phase:
+          type: string
+        id:
+          type: integer
+          readOnly: true
+        public:
+          type: boolean
+        owner_edit_override:
+          type: boolean
+        archived:
+          type: boolean
+        onhold:
+          type: boolean
+        create_principles:
+          type: boolean
+          title: Luo periaatteet
+        create_draft:
+          type: boolean
+          title: Luo luonnos
+      required:
+      - created_at
+      - id
+      - modified_at
+      - name
+      - phase
+      - subtype
+      - type
+      - user
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        department_name:
+          type: string
+          nullable: true
+          maxLength: 50
+        first_name:
+          type: string
+          title: Etunimi
+          maxLength: 150
+        last_name:
+          type: string
+          title: Sukunimi
+          maxLength: 150
+        is_active:
+          type: boolean
+          title: Voimassa
+          description: Määrää, voiko käyttäjä kirjautua sisään. Tällä voi estää käyttäjätilin
+            käytön poistamatta sitä.
+        is_staff:
+          type: boolean
+          title: Ylläpitäjä
+          description: Määrittää, pääseekö käyttäjä tähän sivuston ylläpito-osioon.
+        email:
+          type: string
+          format: email
+          title: Sähköpostiosoite
+          maxLength: 254
+        privilege:
+          type: string
+          readOnly: true
+        privilege_name:
+          type: string
+          readOnly: true
+        role_name:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - privilege
+      - privilege_name
+      - role_name
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"

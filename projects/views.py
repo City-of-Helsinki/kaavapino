@@ -13,6 +13,7 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django_q.tasks import async_task, result as async_result
 from django_q.models import OrmQ
+from drf_spectacular.utils import extend_schema_view, extend_schema, inline_serializer
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
@@ -117,6 +118,23 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectTypeSerializer
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        responses=ProjectSerializer,
+    ),
+    create=extend_schema(
+        request=ProjectSerializer,
+        responses=ProjectSerializer,
+    ),
+    update=extend_schema(
+        request=ProjectSerializer,
+        responses=ProjectSerializer,
+    ),
+    partial_update=extend_schema(
+        request=ProjectSerializer,
+        responses=ProjectSerializer,
+    ),
+)
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     permission_classes = [IsAuthenticated, ProjectPermissions]
@@ -149,6 +167,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = self.queryset
+        if self.request.method in ['PUT', 'PATCH']:
+            queryset = queryset \
+                .prefetch_related('deadlines') \
+                .prefetch_related('deadlines__deadline') \
+                .prefetch_related('deadlines__deadline__condition_attributes') \
+                .prefetch_related('deadlines__deadline__initial_calculations') \
+                .prefetch_related('deadlines__deadline__update_calculations')
 
         includeds_users = self.request.query_params.get("includes_users", None)
         search = self.request.query_params.get("search", None)
@@ -250,6 +275,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return context
 
+    @extend_schema(
+        responses=SimpleProjectSerializer,
+    )
     @action(
         methods=["get"],
         detail=True,
@@ -258,6 +286,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def simple(self, request, pk):
         return Response(SimpleProjectSerializer(self.get_object()).data)
 
+    @extend_schema(
+        request=ProjectFileSerializer,
+        responses=ProjectFileSerializer,
+    )
     @action(
         methods=["put"],
         detail=True,
@@ -280,6 +312,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
+    @extend_schema(
+        responses=inline_serializer('ExternalDocuments', fields={'sections': ProjectExternalDocumentSectionSerializer(many=True)}),
+    )
     @action(
         methods=["get"],
         detail=True,
@@ -399,6 +434,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return query
 
+    @extend_schema(
+        responses=OverviewFilterSerializer(many=True),
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -635,6 +673,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ).data
         })
 
+    @extend_schema(
+        responses=ProjectOnMapOverviewSerializer(many=True),
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -747,7 +788,7 @@ class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["parent_instance"] = self.parent_instance
+        context["parent_instance"] = self.get_parent_instance()
         return context
 
     @action(methods=["get"], detail=False, url_path=r"field/(?P<field_identifier>\w+)", url_name="project-field-comments")
@@ -930,6 +971,9 @@ class DocumentViewSet(ReadOnlyModelViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
+    @extend_schema(
+        responses=DocumentTemplateSerializer,
+    )
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset().filter(project_card_default_template=False)
         return Response(
@@ -1059,6 +1103,9 @@ class ReportViewSet(ReadOnlyModelViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
+    @extend_schema(
+        responses=ReportSerializer,
+    )
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
         return super().list(request, *args, **kwargs)

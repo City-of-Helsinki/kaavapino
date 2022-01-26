@@ -328,13 +328,16 @@ class Project(models.Model):
         if not self.create_draft:
             excluded_phases.append("Luonnos")
 
+        deadlines = Deadline.objects \
+                .filter(subtype=subtype or self.subtype) \
+                .exclude(phase__common_project_phase__name__in=excluded_phases) \
+                .prefetch_related('condition_attributes') \
+                .prefetch_related('initial_calculations') \
+                .prefetch_related('update_calculations')
+
         return [
             deadline
-            for deadline in list(
-                Deadline.objects \
-                    .filter(subtype=subtype or self.subtype) \
-                    .exclude(phase__common_project_phase__name__in=excluded_phases)
-            )
+            for deadline in deadlines
             if self._check_condition(deadline, preview_attributes)
         ]
 

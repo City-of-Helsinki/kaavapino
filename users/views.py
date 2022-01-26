@@ -3,6 +3,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.http import Http404
+from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -23,6 +24,9 @@ class UserViewSet(mixins.RetrieveModelMixin, mixins.ListModelMixin, GenericViewS
 
 
 class PersonnelList(APIView):
+    @extend_schema(
+        responses=PersonnelSerializer(many=True),
+    )
     def get(self, request):
         token = get_graph_api_access_token()
         if not token:
@@ -55,6 +59,9 @@ class PersonnelList(APIView):
 
 
 class PersonnelDetail(APIView):
+    @extend_schema(
+        responses=PersonnelDetailSerializer,
+    )
     def get(self, __, pk):
         token = get_graph_api_access_token()
         if not token:
