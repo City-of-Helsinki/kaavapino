@@ -25,6 +25,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
+from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type
 from projects.importing import AttributeImporter
 from projects.models import (
     FieldComment,
@@ -872,12 +873,13 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         if task_id:
             result = async_result(task_id)
             if result:
+                doc_type = get_file_type(document_template.file.path)
                 response = HttpResponse(
                     result,
-                    content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    content_type=DOCUMENT_CONTENT_TYPES[doc_type],
                 )
-                response["Content-Disposition"] = "attachment; filename={}.docx".format(
-                    filename
+                response["Content-Disposition"] = "attachment; filename={}.{}".format(
+                    filename, doc_type
                 )
 
                 # Since we are not using DRFs response here, we set a custom CORS control header
