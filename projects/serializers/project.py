@@ -1126,9 +1126,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         return updates
 
     def should_validate_attributes(self):
-        validate_field_data = self.context["request"].data.get(
-            "validate_attribute_data", False
-        )
+        # Always validate if not explicitly turned off
+        if "validate_attribute_data" in self.context["request"].data:
+            validate_field_data = self.context["request"].data.get(
+                "validate_attribute_data", False
+            )
+        else:
+            validate_field_data = True
+
         return serializers.BooleanField().to_internal_value(validate_field_data)
 
     def _get_keys(self):
@@ -1350,19 +1355,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
-        if self.should_validate_attributes() and self.instance.attribute_data:
-            # Make a deep copy of the attribute data if we are validating.
-            # Can't assign straight since the values would be a reference
-            # to the instance value. This will cause issues if attributes are
-            # later removed while looping in the Project.update_attribute_data() method,
-            # as it would mutate the dict while looping over it.
-            valid_attributes = copy.deepcopy(self.instance.attribute_data)
+        # if self.should_validate_attributes() and self.instance.attribute_data:
+        #     # Make a deep copy of the attribute data if we are validating.
+        #     # Can't assign straight since the values would be a reference
+        #     # to the instance value. This will cause issues if attributes are
+        #     # later removed while looping in the Project.update_attribute_data() method,
+        #     # as it would mutate the dict while looping over it.
+        #     valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
         errors = {}
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
-            if not serializer.is_valid(raise_exception=True):
+            if not serializer.is_valid(raise_exception=False):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
 
