@@ -1,3 +1,5 @@
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers
 
 from projects.models import Deadline
@@ -20,6 +22,7 @@ class DeadlineSerializer(serializers.Serializer):
     error_min_distance_previous = serializers.CharField()
     warning_min_distance_next = serializers.CharField()
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_attribute(self, deadline):
         if deadline.attribute:
             return deadline.attribute.identifier

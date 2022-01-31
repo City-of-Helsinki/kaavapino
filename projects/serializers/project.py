@@ -15,6 +15,8 @@ from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from rest_framework.response import Response
@@ -433,9 +435,11 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "deadlines",
         ]
 
+    @extend_schema_field(OpenApiTypes.INT)
     def get_type(self, project):
         return project.type.pk
 
+    @extend_schema_field(OpenApiTypes.DATE)
     def get_phase_start_date(self, project):
         try:
             return project.deadlines \
@@ -468,6 +472,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
         return return_data
 
+    @extend_schema_field(DeadlineSerializer(many=True))
     def get_deadlines(self, project):
         project_schedule_cache = self.context["project_schedule_cache"]
         return project_schedule_cache.get(project.pk, [])
