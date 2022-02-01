@@ -1594,7 +1594,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         should_update_deadlines = self._get_should_update_deadlines(
             subtype_changed, instance, attribute_data,
         )
-        self.context['should_update_deadlines'] = should_update_deadlines
+        self.context['should_update_deadlines'] = \
+            should_update_deadlines or should_generate_deadlines
 
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
