@@ -1,4 +1,5 @@
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -16,6 +17,12 @@ class CommentSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(read_only=True, slug_field="uuid")
     _metadata = serializers.SerializerMethodField()
 
+    @extend_schema_field(inline_serializer(
+        name='_metadata',
+        fields={
+            'users': UserSerializer(many=True)
+        }
+    ))
     def get__metadata(self, comment):
         if not comment.user:
             return {"users": []}

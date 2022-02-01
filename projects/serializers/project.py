@@ -15,7 +15,7 @@ from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
 from django.db.models import Prefetch, Q
 from django.utils.translation import gettext_lazy as _
-from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.utils import extend_schema_field, inline_serializer
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
@@ -82,6 +82,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     deadline = serializers.SerializerMethodField()
     generated = serializers.BooleanField()
 
+    @extend_schema_field(DeadlineSerializer)
     def get_deadline(self, projectdeadline):
         return DeadlineSerializer(
             projectdeadline.deadline
@@ -97,6 +98,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
         return False
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_under_min_distance_next(self, projectdeadline):
         if not projectdeadline.date:
             return False
@@ -133,6 +135,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
         return False
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_under_min_distance_previous(self, projectdeadline):
         if not projectdeadline.date:
             return False
@@ -169,6 +172,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
         return False
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_past_due(self, projectdeadline):
         return len([
             dl for dl in projectdeadline.project.deadlines.filter(
@@ -178,6 +182,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             if not dl.confirmed
         ]) > 0
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_out_of_sync(self, projectdeadline):
         return projectdeadline.project.subtype != \
             projectdeadline.deadline.phase.project_subtype
@@ -242,12 +247,15 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
     def _get_filters(self, overview_filter, filters):
         return bool(overview_filter.attributes.filter(**{filters: True}).count())
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_filters_by_subtype(self, overview_filter):
         return self._get_filters(overview_filter, "filters_by_subtype")
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_filters_on_map(self, overview_filter):
         return self._get_filters(overview_filter, "filters_on_map")
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_filters_floor_area(self, overview_filter):
         return self._get_filters(overview_filter, "filters_floor_area")
 
@@ -259,6 +267,7 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
 
         return None
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_accepts_year(self, overview_filter):
         for attr in overview_filter.attributes.all():
             if attr.attribute.value_type == Attribute.TYPE_DATE and \
@@ -267,6 +276,14 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
 
         return False
 
+    @extend_schema_field(inline_serializer(
+        name='choices',
+        fields={
+            'label': serializers.CharField(),
+            'value': serializers.CharField(),
+        },
+        many=True,
+    ))
     def get_choices(self, overview_filter):
         choices = {}
 
@@ -375,15 +392,18 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
 
         return None
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_user_name(self, project):
         first_name = project.user.first_name
         last_name = project.user.last_name
 
         return " ".join([first_name, last_name])
 
+    # @extend_schema_field(ProjectPhaseSerializer)
     def get_phase(self, project):
         return ProjectPhaseSerializer(project.phase).data
 
+    # @extend_schema_field(ProjectSubtypeSerializer)
     def get_subtype(self, project):
         return ProjectSubtypeSerializer(project.subtype).data
 
@@ -472,7 +492,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
         return return_data
 
-    @extend_schema_field(DeadlineSerializer(many=True))
+    @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
         project_schedule_cache = self.context["project_schedule_cache"]
         return project_schedule_cache.get(project.pk, [])
@@ -501,6 +521,7 @@ class ProjectExternalDocumentSerializer(serializers.Serializer):
         else:
             return value
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_document_name(self, fieldset_item):
         name_attribute = self.context["document_fieldset"]. \
             document_name_attribute
@@ -516,6 +537,7 @@ class ProjectExternalDocumentSerializer(serializers.Serializer):
 
         return custom_name or name
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_link(self, fieldset_item):
         return fieldset_item.get(
             self.context["document_fieldset"].document_link_attribute.identifier
@@ -526,9 +548,11 @@ class ProjectExternalDocumentSectionSerializer(serializers.Serializer):
     section_name = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_section_name(self, *args):
         return self.context["section"].name
 
+    @extend_schema_field(ProjectExternalDocumentSerializer(many=True))
     def get_documents(self, project):
         section = self.context["section"]
         fields = []
@@ -740,9 +764,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return attribute_data
 
+    @extend_schema_field(OpenApiTypes.INT)
     def get_type(self, project):
         return project.type.pk
 
+    @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
         project_schedule_cache = cache.get("serialized_project_schedules", {})
         deadlines = project.deadlines.filter(deadline__subtype=project.subtype)
@@ -759,6 +785,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         cache.set("serialized_project_schedules", project_schedule_cache, None)
         return schedule
 
+    @extend_schema_field(serializers.ListSerializer(child=serializers.CharField()))
     def get_generated_deadline_attributes(self, project):
         return [
             dl.deadline.attribute.identifier
@@ -766,6 +793,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             if dl.deadline.attribute
         ]
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_phase_documents_created(self, project):
         return project.phase_documents_created
 
@@ -779,6 +807,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "request": self.context.get("request")},
         ).data
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_phase_documents_creation_started(self, project):
         return project.phase_documents_creation_started
 
@@ -1993,6 +2022,7 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
             "index",
         ]
 
+    @extend_schema_field(OpenApiTypes.INT)
     def get_project_type(self, project):
         return project.project_type.pk
 
@@ -2009,6 +2039,7 @@ class ProjectSubtypeSerializer(serializers.ModelSerializer):
             "index",
         ]
 
+    @extend_schema_field(OpenApiTypes.INT)
     def get_project_type(self, project):
         return project.project_type.pk
 

@@ -296,6 +296,7 @@ SPECTACULAR_SETTINGS = {
         'helusers.oidc.ApiTokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    'SCHEMA_COERCE_PATH_PK_SUFFIX': True,
     # OTHER SETTINGS
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,

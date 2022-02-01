@@ -1,4 +1,6 @@
 from django.contrib.auth import get_user_model
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers
 
 from users.models import privilege_as_label
@@ -9,9 +11,11 @@ class UserSerializer(serializers.ModelSerializer):
     privilege_name = serializers.SerializerMethodField()
     role_name = serializers.SerializerMethodField()
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_privilege_name(self, user):
         return privilege_as_label(user.privilege)
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_role_name(self, user):
         if not user.all_groups.count():
             return None
@@ -50,6 +54,7 @@ class PersonnelSerializer(serializers.Serializer):
     title = serializers.CharField(source="jobTitle")
     office = serializers.CharField(source="officeLocation")
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_name(self, user):
         return " ".join([
             name for name in [user["givenName"], user["surname"]] if name
@@ -63,6 +68,7 @@ class PersonnelDetailSerializer(PersonnelSerializer):
         fields["company"] = serializers.SerializerMethodField()
         return fields
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_company(self, user):
         try:
             return {
