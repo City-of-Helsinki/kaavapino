@@ -1,9 +1,10 @@
 from rest_framework import permissions
 
+from projects.helpers import TRUE
 
 class DocumentPermissions(permissions.BasePermission):
     def has_permission(self, request, view):
-        preview = request.query_params.get("preview") in ("true", "True", "1")
+        preview = request.query_params.get("preview") in TRUE
         project = view.get_project()
         user = request.user
 

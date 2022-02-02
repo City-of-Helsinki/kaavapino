@@ -44,6 +44,11 @@ class DocumentTemplate(models.Model):
         default=False,
     )
 
+    project_card_default_template = models.BooleanField(
+        verbose_name=_("project card default template"),
+        default=False,
+    )
+
     class Meta:
         verbose_name = _("document template")
         verbose_name_plural = _("document templates")

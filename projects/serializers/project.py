@@ -54,6 +54,7 @@ from projects.permissions.media_file_permissions import (
 )
 from projects.serializers.utils import _set_fieldset_path
 from projects.serializers.fields import AttributeDataField
+from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
 from sitecontent.models import ListViewAttributeColumn
@@ -561,6 +562,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     phase_documents_created = serializers.SerializerMethodField()
     phase_documents_creation_started = serializers.SerializerMethodField()
 
+    project_card_document = serializers.SerializerMethodField()
+
     _metadata = serializers.SerializerMethodField()
 
     class Meta:
@@ -571,6 +574,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "modified_at",
             "phase_documents_created",
             "phase_documents_creation_started",
+            "project_card_document",
             "name",
             "identifier",
             "pino_number",
@@ -590,7 +594,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "geoserver_data",
             "_metadata",
         ]
-        read_only_fields = ["type", "created_at", "modified_at"]
+        read_only_fields = ["type", "created_at", "modified_at", "project_card_document"]
 
     def get_geoserver_data(self, project):
         identifier = project.attribute_data.get("hankenumero")
@@ -754,6 +758,16 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_phase_documents_created(self, project):
         return project.phase_documents_created
+
+    def get_project_card_document(self, project):
+        template = DocumentTemplate.objects.filter(project_card_default_template=True).first()
+        if not template:
+            return None
+
+        return DocumentTemplateSerializer(template, many=False, context={
+            "project": project,
+            "request": self.context.get("request")},
+        ).data
 
     def get_phase_documents_creation_started(self, project):
         return project.phase_documents_creation_started

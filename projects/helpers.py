@@ -670,3 +670,6 @@ DOCUMENT_CONTENT_TYPES = {
     'docx': "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     'pptx': "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
 }
+
+
+TRUE = ("true", "True", "1")
