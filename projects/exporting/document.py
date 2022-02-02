@@ -417,15 +417,16 @@ class PptxTemplate:
     def render_picture(self, shape):
         img = self.data.get(shape.name)
         if img:
-            placeholder_right = shape.left + shape.width
             parent = shape._parent
-            new_picture = parent.add_picture(
-                img,
-                shape.left,
-                shape.top,
-                height=shape.height
-            )
-            new_picture.left += max([shape.width - new_picture.width])
+            try:
+                new_picture = parent.add_picture(
+                    img,
+                    shape.left,
+                    shape.top,
+                    height=shape.height
+                )
+            except FileNotFoundError:
+                pass
             parent.element.remove(shape._element)
 
     def render_text_frame(self, text_frame):

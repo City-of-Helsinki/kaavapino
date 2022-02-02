@@ -365,8 +365,26 @@ class ReportFilterAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "file")
-    readonly_fields = ("slug",)
+    list_display = ("name", "file", "project_card_default_template")
+    readonly_fields = ("project_card_default_template", "slug")
+
+    actions = ('set_project_card_default_template',)
+
+    def set_project_card_default_template(self, request, queryset):
+        try:
+            template = queryset.get()
+        except (DocumentTemplate.DoesNotExist, DocumentTemplate.MultipleObjectsReturned):
+            self.message_user(_('choose one template'))
+            return
+
+        DocumentTemplate.objects \
+            .exclude(id=template.id) \
+            .update(project_card_default_template=False)
+
+        template.project_card_default_template = True
+        template.save()
+
+    set_project_card_default_template.short_description = _('set_project_card_default_template')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "common_project_phase":

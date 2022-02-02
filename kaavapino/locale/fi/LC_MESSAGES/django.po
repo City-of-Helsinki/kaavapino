@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-01-21 02:04+0200\n"
+"POT-Creation-Date: 2022-01-27 14:10+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -42,8 +42,16 @@ msgstr "Valitse vain yksi projekti"
 msgid "Create document {}"
 msgstr "Luo dokumentti {}"
 
+#: projects/admin.py:377
+msgid "choose one template"
+msgstr "valitse yksi dokumenttipohja"
+
+#: projects/admin.py:387
+msgid "set_project_card_default_template"
+msgstr "aseta projektikortin dokumenttipohjaksi"
+
 #: projects/exporting/report.py:28 projects/models/project.py:104
-#: projects/models/project.py:831 projects/models/project.py:989
+#: projects/models/project.py:828 projects/models/project.py:986
 #: projects/models/projectcomment.py:30 projects/models/projectcomment.py:75
 msgid "created at"
 msgstr "luotu"
@@ -690,11 +698,15 @@ msgstr "Dokumentin lataus ei aiheuta varoitusta"
 msgid "image template"
 msgstr "kuvadokumenttipohja"
 
-#: projects/models/document.py:48 projects/models/document.py:71
+#: projects/models/document.py:48
+msgid "project card default template"
+msgstr "projektikortin dokumenttipohja"
+
+#: projects/models/document.py:53 projects/models/document.py:76
 msgid "document template"
 msgstr "dokumenttipohja"
 
-#: projects/models/document.py:49
+#: projects/models/document.py:54
 msgid "document templates"
 msgstr "dokumenttipohjat"
 
