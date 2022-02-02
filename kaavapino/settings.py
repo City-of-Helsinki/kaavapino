@@ -291,13 +291,14 @@ Q_CLUSTER = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "Helsingin Kaupunki - Kaavapino - API",
     "DESCRIPTION": "Kaavapino API for planning data",
-    'VERSION': '1.0.0',
-    'AUTHENTICATION_WHITELIST': [
-        'helusers.oidc.ApiTokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+    "VERSION": "1.0.0",
+    "AUTHENTICATION_WHITELIST": [
+        "helusers.oidc.ApiTokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'SCHEMA_COERCE_PATH_PK_SUFFIX': True,
+    "SCHEMA_COERCE_PATH_PK_SUFFIX": True,
     # OTHER SETTINGS
+    "DISABLE_ERRORS_AND_WARNINGS": True,
     "SWAGGER_UI_SETTINGS": {
         "deepLinking": True,
         "persistAuthorization": True,

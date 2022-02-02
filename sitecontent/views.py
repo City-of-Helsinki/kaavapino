@@ -1,5 +1,6 @@
 from rest_framework import mixins, status
 from rest_framework.response import Response
+from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
@@ -15,6 +16,11 @@ class FooterSectionViewSet(mixins.ListModelMixin, GenericViewSet):
 
 
 class TargetFloorAreas(APIView):
+    @extend_schema(
+        responses=inline_serializer('TargetFloorAreas', fields={
+            '[year]': serializers.IntegerField()
+        })
+    )
     def get(self, __):
         return Response({
             obj.year: obj.target

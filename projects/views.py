@@ -13,7 +13,13 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django_q.tasks import async_task, result as async_result
 from django_q.models import OrmQ
-from drf_spectacular.utils import extend_schema_view, extend_schema, inline_serializer
+from drf_spectacular.utils import (
+    extend_schema_view,
+    extend_schema,
+    inline_serializer,
+    OpenApiParameter,
+)
+from drf_spectacular.types import OpenApiTypes
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
@@ -467,6 +473,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return (start_date, end_date)
 
+    @extend_schema(
+        parameters=[
+          OpenApiParameter("start_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+          OpenApiParameter("end_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+        ],
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -633,6 +645,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ]
         })
 
+    @extend_schema(
+        parameters=[
+          OpenApiParameter("start_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+          OpenApiParameter("end_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+        ],
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -711,6 +729,12 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SimpleAttributeSerializer
 
 
+@extend_schema(
+    parameters=[
+      OpenApiParameter("owner", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+      OpenApiParameter("project", OpenApiTypes.INT, OpenApiParameter.QUERY),
+    ],
+)
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
 
@@ -906,6 +930,13 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         response["Access-Control-Expose-Headers"] = "content-disposition"
         response["Access-Control-Allow-Origin"] = "*"
 
+    @extend_schema(
+        parameters=[
+          OpenApiParameter("task", OpenApiTypes.STR, OpenApiParameter.QUERY),
+          OpenApiParameter("filename", OpenApiTypes.STR, OpenApiParameter.QUERY),
+          OpenApiParameter("preview", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+        ],
+    )
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
         filename = request.query_params.get("filename")
@@ -997,7 +1028,11 @@ class DocumentTemplateDownloadView(
     def can_access_file(self, private_file):
         return self.request.user.has_privilege("admin")
 
-
+@action(
+    methods=["post"],
+    detail=True,
+    permission_classes=[IsAuthenticated, ProjectPermissions],
+)
 class UploadSpecifications(APIView):
     parser_classes = (MultiPartParser,)
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -1015,6 +1050,7 @@ class UploadSpecifications(APIView):
 
 class ReportViewSet(ReadOnlyModelViewSet):
     queryset = Report.objects.filter(hidden=False)
+    serializer_class = ReportSerializer
 
     def get_queryset(self):
         user = self.request.user
