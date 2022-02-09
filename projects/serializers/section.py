@@ -113,15 +113,16 @@ def get_deadline_validator(attribute, subtype, preview):
                 if type(prev_dl) == str:
                     prev_dl = datetime.datetime.strptime(prev_dl, "%Y-%m-%d").date()
 
-                first_valid_day = distance.date_type.valid_days_from(
-                    prev_dl,
-                    distance.distance_from_previous,
-                )
-                if distance.date_type and first_valid_day > value:
-                    raise ValidationError(
-                        (attr_dl.error_min_distance_previous or default_error,
-                        _("The first possible date is {date}.").format(date=formats.date_format(first_valid_day, format_code))),
+                if distance.date_type:
+                    first_valid_day = distance.date_type.valid_days_from(
+                        prev_dl,
+                        distance.distance_from_previous,
                     )
+                    if first_valid_day > value:
+                        raise ValidationError(
+                            (attr_dl.error_min_distance_previous or default_error,
+                            _("The first possible date is {date}.").format(date=formats.date_format(first_valid_day, format_code))),
+                        )
                 elif prev_dl + datetime.timedelta(
                     days=distance.distance_from_previous,
                 ) > value:
