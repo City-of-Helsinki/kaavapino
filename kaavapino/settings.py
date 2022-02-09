@@ -10,6 +10,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 
 import os
 import raven
+import sys
 
 import environ
 
@@ -209,14 +210,32 @@ OIDC_API_TOKEN_AUTH = {
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
 
-if DEBUG:
-    LOGGING = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "handlers": {"console": {"class": "logging.StreamHandler"}},
-        "loggers": {"projects": {"handlers": ["console"], "level": "DEBUG"}},
-    }
-
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'stdout': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+        },
+        'sentry': {
+            'level': 'INFO',
+            'class': 'raven.contrib.django.raven_compat.handlers.SentryHandler',
+        },
+    },
+    'loggers': {
+        'root': {
+            'level': 'INFO',
+            'handlers': ['sentry'],
+        },
+        'django.server': {
+            'handlers': ['stdout'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
