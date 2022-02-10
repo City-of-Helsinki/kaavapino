@@ -118,7 +118,17 @@ def get_deadline_validator(attribute, subtype, preview):
                         prev_dl,
                         distance.distance_from_previous,
                     )
-                    valid_date = attr_dl.date_type.get_closest_valid_date(first_valid_day)
+                    if attr_dl.date_type:
+                        # Make the validated date valid for the
+                        # actual deadline too
+                        valid_date = attr_dl.date_type.get_closest_valid_date(
+                            first_valid_day
+                        )
+                    else:
+                        valid_date = distance.date_type.valid_days_from(
+                            prev_dl,
+                            distance.distance_from_previous,
+                        )
                     if valid_date > value:
                         raise ValidationError(
                             (attr_dl.error_min_distance_previous or default_error,
