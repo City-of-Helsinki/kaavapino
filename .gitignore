@@ -111,3 +111,5 @@ static/
 
 # Node
 node_modules/
+
+media/

@@ -660,3 +660,16 @@ def set_automatic_attributes(attribute_data):
         value = auto_attr.get_value(key)
         if value:
             set_attribute_data(attribute_data, target, value)
+
+
+def get_file_type(filename):
+    return filename.split(".")[-1]
+
+
+DOCUMENT_CONTENT_TYPES = {
+    'docx': "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    'pptx': "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+}
+
+
+TRUE = ("true", "True", "1")

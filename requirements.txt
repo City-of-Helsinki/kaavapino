@@ -41,7 +41,7 @@ future==0.18.2            # via pyjwkest
 idna==3.3                 # via requests
 jinja2==3.0.3             # via docxtpl
 lunardate==0.2.0          # via workalendar
-lxml==4.7.1               # via docxcompose, docxtpl, python-docx
+lxml==4.7.1               # via docxcompose, docxtpl, python-docx, python-pptx
 markupsafe==2.0.1         # via jinja2
 numpy==1.21.5
 oauthlib==3.1.1           # via requests-oauthlib, social-auth-core
@@ -60,8 +60,9 @@ pyparsing==3.0.6          # via packaging
 python-dateutil==2.8.2    # via arrow, croniter, workalendar
 python-docx==0.8.11       # via docxcompose, docxtpl
 python-jose==3.3.0        # via django-helusers
+python-pptx==0.6.21
 python3-openid==3.2.0     # via django-allauth, social-auth-core
-pytz==2021.3              # via django, convertdate, djangorestframework
+pytz==2021.3              # via convertdate, django, djangorestframework
 raven==6.10.0
 redis==3.5.3              # via django-q
 requests==2.26.0          # via django-allauth, django-helusers, pyjwkest, requests-oauthlib, social-auth-core
@@ -74,6 +75,7 @@ sqlparse==0.4.2           # via django
 urllib3==1.26.7           # via requests
 wcwidth==0.2.5            # via blessed
 workalendar==16.2.0
+xlsxwriter==3.0.2         # via python-pptx
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools                # via docxcompose

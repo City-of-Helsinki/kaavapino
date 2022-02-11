@@ -25,6 +25,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
+from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE
 from projects.importing import AttributeImporter
 from projects.models import (
     FieldComment,
@@ -831,6 +832,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
     queryset = DocumentTemplate.objects.all()
     permission_classes = [IsAuthenticated, DocumentPermissions]
     lookup_field = "slug"
+    serializer_class = DocumentTemplateSerializer
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
@@ -846,7 +848,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
             phases__project_subtype=self.project.subtype,
         )
         return DocumentTemplate.objects.filter(
-            common_project_phases__in=phases
+            common_project_phases__in=phases,
         ).distinct()
 
     def get_project(self):
@@ -856,6 +858,14 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         if not project:
             raise Http404
         return project
+
+    def _set_response_headers(self, response, filename, document_type):
+        response["Content-Disposition"] = "attachment; filename={}.{}".format(
+            filename, document_type
+        )
+        # Since we are not using DRFs response here, we set a custom CORS control header
+        response["Access-Control-Expose-Headers"] = "content-disposition"
+        response["Access-Control-Allow-Origin"] = "*"
 
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
@@ -869,20 +879,33 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
+        doc_type = get_file_type(document_template.file.path)
+
+        preview = \
+            True if request.query_params.get("preview") in TRUE \
+            else False
+
+        immediate =  \
+            True if request.query_params.get("immediate") in TRUE \
+            else False
+
+        if immediate:
+            document = render_template(self.project, document_template, preview)
+            response = HttpResponse(
+                document,
+                content_type=DOCUMENT_CONTENT_TYPES[doc_type],
+            )
+            self._set_response_headers(response, filename, doc_type)
+            return response
+
         if task_id:
             result = async_result(task_id)
             if result:
                 response = HttpResponse(
                     result,
-                    content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    content_type=DOCUMENT_CONTENT_TYPES[doc_type],
                 )
-                response["Content-Disposition"] = "attachment; filename={}.docx".format(
-                    filename
-                )
-
-                # Since we are not using DRFs response here, we set a custom CORS control header
-                response["Access-Control-Expose-Headers"] = "content-disposition"
-                response["Access-Control-Allow-Origin"] = "*"
+                self._set_response_headers(response, filename, doc_type)
                 return response
 
             queued_ids = [
@@ -899,10 +922,6 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-        preview = \
-            True if request.query_params.get("preview") in ("true", "True", "1") \
-            else False
-
         document_task = async_task(
             render_template,
             self.project, document_template, preview,
@@ -914,8 +933,11 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         )
 
     def list(self, request, *args, **kwargs):
-        self.serializer_class = DocumentTemplateSerializer
-        return super().list(request, *args, **kwargs)
+        qs = self.get_queryset().filter(project_card_default_template=False)
+        return Response(
+            self.get_serializer(qs, many=True).data,
+            status=status.HTTP_200_OK
+        )
 
 
 class DocumentTemplateDownloadView(
