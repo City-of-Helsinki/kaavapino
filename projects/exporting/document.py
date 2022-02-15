@@ -448,6 +448,7 @@ class PptxTemplate:
         if paragraph.runs:
             template = self.env.parse(original_text)
             vars = self.get_cleaned_context_variables(template)
+            rendered = self.clean_empty_lines(rendered)
             paragraph.runs[0].text = rendered
 
             if len(vars) == 1:
@@ -460,6 +461,9 @@ class PptxTemplate:
         if not paragraph.text.strip():
             p = paragraph._p
             p.getparent().remove(p)
+
+    def clean_empty_lines(self, rendered_text):
+        return '\n'.join([txt for txt in rendered_text.split('\n') if txt.strip()])
 
     def get_cleaned_context_variables(self, template):
         return set([
