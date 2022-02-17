@@ -205,12 +205,12 @@ class ProjectAdmin(OSMGeoAdmin):
         "modified_at",
         "pino_number",
         "subtype",
-        "phase",
         "create_principles",
         "create_draft",
     )
     fields = (
         *readonly_fields,
+        "phase",
         "public",
         "archived",
         "onhold",
