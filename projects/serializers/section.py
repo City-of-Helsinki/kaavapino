@@ -1,7 +1,9 @@
 import collections
 import copy
 import datetime
+import logging
 
+from django.utils import formats, translation
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
@@ -22,6 +24,7 @@ from collections import namedtuple
 
 from django.contrib.auth import get_user_model
 
+log = logging.getLogger(__name__)
 
 FIELD_TYPES = {
     Attribute.TYPE_SHORT_STRING: serializers.CharField,
@@ -42,7 +45,7 @@ FIELD_TYPES = {
     Attribute.TYPE_PERSONNEL: serializers.CharField,
 }
 
-
+format_code = formats.get_format("SHORT_DATE_FORMAT", lang=translation.get_language())
 FieldData = namedtuple("FieldData", ["field_class", "field_arguments"])
 
 
@@ -92,10 +95,12 @@ def get_deadline_validator(attribute, subtype, preview):
             except AttributeError:
                 pass
             except AssertionError:
-                raise ValidationError(_(
-                    attr_dl.error_date_type_mismatch or \
-                    f"Invalid date selection for date type {attr_dl.date_type}"
-                ))
+                valid_date = attr_dl.date_type.get_closest_valid_date(value)
+                raise ValidationError(
+                    (_(attr_dl.error_date_type_mismatch or \
+                    f"Invalid date selection for date type {attr_dl.date_type}"),
+                    _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
+                )
 
             # validate minimum distance to previous deadline(s)
             for distance in attr_dl.distances_to_previous.all():
@@ -108,18 +113,38 @@ def get_deadline_validator(attribute, subtype, preview):
                 if type(prev_dl) == str:
                     prev_dl = datetime.datetime.strptime(prev_dl, "%Y-%m-%d").date()
 
-                if distance.date_type and distance.date_type.valid_days_from(
-                    prev_dl,
-                    distance.distance_from_previous,
-                ) > value:
-                    raise ValidationError(
-                        attr_dl.error_min_distance_previous or default_error
+                if distance.date_type:
+                    first_valid_day = distance.date_type.valid_days_from(
+                        prev_dl,
+                        distance.distance_from_previous,
                     )
+                    if attr_dl.date_type:
+                        # Make the validated date valid for the
+                        # actual deadline too
+                        valid_date = attr_dl.date_type.get_closest_valid_date(
+                            first_valid_day
+                        )
+                    else:
+                        valid_date = distance.date_type.valid_days_from(
+                            prev_dl,
+                            distance.distance_from_previous,
+                        )
+                    if valid_date > value:
+                        raise ValidationError(
+                            (attr_dl.error_min_distance_previous or default_error,
+                            _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
+                        )
                 elif prev_dl + datetime.timedelta(
                     days=distance.distance_from_previous,
                 ) > value:
+                    if distance.date_type:
+                        valid_date = distance.date_type.get_closest_valid_date(value)
+                    else:
+                        valid_date = prev_dl + datetime.timedelta(days=distance.distance_from_previous)
+
                     raise ValidationError(
-                        attr_dl.error_min_distance_previous or default_error
+                        (attr_dl.error_min_distance_previous or default_error,
+                        _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
                     )
 
     return validate

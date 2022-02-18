@@ -636,7 +636,6 @@ def set_automatic_attributes(attribute_data):
     from projects.models import AttributeAutoValue
 
     paths = []
-
     for auto_attr in AttributeAutoValue.objects.all():
         key_attr_path = \
             get_fieldset_path(auto_attr.key_attribute) + [auto_attr.key_attribute]
@@ -656,7 +655,22 @@ def set_automatic_attributes(attribute_data):
             paths.append((path+[auto_attr.value_attribute], key_path, auto_attr))
 
     for (target, source, auto_attr) in paths:
+        if len(target) == 2 and len(source) == 2:
+            target, source = [target[1]], [source[1]]
         key = get_attribute_data(source, attribute_data)
         value = auto_attr.get_value(key)
         if value:
             set_attribute_data(attribute_data, target, value)
+
+
+def get_file_type(filename):
+    return filename.split(".")[-1]
+
+
+DOCUMENT_CONTENT_TYPES = {
+    'docx': "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    'pptx': "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+}
+
+
+TRUE = ("true", "True", "1")

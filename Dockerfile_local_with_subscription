@@ -1,5 +1,5 @@
 ##### Base image #####
-FROM registry.access.redhat.com/ubi8/python-39 as base
+FROM registry.access.redhat.com/ubi8/python-39:1-22.1638364042 as base
 
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND noninteractive
@@ -18,7 +18,7 @@ WORKDIR /$APP_NAME
 ARG REDHAT_USERNAME
 ARG REDHAT_PASSWORD
 
-RUN subscription-manager register --username $REDHAT_USERNAME --password $REDHAT_PASSWORD --auto-attach
+RUN subscription-manager register --username $REDHAT_USERNAME --password $REDHAT_PASSWORD --auto-attach --force
 RUN subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms
 RUN dnf -y update
 RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
@@ -36,9 +36,9 @@ RUN pip install -U pip
 RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapinouser
 #RUN mkdir -p $STATIC_ROOT $MEDIA_ROOT
 
-#RUN subscription-manager remove --all || :
-#RUN subscription-manager unregister || :
-#RUN subscription-manager clean || :
+RUN subscription-manager remove --all || :
+RUN subscription-manager unregister || :
+RUN subscription-manager clean || :
 
 
 ##### Test image #####

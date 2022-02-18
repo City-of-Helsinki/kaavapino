@@ -17,7 +17,7 @@ from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -25,6 +25,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
+from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE
 from projects.importing import AttributeImporter
 from projects.models import (
     FieldComment,
@@ -118,7 +119,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
-    permission_classes = (ProjectPermissions,)
+    permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
     try:
         ordering_fields = [
@@ -253,7 +254,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=True,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
     )
     def simple(self, request, pk):
         return Response(SimpleProjectSerializer(self.get_object()).data)
@@ -262,7 +263,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         methods=["put"],
         detail=True,
         parser_classes=[MultiPartParser],
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
     )
     def files(self, request, pk=None):
         project = self.get_object()
@@ -283,7 +284,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=True,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
     )
     def external_documents(self, request, pk):
         project = self.get_object()
@@ -402,7 +403,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/filters",
         url_name="projects-overview-filters",
     )
@@ -432,7 +433,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/floor_area",
         url_name="projects-overview-floor-area"
     )
@@ -599,7 +600,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/by_subtype",
         url_name="projects-overview-by-subtype"
     )
@@ -639,7 +640,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     @action(
         methods=["get"],
         detail=False,
-        permission_classes=[ProjectPermissions],
+        permission_classes=[IsAuthenticated, ProjectPermissions],
         url_path="overview/on_map",
         url_name="projects-overview-on-map"
     )
@@ -729,7 +730,7 @@ class ProjectAttributeFileDownloadView(
 class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = FieldComment.objects.all().select_related("user")
     serializer_class = FieldCommentSerializer
-    permission_classes = (CommentPermissions,)
+    permission_classes = [IsAuthenticated, CommentPermissions]
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ("created_at", "modified_at")
 
@@ -770,7 +771,7 @@ class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = ProjectComment.objects.all().select_related("user")
     serializer_class = CommentSerializer
-    permission_classes = (CommentPermissions,)
+    permission_classes = [IsAuthenticated, CommentPermissions]
     filter_backends = (filters.OrderingFilter,)
     ordering_fields = ("created_at", "modified_at")
 
@@ -829,8 +830,9 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
 class DocumentViewSet(ReadOnlyModelViewSet):
     queryset = DocumentTemplate.objects.all()
-    permission_classes = (DocumentPermissions,)
+    permission_classes = [IsAuthenticated, DocumentPermissions]
     lookup_field = "slug"
+    serializer_class = DocumentTemplateSerializer
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
@@ -846,7 +848,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
             phases__project_subtype=self.project.subtype,
         )
         return DocumentTemplate.objects.filter(
-            common_project_phases__in=phases
+            common_project_phases__in=phases,
         ).distinct()
 
     def get_project(self):
@@ -856,6 +858,14 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         if not project:
             raise Http404
         return project
+
+    def _set_response_headers(self, response, filename, document_type):
+        response["Content-Disposition"] = "attachment; filename={}.{}".format(
+            filename, document_type
+        )
+        # Since we are not using DRFs response here, we set a custom CORS control header
+        response["Access-Control-Expose-Headers"] = "content-disposition"
+        response["Access-Control-Allow-Origin"] = "*"
 
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
@@ -869,20 +879,33 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
+        doc_type = get_file_type(document_template.file.path)
+
+        preview = \
+            True if request.query_params.get("preview") in TRUE \
+            else False
+
+        immediate =  \
+            True if request.query_params.get("immediate") in TRUE \
+            else False
+
+        if immediate:
+            document = render_template(self.project, document_template, preview)
+            response = HttpResponse(
+                document,
+                content_type=DOCUMENT_CONTENT_TYPES[doc_type],
+            )
+            self._set_response_headers(response, filename, doc_type)
+            return response
+
         if task_id:
             result = async_result(task_id)
             if result:
                 response = HttpResponse(
                     result,
-                    content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    content_type=DOCUMENT_CONTENT_TYPES[doc_type],
                 )
-                response["Content-Disposition"] = "attachment; filename={}.docx".format(
-                    filename
-                )
-
-                # Since we are not using DRFs response here, we set a custom CORS control header
-                response["Access-Control-Expose-Headers"] = "content-disposition"
-                response["Access-Control-Allow-Origin"] = "*"
+                self._set_response_headers(response, filename, doc_type)
                 return response
 
             queued_ids = [
@@ -899,10 +922,6 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-        preview = \
-            True if request.query_params.get("preview") in ("true", "True", "1") \
-            else False
-
         document_task = async_task(
             render_template,
             self.project, document_template, preview,
@@ -914,8 +933,11 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         )
 
     def list(self, request, *args, **kwargs):
-        self.serializer_class = DocumentTemplateSerializer
-        return super().list(request, *args, **kwargs)
+        qs = self.get_queryset().filter(project_card_default_template=False)
+        return Response(
+            self.get_serializer(qs, many=True).data,
+            status=status.HTTP_200_OK
+        )
 
 
 class DocumentTemplateDownloadView(
@@ -936,7 +958,7 @@ class DocumentTemplateDownloadView(
 
 class UploadSpecifications(APIView):
     parser_classes = (MultiPartParser,)
-    permission_classes = (IsAdminUser,)
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def post(self, request, format=None):
         if request.FILES and request.FILES["specifications"]:
