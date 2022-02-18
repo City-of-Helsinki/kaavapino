@@ -44,8 +44,8 @@ RUN rm /etc/rhsm-host && \
 # Upgrade pip
 RUN pip install -U pip
 
-RUN useradd --system -u 1002 -g 0 kaavapinouser
-RUN mkdir -p $STATIC_ROOT $MEDIA_ROOT
+RUN useradd --system -u 1002 -g 0 kaavapinouser && \
+    mkdir -p $STATIC_ROOT $MEDIA_ROOT
 
 #RUN subscription-manager remove --all || :
 #RUN subscription-manager unregister || :
@@ -58,8 +58,8 @@ FROM base AS test
 COPY requirements.txt /$APP_NAME/
 COPY requirements-dev.txt /$APP_NAME/
 
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-dev.txt
 
 # Add entrypoint script
 COPY docker-entrypoint.sh /
@@ -75,9 +75,7 @@ RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 
 COPY . .
 
-RUN chown -Rh kaavapinouser:0 /$APP_NAME
-RUN chown -Rh kaavapinouser:0 /$STATIC_ROOT
-RUN chown -Rh kaavapinouser:0 /$MEDIA_ROOT
+RUN chown -Rh kaavapinouser:0 /$APP_NAME /$STATIC_ROOT /$MEDIA_ROOT
 
 USER kaavapinouser
 
