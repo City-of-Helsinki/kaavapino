@@ -33,7 +33,7 @@ RUN dnf install -y \
 # Upgrade pip
 RUN pip install -U pip
 
-RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapinouser
+RUN useradd --system -u 1002 -g 0 kaavapinouser
 RUN mkdir -p $STATIC_ROOT $MEDIA_ROOT
 
 #RUN subscription-manager remove --all || :
@@ -64,9 +64,9 @@ RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 
 COPY . .
 
-RUN chown -Rh kaavapinouser:kaavapinogroup /$APP_NAME
-RUN chown -Rh kaavapinouser:kaavapinogroup /$STATIC_ROOT
-RUN chown -Rh kaavapinouser:kaavapinogroup /$MEDIA_ROOT
+RUN chown -Rh kaavapinouser:0 /$APP_NAME
+RUN chown -Rh kaavapinouser:0 /$STATIC_ROOT
+RUN chown -Rh kaavapinouser:0 /$MEDIA_ROOT
 
 USER kaavapinouser
 
