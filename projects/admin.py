@@ -218,6 +218,14 @@ class ProjectAdmin(OSMGeoAdmin):
     )
     inlines = (ProjectPhaseLogInline, ProjectDeadlineInline)
 
+    def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
+        if db_field.name == 'phase':
+            project = Project.objects.get(id=request.resolver_match.kwargs.get('object_id'))
+            kwargs['queryset'] = ProjectPhase.objects.filter(
+                project_subtype=project.subtype
+            )
+        return super(ProjectAdmin, self).formfield_for_foreignkey(db_field, request, **kwargs)
+
     def get_actions(self, request):
         actions = super().get_actions(request)
 
