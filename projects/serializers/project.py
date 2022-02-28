@@ -1423,12 +1423,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
         if len(invalid_identifiers):
-            raise ValidationError(
-                {
-                    key: _("Cannot edit field.")
-                    for key in invalid_identifiers
-                }
-            )
+            invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
+            log.warn(", ".join(invalids))
 
         for identifier, attribute_file in files_to_archive:
             entry = action.send(
