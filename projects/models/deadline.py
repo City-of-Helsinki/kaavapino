@@ -1,4 +1,5 @@
 import datetime
+import logging
 from calendar import isleap
 from workalendar.core import MON, TUE, WED, THU, FRI, SAT, SUN
 from workalendar.europe import Finland
@@ -13,6 +14,7 @@ from users.models import PRIVILEGE_LEVELS
 from . import Attribute
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 
+log = logging.getLogger(__name__)
 
 class Deadline(models.Model):
     """Defines a common deadline type shared by multiple projects."""
@@ -434,7 +436,7 @@ class DateType(models.Model):
             dates = [date for date in dates if date >= orig_date]
 
         # Handle the case where there aren't enough days left in the year
-        while abs(days) >= len(dates):
+        while abs(days) > len(dates):
             if days < 0:
                 days += len(dates)
                 year -= 1
@@ -452,6 +454,10 @@ class DateType(models.Model):
                 dates.reverse()
 
         if not is_valid:
+            # Special case to prevent using last index
+            if days == 0:
+                return dates[days]
+
             return dates[abs(days) - 1]
 
         return dates[abs(days)]
