@@ -603,20 +603,47 @@ class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
 class ProjectSubTypeSchemaSerializer(serializers.Serializer):
     subtype_name = serializers.CharField(source="name")
     subtype = serializers.IntegerField(source="id")
+    phases = serializers.SerializerMethodField()
+    deadline_sections = serializers.SerializerMethodField()
+
+    def get_phases(self, instance):
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(pk=int(query_params.get("project")))
+        except (ValueError, TypeError, Project.DoesNotExist):
+            return ProjectPhaseSchemaSerializer(
+                instance.phases.all(),
+                many=True,
+                context=self.context,
+            ).data
+
+        return ProjectPhaseSchemaSerializer(
+            instance.get_phases(project),
+            many=True,
+            context=self.context,
+        ).data
+
+    def get_deadline_sections(self, instance):
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(pk=int(query_params.get("project")))
+        except (ValueError, TypeError, Project.DoesNotExist):
+            return ProjectPhaseSchemaSerializer(
+                instance.phases.all(),
+                many=True,
+                context=self.context,
+            ).data
+
+        return ProjectPhaseDeadlineSectionsSerializer(
+            instance.get_phases(project),
+            many=True,
+            context=self.context,
+        ).data
 
     def get_fields(self):
         fields = super(ProjectSubTypeSchemaSerializer, self).get_fields()
-        fields["phases"] = ProjectPhaseSchemaSerializer(
-            many=True,
-            context=self.context,
-        )
         fields["floor_area_sections"] = ProjectFloorAreaSchemaSerializer(
             many=True,
-            context=self.context,
-        )
-        fields["deadline_sections"] = ProjectPhaseDeadlineSectionsSerializer(
-            many=True,
-            source="phases",
             context=self.context,
         )
 

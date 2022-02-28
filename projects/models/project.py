@@ -90,6 +90,18 @@ class ProjectSubtype(models.Model):
     def __str__(self):
         return self.name
 
+    def get_phases(self, project=None):
+        if not project:
+            return self.phases.all()
+
+        phases = self.phases.all()
+        if not project.create_principles:
+            phases = phases.exclude(common_project_phase__name="Periaatteet")
+
+        if not project.create_draft:
+            phases = phases.exclude(common_project_phase__name="Luonnos")
+
+        return phases
 
 class Project(models.Model):
     """Represents a single project in the system."""
