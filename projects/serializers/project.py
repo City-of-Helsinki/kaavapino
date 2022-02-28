@@ -360,6 +360,11 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
                 )
                 if response.status_code == 200:
                     cache.set(url, response, 90000)
+                elif response.status_code >= 500:
+                    log.error("Kaavoitus-api connection error: {} {}".format(
+                        response.status_code,
+                        response.text
+                    ))
                 else:
                     cache.set(url, response, 180)
 
