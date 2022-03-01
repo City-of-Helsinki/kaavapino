@@ -360,6 +360,11 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
                 )
                 if response.status_code == 200:
                     cache.set(url, response, 90000)
+                elif response.status_code >= 500:
+                    log.error("Kaavoitus-api connection error: {} {}".format(
+                        response.status_code,
+                        response.text
+                    ))
                 else:
                     cache.set(url, response, 180)
 
@@ -1423,12 +1428,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
         if len(invalid_identifiers):
-            raise ValidationError(
-                {
-                    key: _("Cannot edit field.")
-                    for key in invalid_identifiers
-                }
-            )
+            invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
+            log.warn(", ".join(invalids))
 
         for identifier, attribute_file in files_to_archive:
             entry = action.send(

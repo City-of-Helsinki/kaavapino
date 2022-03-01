@@ -9,9 +9,12 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
-import raven
+import sys
 
 import environ
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
 
 project_root = environ.Path(__file__) - 2
 
@@ -34,6 +37,7 @@ env = environ.Env(
     NGINX_X_ACCEL=(bool, False),
     USE_X_FORWARDED_HOST=(bool, False),
     SENTRY_DSN=(str, ""),
+    SENTRY_ENVIRONMENT=(str, "development"),
     CSRF_COOKIE_DOMAIN=(str, ""),
     CSRF_TRUSTED_ORIGINS=(list, []),
     SOCIAL_AUTH_TUNNISTAMO_SECRET=(str, "SECRET_UNSET"),
@@ -47,6 +51,13 @@ env = environ.Env(
     GRAPH_API_TENANT_ID=(str, ""),
     GRAPH_API_CLIENT_SECRET=(str, ""),
 )
+
+if env('SENTRY_DSN'):
+    sentry_sdk.init(
+        dsn=env('SENTRY_DSN'),
+        environment=env('SENTRY_ENVIRONMENT'),
+        integrations=[DjangoIntegration()]
+    )
 
 SOCIAL_AUTH_TUNNISTAMO_SECRET = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_SECRET")
 SOCIAL_AUTH_TUNNISTAMO_KEY = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_KEY")
@@ -113,14 +124,6 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
-# Raven
-try:
-    version = raven.fetch_git_sha(project_root())
-except Exception:
-    version = None
-
-RAVEN_CONFIG = {"dsn": env.str("SENTRY_DSN"), "release": version}
-
 INSTALLED_APPS = [
     "helusers.apps.HelusersConfig",
     "helusers.apps.HelusersAdminConfig",
@@ -149,9 +152,6 @@ INSTALLED_APPS = [
     "users",
     "django_q",
 ]
-
-if RAVEN_CONFIG["dsn"]:
-    INSTALLED_APPS += ["raven.contrib.django.raven_compat"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -209,14 +209,28 @@ OIDC_API_TOKEN_AUTH = {
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
 
-if DEBUG:
-    LOGGING = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "handlers": {"console": {"class": "logging.StreamHandler"}},
-        "loggers": {"projects": {"handlers": ["console"], "level": "DEBUG"}},
-    }
-
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'stdout': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+        },
+    },
+    'loggers': {
+        'root': {
+            'level': 'INFO',
+            'handlers': ['stdout'],
+        },
+        'django.server': {
+            'handlers': ['stdout'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

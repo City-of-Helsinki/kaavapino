@@ -1264,13 +1264,11 @@ class AttributeImporter:
 
                 section_phase_name = locations["label"]
 
-                if self._row_part_of_fieldset(row):
-                    try:
-                        attribute_index = locations["child_field_locations"][-1]
-                    except IndexError:
-                        attribute_index = 0
-                else:
-                    attribute_index = locations["field_location"]
+                try:
+                    child_location = locations["child_locations"][-1]
+                except IndexError:
+                    child_location = 0
+                attribute_index = locations["field_location"] + int(child_location / 100)
 
                 section = ProjectPhaseSection.objects.get(
                     phase=phase,
