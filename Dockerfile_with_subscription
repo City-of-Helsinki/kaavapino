@@ -82,7 +82,7 @@ COPY . .
 
 # probably only $STATIC_ROOT needs to be group-writable,
 # check this later!
-RUN chown -Rh kaavapinouser:0 /$APP_NAME $STATIC_ROOT $MEDIA_ROOT && \
+RUN chown -R kaavapinouser:0 /$APP_NAME $STATIC_ROOT $MEDIA_ROOT && \
     chmod -R g+rwX /$APP_NAME $STATIC_ROOT $MEDIA_ROOT
 
 USER kaavapinouser
