@@ -61,6 +61,11 @@ COPY requirements-dev.txt /$APP_NAME/
 RUN pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r requirements-dev.txt
 
+# probably only $STATIC_ROOT needs to be group-writable,
+# check this later!
+RUN chown -R kaavapinouser:0 /$APP_NAME $STATIC_ROOT $MEDIA_ROOT && \
+    chmod -R g+rwX /$APP_NAME $STATIC_ROOT $MEDIA_ROOT
+
 # Add entrypoint script
 COPY docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
