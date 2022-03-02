@@ -76,6 +76,8 @@ SOCIAL_AUTH_TUNNISTAMO_AUTH_EXTRA_ARGUMENTS = {'ui_locales': 'fi'}
 
 env_file = project_root(".env")
 
+FILE_UPLOAD_PERMISSIONS = None
+
 if os.path.exists(env_file):
     env.read_env(env_file)
 
