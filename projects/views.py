@@ -206,7 +206,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def _filter_users(self, users, queryset):
         users_list = self._string_filter_to_list(users)
-        return queryset.filter(user__uuid__in=users_list)
+        return queryset.filter(user__uuid__in=users_list).filter(Q(vector_column__icontains=users) | Q(vector_column=users))
 
     def _search(self, search, queryset):
         def search_field_for_attribute(attr):
@@ -231,7 +231,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # return queryset \
         #     .annotate(search=SearchVector(*search_fields)) \
         #     .filter(Q(search__icontains=search) | Q(search=search))
-
         return queryset.filter(Q(vector_column__icontains=search) | Q(vector_column=search))
 
     @staticmethod
@@ -507,12 +506,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         confirmed_projects_by_date = {
             date: Project.objects.filter(
                 project_query, (
-                    Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__gte=start_date,
-                      attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
-                    Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__gte=start_date,
-                      attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
-                    Q(attribute_data__kylk_hyvaksymispaatos_pvm__gte=start_date,
-                      attribute_data__kylk_hyvaksymispaatos_pvm__lte=date)
+                    Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
+                    Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
+                    Q(attribute_data__kylk_hyvaksymispaatos_pvm__lte=date)
                 ),
                 public=True,
                 pk__in=[p.pk for p in projects_in_range],
