@@ -206,7 +206,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def _filter_users(self, users, queryset):
         users_list = self._string_filter_to_list(users)
-        return queryset.filter(user__uuid__in=users_list).filter(Q(vector_column__icontains=users) | Q(vector_column=users))
+        return queryset.filter(user__uuid__in=users_list)
 
     def _search(self, search, queryset):
         def search_field_for_attribute(attr):
