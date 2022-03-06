@@ -126,19 +126,35 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 
 @extend_schema_view(
     retrieve=extend_schema(
-        responses=ProjectSerializer,
+        responses={
+            200: ProjectSerializer,
+            401: OpenApiTypes.STR,
+            404: OpenApiTypes.STR,
+        },
     ),
     create=extend_schema(
         request=ProjectSerializer,
-        responses=ProjectSerializer,
+        responses={
+            200: ProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     ),
     update=extend_schema(
         request=ProjectSerializer,
-        responses=ProjectSerializer,
+        responses={
+            200: ProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     ),
     partial_update=extend_schema(
         request=ProjectSerializer,
-        responses=ProjectSerializer,
+        responses={
+            200: ProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     ),
 )
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
@@ -295,7 +311,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return context
 
     @extend_schema(
-        responses=SimpleProjectSerializer,
+        responses={
+            200: SimpleProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     )
     @action(
         methods=["get"],
@@ -307,7 +327,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     @extend_schema(
         request=ProjectFileSerializer,
-        responses=ProjectFileSerializer,
+        responses={
+            200: ProjectFileSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     )
     @action(
         methods=["put"],
@@ -705,7 +729,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         })
 
     @extend_schema(
-        responses=ProjectOnMapOverviewSerializer(many=True),
+        responses={
+            200: ProjectOnMapOverviewSerializer(many=True),
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     )
     @action(
         methods=["get"],
@@ -1016,7 +1044,11 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         )
 
     @extend_schema(
-        responses=DocumentTemplateSerializer,
+        responses={
+            200: DocumentTemplateSerializer(many=True),
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     )
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset().filter(project_card_default_template=False)
@@ -1153,7 +1185,11 @@ class ReportViewSet(ReadOnlyModelViewSet):
         )
 
     @extend_schema(
-        responses=ReportSerializer,
+        responses={
+            200: ReportSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
     )
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer

@@ -19,12 +19,7 @@ from users.urls import router as users_router
 
 admin.autodiscover()
 
-<<<<<<< HEAD
-
 router = routers.DefaultRouter(trailing_slash=True)
-=======
-router = routers.DefaultRouter()
->>>>>>> Swagger support: initial version added
 router.registry.extend(projects_router.registry)
 router.registry.extend(sitecontent_router.registry)
 router.registry.extend(users_router.registry)

@@ -331,6 +331,11 @@ paths:
   /v1/personnel/:
     get:
       operationId: v1_personnel_list
+      parameters:
+      - in: query
+        name: search
+        schema:
+          type: string
       tags:
       - v1
       security:
@@ -1131,6 +1136,14 @@ paths:
     get:
       operationId: v1_projects_documents_retrieve
       parameters:
+      - in: query
+        name: filename
+        schema:
+          type: string
+      - in: query
+        name: preview
+        schema:
+          type: boolean
       - in: path
         name: project_id
         schema:
@@ -1141,6 +1154,10 @@ paths:
         schema:
           type: string
         required: true
+      - in: query
+        name: task
+        schema:
+          type: string
       tags:
       - v1
       security:
@@ -1148,10 +1165,25 @@ paths:
       - cookieAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentTemplate'
+          description: ''
   /v1/projects/overview/by_subtype/:
     get:
       operationId: v1_projects_overview_by_subtype_retrieve
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
       tags:
       - v1
       security:
@@ -1191,6 +1223,17 @@ paths:
   /v1/projects/overview/floor_area/:
     get:
       operationId: v1_projects_overview_floor_area_retrieve
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
       tags:
       - v1
       security:
@@ -1354,10 +1397,23 @@ paths:
       - cookieAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Report'
+          description: ''
   /v1/schemas/:
     get:
       operationId: v1_schemas_retrieve
+      parameters:
+      - in: query
+        name: owner
+        schema:
+          type: boolean
+      - in: query
+        name: project
+        schema:
+          type: integer
       tags:
       - v1
       security:
@@ -1376,6 +1432,14 @@ paths:
           type: integer
         description: A unique integer value identifying this projektin tyyppi.
         required: true
+      - in: query
+        name: owner
+        schema:
+          type: boolean
+      - in: query
+        name: project
+        schema:
+          type: integer
       tags:
       - v1
       security:
@@ -1394,7 +1458,11 @@ paths:
       - cookieAuth: []
       responses:
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TargetFloorAreas'
+          description: ''
   /v1/users/:
     get:
       operationId: v1_users_list
@@ -2819,6 +2887,13 @@ components:
       - subtype
       - type
       - user
+    TargetFloorAreas:
+      type: object
+      properties:
+        '[year]':
+          type: integer
+      required:
+      - '[year]'
     User:
       type: object
       properties:
