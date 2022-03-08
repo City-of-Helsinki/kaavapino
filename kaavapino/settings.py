@@ -153,6 +153,7 @@ INSTALLED_APPS = [
     "rest_framework_gis",
     "users",
     "django_q",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -243,6 +244,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 local_settings = project_root("local_settings.py")
@@ -285,3 +287,20 @@ Q_CLUSTER = {
 
 # TODO: Enable in production
 # HELUSERS_PASSWORD_LOGIN_DISABLED = True
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Helsingin Kaupunki - Kaavapino - API",
+    "DESCRIPTION": "Kaavapino API for planning data",
+    "VERSION": "1.0.0",
+    "AUTHENTICATION_WHITELIST": [
+        "helusers.oidc.ApiTokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "SCHEMA_COERCE_PATH_PK_SUFFIX": True,
+    # OTHER SETTINGS
+    "DISABLE_ERRORS_AND_WARNINGS": True,
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+    },
+}

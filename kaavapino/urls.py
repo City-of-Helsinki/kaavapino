@@ -3,6 +3,11 @@ from django.urls import re_path
 from django.conf.urls.static import static
 from helusers.admin_site import admin
 from django.urls import path, include
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 from rest_framework import routers
 
 from projects import views as project_views
@@ -13,7 +18,6 @@ from users.views import PersonnelDetail, PersonnelList
 from users.urls import router as users_router
 
 admin.autodiscover()
-
 
 router = routers.DefaultRouter(trailing_slash=True)
 router.registry.extend(projects_router.registry)
@@ -56,6 +60,11 @@ urlpatterns = [
         project_views.DocumentTemplateDownloadView.as_view(),
         name="serve_private_document_template_file",
     ),
+    # OpenAPI 3 documentation with Swagger UI:
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    # Optional UI:
+    path('schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 if settings.DEBUG:

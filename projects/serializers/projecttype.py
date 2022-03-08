@@ -1,4 +1,5 @@
 from django.db.models import Case, When
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from projects.models import ProjectType, ProjectSubtype, Attribute
@@ -35,9 +36,11 @@ class ProjectTypeMetadataSerializer(serializers.Serializer):
     normal_project_card_attributes = serializers.SerializerMethodField()
     extended_project_card_attributes = serializers.SerializerMethodField()
 
+    @extend_schema_field(ProjectTypeMetadataCardAttributeSerializer(many=True))
     def get_normal_project_card_attributes(self, metadata):
         return self._get_card_attributes(metadata, "normal_project_card_attributes")
 
+    @extend_schema_field(ProjectTypeMetadataCardAttributeSerializer(many=True))
     def get_extended_project_card_attributes(self, metadata):
         return self._get_card_attributes(metadata, "extended_project_card_attributes")
 

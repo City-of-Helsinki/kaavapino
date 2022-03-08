@@ -13,6 +13,13 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django_q.tasks import async_task, result as async_result
 from django_q.models import OrmQ
+from drf_spectacular.utils import (
+    extend_schema_view,
+    extend_schema,
+    inline_serializer,
+    OpenApiParameter,
+)
+from drf_spectacular.types import OpenApiTypes
 from private_storage.views import PrivateStorageDetailView
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
@@ -117,6 +124,39 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectTypeSerializer
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        responses={
+            200: ProjectSerializer,
+            401: OpenApiTypes.STR,
+            404: OpenApiTypes.STR,
+        },
+    ),
+    create=extend_schema(
+        request=ProjectSerializer,
+        responses={
+            200: ProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    ),
+    update=extend_schema(
+        request=ProjectSerializer,
+        responses={
+            200: ProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    ),
+    partial_update=extend_schema(
+        request=ProjectSerializer,
+        responses={
+            200: ProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    ),
+)
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user")
     permission_classes = [IsAuthenticated, ProjectPermissions]
@@ -149,6 +189,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = self.queryset
+        if self.request.method in ['PUT', 'PATCH']:
+            queryset = queryset \
+                .prefetch_related('deadlines') \
+                .prefetch_related('deadlines__deadline') \
+                .prefetch_related('deadlines__deadline__condition_attributes') \
+                .prefetch_related('deadlines__deadline__initial_calculations') \
+                .prefetch_related('deadlines__deadline__update_calculations')
 
         includeds_users = self.request.query_params.get("includes_users", None)
         search = self.request.query_params.get("search", None)
@@ -209,20 +256,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return queryset.filter(user__uuid__in=users_list)
 
     def _search(self, search, queryset):
-        def search_field_for_attribute(attr):
-            if attr.static_property:
-                return attr.static_property
-            elif not attr.fieldset_attribute_target.count():
-                return f"attribute_data__{attr.identifier}"
-            else:
-                fieldset_path = [attr.identifier]
-                while attr.fieldset_attribute_target.count():
-                    attr = attr.fieldset_attribute_target.get().attribute_source
-                    fieldset_path.append(attr.identifier)
+        # def search_field_for_attribute(attr):
+        #     if attr.static_property:
+        #         return attr.static_property
+        #     elif not attr.fieldset_attribute_target.count():
+        #         return f"attribute_data__{attr.identifier}"
+        #     else:
+        #         fieldset_path = [attr.identifier]
+        #         while attr.fieldset_attribute_target.count():
+        #             attr = attr.fieldset_attribute_target.get().attribute_source
+        #             fieldset_path.append(attr.identifier)
 
-                fieldset_path.reverse()
-                field_string = "__".join(fieldset_path)
-                return f"attribute_data__{field_string}"
+        #         fieldset_path.reverse()
+        #         field_string = "__".join(fieldset_path)
+        #         return f"attribute_data__{field_string}"
 
         # search_fields = [
         #     search_field_for_attribute(attr)
@@ -231,7 +278,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # return queryset \
         #     .annotate(search=SearchVector(*search_fields)) \
         #     .filter(Q(search__icontains=search) | Q(search=search))
-        return queryset.filter(Q(vector_column__icontains=search) | Q(vector_column=search))
+
+        # Add 'like' condition for partial matching of single lexeme even
+        # it prevents bitmap heap scan of gin index. This might be removed
+        # if it cerates performance issues in the future
+        combined_queryset = queryset.filter(Q(vector_column__icontains=search))
+        # Django creates plainto_tsquery() whereas we want to use to_tsquery(),
+        # so we'll create our own query to allow prefix matching
+        terms = search.split()
+        tsquery = " & ".join(terms)
+        tsquery += ":*"
+        combined_queryset |= queryset.extra(where=["vector_column @@ to_tsquery(%s)"], params=[tsquery])
+
+        # log.info(combined_queryset.query)
+        return combined_queryset
 
     @staticmethod
     def _filter_private(queryset, user):
@@ -250,6 +310,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return context
 
+    @extend_schema(
+        responses={
+            200: SimpleProjectSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    )
     @action(
         methods=["get"],
         detail=True,
@@ -258,6 +325,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def simple(self, request, pk):
         return Response(SimpleProjectSerializer(self.get_object()).data)
 
+    @extend_schema(
+        request=ProjectFileSerializer,
+        responses={
+            200: ProjectFileSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    )
     @action(
         methods=["put"],
         detail=True,
@@ -280,6 +355,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return Response(serializer.data)
 
+    @extend_schema(
+        responses=inline_serializer('ExternalDocuments', fields={'sections': ProjectExternalDocumentSectionSerializer(many=True)}),
+    )
     @action(
         methods=["get"],
         detail=True,
@@ -399,6 +477,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return query
 
+    @extend_schema(
+        responses=OverviewFilterSerializer(many=True),
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -429,6 +510,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return (start_date, end_date)
 
+    @extend_schema(
+        parameters=[
+          OpenApiParameter("start_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+          OpenApiParameter("end_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+        ],
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -595,6 +682,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ]
         })
 
+    @extend_schema(
+        parameters=[
+          OpenApiParameter("start_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+          OpenApiParameter("end_date", OpenApiTypes.DATE, OpenApiParameter.QUERY),
+        ],
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -635,6 +728,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ).data
         })
 
+    @extend_schema(
+        responses={
+            200: ProjectOnMapOverviewSerializer(many=True),
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    )
     @action(
         methods=["get"],
         detail=False,
@@ -670,6 +770,12 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = SimpleAttributeSerializer
 
 
+@extend_schema(
+    parameters=[
+      OpenApiParameter("owner", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+      OpenApiParameter("project", OpenApiTypes.INT, OpenApiParameter.QUERY),
+    ],
+)
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
 
@@ -747,7 +853,7 @@ class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["parent_instance"] = self.parent_instance
+        context["parent_instance"] = self.get_parent_instance()
         return context
 
     @action(methods=["get"], detail=False, url_path=r"field/(?P<field_identifier>\w+)", url_name="project-field-comments")
@@ -865,6 +971,13 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         response["Access-Control-Expose-Headers"] = "content-disposition"
         response["Access-Control-Allow-Origin"] = "*"
 
+    @extend_schema(
+        parameters=[
+          OpenApiParameter("task", OpenApiTypes.STR, OpenApiParameter.QUERY),
+          OpenApiParameter("filename", OpenApiTypes.STR, OpenApiParameter.QUERY),
+          OpenApiParameter("preview", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
+        ],
+    )
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
         filename = request.query_params.get("filename")
@@ -930,6 +1043,13 @@ class DocumentViewSet(ReadOnlyModelViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
+    @extend_schema(
+        responses={
+            200: DocumentTemplateSerializer(many=True),
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    )
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset().filter(project_card_default_template=False)
         return Response(
@@ -953,7 +1073,11 @@ class DocumentTemplateDownloadView(
     def can_access_file(self, private_file):
         return self.request.user.has_privilege("admin")
 
-
+@action(
+    methods=["post"],
+    detail=True,
+    permission_classes=[IsAuthenticated, ProjectPermissions],
+)
 class UploadSpecifications(APIView):
     parser_classes = (MultiPartParser,)
     permission_classes = [IsAuthenticated, IsAdminUser]
@@ -971,6 +1095,7 @@ class UploadSpecifications(APIView):
 
 class ReportViewSet(ReadOnlyModelViewSet):
     queryset = Report.objects.filter(hidden=False)
+    serializer_class = ReportSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -1059,6 +1184,13 @@ class ReportViewSet(ReadOnlyModelViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
+    @extend_schema(
+        responses={
+            200: ReportSerializer,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    )
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
         return super().list(request, *args, **kwargs)
