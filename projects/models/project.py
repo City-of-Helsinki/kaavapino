@@ -10,6 +10,7 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
+from django.db.models import Q
 from django.db.models.expressions import Value
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -579,7 +580,7 @@ class Project(models.Model):
         return True
 
     def save(self, *args, **kwargs):
-        def add_fieldset_field_for_attribute(search_fields, attr, fieldset):
+        def add_fieldset_field_for_attribute(search_fields, attr, fieldset, raw=False):
             key = attr.identifier
             while attr.fieldset_attribute_target.count():
                 attr = attr.fieldset_attribute_target.get().attribute_source
@@ -599,7 +600,10 @@ class Project(models.Model):
                         for source in sources:
                             add_fieldset_field_for_attribute(search_fields, source.attribute_target, value)
                     else:
-                        search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
+                        if raw:
+                            search_fields.add(Value(value, output_field=models.TextField()))
+                        else:
+                            search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
 
         def add_search_field_for_attribute(search_fields, attr):
             if attr.static_property:
@@ -633,6 +637,15 @@ class Project(models.Model):
         search_fields = set()
         for attr in Attribute.objects.filter(searchable=True):
             add_search_field_for_attribute(search_fields, attr)
+
+        # Raw personnels
+        for attr in Attribute.objects.filter(value_type=Attribute.TYPE_PERSONNEL):
+            if not attr.fieldset_attribute_target.count():
+                value = self.attribute_data.get(attr.identifier)
+                if value and attr.value_type != Attribute.TYPE_FIELDSET:
+                    search_fields.add(Value(value, output_field=models.TextField()))
+            else:
+                add_fieldset_field_for_attribute(search_fields, attr, None, raw=True)
 
         search_fields.add(Value(self.subtype, output_field=models.TextField()))
         search_fields.add(Value(self.user, output_field=models.TextField()))

@@ -445,7 +445,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
             value = " ".join([
                 str(value.get(key))
                 for key in data_source_keys[-1].split(";")
-                if value.get(key)
+                if value and value.get(key)
             ])
         elif last_key[0] != "{" and last_key[-1] == "}":
             last_key, dictionary = last_key.split(":", 1)
