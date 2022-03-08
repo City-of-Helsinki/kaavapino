@@ -15,7 +15,7 @@ from users.urls import router as users_router
 admin.autodiscover()
 
 
-router = routers.DefaultRouter()
+router = routers.DefaultRouter(trailing_slash=True)
 router.registry.extend(projects_router.registry)
 router.registry.extend(sitecontent_router.registry)
 router.registry.extend(users_router.registry)
@@ -37,8 +37,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path('pysocial/', include('social_django.urls', namespace='social')),
     path('helauth/', include('helusers.urls')),
-    path("v1/legend", Legend.as_view(), name="legend"),
-    path("v1/targetfloorareas", TargetFloorAreas.as_view(), name="targetfloorareas"),
+    path("v1/legend/", Legend.as_view(), name="legend"),
+    path("v1/targetfloorareas/", TargetFloorAreas.as_view(), name="targetfloorareas"),
     path("v1/personnel/", PersonnelList.as_view(), name="personnellist"),
     path("v1/", include(router.urls)),
     re_path(
