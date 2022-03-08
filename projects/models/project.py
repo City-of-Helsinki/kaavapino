@@ -649,8 +649,7 @@ class Project(models.Model):
 
         search_fields.add(Value(self.subtype, output_field=models.TextField()))
         search_fields.add(Value(self.user, output_field=models.TextField()))
-
-        # log.info(search_fields)
+        search_fields.add(Value(self.user.ad_id, output_field=models.TextField()))
 
         self.vector_column = SearchVector(*list(search_fields))
 
