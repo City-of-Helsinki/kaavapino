@@ -313,7 +313,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedFooterSectionList'
           description: ''
-  /v1/legend:
+  /v1/legend/:
     get:
       operationId: v1_legend_retrieve
       tags:
@@ -464,11 +464,23 @@ paths:
       - jwtAuth: []
       - cookieAuth: []
       responses:
-        '201':
+        '200':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
           description: ''
   /v1/projects/{parent_lookup_project}/comments/:
     get:
@@ -951,6 +963,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
           description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
     put:
       operationId: v1_projects_update
       parameters:
@@ -984,6 +1008,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/Project'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
     patch:
       operationId: v1_projects_partial_update
       parameters:
@@ -1015,6 +1051,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
           description: ''
     delete:
       operationId: v1_projects_destroy
@@ -1083,6 +1131,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectFile'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/projects/{id}/simple/:
     get:
       operationId: v1_projects_simple_retrieve
@@ -1104,6 +1164,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SimpleProject'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
           description: ''
   /v1/projects/{project_id}/documents/:
     get:
@@ -1131,6 +1203,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedDocumentTemplateList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
           description: ''
   /v1/projects/{project_id}/documents/{slug}/:
     get:
@@ -1270,6 +1354,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedProjectOnMapOverviewList'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/projectsubtypes/:
     get:
       operationId: v1_projectsubtypes_list
@@ -1380,6 +1476,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedReportList'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/reports/{id}/:
     get:
       operationId: v1_reports_retrieve
@@ -1448,7 +1556,7 @@ paths:
       responses:
         '200':
           description: No response body
-  /v1/targetfloorareas:
+  /v1/targetfloorareas/:
     get:
       operationId: v1_targetfloorareas_retrieve
       tags:
@@ -2207,6 +2315,9 @@ components:
         phase_documents_creation_started:
           type: boolean
           readOnly: true
+        project_card_document:
+          type: string
+          readOnly: true
         name:
           type: string
           title: Nimi
@@ -2348,6 +2459,9 @@ components:
         phase_documents_creation_started:
           type: boolean
           readOnly: true
+        project_card_document:
+          type: string
+          readOnly: true
         name:
           type: string
           title: Nimi
@@ -2432,6 +2546,7 @@ components:
       - owner_edit_override
       - phase_documents_created
       - phase_documents_creation_started
+      - project_card_document
       - public
       - subtype
       - type
