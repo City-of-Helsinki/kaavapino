@@ -1,1 +1,1 @@
-import kaavapino.schema
+#import kaavapino.schema
