@@ -18,8 +18,8 @@ from projects.views import (
 
 app_name = "projects"
 
-router = routers.SimpleRouter(trailing_slash=True)
-projects_router = ExtendedSimpleRouter(trailing_slash=True)
+router = routers.SimpleRouter()
+projects_router = ExtendedSimpleRouter()
 projects = projects_router.register(r"projects", ProjectViewSet, basename="projects")
 projects.register(
     r"comments/fields",
