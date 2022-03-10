@@ -50,7 +50,18 @@ env = environ.Env(
     GRAPH_API_APPLICATION_ID=(str, ""),
     GRAPH_API_TENANT_ID=(str, ""),
     GRAPH_API_CLIENT_SECRET=(str, ""),
+    ELASTIC_APM_SERVER_URL=(str, ""),
+    ELASTIC_APM_SERVICE_NAME=(str, ""),
+    ELASTIC_APM_SECRET_TOKEN=(str, ""),
 )
+
+if env.str("ELASTIC_APM_SERVER_URL") and env.str("ELASTIC_APM_SECRET_TOKEN"):
+    ELASTIC_APM = {
+        "DEBUG": True,
+        "SERVER_URL": env.str("ELASTIC_APM_SERVER_URL"),
+        "SERVICE_NAME": env.str("ELASTIC_APM_SERVICE_NAME"),
+        "SECRET_TOKEN": env.str("ELASTIC_APM_SECRET_TOKEN"),
+    }
 
 if env('SENTRY_DSN'):
     sentry_sdk.init(
@@ -154,6 +165,9 @@ INSTALLED_APPS = [
     "users",
     "django_q",
 ]
+
+if env.str("ELASTIC_APM_SERVER_URL") and env.str("ELASTIC_APM_SECRET_TOKEN"):
+    INSTALLED_APPS += ["elasticapm.contrib.django"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
