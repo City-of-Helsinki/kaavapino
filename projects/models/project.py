@@ -312,10 +312,6 @@ class Project(models.Model):
             return True
 
         attribute_data = {**self.attribute_data, **preview_attributes}
-
-        if not attribute_data.get(deadline.attribute, None):
-            return False
-
         for attr in deadline.condition_attributes.all():
             if bool(attribute_data.get(attr.identifier, None)):
                 return True
@@ -461,9 +457,8 @@ class Project(models.Model):
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
 
-            if value:
-                dl.date = value
-                dl.save()
+            dl.date = value
+            dl.save()
 
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
