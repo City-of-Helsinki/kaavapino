@@ -444,6 +444,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                             param_parsed = int(param)
                         except (TypeError, ValueError):
                             continue
+                    elif attr.value_type == Attribute.TYPE_CHOICE:
+                        choices = {}
+                        for choice in attr.value_choices.all():
+                            choices[choice.identifier] = choice.value
+                        param_parsed = choices.get(param)
                     else:
                         param_parsed = param
 
@@ -469,6 +474,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 return q
 
             param_queries = Q()
+
 
             for param in split_params:
                 param_queries |= get_query_for_filter(param)
