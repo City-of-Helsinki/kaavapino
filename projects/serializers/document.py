@@ -87,7 +87,7 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
 
             phase_ended = project_phase.index < project.phase.index
             phase_list.append({
-                "phase_index": project_phase.index,
+                "phase_index": project_phase.index or project_phase.common_project_phase.index,
                 "phase_name": phase.prefixed_name,
                 "phase_ended": phase_ended,
                 "last_downloaded": last_downloaded,
