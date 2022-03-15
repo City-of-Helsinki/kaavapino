@@ -4,7 +4,7 @@
 #
 --no-binary psycopg2
 
-attrs==21.2.0             # via pytest
+attrs==21.4.0             # via pytest
 backcall==0.2.0           # via ipython
 click==7.1.2              # via prequ
 coverage[toml]==6.2       # via pytest-cov

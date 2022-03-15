@@ -5,6 +5,7 @@ from collections import namedtuple
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from projects.models import (
@@ -737,6 +738,7 @@ class ProjectCardSchemaSerializer(serializers.ModelSerializer):
         ]
 
     @staticmethod
+    @extend_schema_field(AttributeChoiceSchemaSerializer(many=True))
     def get_choices(sect_attr):
         attribute = sect_attr.attribute
         foreign_key_choice = FOREIGN_KEY_TYPE_MODELS.get(attribute.value_type, None)

@@ -138,3 +138,16 @@ Install kubectl locally. Check version to deploy and run:
 ... kaavapino/api/deploy/rancher
 #> ./deploy_staging_api.sh <version> run
 ```
+
+
+## Schema
+
+### Generate API-schema
+
+Unversioned:
+```bash
+./manage.py spectacular --file schema/schema.yaml
+```
+
+### Access swagger ui
+`<server_url>/schema/swagger-ui/`
