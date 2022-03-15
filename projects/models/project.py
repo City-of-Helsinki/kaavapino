@@ -433,7 +433,11 @@ class Project(models.Model):
         deadlines = self.get_applicable_deadlines()
 
         # Delete no longer relevant deadlines and create missing
-        self.deadlines.exclude(deadline__in=deadlines).delete()
+        to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
+
+        for dl in to_be_deleted:
+            self.deadlines.remove(dl)
+
         generated_deadlines = []
         project_deadlines = list(self.deadlines.all())
 
@@ -458,9 +462,8 @@ class Project(models.Model):
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
 
-            if value:
-                dl.date = value
-                dl.save()
+            dl.date = value
+            dl.save()
 
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(

@@ -592,6 +592,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         allow_null=True, required=False, read_only=True,
     )
     generated_deadline_attributes = serializers.SerializerMethodField()
+    deadline_attributes = serializers.SerializerMethodField()
     geoserver_data = serializers.SerializerMethodField()
     phase_documents_created = serializers.SerializerMethodField()
     phase_documents_creation_started = serializers.SerializerMethodField()
@@ -625,6 +626,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "create_principles",
             "create_draft",
             "generated_deadline_attributes",
+            "deadline_attributes",
             "geoserver_data",
             "_metadata",
         ]
@@ -790,6 +792,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         return [
             dl.deadline.attribute.identifier
             for dl in project.deadlines.filter(generated=True)
+            if dl.deadline.attribute
+        ]
+
+    @extend_schema_field(serializers.ListSerializer(child=serializers.CharField()))
+    def get_deadline_attributes(self, project):
+        return [
+            dl.deadline.attribute.identifier
+            for dl in project.deadlines.filter()
             if dl.deadline.attribute
         ]
 
