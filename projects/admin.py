@@ -215,6 +215,7 @@ class ProjectAdmin(OSMGeoAdmin):
         "archived",
         "onhold",
         "owner_edit_override",
+        "attribute_data",
     )
     inlines = (ProjectPhaseLogInline, ProjectDeadlineInline)
 
