@@ -15,7 +15,7 @@ flake8==4.0.1
 flake8-print==4.0.0
 inflection==0.5.1         # via pytest-factoryboy
 iniconfig==1.1.1          # via pytest
-ipython==7.30.1
+ipython==7.31.1
 isort==5.10.1
 jedi==0.18.1              # via ipython
 matplotlib-inline==0.1.3  # via ipython
