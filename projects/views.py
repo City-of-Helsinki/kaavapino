@@ -238,13 +238,21 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         """
         user_queryset = self._filter_users(users, queryset)
         users_list = self._string_filter_to_list(users)
-        user_attributes = Attribute.objects.filter(value_type=Attribute.TYPE_USER)
+        user_attributes = Attribute.objects.filter(
+            value_type__in=[Attribute.TYPE_USER, Attribute.TYPE_PERSONNEL]
+        )
 
         attribute_data_users = self.queryset.none()
         for attribute in user_attributes:
-            attribute_filter = {
-                f"attribute_data__{attribute.identifier}__in": users_list
-            }
+            if attribute.fieldsets.exists():
+                parent_attr = attribute.fieldsets.last()
+                attribute_filter = {
+                    f"attribute_data__{parent_attr.identifier}__contains": [{f"{attribute.identifier}": users_list[0]}]
+                }
+            else:
+                attribute_filter = {
+                    f"attribute_data__{attribute.identifier}__in": users_list
+                }
             attribute_data_users = attribute_data_users | queryset.filter(
                 **attribute_filter
             )
