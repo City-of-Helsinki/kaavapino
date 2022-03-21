@@ -30,6 +30,14 @@
                 <input type="file" name="specifications"/> <br/>
                 <button type="submit" class="action button">{% trans 'Import' %}</button>
             </form>
+
+            <h2>{% trans 'Import attribute update file' %}</h2>
+            <p><small><a href="{% url 'admin_attribute_updater_template' %}">Lataa mallitiedosto</a></small></p>
+            <form action="{% url 'admin_upload_attribute_updater' %}" method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="file" name="specifications"/> <br/>
+                <button type="submit" class="action button">{% trans 'Import' %}</button>
+            </form>
         </div>
     </div>
 {% endblock %}

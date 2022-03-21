@@ -1,4 +1,5 @@
 import pytz
+import csv
 from datetime import datetime, timedelta
 import time
 import logging
@@ -33,7 +34,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
 from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE
-from projects.importing import AttributeImporter
+from projects.importing import AttributeImporter, AttributeUpdater
 from projects.models import (
     FieldComment,
     ProjectComment,
@@ -1105,6 +1106,39 @@ class UploadSpecifications(APIView):
             attribute_importer.run()
 
         return redirect(".")
+
+
+@action(
+    methods=["post"],
+    detail=True,
+    permission_classes=[IsAuthenticated, ProjectPermissions],
+)
+class UploadAttributeUpdate(APIView):
+    parser_classes = (MultiPartParser,)
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def post(self, request, format=None):
+        if request.FILES and request.FILES["specifications"]:
+            specifications_file = request.FILES["specifications"]
+
+            options = {"filename": specifications_file}
+            attribute_importer = AttributeUpdater(options)
+            attribute_importer.run()
+
+        return redirect(".")
+
+
+def admin_attribute_updater_template(request):
+    response = HttpResponse(
+        content_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="muuttuneet-tunnisteet-template.csv"'},
+    )
+
+    writer = csv.writer(response)
+    writer.writerow(["Korvattava tunniste", "Korvaava tunniste"])
+    writer.writerow(["vanha_tunniste", "uusi_tunniste"])
+
+    return response
 
 
 class ReportViewSet(ReadOnlyModelViewSet):

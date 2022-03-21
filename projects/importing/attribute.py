@@ -1,8 +1,11 @@
 import itertools
+import csv
+import json
 import logging
 import re
 from collections import Counter, defaultdict
 from enum import Enum
+from io import StringIO
 from itertools import filterfalse
 from typing import Iterable, Sequence, List, Optional
 
@@ -10,7 +13,7 @@ from django.core.cache import cache
 from django.db.utils import IntegrityError
 from django.contrib.auth.models import Group
 from django.db import transaction
-from django.db.models import ProtectedError
+from django.db.models import ProtectedError, Q
 from openpyxl import load_workbook
 
 from ..models import (
@@ -35,6 +38,7 @@ from ..models import (
     ProjectPhaseSectionAttribute,
     ProjectPhase,
     CommonProjectPhase,
+    Project,
     ProjectPhaseFieldSetAttributeIndex,
     ProjectType,
     ProjectSubtype,
@@ -413,6 +417,78 @@ DISPLAY_TYPES = {
 
 
 class AttributeImporterException(Exception):
+    pass
+
+
+class AttributeUpdater:
+    def __init__(self, options=None):
+        self.options = options
+
+    @transaction.atomic
+    def run(self):
+        logger.info(f"Admin: Starting to update attribute identifiers")
+        file = self.options['filename'].read().decode('utf-8')
+        reader = csv.reader(StringIO(file))
+
+        for i, row in enumerate(reader):
+            if i == 0:
+                continue
+
+            old_identifier = row[0]
+            new_identifier = row[1]
+
+            if not old_identifier or not new_identifier:
+                logger.info(f"Invalid input data: Identifier to replace: {old_identifier} New identifier: {new_identifier}")
+                continue
+
+            logger.info(f"Updating attributes: {old_identifier}->{new_identifier}")
+            attributes = Attribute.objects.filter(
+                Q(identifier=old_identifier)
+                | Q(key_attribute_path__contains=old_identifier)
+                | Q(related_fields__contains=[old_identifier])
+                | Q(visibility_conditions__0__contains={"variable": old_identifier})
+            )
+            for attr in attributes:
+                logger.info(f"    Updating attribute {attr.id} {attr.identifier}")
+                if attr.identifier == old_identifier:
+                    attr.identifier = new_identifier
+                    logger.info(f"        Updated Attribute.identifier")
+
+                if attr.key_attribute_path and old_identifier in attr.key_attribute_path:
+                    attr.key_attribute_path = attr.key_attribute_path.replace(
+                        old_identifier,
+                        new_identifier
+                    )
+                    logger.info(f"        Updated Attribute.key_attribute_path")
+
+                if attr.related_fields and old_identifier in attr.related_fields:
+                    updated = []
+                    for i, rel_f in enumerate(attr.related_fields):
+                        if rel_f == old_identifier:
+                            attr.related_fields[i] = new_identifier
+                            logger.info(f"        Updated Attribute.related_fields")
+
+                for i, vis_con in enumerate(attr.visibility_conditions):
+                    if vis_con.get("variable") == old_identifier:
+                        attr.visibility_conditions[i]["variable"] = new_identifier
+                        logger.info(f"        Updated Attribute.visibility_conditions")
+
+
+                attr.save()
+
+
+            logger.info(f"Updating project attribute_data: {old_identifier}->{new_identifier}")
+            for proj in Project.objects.all():
+                attr_data = json.dumps(proj.attribute_data)
+                if old_identifier in attr_data:
+                    logger.info(f"    Updating project {proj.id}: {old_identifier}->{new_identifier}")
+                    attr_data = attr_data.replace(old_identifier, new_identifier)
+                    proj.attribute_data = json.loads(attr_data)
+                    proj.save()
+
+
+
+class AttributeUpdaterException(Exception):
     pass
 
 
