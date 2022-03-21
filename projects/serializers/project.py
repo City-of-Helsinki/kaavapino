@@ -1669,7 +1669,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     for project_dl in project.deadlines.all()
                     if project_dl.deadline.attribute
                 }
-                instance.update_attribute_data(cleared_attributes)
+                project.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
                 project.update_deadlines(user=user)

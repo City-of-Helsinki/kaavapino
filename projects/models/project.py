@@ -389,6 +389,7 @@ class Project(models.Model):
 
     def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False, preview_attribute_data={}):
         results = {}
+        fillers = []
 
         for deadline in deadlines:
             if initial:
@@ -417,7 +418,28 @@ class Project(models.Model):
                     )
                 }
 
-            results[deadline] = self._set_calculated_deadline(
+            result = self._set_calculated_deadline(
+                deadline,
+                calculate_deadline(self, preview_attributes=preview_attribute_data),
+                initial,
+                user,
+                preview,
+                preview_attribute_data,
+            )
+
+            if not result:
+                fillers += [deadline]
+
+            results[deadline] = result
+
+        for deadline in fillers:
+            # Another pass for few deadlines that depend on other deadlines
+            if initial:
+                calculate_deadline = deadline.calculate_initial
+            else:
+                calculate_deadline = deadline.calculate_updated
+
+            self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
                 initial,
@@ -461,9 +483,9 @@ class Project(models.Model):
                 continue
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
-
-            dl.date = value
-            dl.save()
+            if value:
+                dl.date = value
+                dl.save()
 
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
