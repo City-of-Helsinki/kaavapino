@@ -38,6 +38,16 @@ urlpatterns = [
         project_views.UploadSpecifications.as_view(),
         name="admin_upload_specifications",
     ),
+    path(
+        "admin/upload_attribute_updater",
+        project_views.UploadAttributeUpdate.as_view(),
+        name="admin_upload_attribute_updater",
+    ),
+    path(
+        "admin/admin_attribute_updater_template",
+        project_views.admin_attribute_updater_template,
+        name="admin_attribute_updater_template",
+    ),
     path("admin/", admin.site.urls),
     path('pysocial/', include('social_django.urls', namespace='social')),
     path('helauth/', include('helusers.urls')),
