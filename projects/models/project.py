@@ -483,9 +483,8 @@ class Project(models.Model):
                 continue
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
-            if value:
-                dl.date = value
-                dl.save()
+            dl.date = value
+            dl.save()
 
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
