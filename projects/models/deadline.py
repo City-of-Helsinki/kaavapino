@@ -460,6 +460,9 @@ class DateType(models.Model):
 
             return dates[abs(days) - 1]
 
+        if len(dates) == abs(days):
+            return dates[0]
+
         return dates[abs(days)]
 
     def is_valid_date(self, date):
