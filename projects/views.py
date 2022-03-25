@@ -576,10 +576,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "kerrosalan_lisays_yhteensa_toimitila",
         ]
         meeting_attrs = [
-            "milloin_kaavaehdotus_lautakunnassa",
-            "milloin_kaavaehdotus_lautakunnassa_2",
-            "milloin_kaavaehdotus_lautakunnassa_3",
-            "milloin_kaavaehdotus_lautakunnassa_4",
             "milloin_tarkistettu_ehdotus_lautakunnassa",
             "milloin_tarkistettu_ehdotus_lautakunnassa_2",
             "milloin_tarkistettu_ehdotus_lautakunnassa_3",
@@ -591,7 +587,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             date: [dl.project for dl in ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
-                deadline__attribute__identifier__in=meeting_attrs,
+                deadline__attribute__identifier__in=meeting_attrs + [
+                    "milloin_kaavaehdotus_lautakunnassa",
+                    "milloin_kaavaehdotus_lautakunnassa_2",
+                    "milloin_kaavaehdotus_lautakunnassa_3",
+                    "milloin_kaavaehdotus_lautakunnassa_4",
+                ],
                 date=date,
             ).order_by("project__pk").distinct("project__pk")]
             for date in date_range
