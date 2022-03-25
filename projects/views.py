@@ -576,6 +576,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "kerrosalan_lisays_yhteensa_toimitila",
         ]
         meeting_attrs = [
+            "milloin_kaavaehdotus_lautakunnassa",
+            "milloin_kaavaehdotus_lautakunnassa_2",
+            "milloin_kaavaehdotus_lautakunnassa_3",
+            "milloin_kaavaehdotus_lautakunnassa_4",
             "milloin_tarkistettu_ehdotus_lautakunnassa",
             "milloin_tarkistettu_ehdotus_lautakunnassa_2",
             "milloin_tarkistettu_ehdotus_lautakunnassa_3",
