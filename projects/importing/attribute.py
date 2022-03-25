@@ -1583,6 +1583,7 @@ class AttributeImporter:
                 common_project_phase=common_phase,
                 defaults={
                     "metadata": metadata,
+                    "index": common_phase.index,
                 },
             )
             if project_phase.id in old_phases:
