@@ -456,7 +456,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     elif attr.value_type == Attribute.TYPE_CHOICE:
                         choices = {}
                         for choice in attr.value_choices.all():
-                            choices[choice.identifier] = choice.value
+                            choices[choice.identifier] = [choice.value, choice.identifier]
                         param_parsed = choices.get(param)
                     else:
                         param_parsed = param
@@ -467,18 +467,22 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     else:
                         postfix = ""
 
-                    # Add to query
-                    if attr.fieldsets.first():
-                        q |= Q(**{
-                            f"{prefix}attribute_data__{attr.fieldsets.first().identifier}{postfix}__contains": \
-                                [{attr.identifier: param_parsed}]
-                        })
-                    elif attr.static_property:
-                        q |= Q(**{f"{prefix}{attr.static_property}{postfix}": param_parsed})
-                    else:
-                        # TODO: __iexact is no longer needed if kaavaprosessin_kokoluokka
-                        # ever gets refactored
-                        q |= Q(**{f"{prefix}attribute_data__{attr.identifier}{postfix}__iexact": param_parsed})
+                    if type(param_parsed) is not list:
+                        param_parsed = [param_parsed]
+
+                    for pp in param_parsed:
+                        # Add to query
+                        if attr.fieldsets.first():
+                            q |= Q(**{
+                                f"{prefix}attribute_data__{attr.fieldsets.first().identifier}{postfix}__contains": \
+                                    [{attr.identifier: pp}]
+                            })
+                        elif attr.static_property:
+                            q |= Q(**{f"{prefix}{attr.static_property}{postfix}": pp})
+                        else:
+                            # TODO: __iexact is no longer needed if kaavaprosessin_kokoluokka
+                            # ever gets refactored
+                            q |= Q(**{f"{prefix}attribute_data__{attr.identifier}{postfix}__iexact": pp})
 
                 return q
 
