@@ -50,6 +50,7 @@ env = environ.Env(
     GRAPH_API_APPLICATION_ID=(str, ""),
     GRAPH_API_TENANT_ID=(str, ""),
     GRAPH_API_CLIENT_SECRET=(str, ""),
+    HELUSERS_PASSWORD_LOGIN_DISABLED=(bool, False),
     ELASTIC_APM_SERVER_URL=(str, ""),
     ELASTIC_APM_SERVICE_NAME=(str, ""),
     ELASTIC_APM_SECRET_TOKEN=(str, ""),
@@ -299,8 +300,7 @@ Q_CLUSTER = {
     "max_attempts": 1,
 }
 
-# TODO: Enable in production
-# HELUSERS_PASSWORD_LOGIN_DISABLED = True
+HELUSERS_PASSWORD_LOGIN_DISABLED = env.bool("HELUSERS_PASSWORD_LOGIN_DISABLED")
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Helsingin Kaupunki - Kaavapino - API",
