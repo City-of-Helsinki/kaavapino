@@ -9,7 +9,7 @@ asgiref==3.4.1            # via django
 attrs==21.4.0             # via jsonschema
 blessed==1.19.0           # via django-q
 cachetools==4.2.4         # via django-helusers
-certifi==2021.10.8        # via requests, sentry-sdk
+certifi==2021.10.8        # via elastic-apm, requests, sentry-sdk
 cffi==1.15.0              # via cryptography
 charset-normalizer==2.0.9  # via requests
 convertdate==2.3.2        # via workalendar
@@ -38,6 +38,7 @@ drf-extensions==0.7.1
 drf-oidc-auth==0.10.0
 drf-spectacular==0.21.1
 ecdsa==0.17.0             # via python-jose
+elastic-apm==6.8.1
 et-xmlfile==1.1.0         # via openpyxl
 future==0.18.2            # via pyjwkest
 idna==3.3                 # via requests
@@ -79,7 +80,7 @@ six==1.16.0               # via blessed, django-extended-choices, docxcompose, d
 social-auth-app-django==5.0.0
 social-auth-core==4.1.0   # via social-auth-app-django
 sqlparse==0.4.2           # via django
-urllib3==1.26.7           # via requests, sentry-sdk
+urllib3==1.26.7           # via elastic-apm, requests, sentry-sdk
 uritemplate==4.1.1        # via drf-spectacular
 wcwidth==0.2.5            # via blessed
 workalendar==16.2.0

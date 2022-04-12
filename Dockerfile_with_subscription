@@ -15,26 +15,37 @@ USER root
 RUN mkdir /$APP_NAME
 WORKDIR /$APP_NAME
 
-ARG REDHAT_USERNAME
-ARG REDHAT_PASSWORD
-
-RUN subscription-manager register --username $REDHAT_USERNAME --password $REDHAT_PASSWORD --auto-attach
-RUN subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms
-RUN dnf -y update
-RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-RUN dnf install -y \
-    git \
-    binutils \
-    gdal \
-    geos \
-    nc \
-    vim
-
+# Copy entitlements
+COPY ./etc-pki-entitlement /etc/pki/entitlement
+# Copy subscription manager configurations if required
+#COPY ./rhsm-conf /etc/rhsm
+#COPY ./rhsm-ca /etc/rhsm/ca
+# Delete /etc/rhsm-host to use entitlements from the build container
+RUN rm /etc/rhsm-host && \
+    # Initialize /etc/yum.repos.d/redhat.repo
+    # See <https://access.redhat.com/solutions/1443553>
+    yum repolist --disablerepo=* && \
+    # Enable the repos you need
+    subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms && \
+    dnf -y update && \
+    dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
+    dnf install -y \
+        git \
+        binutils \
+        gdal \
+        geos \
+        nc \
+        vim && \
+    # Remove entitlements and Subscription Manager configs
+    rm -rf /etc/pki/entitlement 
+    # && \
+    #rm -rf /etc/rhsm
+    
 # Upgrade pip
 RUN pip install -U pip
 
-RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapinouser
-RUN mkdir -p $STATIC_ROOT $MEDIA_ROOT
+RUN useradd --system -u 1002 -g 0 kaavapinouser && \
+    mkdir -p $STATIC_ROOT $MEDIA_ROOT
 
 #RUN subscription-manager remove --all || :
 #RUN subscription-manager unregister || :
@@ -47,8 +58,13 @@ FROM base AS test
 COPY requirements.txt /$APP_NAME/
 COPY requirements-dev.txt /$APP_NAME/
 
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-dev.txt
+
+# probably only $STATIC_ROOT needs to be group-writable,
+# check this later!
+RUN chown -R kaavapinouser:0 /$APP_NAME $STATIC_ROOT $MEDIA_ROOT && \
+    chmod -R g+rwX /$APP_NAME $STATIC_ROOT $MEDIA_ROOT
 
 # Add entrypoint script
 COPY docker-entrypoint.sh /
@@ -64,9 +80,10 @@ RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 
 COPY . .
 
-RUN chown -Rh kaavapinouser:kaavapinogroup /$APP_NAME
-RUN chown -Rh kaavapinouser:kaavapinogroup /$STATIC_ROOT
-RUN chown -Rh kaavapinouser:kaavapinogroup /$MEDIA_ROOT
+# probably only $STATIC_ROOT needs to be group-writable,
+# check this later!
+RUN chown -R kaavapinouser:0 /$APP_NAME $STATIC_ROOT $MEDIA_ROOT && \
+    chmod -R g+rwX /$APP_NAME $STATIC_ROOT $MEDIA_ROOT
 
 USER kaavapinouser
 
