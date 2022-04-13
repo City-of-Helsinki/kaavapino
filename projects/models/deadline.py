@@ -455,13 +455,13 @@ class DateType(models.Model):
 
         if not is_valid:
             # Special case to prevent using last index
-            # if days == 0:
-            #     return dates[days]
+            if days == 0:
+                return dates[days]
 
             return dates[abs(days) - 1]
 
         if len(dates) == abs(days):
-            return dates[0]
+            return dates[abs(days) - 1]
 
         return dates[abs(days)]
 

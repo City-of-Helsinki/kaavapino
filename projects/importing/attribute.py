@@ -204,8 +204,8 @@ PROJECT_PHASES = {
     },  # None
     Phases.PRINCIPLES.value: {
         "name": Phases.PRINCIPLES.value,
-        "color": 'color-silver',
-        "color_code": '#dedfe1',
+        "color": 'color-green',
+        "color_code": '#009246',
         "list_prefix": "XL",
     },
     Phases.OAS.value: {
