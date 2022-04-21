@@ -135,6 +135,8 @@ class Deadline(models.Model):
         default=0,
     )
 
+    admin_description = "Projektiaikataulun määräaikojen määritykset"
+
     @property
     def initial_depends_on(self):
         return list(set([
@@ -271,6 +273,8 @@ class Deadline(models.Model):
             ("attribute", "phase"),
         )
         ordering = ("index",)
+        verbose_name = _("deadline")
+        verbose_name_plural = _("deadlines")
 
 
 class DeadlineDistance(models.Model):
@@ -476,6 +480,10 @@ class DateType(models.Model):
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        verbose_name = _("date type")
+        verbose_name_plural = _("date types")
 
 
 class AutomaticDate(models.Model):

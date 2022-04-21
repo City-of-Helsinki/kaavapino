@@ -365,7 +365,7 @@ class Attribute(models.Model):
     )
     objects = AttributeQuerySet.as_manager()
 
-
+    admin_description = "Projektin kenttien hallinta. Muutokset tänne vaatii mahdollisesti myös muutoksia dokumenttipohjiin."
 
     class Meta:
         verbose_name = _("attribute")
@@ -737,6 +737,12 @@ class AttributeAutoValue(models.Model):
     def __str__(self):
         return f"{self.key_attribute.name} -> {self.value_attribute.name}"
 
+    admin_description = "Kentät joiden arvo määräytyy toisen kentän arvon perusteella"
+
+    class Meta:
+        verbose_name = _("attribute auto value map")
+        verbose_name_plural = _("attribute auto value maps")
+
 
 class AttributeAutoValueMapping(models.Model):
     """A single key-value pair related to an auto value attribute pair"""
@@ -759,6 +765,8 @@ class AttributeAutoValueMapping(models.Model):
 
     class Meta:
         unique_together = ('auto_attr', 'key_str')
+        verbose_name = _("attribute auto value mapping")
+        verbose_name_plural = _("attribute auto value mappings")
 
 
 class FieldSetAttribute(models.Model):
@@ -860,6 +868,8 @@ class OverviewFilter(models.Model):
         unique=True,
         validators=[validate_identifier],
     )
+
+    admin_description = "Karttanäkymän suodattimet"
 
     class Meta:
         verbose_name = _("overview filter")

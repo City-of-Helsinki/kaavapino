@@ -1,5 +1,6 @@
 from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin
 from django import forms
+from django.apps import apps
 from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
@@ -417,7 +418,7 @@ class ProjectFloorAreaSectionChoiceField(forms.ModelChoiceField):
 
 # class BaseMatrixStructureAdmin(admin.Model):
 
-@admin.register(PhaseAttributeMatrixStructure)
+#@admin.register(PhaseAttributeMatrixStructure)
 class PhaseAttributeMatrixStructureAdmin(admin.ModelAdmin):
 # class PhaseAttributeMatrixStructureAdmin(BaseMatrixStructureAdmin):
     change_form_template = "admin/matrix.html"
@@ -621,3 +622,38 @@ class DataRetentionPlanAdmin(admin.ModelAdmin):
 
 
 admin.site.index_template = "admin/kaavapino_index.html"
+
+
+def get_app_list(self, request):
+    # Overridden get_app_list for injecting the admin descriptions
+    app_dict = self._build_app_dict(request)
+    app_list = sorted(app_dict.values(), key=lambda x: x['name'].lower())
+
+    # Sort the models customably within each app.
+    for app in app_list:
+        for model in app["models"]:
+            try:
+                print(app)
+                model_obj = apps.get_model(app["app_label"], model["object_name"])
+            except Exception as e:
+                continue
+
+            model["admin_description"] = getattr(model_obj, "admin_description", None)
+
+    return app_list
+
+admin.AdminSite.get_app_list = get_app_list
+
+
+# Unregister unnecessary models
+from rest_framework.authtoken.models import TokenProxy
+admin.site.unregister(TokenProxy)
+
+from actstream.models import Action, Follow
+admin.site.unregister(Action)
+admin.site.unregister(Follow)
+
+from social_django.models import Association, Nonce, UserSocialAuth
+admin.site.unregister(Association)
+admin.site.unregister(Nonce)
+admin.site.unregister(UserSocialAuth)

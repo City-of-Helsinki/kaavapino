@@ -49,6 +49,8 @@ class DocumentTemplate(models.Model):
         default=False,
     )
 
+    admin_description = "Projektin dokumenttipohjien hallinta"
+
     class Meta:
         verbose_name = _("document template")
         verbose_name_plural = _("document templates")
