@@ -166,7 +166,11 @@ def render_report_to_response(
     if preview:
         writer.writerow(fieldnames)
     else:
-        sheet.append([i[1] for i in fieldnames.items()])
+        def ensure_str(val):
+            if not isinstance(val, str):
+                return str(val)
+            return val
+        sheet.append([ensure_str(i[1]) for i in fieldnames.items()])
 
     # Write data
     for project in projects:
