@@ -31,6 +31,9 @@ class FooterSection(models.Model):
     title = models.CharField(max_length=255, verbose_name=_("title"))
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
 
+    admin_description = "Sivuston alaosan linkit"
+
+
     class Meta:
         verbose_name = _("footer section")
         verbose_name_plural = _("footer sections")
@@ -45,6 +48,8 @@ class ListViewAttributeColumn(models.Model):
     index = models.PositiveIntegerField(default=0)
     attribute = models.OneToOneField( \
         Attribute, primary_key=True, on_delete=models.CASCADE)
+
+    admin_description = "Projektilistasa näkyvät sarakkeet"
 
     class Meta(object):
         verbose_name = _("list view attribute column")
@@ -61,3 +66,12 @@ class TargetFloorArea(models.Model):
     target = models.IntegerField(
         verbose_name=_("area target"),
     )
+
+    admin_description = "Vuositavoitteiden lisääminen ja muokkaaminen"
+
+    def __str__(self):
+        return f"{self.year}: {self.target}"
+
+    class Meta:
+        verbose_name = _("Asuinkerrosalan vuositavoite")
+        verbose_name_plural = _("Asuinkerrosalan vuositavoitteet")

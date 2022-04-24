@@ -179,6 +179,8 @@ class Project(models.Model):
     # For indexing
     vector_column = SearchVectorField(null=True)
 
+    admin_description = "Voi muuttaa huoletta."
+
     class Meta:
         verbose_name = _("project")
         verbose_name_plural = _("projects")
@@ -751,6 +753,10 @@ class ProjectFloorAreaSectionAttributeMatrixStructure(BaseAttributeMatrixStructu
     def __str__(self):
         return f"{self.section} ({len(self.row_names)}x{len(self.column_names)})"
 
+    class Meta:
+        verbose_name = _("project floor area section attribute matrix structure")
+        verbose_name_plural = _("project floor area section attribute matrix structures")
+
 
 class ProjectFloorAreaSectionAttributeMatrixCell(BaseAttributeMatrixCell):
     attribute = models.ForeignKey(
@@ -820,7 +826,9 @@ class ProjectPhase(models.Model):
         null=True,
         encoder=DjangoJSONEncoder,
     )
-
+    
+    admin_description = "Projektin vaiheet per kokoluokka, sekä niiden sisältö"
+    
     class Meta:
         verbose_name = _("project phase")
         verbose_name_plural = _("project phases")
@@ -906,6 +914,9 @@ class ProjectPhaseSection(models.Model):
         through="ProjectPhaseSectionAttribute",
     )
 
+    admin_description = "Kentät projektivaiheissa"
+
+
     class Meta:
         verbose_name = _("project phase section")
         verbose_name_plural = _("project phase sections")
@@ -957,6 +968,8 @@ class ProjectCardSection(models.Model):
         verbose_name=_("index"),
         default=0,
     )
+
+    admin_description = "Ei vielä tuettu käyttöliittymässä"
 
     class Meta:
         verbose_name = _("project card section")
@@ -1104,6 +1117,10 @@ class PhaseAttributeMatrixStructure(BaseAttributeMatrixStructure):
     def __str__(self):
         return f"{self.section} ({len(self.row_names)}x{len(self.column_names)})"
 
+    class Meta:
+        verbose_name = _("phase attribute matrix structure")
+        verbose_name_plural = _("phase attribute matrix structure")
+
 
 class PhaseAttributeMatrixCell(BaseAttributeMatrixCell):
     attribute = models.ForeignKey(
@@ -1226,6 +1243,8 @@ class ProjectPhaseDeadlineSection(models.Model):
         related_name="phase_deadline_sections",
         through="ProjectPhaseDeadlineSectionAttribute",
     )
+
+    admin_description = "Aikataulumodaalin osiot ja kentät"
 
     @property
     def name(self):

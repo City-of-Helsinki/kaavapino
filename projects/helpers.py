@@ -162,7 +162,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         attr: build_request_paths(attr)
         for attr in external_data_attrs.exclude(
             data_source=Attribute.SOURCE_PARENT_FIELDSET,
-        )
+        ) if attr is not None
     }
 
     for attr, urls in fetched_data.items():
