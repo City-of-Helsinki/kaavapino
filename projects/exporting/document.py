@@ -36,7 +36,7 @@ def _get_raw_value(value, attribute):
     if attribute.value_type == Attribute.TYPE_DATE and isinstance(value, str):
         return datetime.datetime.strptime(value, "%Y-%m-%d").date()
     else:
-        return value
+        return str(value)
 
 # TODO: Copied from serializers/utils.py, move under helpers at some point
 def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value):
