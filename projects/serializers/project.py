@@ -1570,7 +1570,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         # Try to find a corresponding phase for current subtype
         else:
             try:
-                return ProjectPhase.objects.get(name=phase.name, project_subtype__pk=subtype_id)
+                return ProjectPhase.objects.get(common_project_phase__name=phase.name, project_subtype__pk=subtype_id)
             except ProjectPhase.DoesNotExist:
                 pass
             try:
