@@ -619,7 +619,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 project_query, (
                     Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
                     Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
-                    Q(attribute_data__kylk_hyvaksymispaatos_pvm__lte=date)
+                    Q(attribute_data__hyvaksymispaatos_pvm__lte=date)
                 ),
                 public=True,
                 pk__in=[p.pk for p in projects_in_range],
