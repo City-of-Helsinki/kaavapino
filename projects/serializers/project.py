@@ -1605,6 +1605,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             self.context['should_update_deadlines'] = True
             attribute_data = validated_data.pop("attribute_data", {})
+            attribute_data["kaavaprosessin_kokoluokka_readonly"] = validated_data["phase"].project_subtype.name
             project: Project = super().create(validated_data)
             user = self.context["request"].user
             action.send(
