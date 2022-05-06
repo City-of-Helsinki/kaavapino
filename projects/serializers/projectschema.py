@@ -724,14 +724,17 @@ class ProjectCardSchemaSerializer(serializers.ModelSerializer):
     choices = serializers.SerializerMethodField()
     label = serializers.CharField(source="attribute.name")
     name = serializers.CharField(source="attribute.identifier")
+    section_key = serializers.CharField(source="section.key")
     section_name = serializers.CharField(source="section.name")
 
     class Meta:
         model = ProjectCardSectionAttribute
         fields = [
+            "section_id",
             "label",
             "name",
             "section_name",
+            "section_key",
             "choices",
             "date_format",
             "show_on_mobile",

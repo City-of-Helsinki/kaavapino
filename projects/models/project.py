@@ -957,6 +957,20 @@ class ProjectPhaseSectionAttribute(models.Model):
         return f"{self.attribute} {self.section} {self.section.phase} {self.index}"
 
 
+PROJECT_CARD_SECTION_KEYS = (
+    ("projektikortin_kuva", "projektikortin_kuva"),
+    ("perustiedot", "perustiedot"),
+    ("suunnittelualueen_kuvaus", "suunnittelualueen_kuvaus"),
+    ("strategiakytkenta", "strategiakytkenta"),
+    ("maanomistus", "maanomistus"),
+    ("kerrosalatiedot", "kerrosalatiedot"),
+    ("aikataulu", "aikataulu"),
+    ("yhteyshenkilöt", "yhteyshenkilöt"),
+    ("dokumentit", "dokumentit"),
+    ("suunnittelualueen_rajaus", "suunnittelualueen_rajaus"),
+)
+
+
 class ProjectCardSection(models.Model):
     """Defines a section to be shown on project card view."""
 
@@ -967,6 +981,13 @@ class ProjectCardSection(models.Model):
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
         default=0,
+    )
+
+    key = models.CharField(
+        choices=PROJECT_CARD_SECTION_KEYS,
+        max_length=255,
+        verbose_name=_("key"),
+        null=True,
     )
 
     admin_description = "Ei vielä tuettu käyttöliittymässä"
