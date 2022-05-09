@@ -297,7 +297,7 @@ class ProjectPhaseAdmin(admin.ModelAdmin):
 class ProjectPhaseSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectPhaseSectionAttribute
     extra = 0
-    readonly_fields = ("attribute", "relies_on")
+    readonly_fields = ("relies_on",)
     can_delete = True
 
 
