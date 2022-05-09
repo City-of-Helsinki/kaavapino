@@ -43,6 +43,11 @@ class User(AbstractUser):
         blank=True,
     )
 
+    hide_from_ui = models.BooleanField(
+        verbose_name=_('hide from ui'),
+        default=False,
+    )
+
     def is_in_group(self, group):
         if isinstance(group, Group):
             return self.groups.filter(group=group).exists()

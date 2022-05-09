@@ -19,7 +19,7 @@ from users.helpers import get_graph_api_access_token
 
 
 class UserViewSet(mixins.RetrieveModelMixin, mixins.ListModelMixin, GenericViewSet):
-    queryset = get_user_model().objects.all()
+    queryset = get_user_model().objects.filter(hide_from_ui=False)
     serializer_class = UserSerializer
     lookup_field = "uuid"
 
