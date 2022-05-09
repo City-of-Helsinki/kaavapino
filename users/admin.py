@@ -1,5 +1,6 @@
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.models import Group
+from django.utils.translation import gettext_lazy as _
 
 from helusers.admin import admin
 from helusers.models import ADGroupMapping
@@ -39,6 +40,22 @@ class UserAdmin(UserAdmin):
         "is_staff",
         "is_superuser",
     )
+    list_display = UserAdmin.list_display + ('hide_from_ui',)
+    actions = ('hide_users_from_ui', 'show_users_in_ui')
+
+    def hide_users_from_ui(self, request, queryset):
+        users = queryset.all()
+        users.update(hide_from_ui=True)
+    
+    def show_users_in_ui(self, request, queryset):
+        users = queryset.all()
+        users.update(hide_from_ui=False)
+
+    hide_users_from_ui.short_description = _('hide from ui')
+    show_users_in_ui.short_description = _('show in ui')
+
+    class Meta:
+        fields = '__all__'
 
 
 class GroupPrivilegeInline(admin.TabularInline):
