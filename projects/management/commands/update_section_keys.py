@@ -15,7 +15,7 @@ class Command(BaseCommand):
             "Maanomistus ja sopimusmenettelyt": "maanomistus",
             "Kerrosalatiedot": "kerrosalatiedot",
             "Aikataulu": "aikataulu",
-            "Yhteyshenkilöt": "yhteyshenkilöt",
+            "Yhteyshenkilöt": "yhteyshenkilot",
             "Dokumentit": "dokumentit",
             "Suunnittelualueen rajaus": "suunnittelualueen_rajaus",
         }
@@ -23,7 +23,7 @@ class Command(BaseCommand):
             print(f"Updating '{section.id}. {section.name}'")
             section.key = section_keys.get(section.name)
             section.save()
-        
+
         print(f"Clearing cache...")
         cache.clear()
         print('All done!')

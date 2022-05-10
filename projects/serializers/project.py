@@ -597,6 +597,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     phase_documents_created = serializers.SerializerMethodField()
     phase_documents_creation_started = serializers.SerializerMethodField()
 
+    project_type = serializers.CharField(source="projektityyppi", allow_null=True, required=False)
     project_card_document = serializers.SerializerMethodField()
 
     _metadata = serializers.SerializerMethodField()
@@ -628,6 +629,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "generated_deadline_attributes",
             "deadline_attributes",
             "geoserver_data",
+            "project_type",
             "_metadata",
         ]
         read_only_fields = ["type", "created_at", "modified_at", "project_card_document"]
@@ -1606,6 +1608,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             self.context['should_update_deadlines'] = True
             attribute_data = validated_data.pop("attribute_data", {})
             attribute_data["kaavaprosessin_kokoluokka_readonly"] = validated_data["phase"].project_subtype.name
+            try:
+                attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
+            except:
+                pass
+
             project: Project = super().create(validated_data)
             user = self.context["request"].user
             action.send(
@@ -1659,6 +1666,10 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         with transaction.atomic():
             self.log_updates_attribute_data(attribute_data)
+            try:
+                attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
+            except:
+                pass
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
