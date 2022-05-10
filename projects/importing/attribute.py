@@ -1212,10 +1212,24 @@ class AttributeImporter:
 
             attr_index = int(location[-1]) if len(location) >= 1 else 0
 
+            section_keys = {
+                "Projektikortin kuva": "projektikortin_kuva",
+                "Perustiedot": "perustiedot",
+                "Suunnittelualueen kuvaus": "suunnittelualueen_kuvaus",
+                "Strategiakytkentä": "strategiakytkenta",
+                "Maanomistus ja sopimusmenettelyt": "maanomistus",
+                "Kerrosalatiedot": "kerrosalatiedot",
+                "Aikataulu": "aikataulu",
+                "Yhteyshenkilöt": "yhteyshenkilöt",
+                "Dokumentit": "dokumentit",
+                "Suunnittelualueen rajaus": "suunnittelualueen_rajaus",
+            }
+
             section, __ = ProjectCardSection.objects.update_or_create(
                 name=section_name,
                 defaults={
                     "index": int(location[0]),
+                    "key": section_keys.get(section_name)
                 },
             )
             ProjectCardSectionAttribute.objects.create(
