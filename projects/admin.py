@@ -341,6 +341,8 @@ class ReportColumnInline(SortableInlineAdminMixin, admin.TabularInline):
     extra = 0
     show_change_link = True
     exclude = ("condition",)
+    readonly_fields = ("preview", "preview_only", "preview_title_column")
+
 
 
 class ReportColumnPostfixInline(admin.TabularInline):
@@ -353,12 +355,14 @@ class ReportColumnAdmin(admin.ModelAdmin):
     list_display = ("__str__",)
     inlines = (ReportColumnPostfixInline,)
     filter_horizontal = ("condition", "attributes")
+    readonly_fields = ("preview", "preview_only", "preview_title_column")
 
 
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
     list_display = ("name",)
     inlines = (ReportColumnInline,)
+    readonly_fields = ("previewable",)
 
 
 class ReportFilterAttributeChoiceInline(admin.TabularInline):
