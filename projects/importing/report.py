@@ -195,7 +195,7 @@ class ReportImporter:
                     [self.report_column_index[COLUMN_PREVIEW_TITLE_COLUMN]] == \
                     "kyllä",
                 custom_display_mapping=custom_display_mapping,
-                generated_new_rows=row \
+                generates_new_rows=row \
                     [self.report_column_index[COLUMN_GENERATE_NEW_ROW]] == \
                     "kyllä",
             )
