@@ -159,7 +159,9 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     ),
 )
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = Project.objects.all().select_related("user")
+    queryset = Project.objects.all() \
+            .select_related("user", "subtype", "phase") \
+            .prefetch_related("deadlines", "target_actions")
     permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
     try:
