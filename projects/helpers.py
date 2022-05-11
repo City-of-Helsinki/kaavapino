@@ -66,7 +66,7 @@ def get_attribute_data(attribute_path, data):
         data.get(attribute_path[0].identifier, [])[attribute_path[1]]
     )
 
-def get_flat_attribute_data(data, flat, first_run=True, flat_key=None):
+def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_types={}):
     if first_run:
         id = data.get("pinonumero")
         cache_key = 'projects.helpers.get_flat_attribute_data'
@@ -79,19 +79,17 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None):
             cache.set(cache_key, flats, None)
             return cached_flat
 
-    from projects.models import Attribute
+        from projects.models import Attribute
+        value_types = {a.identifier: a.value_type for a in Attribute.objects.all()}
+
     for key, val in data.items():
         flat[key] = flat.get(key, [])
-
-        try:
-            value_type = Attribute.objects.get(identifier=key).value_type
-        except Attribute.DoesNotExist:
-            value_type = None
+        value_type = value_types.get(key, None)
 
         if type(val) is list and value_type == Attribute.TYPE_FIELDSET:
             for item in val:
                 get_flat_attribute_data(
-                    item, flat, first_run=False, flat_key=flat_key,
+                    item, flat, first_run=False, flat_key=flat_key, value_types=value_types
                 )
         elif type(val) is list:
             flat[key] += val
@@ -119,13 +117,13 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
     external_data_attrs = Attribute.objects.filter(
         data_source__isnull=False,
-    )
+    ).select_related("key_attribute", "fieldsets")
 
     leaf_node_attrs = external_data_attrs.filter(
         data_source__isnull=False,
     ).exclude(
         value_type=Attribute.TYPE_FIELDSET,
-    )
+    ).select_related("key_attribute", "fieldsets")
 
     flat_attribute_data = get_flat_attribute_data(attribute_data, {})
 
@@ -581,10 +579,12 @@ def set_ad_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
     paths = []
 
-    for attr in Attribute.objects.filter(
+    attributes = Attribute.objects.filter(
         ad_key_attribute__isnull=False,
         ad_data_key__isnull=False,
-    ):
+    ).select_related("ad_key_attribute")
+
+    for attr in attributes:
         fieldset_path = get_fieldset_path(attr)
         _add_paths(paths, [], fieldset_path+[attr], attribute_data)
 
@@ -636,7 +636,7 @@ def set_automatic_attributes(attribute_data):
     from projects.models import AttributeAutoValue
 
     paths = []
-    for auto_attr in AttributeAutoValue.objects.all():
+    for auto_attr in AttributeAutoValue.objects.all().select_related("key_attribute", "value_attribute").prefetch_related("value_map"):
         key_attr_path = \
             get_fieldset_path(auto_attr.key_attribute) + [auto_attr.key_attribute]
         new_paths = []

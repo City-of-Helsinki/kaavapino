@@ -230,15 +230,6 @@ class Project(models.Model):
         if not data:
             return False
 
-        phase_section_attrs = Attribute.objects.filter(
-            phase_sections__phase__project_subtype__projects=self
-        )
-        floor_area_section_attrs = Attribute.objects.filter(
-            floor_area_sections__project_subtype__projects=self
-        )
-        deadline_attrs = Attribute.objects.filter(
-            deadline__in=Deadline.objects.filter(subtype=self.subtype)
-        )
         project_attributes = (
             Attribute.objects.all()
             .distinct()
@@ -480,7 +471,7 @@ class Project(models.Model):
         self.deadlines.set(project_deadlines)
 
         # Update attribute-based deadlines
-        for dl in self.deadlines.all():
+        for dl in self.deadlines.all().select_related("deadline__attribute"):
             if not dl.deadline.attribute:
                 continue
 
@@ -661,11 +652,11 @@ class Project(models.Model):
         # TODO: check if required
         # set_ad_data_in_attribute_data(self.attribute_data)
         search_fields = set()
-        for attr in Attribute.objects.filter(searchable=True):
+        for attr in Attribute.objects.filter(searchable=True).prefetch_related("fieldset_attribute_target"):
             add_search_field_for_attribute(search_fields, attr)
 
         # Raw personnels
-        for attr in Attribute.objects.filter(value_type=Attribute.TYPE_PERSONNEL):
+        for attr in Attribute.objects.filter(value_type=Attribute.TYPE_PERSONNEL).prefetch_related("fieldset_attribute_target"):
             if not attr.fieldset_attribute_target.count():
                 value = self.attribute_data.get(attr.identifier)
                 if value and attr.value_type != Attribute.TYPE_FIELDSET:
@@ -826,9 +817,9 @@ class ProjectPhase(models.Model):
         null=True,
         encoder=DjangoJSONEncoder,
     )
-    
+
     admin_description = "Projektin vaiheet per kokoluokka, sekä niiden sisältö"
-    
+
     class Meta:
         verbose_name = _("project phase")
         verbose_name_plural = _("project phases")
