@@ -793,7 +793,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_generated_deadline_attributes(self, project):
         return [
             dl.deadline.attribute.identifier
-            for dl in project.deadlines.filter(generated=True)
+            for dl in project.deadlines.filter(generated=True).select_related("deadline__attribute")
             if dl.deadline.attribute
         ]
 
@@ -801,7 +801,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_deadline_attributes(self, project):
         return [
             dl.deadline.attribute.identifier
-            for dl in project.deadlines.filter()
+            for dl in project.deadlines.filter().select_related("deadline__attribute")
             if dl.deadline.attribute
         ]
 
@@ -976,7 +976,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             if str(project.user.uuid) in user_attribute_ids:
                 user_attribute_ids.remove(str(project.user.uuid))
 
-            users += list(User.objects.filter(uuid__in=user_attribute_ids))
+            users += list(User.objects.filter(uuid__in=user_attribute_ids).prefetch_related("groups", "additional_groups"))
 
         return UserSerializer(users, many=True).data
 
@@ -1674,7 +1674,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                 instance.update_attribute_data(attribute_data)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
-            old_deadlines = project.deadlines.all()
+
+            old_deadlines = None
+            if should_update_deadlines or should_generate_deadlines:
+                old_deadlines = project.deadlines.all()
+
             if should_generate_deadlines:
                 cleared_attributes = {
                     project_dl.deadline.attribute.identifier: None
@@ -1690,21 +1694,22 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             project.save()
 
-            updated_deadlines = old_deadlines.union(project.deadlines.all())
-            for dl in updated_deadlines:
-                try:
-                    new_date = project.deadlines.get(deadline=dl.deadline).date
-                except ProjectDeadline.DoesNotExist:
-                    new_date = None
+            if old_deadlines:
+                updated_deadlines = old_deadlines.union(project.deadlines.all())
+                for dl in updated_deadlines:
+                    try:
+                        new_date = project.deadlines.get(deadline=dl.deadline).date
+                    except ProjectDeadline.DoesNotExist:
+                        new_date = None
 
-                try:
-                    old_date = old_deadlines.get(deadline=dl.deadline).date
-                except ProjectDeadline.DoesNotExist:
-                    old_date = None
+                    try:
+                        old_date = old_deadlines.get(deadline=dl.deadline).date
+                    except ProjectDeadline.DoesNotExist:
+                        old_date = None
 
-                self.create_deadline_updates_log(
-                    dl.deadline, project, user, old_date, new_date
-                )
+                    self.create_deadline_updates_log(
+                        dl.deadline, project, user, old_date, new_date
+                    )
 
             return project
 
