@@ -117,6 +117,11 @@ def _get_fieldset_children_display(items, attribute, column, offset=1):
     ]
     return "\n".join(items)
 
+
+# Special case for generating Esittelysuunnitelma/Selite postfix
+SPECIAL_COLUMN_NAME = "Selite"
+
+
 def render_report_to_response(
     report: Report, project_ids, response, preview=False, limit=None,
 ):
@@ -190,86 +195,121 @@ def render_report_to_response(
 
         flat_data = get_flat_attribute_data(data, {})
 
-        # Raw values into display values
-        for col in cols:
-            # check conditions if any
-            if col.condition.count():
-                condition_passed = False
-                for condition in col.condition.all():
-                    if data.get(condition.identifier):
-                        condition_passed = True
-                        break
-            else:
-                condition_passed = True
+        row_generating_col = cols.filter(generates_new_rows=True).first()
+        row_gen_data = OrderedDict()
+        if row_generating_col is not None:
+            gen_attrs = row_generating_col.attributes.all()
+            for a in gen_attrs:
+                value = data.get(a.identifier, None)
+                if value:
+                    row_gen_data[a.identifier] = value
 
-            if not condition_passed:
-                data[col.id] = ""
-                continue
+        # Special case to generate multiple rows
+        for gen_attr in (row_gen_data.keys() or [None]):
+            # Raw values into display values
+            for col in cols:
+                # check conditions if any
+                if col.condition.count():
+                    condition_passed = False
+                    for condition in col.condition.all():
+                        if data.get(condition.identifier):
+                            condition_passed = True
+                            break
+                else:
+                    condition_passed = True
 
-            # get all related attribute display values
-            display_values = {}
-            for attr in col.attributes.all():
-                try:
-                    if attr.value_type == Attribute.TYPE_FIELDSET:
-                        path = get_fieldset_path(attr) + [attr]
+                if not condition_passed:
+                    data[col.id] = ""
+                    continue
 
-                        if not path[0].identifier in data:
-                            continue
-
-                        fieldset_data = data[path[0].identifier]
-
-                        if attr.fieldsets.count():
-                            path = path[1:]
-
-                        display_values[attr.identifier] = \
-                            _get_fieldset_display(
-                                fieldset_data, path, 0, 1, col,
+                # get all related attribute display values
+                display_values = {}
+                if col.generates_new_rows:
+                    if gen_attr in data:
+                        display_values[gen_attr] = \
+                            _get_display_value(
+                                Attribute.objects.get(identifier=gen_attr),
+                                col,
+                                row_gen_data[gen_attr],
                             )
-                    elif attr.fieldsets.count():
-                        if attr.identifier in flat_data:
-                            display_values[attr.identifier] = \
-                                _get_fieldset_children_display(
-                                    flat_data[attr.identifier], attr, col,
-                                )
-                    else:
-                        if attr.identifier in data:
-                            display_values[attr.identifier] = \
-                                _get_display_value(
-                                    attr,
-                                    col,
-                                    data[attr.identifier],
-                                )
+                else:
+                    for attr in col.attributes.all():
+                        try:
+                            if attr.value_type == Attribute.TYPE_FIELDSET:
+                                path = get_fieldset_path(attr) + [attr]
 
-                except AssertionError:
-                    logger.exception(
-                        f"Could not handle attribute {attr} for project {project}."
-                    )
+                                if not path[0].identifier in data:
+                                    continue
 
-            # combine attribute display values into one string
-            data[col.id] = ", ".join([
-                str(display_values.get(attr.identifier, ""))
-                for attr in col.attributes.all()
-                if display_values.get(attr.identifier)
-            ])
+                                fieldset_data = data[path[0].identifier]
 
-            # append postfix if any for non-empty fields
-            if data[col.id] is None:
-                pass
-            elif col.postfix_only:
-                data[col.id] = col.generate_postfix(project, data)
-            else:
-                data[col.id] = "".join([
-                    data[col.id],
-                    col.generate_postfix(project, data),
+                                if attr.fieldsets.count():
+                                    path = path[1:]
+
+                                display_values[attr.identifier] = \
+                                    _get_fieldset_display(
+                                        fieldset_data, path, 0, 1, col,
+                                    )
+                            elif attr.fieldsets.count():
+                                if attr.identifier in flat_data:
+                                    display_values[attr.identifier] = \
+                                        _get_fieldset_children_display(
+                                            flat_data[attr.identifier], attr, col,
+                                        )
+                            else:
+                                if attr.identifier in data:
+                                    display_values[attr.identifier] = \
+                                        _get_display_value(
+                                            attr,
+                                            col,
+                                            data[attr.identifier],
+                                        )
+
+                        except AssertionError:
+                            logger.exception(
+                                f"Could not handle attribute {attr} for project {project}."
+                            )
+
+                # combine attribute display values into one string
+                data[col.id] = ", ".join([
+                    str(display_values.get(attr.identifier, ""))
+                    for attr in col.attributes.all()
+                    if display_values.get(attr.identifier)
                 ])
 
-        if preview:
-            writer.writerow(data)
-        else:
-            sheet.append([
-                i[1] for i in data.items()
-                if i[0] in [j[0] for j in fieldnames.items()]
-            ])
+                cleaned_data = copy.deepcopy(data)
+                for key in row_gen_data.keys():
+                    if key == gen_attr:
+                        continue
+                    cleaned_data.pop(key)
+
+                # append postfix if any for non-empty fields
+                if data[col.id] is None:
+                    pass
+                elif col.postfix_only:
+                    if col.title == SPECIAL_COLUMN_NAME:
+                        data[col.id] = col.generate_postfix(project, cleaned_data)
+                    else:
+                        data[col.id] = col.generate_postfix(project, data)
+                else:
+                    if col.title == SPECIAL_COLUMN_NAME:
+                        data[col.id] = "".join([
+                            data[col.id],
+                            col.generate_postfix(project, cleaned_data),
+                        ])
+                    else:
+                        data[col.id] = "".join([
+                            data[col.id],
+                            col.generate_postfix(project, data),
+                        ])
+
+            if preview:
+                writer.writerow(data)
+            else:
+                sheet.append([
+                    i[1] for i in data.items()
+                    if i[0] in [j[0] for j in fieldnames.items()]
+                ])
 
     if not preview:
         workbook.save(response)
