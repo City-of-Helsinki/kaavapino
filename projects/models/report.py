@@ -108,6 +108,10 @@ class ReportColumn(models.Model):
         encoder=DjangoJSONEncoder,
         verbose_name=_("map automatic display value strings to custom display values"),
     )
+    generates_new_rows = models.BooleanField(
+        default=False,
+        verbose_name=_("create new column"),
+    )
 
     def generate_postfix(self, project, attribute_data=None):
         postfixes = self.postfixes.filter(
@@ -133,12 +137,12 @@ class ReportColumn(models.Model):
             # do not use this postfix if any hide condition is fulfilled
             hide = False
             for cond_attr in pf.hide_conditions.all():
-                if project.attribute_data.get(cond_attr.identifier):
+                if attribute_data.get(cond_attr.identifier):
                     hide = True
                     break
 
             for cond_attr in pf.hide_not_conditions.all():
-                if not project.attribute_data.get(cond_attr.identifier):
+                if not attribute_data.get(cond_attr.identifier):
                     hide = True
                     break
 
@@ -147,12 +151,12 @@ class ReportColumn(models.Model):
 
             # use this postfix if at least one condition is fulfilled
             for cond_attr in pf.show_conditions.all():
-                if project.attribute_data.get(cond_attr.identifier):
+                if attribute_data.get(cond_attr.identifier):
                     postfix = pf
                     break
 
             for cond_attr in pf.show_not_conditions.all():
-                if not project.attribute_data.get(cond_attr.identifier):
+                if not attribute_data.get(cond_attr.identifier):
                     postfix = pf
                     break
 
@@ -171,7 +175,7 @@ class ReportColumn(models.Model):
                 postfix = postfix.replace(
                     "{"+identifier+"}",
                     attribute.get_attribute_display(
-                        attribute_data.get(identifier, "")
+                        attribute_data.pop(identifier, "")
                     ),
                 )
             except Attribute.DoesNotExist:
