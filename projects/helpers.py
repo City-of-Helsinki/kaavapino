@@ -67,6 +67,7 @@ def get_attribute_data(attribute_path, data):
     )
 
 def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_types={}):
+    from projects.models import Attribute
     if first_run:
         id = data.get("pinonumero")
         cache_key = 'projects.helpers.get_flat_attribute_data'
@@ -79,7 +80,6 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
             cache.set(cache_key, flats, None)
             return cached_flat
 
-        from projects.models import Attribute
         value_types = {a.identifier: a.value_type for a in Attribute.objects.all()}
 
     for key, val in data.items():
