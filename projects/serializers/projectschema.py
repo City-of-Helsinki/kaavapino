@@ -722,10 +722,13 @@ class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
 
 class ProjectCardSchemaSerializer(serializers.ModelSerializer):
     choices = serializers.SerializerMethodField()
-    label = serializers.CharField(source="attribute.name")
+    label =serializers.SerializerMethodField()
     name = serializers.CharField(source="attribute.identifier")
     section_key = serializers.CharField(source="section.key")
     section_name = serializers.CharField(source="section.name")
+
+    def get_label(self, obj):
+        return obj.custom_label or obj.attribute.name
 
     class Meta:
         model = ProjectCardSectionAttribute
