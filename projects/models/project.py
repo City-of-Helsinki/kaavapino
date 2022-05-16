@@ -1004,6 +1004,12 @@ class ProjectCardSectionAttribute(models.Model):
         related_name="attributes",
         on_delete=models.CASCADE,
     )
+    custom_label = models.CharField(
+        max_length=255,
+        verbose_name=_("custom label"),
+        null=True,
+        blank=True,
+    )
     date_format = models.CharField(
         max_length=255,
         verbose_name=_("date format and text"),
