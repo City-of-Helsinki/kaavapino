@@ -1220,7 +1220,7 @@ class AttributeImporter:
                 "Maanomistus ja sopimusmenettelyt": "maanomistus",
                 "Kerrosalatiedot": "kerrosalatiedot",
                 "Aikataulu": "aikataulu",
-                "Yhteyshenkilöt": "yhteyshenkilöt",
+                "Yhteyshenkilöt": "yhteyshenkilot",
                 "Dokumentit": "dokumentit",
                 "Suunnittelualueen rajaus": "suunnittelualueen_rajaus",
             }
