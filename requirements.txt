@@ -88,3 +88,4 @@ xlsxwriter==3.0.2         # via python-pptx
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools                # via docxcompose
+pyjwt>=2.4.0 # not directly required, pinned by Snyk to avoid a vulnerability
