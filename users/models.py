@@ -1,7 +1,9 @@
 from django.contrib.auth.models import Group
 from helusers.models import AbstractUser
+from django.contrib.auth.models import UserManager
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils.functional import cached_property
 
 
 # TODO: hard-coded for the MVP, migrate into a separate model when needed
@@ -28,7 +30,14 @@ def privilege_as_label(name):
     }[name]
 
 
+class CustomUserManager(UserManager):
+    def get(self, *args, **kwargs):
+        return super().prefetch_related('groups', 'additional_groups').get(*args, **kwargs)
+
+
 class User(AbstractUser):
+    objects = CustomUserManager()
+
     additional_groups = models.ManyToManyField(
         Group,
         verbose_name=_("additional groups"),
@@ -61,16 +70,16 @@ class User(AbstractUser):
             return self.groups.filter(group__in=groups).exists()
         return self.groups.filter(name__in=groups).exists()
 
-    @property
+    @cached_property
     def all_groups(self):
-        return self.groups.all().union(self.additional_groups.all())
+        return self.groups.all().select_related("groupprivilege").union(self.additional_groups.all().select_related("groupprivilege"))
 
-    @property
+    @cached_property
     def privilege(self):
         privileges = tuple(p for (p, _) in PRIVILEGE_LEVELS)
         user_privilege = None
 
-        for group in self.groups.all().union(self.additional_groups.all()):
+        for group in self.all_groups:
             try:
                 privilege_name = group.groupprivilege.privilege_level
                 group_privilege = privileges.index(privilege_name)
@@ -101,7 +110,7 @@ class GroupPrivilege(models.Model):
     privilege_level = models.CharField( \
         default=None, null=True, max_length=6, choices=PRIVILEGE_LEVELS)
 
-    @property
+    @cached_property
     def as_int(self):
         return privilege_as_int(self.privilege_level)
 

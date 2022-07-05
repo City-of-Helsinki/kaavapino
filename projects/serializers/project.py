@@ -178,7 +178,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             dl for dl in projectdeadline.project.deadlines.filter(
                 deadline__index__lte=projectdeadline.deadline.index,
                 date__lt=datetime.date.today(),
-            )
+            ).prefetch_related("deadline", "deadline__confirmation_attribute", "project")
             if not dl.confirmed
         ]) > 0
 
@@ -269,7 +269,7 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_accepts_year(self, overview_filter):
-        for attr in overview_filter.attributes.all():
+        for attr in overview_filter.attributes.all().prefetch_related("attribute"):
             if attr.attribute.value_type == Attribute.TYPE_DATE and \
                 not attr.attribute.fieldsets.count():
                 return True
@@ -287,7 +287,7 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
     def get_choices(self, overview_filter):
         choices = {}
 
-        for attr in overview_filter.attributes.all():
+        for attr in overview_filter.attributes.all().prefetch_related("attribute__value_choices"):
             for choice in attr.attribute.value_choices.all():
                 choices[choice.identifier] = choice.value
 
@@ -325,7 +325,7 @@ class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
             phase.projects.filter(
                 self.context.get("query", Q()),
                 public=True,
-            ),
+            ).prefetch_related("subtype", "user"),
             many=True,
         ).data
 
@@ -345,7 +345,7 @@ class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
 
     def get_phases(self, subtype):
         return ProjectPhaseOverviewSerializer(
-            subtype.phases.all(),
+            subtype.phases.all().prefetch_related("project_subtype", "common_project_phase"),
             many=True,
             context=self.context,
         ).data
@@ -639,17 +639,20 @@ class ProjectSerializer(serializers.ModelSerializer):
         if identifier:
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
-            response = requests.get(
-                url,
-                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-            )
-            if response.status_code == 200:
-                cache.set(url, response, 28800)
+            if cache.get(url) is not None:
+                return cache.get(url)
             else:
-                cache.set(url, response, 180)
+                response = requests.get(
+                    url,
+                    headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                )
+                if response.status_code == 200:
+                    cache.set(url, response, 28800)
+                else:
+                    cache.set(url, response, 180)
 
-            if response.status_code == 200:
-                return response.json()
+                if response.status_code == 200:
+                    return response.json()
 
         return None
 
@@ -713,7 +716,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         if snapshot:
             attribute_data = {
                 k: v["new_value"]
-                for k, v in self._get_updates(project, cutoff=snapshot, request=self.context.get('request', None)).items()
+                for k, v in self._get_updates(project, Attribute.objects.all()
+                    .select_related("auth_group", "groupprivilege", "users__groupprivilege", "users__groupprivilege__group")\
+                    , cutoff=snapshot, request=self.context.get('request', None)).items()
             }
         else:
             attribute_data = getattr(project, "attribute_data", {})
@@ -775,7 +780,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
         project_schedule_cache = cache.get("serialized_project_schedules", {})
-        deadlines = project.deadlines.filter(deadline__subtype=project.subtype)
+        deadlines = project.deadlines.filter(deadline__subtype=project.subtype).prefetch_related(
+            "project", "project__deadlines", "deadline__distances_to_previous", "deadline__distances_to_next", "deadline__attribute")
         schedule = project_schedule_cache.get(project.pk)
         if self.context.get('should_update_deadlines') or not schedule:
             schedule = ProjectDeadlineSerializer(
@@ -839,6 +845,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         else:
             attribute_files = ProjectAttributeFile.objects \
                 .filter(project=project, archived_at=None) \
+                .prefetch_related("fieldset_path_locations") \
                 .order_by(
                     "fieldset_path_str",
                     "attribute__pk",
@@ -915,14 +922,20 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"
+        attributes = Attribute.objects.all().prefetch_related("key_attribute", "fieldsets",
+            Prefetch(
+                "fieldset_attributes",
+                queryset=Attribute.objects.filter(value_type=Attribute.TYPE_USER),
+            ),
+        )  # perform further filtering of attributes within methods
         metadata = {
-            "users": self._get_users(project, list_view=list_view),
-            "personnel": self._get_personnel(project, list_view=list_view),
+            "users": self._get_users(project, attributes, list_view=list_view),
+            "personnel": self._get_personnel(project, attributes, list_view=list_view),
         }
         query_params = getattr(self.context["request"], "GET", {})
         snapshot_param = query_params.get("snapshot")
         if not list_view and not snapshot_param:
-            metadata["updates"] = self._get_updates(project, cutoff=None, request=self.context.get('request', None))
+            metadata["updates"] = self._get_updates(project, attributes, cutoff=None, request=self.context.get('request', None))
 
         created = project.target_actions.filter(verb=verbs.CREATED_PROJECT) \
             .prefetch_related("actor").first()
@@ -944,23 +957,15 @@ class ProjectSerializer(serializers.ModelSerializer):
         return metadata
 
     @staticmethod
-    def _get_users(project, list_view=False):
+    def _get_users(project, attributes, list_view=False):
         users = [project.user]
 
         if not list_view:
-            attributes = Attribute.objects.filter(
-                value_type__in=[Attribute.TYPE_USER, Attribute.TYPE_FIELDSET]
-            ).prefetch_related(
-                Prefetch(
-                    "fieldset_attributes",
-                    queryset=Attribute.objects.filter(value_type=Attribute.TYPE_USER),
-                )
-            )
-
             user_attribute_ids = set()
-            for attribute in attributes:
+            for attribute in filter(lambda a: a.value_type in [Attribute.TYPE_USER, Attribute.TYPE_FIELDSET], attributes):
                 if attribute.value_type == Attribute.TYPE_FIELDSET:
-                    fieldset_user_identifiers = attribute.fieldset_attributes.all().values_list(
+                    fieldset_user_identifiers = attribute.fieldset_attributes.all().prefetch_related("identifier").\
+                        values_list(
                         "identifier", flat=True
                     )
                     if attribute.identifier in project.attribute_data:
@@ -976,12 +981,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             if str(project.user.uuid) in user_attribute_ids:
                 user_attribute_ids.remove(str(project.user.uuid))
 
-            users += list(User.objects.filter(uuid__in=user_attribute_ids).prefetch_related("groups", "additional_groups"))
+            users += list(User.objects.filter(uuid__in=user_attribute_ids).prefetch_related(
+                "groups", "additional_groups", "additional_groups__permissions"
+            ))
 
         return UserSerializer(users, many=True).data
 
     @staticmethod
-    def _get_personnel(project, list_view=False):
+    def _get_personnel(project, attributes, list_view=False):
         if list_view:
             return []
 
@@ -989,9 +996,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         ids = []
 
-        for attr in Attribute.objects.filter(
-            value_type=Attribute.TYPE_PERSONNEL,
-        ):
+        for attr in filter(lambda a: a.value_type == Attribute.TYPE_PERSONNEL, attributes):
             value = flat_data.get(attr.identifier)
 
             if not value:
@@ -1041,7 +1046,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return values
 
     @staticmethod
-    def _get_updates(project, cutoff=None, request=None):
+    def _get_updates(project, attributes, cutoff=None, request=None):
         def get_editable(attribute):
             from users.models import privilege_as_int
 
@@ -1072,7 +1077,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             for attr in attribute_list:
                 if type(attr) == str:
-                    attribute = Attribute.objects.filter(identifier=attr).first()
+                    attribute = next(filter(lambda a: a.identifier == attr, attributes), None)
                     if attribute:
                         schema.update({
                             attribute.identifier: {
@@ -1084,7 +1089,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         })
                 elif type(attr) == dict:
                     for identifier, value in attr.items():
-                        attribute = Attribute.objects.filter(identifier=identifier).first()
+                        attribute = next(filter(lambda a: a.identifier == identifier, attributes), None)
                         if attribute:
                             schema.update({
                                 attribute.identifier: {
@@ -1102,7 +1107,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         def get_schema(attribute_identifier, data, labels):
             schema = {}
 
-            attribute = Attribute.objects.filter(identifier=attribute_identifier).first()
+            attribute = next(filter(lambda a: a.identifier == attribute_identifier, attributes), None)
             # log.info('%s: %s' % (attribute_identifier, attribute))
             if attribute:
                 schema.update({
@@ -1181,7 +1186,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     "timestamp": _action.timestamp,
                     "new_value": _action.data.get("new_value", None),
                     "old_value": _action.data.get("old_value", None),
-                    "schema":  get_schema(
+                    "schema": get_schema(
                         attribute_identifier,
                         _action.data,
                         _action.data.get("labels", {}),
@@ -1677,12 +1682,12 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             old_deadlines = None
             if should_update_deadlines or should_generate_deadlines:
-                old_deadlines = project.deadlines.all()
+                old_deadlines = project.deadlines.select_related("deadline").all()
 
             if should_generate_deadlines:
                 cleared_attributes = {
                     project_dl.deadline.attribute.identifier: None
-                    for project_dl in project.deadlines.all()
+                    for project_dl in project.deadlines.select_related("deadline", "deadline__attribute").all()
                     if project_dl.deadline.attribute
                 }
                 project.update_attribute_data(cleared_attributes)
@@ -1695,7 +1700,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             project.save()
 
             if old_deadlines:
-                updated_deadlines = old_deadlines.union(project.deadlines.all())
+                updated_deadlines = old_deadlines.union(project.deadlines.select_related("deadline").all())
                 for dl in updated_deadlines:
                     try:
                         new_date = project.deadlines.get(deadline=dl.deadline).date

@@ -287,7 +287,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
 
         cells = cell_class.objects.filter(
             attribute__in=section_attributes
-        )
+        ).prefetch_related("structure")
         cell_attribute_map = {cell.attribute_id: cell for cell in cells}
 
         # Iterate over all section attributes and find all matrices
@@ -436,7 +436,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             cache.set("serialized_phase_sections", sections_cache, None)
 
         confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in project.deadlines.all()
+            dl.deadline.attribute.identifier for dl in project.deadlines.all().prefetch_related("deadline", "project", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if project else []
 
@@ -459,7 +459,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             query_params = {}
 
         try:
-            project = Project.objects.get(pk=int(query_params.get("project")))
+            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
         except (ValueError, TypeError, Project.DoesNotExist):
             project = None
 
@@ -476,7 +476,7 @@ class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):
-        section_attributes = list(section.projectfloorareasectionattribute_set.all())
+        section_attributes = list(section.projectfloorareasectionattribute_set.all().prefetch_related("attribute", "attribute__value_choices"))
         self._create_matrix_fields(
             ProjectFloorAreaSectionAttributeMatrixCell,
             section_attributes
@@ -553,7 +553,7 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
             cache.set("serialized_deadline_sections", sections_cache, None)
 
         confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in project.deadlines.all()
+            dl.deadline.attribute.identifier for dl in project.deadlines.all().prefetch_related("deadline", "project", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if project else []
 

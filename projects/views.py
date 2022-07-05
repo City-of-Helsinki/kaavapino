@@ -3,6 +3,7 @@ import csv
 from datetime import datetime, timedelta
 import time
 import logging
+import threading
 
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import FieldError
@@ -99,6 +100,8 @@ from projects.serializers.projecttype import (
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer
 
+import django_auto_prefetching
+
 log = logging.getLogger(__name__)
 
 
@@ -158,7 +161,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
         },
     ),
 )
-class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
+class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all() \
             .select_related("user", "subtype", "phase") \
             .prefetch_related("deadlines", "target_actions")
@@ -174,6 +177,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ]
     except Exception:
         ordering_fields = []
+
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -222,7 +226,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             elif status == "archived":
                 queryset = queryset.filter(archived=True)
 
-        return queryset
+        return django_auto_prefetching.prefetch(queryset, self.serializer_class)
 
     def _string_filter_to_list(self, filter_string):
         return [_filter.strip().lower() for _filter in filter_string.split(",")]
@@ -380,14 +384,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ProjectExternalDocumentSectionSerializer(
                 project, context={"section": document_section}
             ).data
-            for document_section in DocumentLinkSection.objects.all()
+            for document_section in DocumentLinkSection.objects.all().prefetch_related("documentlinkfieldset_set")
         ]})
 
     def _get_valid_filters(self, filters_view):
         try:
             attrs = OverviewFilterAttribute.objects.filter(
                 **{filters_view: True},
-            )
+            ).prefetch_related("overview_filter")
         except FieldError:
             return None
 
@@ -509,7 +513,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         url_name="projects-overview-filters",
     )
     def overview_filters(self, request):
-        queryset = OverviewFilter.objects.all()
+        queryset = OverviewFilter.objects.all().prefetch_related("attributes")
         return Response(OverviewFilterSerializer(queryset, many=True).data)
 
     def _parse_date_range(
@@ -600,7 +604,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     "milloin_kaavaehdotus_lautakunnassa_4",
                 ],
                 date=date,
-            ).order_by("project__pk").distinct("project__pk")]
+            ).prefetch_related("project", "project__user",
+                               "project__subtype", "project__subtype__project_type",
+                               "project__phase", "project__phase__common_project_phase").
+                order_by("project__pk").distinct("project__pk")]
             for date in date_range
         }
 
@@ -611,7 +618,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
                 date__lte=date,
-            ).order_by("project__pk").distinct("project__pk")]
+            ).prefetch_related("project").order_by("project__pk").distinct("project__pk")]
             for date in date_range
         }
         projects_in_range = projects_in_range_by_date[end_date]
@@ -754,6 +761,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ).data
         })
 
+    @staticmethod
+    def append_project_on_map_overview_serializer(project, query, serializers):
+        serializers.append(ProjectOnMapOverviewSerializer(project, context={"query": query}).data)
+
     @extend_schema(
         responses={
             200: ProjectOnMapOverviewSerializer(many=True),
@@ -771,27 +782,41 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def overview_on_map(self, request):
         valid_filters = self._get_valid_filters("filters_on_map")
         query = self._get_query(valid_filters)
-        queryset = Project.objects.filter(query, public=True)
-        return Response({
-            "projects": ProjectOnMapOverviewSerializer(
-                queryset, many=True, context={"query": query},
-            ).data
-        })
+        queryset = Project.objects.filter(query, public=True)\
+            .prefetch_related("phase", "phase__common_project_phase", "phase__project_subtype",
+                              "subtype", "subtype__project_type",
+                              "user",
+                              )
+
+        serializers = []
+        threads = []
+
+        # Threaded because ProjectOnMapOverviewSerializer::get_geoserver_data makes API calls that slow down a lot
+        # if called one by one
+        for p in queryset.all():
+            thread = threading.Thread(target=self.append_project_on_map_overview_serializer, args=(p, query, serializers))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        return Response({"projects": serializers})
 
 
-class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectPhase.objects.all()
+class ProjectPhaseViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
+    queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase", "project_subtype", "project_subtype__project_type")
     serializer_class = ProjectPhaseSerializer
 
 
-class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
+class ProjectCardSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = ProjectCardSectionAttribute.objects.all().order_by(
         "section__index", "index"
     )
     serializer_class = ProjectCardSchemaSerializer
 
 
-class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
+class AttributeViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = Attribute.objects.all()
     serializer_class = SimpleAttributeSerializer
 
@@ -802,7 +827,7 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
       OpenApiParameter("project", OpenApiTypes.INT, OpenApiParameter.QUERY),
     ],
 )
-class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
+class ProjectTypeSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
 
     def get_serializer_class(self):
@@ -834,7 +859,7 @@ class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
             }[user.privilege]
 
 
-class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):
+class ProjectSubtypeViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
     queryset = ProjectSubtype.objects.all()
     serializer_class = ProjectSubtypeSerializer
 
@@ -857,7 +882,7 @@ class ProjectAttributeFileDownloadView(
         return has_project_attribute_file_permissions(private_file, self.request)
 
 
-class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
+class FieldCommentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = FieldComment.objects.all().select_related("user")
     serializer_class = FieldCommentSerializer
     permission_classes = [IsAuthenticated, CommentPermissions]
@@ -898,7 +923,7 @@ class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
+class CommentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = ProjectComment.objects.all().select_related("user")
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated, CommentPermissions]
@@ -958,7 +983,7 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class DocumentViewSet(ReadOnlyModelViewSet):
+class DocumentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, ReadOnlyModelViewSet):
     queryset = DocumentTemplate.objects.all()
     permission_classes = [IsAuthenticated, DocumentPermissions]
     lookup_field = "slug"
@@ -977,9 +1002,9 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         phases = CommonProjectPhase.objects.filter(
             phases__project_subtype=self.project.subtype,
         )
-        return DocumentTemplate.objects.filter(
+        return django_auto_prefetching.prefetch(DocumentTemplate.objects.filter(
             common_project_phases__in=phases,
-        ).distinct()
+        ).distinct(), self.serializer_class)
 
     def get_project(self):
         project_id = self.kwargs.get("project_pk")
@@ -1152,7 +1177,7 @@ def admin_attribute_updater_template(request):
     return response
 
 
-class ReportViewSet(ReadOnlyModelViewSet):
+class ReportViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, ReadOnlyModelViewSet):
     queryset = Report.objects.filter(hidden=False)
     serializer_class = ReportSerializer
 
@@ -1163,7 +1188,7 @@ class ReportViewSet(ReadOnlyModelViewSet):
         if not user.has_privilege('admin'):
             queryset = queryset.exclude(is_admin_report=True)
 
-        return queryset
+        return django_auto_prefetching.prefetch(queryset, self.serializer_class)
 
     def get_project_queryset(self, report):
         params = self.request.query_params
@@ -1255,7 +1280,7 @@ class ReportViewSet(ReadOnlyModelViewSet):
         return super().list(request, *args, **kwargs)
 
 
-class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
+class DeadlineSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = DeadlineSerializer
     queryset = Deadline.objects.all()
 
@@ -1270,4 +1295,4 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
         if subtype:
             filters["phase__project_subtype__id"] = subtype
 
-        return Deadline.objects.filter(**filters)
+        return django_auto_prefetching.prefetch(Deadline.objects.filter(**filters), self.serializer_class)
