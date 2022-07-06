@@ -46,7 +46,7 @@ inflection==0.5.1         # via drf-spectacular
 jinja2==3.0.3             # via docxtpl
 jsonschema==4.4.0         # via drf-spectacular
 lunardate==0.2.0          # via workalendar
-lxml==4.7.1               # via docxcompose, docxtpl, python-docx, python-pptx
+lxml==4.9.1               # via docxcompose, docxtpl, python-docx, python-pptx
 markupsafe==2.0.1         # via jinja2
 numpy==1.21.5
 oauthlib==3.1.1           # via requests-oauthlib, social-auth-core
