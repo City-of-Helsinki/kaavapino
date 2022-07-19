@@ -384,7 +384,10 @@ class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
             ProjectExternalDocumentSectionSerializer(
                 project, context={"section": document_section}
             ).data
-            for document_section in DocumentLinkSection.objects.all().prefetch_related("documentlinkfieldset_set")
+            for document_section in DocumentLinkSection.objects.all().prefetch_related(
+                "documentlinkfieldset_set", "documentlinkfieldset_set__fieldset_attribute",
+                "documentlinkfieldset_set__document_link_attribute"
+            )
         ]})
 
     def _get_valid_filters(self, filters_view):
@@ -593,8 +596,7 @@ class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
         ]
 
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
-        projects_by_date = {
-            date: [dl.project for dl in ProjectDeadline.objects.filter(
+        project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs + [
@@ -602,23 +604,24 @@ class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
                     "milloin_kaavaehdotus_lautakunnassa_2",
                     "milloin_kaavaehdotus_lautakunnassa_3",
                     "milloin_kaavaehdotus_lautakunnassa_4",
-                ],
-                date=date,
+                ]
             ).prefetch_related("project", "project__user",
                                "project__subtype", "project__subtype__project_type",
-                               "project__phase", "project__phase__common_project_phase").
-                order_by("project__pk").distinct("project__pk")]
+                               "project__phase", "project__phase__common_project_phase").\
+            order_by("project__pk").distinct("project__pk")
+        projects_by_date = {
+            date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
             for date in date_range
         }
 
-        projects_in_range_by_date = {
-            date: [dl.project for dl in ProjectDeadline.objects.filter(
+        project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
-                date__lte=date,
-            ).prefetch_related("project").order_by("project__pk").distinct("project__pk")]
+            ).prefetch_related("project").order_by("project__pk").distinct("project__pk")
+        projects_in_range_by_date = {
+            date: [dl.project for dl in filter(lambda dl: dl.date <= date, project_deadlines)]
             for date in date_range
         }
         projects_in_range = projects_in_range_by_date[end_date]
@@ -733,7 +736,7 @@ class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
         query = self._get_query(valid_filters)
-        queryset = ProjectSubtype.objects.all()
+        queryset = ProjectSubtype.objects.all().prefetch_related("phases", "phases__projects")
 
         # TODO hard-coded for now; consider a new field for Attribute
         date_range_attrs = [
@@ -810,9 +813,9 @@ class ProjectPhaseViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, view
 
 
 class ProjectCardSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectCardSectionAttribute.objects.all().order_by(
-        "section__index", "index"
-    )
+    queryset = ProjectCardSectionAttribute.objects.all()\
+        .select_related("attribute").prefetch_related("attribute__value_choices")\
+        .order_by("section__index", "index")
     serializer_class = ProjectCardSchemaSerializer
 
 

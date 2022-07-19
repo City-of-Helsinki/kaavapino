@@ -178,7 +178,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             dl for dl in projectdeadline.project.deadlines.filter(
                 deadline__index__lte=projectdeadline.deadline.index,
                 date__lt=datetime.date.today(),
-            ).prefetch_related("deadline", "deadline__confirmation_attribute", "project")
+            ).prefetch_related("deadline", "deadline__confirmation_attribute", "project", "project__deadlines")
             if not dl.confirmed
         ]) > 0
 
@@ -345,7 +345,7 @@ class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
 
     def get_phases(self, subtype):
         return ProjectPhaseOverviewSerializer(
-            subtype.phases.all().prefetch_related("project_subtype", "common_project_phase"),
+            subtype.phases.all().select_related("project_subtype", "project_subtype__project_type", "common_project_phase"),
             many=True,
             context=self.context,
         ).data
@@ -763,18 +763,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
         if not snapshot:
+            # Prevent making database calls within for-loop by getting attributes from database here
+            attributes = Attribute.objects.filter(static_property__in=static_properties)
             for static_property in static_properties:
-                try:
-                    attribute = \
-                        Attribute.objects.get(static_property=static_property)
+                attribute = next(filter(lambda attr: attr.static_property == static_property, attributes), None)
+                if attribute:
                     value = getattr(project, static_property)
 
                     if attribute.value_type == Attribute.TYPE_USER:
                         value = value.uuid
 
                     attribute_data[attribute.identifier] = value
-                except Attribute.DoesNotExist:
-                    continue
 
         return attribute_data
 
@@ -785,8 +784,11 @@ class ProjectSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
         project_schedule_cache = cache.get("serialized_project_schedules", {})
-        deadlines = project.deadlines.filter(deadline__subtype=project.subtype).prefetch_related(
-            "project", "project__deadlines", "deadline__distances_to_previous", "deadline__distances_to_next", "deadline__attribute")
+        deadlines = project.deadlines.filter(deadline__subtype=project.subtype)\
+            .prefetch_related("deadline", "project", "project__deadlines", "project__deadlines__deadline",
+                              "project__deadlines__project", "deadline__distances_to_previous",
+                              "deadline__distances_to_next", "deadline__attribute", "deadline__phase",
+                              "deadline__subtype", "deadline__date_type", "deadline__phase__project_subtype")
         schedule = project_schedule_cache.get(project.pk)
         if self.context.get('should_update_deadlines') or not schedule:
             schedule = ProjectDeadlineSerializer(
@@ -850,7 +852,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         else:
             attribute_files = ProjectAttributeFile.objects \
                 .filter(project=project, archived_at=None) \
-                .prefetch_related("fieldset_path_locations") \
+                .prefetch_related("attribute", "fieldset_path_locations") \
                 .order_by(
                     "fieldset_path_str",
                     "attribute__pk",
@@ -927,11 +929,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"
-        attributes = Attribute.objects.all().prefetch_related("key_attribute", "fieldsets",
-            Prefetch(
-                "fieldset_attributes",
-                queryset=Attribute.objects.filter(value_type=Attribute.TYPE_USER),
-            ),
+        attributes = Attribute.objects.all().prefetch_related("key_attribute", "fieldsets", "fieldset_attributes"
         )  # perform further filtering of attributes within methods
         metadata = {
             "users": self._get_users(project, attributes, list_view=list_view),
@@ -969,10 +967,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             user_attribute_ids = set()
             for attribute in filter(lambda a: a.value_type in [Attribute.TYPE_USER, Attribute.TYPE_FIELDSET], attributes):
                 if attribute.value_type == Attribute.TYPE_FIELDSET:
-                    fieldset_user_identifiers = attribute.fieldset_attributes.all().prefetch_related("identifier").\
-                        values_list(
-                        "identifier", flat=True
-                    )
+                    fieldset_user_identifiers = attribute.fieldset_attributes.filter(value_type=Attribute.TYPE_USER)\
+                        .prefetch_related("identifier").values_list("identifier", flat=True)
                     if attribute.identifier in project.attribute_data:
                         user_attribute_ids |= ProjectSerializer._get_fieldset_attribute_values(
                             project, attribute, fieldset_user_identifiers
@@ -1687,12 +1683,12 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             old_deadlines = None
             if should_update_deadlines or should_generate_deadlines:
-                old_deadlines = project.deadlines.select_related("deadline").all()
+                old_deadlines = project.deadlines.all().select_related("deadline")
 
             if should_generate_deadlines:
                 cleared_attributes = {
                     project_dl.deadline.attribute.identifier: None
-                    for project_dl in project.deadlines.select_related("deadline", "deadline__attribute").all()
+                    for project_dl in project.deadlines.all().select_related("deadline", "deadline__attribute")
                     if project_dl.deadline.attribute
                 }
                 project.update_attribute_data(cleared_attributes)
@@ -1705,7 +1701,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             project.save()
 
             if old_deadlines:
-                updated_deadlines = old_deadlines.union(project.deadlines.select_related("deadline").all())
+                updated_deadlines = old_deadlines.union(project.deadlines.all().select_related("deadline"))
                 for dl in updated_deadlines:
                     try:
                         new_date = project.deadlines.get(deadline=dl.deadline).date

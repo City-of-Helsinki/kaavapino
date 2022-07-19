@@ -623,7 +623,7 @@ class Project(models.Model):
                         continue
 
                     if type(value) is list and attr.value_type == Attribute.TYPE_FIELDSET:
-                        sources = FieldSetAttribute.objects.filter(attribute_source__identifier=key).prefetch_related("attribute_target")
+                        sources = FieldSetAttribute.objects.filter(attribute_source__identifier=key).select_related("attribute_target")
                         for source in sources:
                             add_fieldset_field_for_attribute(search_fields, source.attribute_target, value)
                     else:
