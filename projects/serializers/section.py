@@ -277,6 +277,7 @@ def create_section_serializer(
             section_attribute.attribute
             for section_attribute
             in section.projectphasedeadlinesectionattribute_set.all()
+            .select_related("attribute").prefetch_related("attribute__deadline")
         ]
     else:
         return None

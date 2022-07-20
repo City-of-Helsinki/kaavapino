@@ -103,7 +103,8 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         if not projectdeadline.date:
             return False
 
-        next_deadlines = projectdeadline.deadline.distances_to_next.all()
+        next_deadlines = projectdeadline.deadline.distances_to_next.all()\
+            .select_related("deadline", "deadline__date_type")
         for next_distance in next_deadlines:
             # Ignore if distance conditions are not met
             if not self._resolve_distance_conditions(
@@ -140,7 +141,9 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         if not projectdeadline.date:
             return False
 
-        prev_deadlines = projectdeadline.deadline.distances_to_previous.all()
+        prev_deadlines = projectdeadline.deadline.distances_to_previous.all()\
+            .select_related("previous_deadline", "previous_deadline__date_type")\
+            .prefetch_related("previous_deadline__date_type__automatic_dates")
         for prev_distance in prev_deadlines:
             # Ignore if distance conditions are not met
             if not self._resolve_distance_conditions(
@@ -178,7 +181,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             dl for dl in projectdeadline.project.deadlines.filter(
                 deadline__index__lte=projectdeadline.deadline.index,
                 date__lt=datetime.date.today(),
-            ).prefetch_related("deadline", "deadline__confirmation_attribute", "project", "project__deadlines")
+            ).select_related("project", "deadline", "deadline__confirmation_attribute").prefetch_related("project__deadlines")
             if not dl.confirmed
         ]) > 0
 
@@ -785,7 +788,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_deadlines(self, project):
         project_schedule_cache = cache.get("serialized_project_schedules", {})
         deadlines = project.deadlines.filter(deadline__subtype=project.subtype)\
-            .prefetch_related("deadline", "project", "project__deadlines", "project__deadlines__deadline",
+            .select_related("deadline", "project")\
+            .prefetch_related("project__subtype", "project__deadlines", "project__deadlines__deadline",
                               "project__deadlines__project", "deadline__distances_to_previous",
                               "deadline__distances_to_next", "deadline__attribute", "deadline__phase",
                               "deadline__subtype", "deadline__date_type", "deadline__phase__project_subtype")

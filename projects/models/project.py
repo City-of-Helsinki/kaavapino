@@ -607,10 +607,12 @@ class Project(models.Model):
         return True
 
     def save(self, *args, **kwargs):
+        fieldset_attributes = {f for f in FieldSetAttribute.objects.all().select_related("attribute_source", "attribute_target")}
+
         def add_fieldset_field_for_attribute(search_fields, attr, fieldset, raw=False):
             key = attr.identifier
             while attr.fieldset_attribute_target.count():
-                attr = attr.fieldset_attribute_target.select_related("attribute_source").get().attribute_source
+                attr = next(filter(lambda a: a.attribute_target == attr, fieldset_attributes), None).attribute_source
                 if not fieldset:
                     fieldset = self.attribute_data.get(attr.identifier)
                 if not fieldset:
@@ -623,7 +625,7 @@ class Project(models.Model):
                         continue
 
                     if type(value) is list and attr.value_type == Attribute.TYPE_FIELDSET:
-                        sources = FieldSetAttribute.objects.filter(attribute_source__identifier=key).select_related("attribute_target")
+                        sources = filter(lambda a: a.attribute_source.identifier == key, fieldset_attributes)
                         for source in sources:
                             add_fieldset_field_for_attribute(search_fields, source.attribute_target, value)
                     else:

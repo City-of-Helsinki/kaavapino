@@ -201,14 +201,10 @@ class AttributeSchemaSerializer(serializers.Serializer):
         return []
 
     def get_fieldset_index(self, attribute):
-        if FieldSetAttribute.objects.filter(attribute_target=attribute).count() <= 0:
-            return None
-
         try:
-            fieldset = FieldSetAttribute.objects.get(attribute_target=attribute)
             return ProjectPhaseFieldSetAttributeIndex.objects.get(
                 phase=self.context["phase"],
-                attribute=fieldset,
+                attribute__attribute_target=attribute,
             ).index
         except Exception:
             return None
@@ -436,7 +432,8 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             cache.set("serialized_phase_sections", sections_cache, None)
 
         confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in project.deadlines.all().prefetch_related("deadline", "project", "deadline__confirmation_attribute")
+            dl.deadline.attribute.identifier for dl in project.deadlines.all()
+            .select_related("deadline", "project", "deadline__attribute", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if project else []
 
@@ -553,7 +550,8 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
             cache.set("serialized_deadline_sections", sections_cache, None)
 
         confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in project.deadlines.all().prefetch_related("deadline", "project", "deadline__confirmation_attribute")
+            dl.deadline.attribute.identifier for dl in project.deadlines.all()
+            .select_related("deadline", "project", "deadline__attribute", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if project else []
 
@@ -572,7 +570,7 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
 
         query_params = getattr(self.context["request"], "GET", {})
         try:
-            project = Project.objects.get(pk=int(query_params.get("project")))
+            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
         except (ValueError, TypeError, Project.DoesNotExist):
             project = None
 

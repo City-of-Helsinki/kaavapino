@@ -198,11 +198,14 @@ class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
         queryset = self.queryset
         if self.request.method in ['PUT', 'PATCH']:
             queryset = queryset \
-                .prefetch_related('deadlines') \
-                .prefetch_related('deadlines__deadline') \
-                .prefetch_related('deadlines__deadline__condition_attributes') \
-                .prefetch_related('deadlines__deadline__initial_calculations') \
-                .prefetch_related('deadlines__deadline__update_calculations')
+                .prefetch_related(
+                    'deadlines',
+                    'deadlines__deadline',
+                    'deadlines__project',
+                    'deadlines__deadline__condition_attributes',
+                    'deadlines__deadline__initial_calculations',
+                    'deadlines__deadline__update_calculations',
+                )
 
         includeds_users = self.request.query_params.get("includes_users", None)
         search = self.request.query_params.get("search", None)
@@ -886,7 +889,7 @@ class ProjectAttributeFileDownloadView(
 
 
 class FieldCommentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = FieldComment.objects.all().select_related("user")
+    queryset = FieldComment.objects.all().select_related("user").prefetch_related("fieldset_path_locations")
     serializer_class = FieldCommentSerializer
     permission_classes = [IsAuthenticated, CommentPermissions]
     filter_backends = (filters.OrderingFilter,)

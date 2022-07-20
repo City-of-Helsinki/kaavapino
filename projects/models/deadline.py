@@ -141,7 +141,7 @@ class Deadline(models.Model):
     def initial_depends_on(self):
         return list(set([
             calc.datecalculation.base_date_deadline
-            for calc in self.initial_calculations.all()
+            for calc in self.initial_calculations.all().select_related("datecalculation", "datecalculation__base_date_deadline")
             if calc.datecalculation.base_date_deadline
         ]))
 
@@ -149,7 +149,7 @@ class Deadline(models.Model):
     def update_depends_on(self):
         return list(set([
             calc.datecalculation.base_date_deadline
-            for calc in self.update_calculations.all()
+            for calc in self.update_calculations.all().select_related("datecalculation", "datecalculation__base_date_deadline")
             if calc.datecalculation.base_date_deadline
         ]))
 
@@ -238,7 +238,7 @@ class Deadline(models.Model):
 
         return self._calculate(
             project,
-            self.initial_calculations.all(),
+            self.initial_calculations.all().select_related("datecalculation"),
             self.date_type,
             valid_dls,
             preview_attributes,
@@ -255,7 +255,9 @@ class Deadline(models.Model):
 
             return self._calculate(
                 project,
-                self.update_calculations.all(),
+                self.update_calculations.all().select_related("datecalculation", "datecalculation__base_date_attribute",
+                                                              "datecalculation__base_date_deadline",
+                                                              "datecalculation__base_date_deadline__attribute"),
                 self.date_type,
                 valid_dls,
                 preview_attributes,
@@ -368,9 +370,9 @@ class DateType(models.Model):
     def get_dates(self, year):
         listed_dates = self.dates or []
         base_dates = []
-        has_base_datetypes = bool(self.base_datetype.count())
+        has_base_datetypes = self.base_datetype.exists()
 
-        for base_datetype in self.base_datetype.all():
+        for base_datetype in self.base_datetype.all().prefetch_related("automatic_dates"):
             base_dates += base_datetype.get_dates(year)
 
 
