@@ -724,9 +724,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         if snapshot:
             attribute_data = {
                 k: v["new_value"]
-                for k, v in self._get_updates(project, Attribute.objects.all()
-                    .select_related("auth_group", "groupprivilege", "users__groupprivilege", "users__groupprivilege__group")\
-                    , cutoff=snapshot, request=self.context.get('request', None)).items()
+                for k, v in self._get_updates(project, Attribute.objects.all(),
+                                              cutoff=snapshot, request=self.context.get('request', None)).items()
             }
         else:
             attribute_data = getattr(project, "attribute_data", {})
