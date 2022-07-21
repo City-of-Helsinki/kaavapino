@@ -17,16 +17,11 @@ from users.serializers import (
 )
 from users.helpers import get_graph_api_access_token
 
-import django_auto_prefetching
 
-
-class UserViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, mixins.RetrieveModelMixin, mixins.ListModelMixin, GenericViewSet):
+class UserViewSet(mixins.RetrieveModelMixin, mixins.ListModelMixin, GenericViewSet):
     queryset = get_user_model().objects.filter(hide_from_ui=False).prefetch_related("groups", "additional_groups")
     serializer_class = UserSerializer
     lookup_field = "uuid"
-
-    def get_queryset(self):
-        return django_auto_prefetching.prefetch(self.queryset, self.serializer_class)
 
 
 class PersonnelList(APIView):

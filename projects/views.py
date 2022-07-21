@@ -100,8 +100,6 @@ from projects.serializers.projecttype import (
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer
 
-import django_auto_prefetching
-
 log = logging.getLogger(__name__)
 
 
@@ -161,7 +159,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
         },
     ),
 )
-class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedViewSetMixin, viewsets.ModelViewSet):
+class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all() \
             .select_related("user", "subtype", "phase") \
             .prefetch_related("deadlines", "target_actions")
@@ -229,7 +227,7 @@ class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
             elif status == "archived":
                 queryset = queryset.filter(archived=True)
 
-        return django_auto_prefetching.prefetch(queryset, self.serializer_class)
+        return queryset
 
     def _string_filter_to_list(self, filter_string):
         return [_filter.strip().lower() for _filter in filter_string.split(",")]
@@ -810,19 +808,19 @@ class ProjectViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
         return Response({"projects": serializers})
 
 
-class ProjectPhaseViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
+class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase", "project_subtype", "project_subtype__project_type")
     serializer_class = ProjectPhaseSerializer
 
 
-class ProjectCardSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
+class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectCardSectionAttribute.objects.all()\
         .select_related("attribute").prefetch_related("attribute__value_choices")\
         .order_by("section__index", "index")
     serializer_class = ProjectCardSchemaSerializer
 
 
-class AttributeViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
+class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Attribute.objects.all()
     serializer_class = SimpleAttributeSerializer
 
@@ -833,7 +831,7 @@ class AttributeViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewset
       OpenApiParameter("project", OpenApiTypes.INT, OpenApiParameter.QUERY),
     ],
 )
-class ProjectTypeSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
+class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectType.objects.all()
 
     def get_serializer_class(self):
@@ -865,7 +863,7 @@ class ProjectTypeSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin,
             }[user.privilege]
 
 
-class ProjectSubtypeViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
+class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectSubtype.objects.all()
     serializer_class = ProjectSubtypeSerializer
 
@@ -888,7 +886,7 @@ class ProjectAttributeFileDownloadView(
         return has_project_attribute_file_permissions(private_file, self.request)
 
 
-class FieldCommentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedViewSetMixin, viewsets.ModelViewSet):
+class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = FieldComment.objects.all().select_related("user").prefetch_related("fieldset_path_locations")
     serializer_class = FieldCommentSerializer
     permission_classes = [IsAuthenticated, CommentPermissions]
@@ -929,7 +927,7 @@ class FieldCommentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, Nest
         return Response(serializer.data)
 
 
-class CommentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedViewSetMixin, viewsets.ModelViewSet):
+class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = ProjectComment.objects.all().select_related("user")
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated, CommentPermissions]
@@ -989,7 +987,7 @@ class CommentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, NestedVie
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class DocumentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, ReadOnlyModelViewSet):
+class DocumentViewSet(ReadOnlyModelViewSet):
     queryset = DocumentTemplate.objects.all()
     permission_classes = [IsAuthenticated, DocumentPermissions]
     lookup_field = "slug"
@@ -1008,9 +1006,9 @@ class DocumentViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, ReadOnly
         phases = CommonProjectPhase.objects.filter(
             phases__project_subtype=self.project.subtype,
         )
-        return django_auto_prefetching.prefetch(DocumentTemplate.objects.filter(
+        return DocumentTemplate.objects.filter(
             common_project_phases__in=phases,
-        ).distinct(), self.serializer_class)
+        ).distinct()
 
     def get_project(self):
         project_id = self.kwargs.get("project_pk")
@@ -1183,7 +1181,7 @@ def admin_attribute_updater_template(request):
     return response
 
 
-class ReportViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, ReadOnlyModelViewSet):
+class ReportViewSet(ReadOnlyModelViewSet):
     queryset = Report.objects.filter(hidden=False)
     serializer_class = ReportSerializer
 
@@ -1194,7 +1192,7 @@ class ReportViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, ReadOnlyMo
         if not user.has_privilege('admin'):
             queryset = queryset.exclude(is_admin_report=True)
 
-        return django_auto_prefetching.prefetch(queryset, self.serializer_class)
+        return queryset
 
     def get_project_queryset(self, report):
         params = self.request.query_params
@@ -1286,7 +1284,7 @@ class ReportViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, ReadOnlyMo
         return super().list(request, *args, **kwargs)
 
 
-class DeadlineSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, viewsets.ReadOnlyModelViewSet):
+class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DeadlineSerializer
     queryset = Deadline.objects.all()
 
@@ -1301,4 +1299,4 @@ class DeadlineSchemaViewSet(django_auto_prefetching.AutoPrefetchViewSetMixin, vi
         if subtype:
             filters["phase__project_subtype__id"] = subtype
 
-        return django_auto_prefetching.prefetch(Deadline.objects.filter(**filters), self.serializer_class)
+        return Deadline.objects.filter(**filters)

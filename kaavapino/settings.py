@@ -166,7 +166,6 @@ INSTALLED_APPS = [
     "users",
     "django_q",
     "drf_spectacular",
-    "django_auto_prefetching",
 ]
 
 if env.str("ELASTIC_APM_SERVER_URL") and env.str("ELASTIC_APM_SECRET_TOKEN"):
