@@ -7,7 +7,8 @@ from collections import Counter, defaultdict
 from enum import Enum
 from io import StringIO
 from itertools import filterfalse
-from typing import Iterable, Sequence, List, Optional
+from collections.abc import Sequence
+from typing import Iterable, List, Optional
 
 from django.core.cache import cache
 from django.db.utils import IntegrityError

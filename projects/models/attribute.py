@@ -1,6 +1,7 @@
 import datetime
 import re
-from collections import Sequence, OrderedDict
+from collections.abc import Sequence
+from collections import OrderedDict
 from html import escape
 
 from django.contrib.auth import get_user_model
