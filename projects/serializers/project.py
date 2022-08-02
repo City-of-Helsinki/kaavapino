@@ -328,7 +328,7 @@ class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
             phase.projects.filter(
                 self.context.get("query", Q()),
                 public=True,
-            ).prefetch_related("subtype", "user"),
+            ).select_related("subtype", "subtype__project_type", "user"),
             many=True,
         ).data
 
@@ -1451,7 +1451,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in self.instance.deadlines.all()
+            dl.deadline.attribute.identifier for dl in self.instance.deadlines.all().select_related("deadline", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if self.instance else []
 

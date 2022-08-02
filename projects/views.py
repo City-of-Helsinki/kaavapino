@@ -737,7 +737,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
         query = self._get_query(valid_filters)
-        queryset = ProjectSubtype.objects.all().prefetch_related("phases", "phases__projects")
+        queryset = ProjectSubtype.objects.all().prefetch_related("phases")
 
         # TODO hard-coded for now; consider a new field for Attribute
         date_range_attrs = [
@@ -815,7 +815,7 @@ class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectCardSectionAttribute.objects.all()\
-        .select_related("attribute").prefetch_related("attribute__value_choices")\
+        .select_related("attribute", "section").prefetch_related("attribute__value_choices")\
         .order_by("section__index", "index")
     serializer_class = ProjectCardSchemaSerializer
 

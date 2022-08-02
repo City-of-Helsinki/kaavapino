@@ -517,7 +517,8 @@ class Project(models.Model):
         # Filter out deadlines that would be deleted
         project_dls = {
             dl.deadline: dl.date
-            for dl in self.deadlines.all()
+            for dl in self.deadlines.all().select_related("deadline", "deadline__phase", "deadline__subtype", "deadline__attribute")
+                                          .prefetch_related("deadline__update_calculations")
             if dl.deadline.subtype == subtype
         }
 
