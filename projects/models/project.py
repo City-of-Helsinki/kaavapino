@@ -518,7 +518,7 @@ class Project(models.Model):
         project_dls = {
             dl.deadline: dl.date
             for dl in self.deadlines.all().select_related("deadline", "deadline__phase", "deadline__subtype", "deadline__attribute")
-                                          .prefetch_related("deadline__update_calculations")
+                                          .prefetch_related("deadline__initial_calculations", "deadline__update_calculations")
             if dl.deadline.subtype == subtype
         }
 

@@ -481,7 +481,8 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "create_draft",
         ]
         return_data = {}
-        attrs = ListViewAttributeColumn.objects.all().select_related("attribute")
+        attrs = self.context["listview_attribute_columns"] if self.context.__contains__("listview_attribute_columns")\
+            else ListViewAttributeColumn.objects.all().select_related("attribute")
         attribute_data = getattr(project, "attribute_data", {})
         for attr in attrs:
             identifier = attr.attribute.identifier

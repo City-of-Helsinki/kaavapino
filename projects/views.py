@@ -99,6 +99,7 @@ from projects.serializers.projecttype import (
 )
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer
+from sitecontent.models import ListViewAttributeColumn
 
 log = logging.getLogger(__name__)
 
@@ -161,7 +162,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all() \
-            .select_related("user", "subtype", "phase") \
+            .select_related("user", "subtype", "subtype__project_type", "phase") \
             .prefetch_related("deadlines", "target_actions")
     permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
@@ -323,6 +324,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         if self.action == "list":
             context["project_schedule_cache"] = \
                 cache.get("serialized_project_schedules", {})
+            context["listview_attribute_columns"] = ListViewAttributeColumn.objects.all().select_related("attribute")
 
         return context
 
