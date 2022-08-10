@@ -117,13 +117,13 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
     external_data_attrs = Attribute.objects.filter(
         data_source__isnull=False,
-    ).select_related("key_for_attributes")
+    ).select_related("key_attribute")
 
     leaf_node_attrs = external_data_attrs.filter(
         data_source__isnull=False,
     ).exclude(
         value_type=Attribute.TYPE_FIELDSET,
-    ).select_related("key_for_attributes")
+    ).select_related("key_attribute")
 
     flat_attribute_data = get_flat_attribute_data(attribute_data, {})
 
