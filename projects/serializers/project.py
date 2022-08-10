@@ -181,7 +181,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             dl for dl in projectdeadline.project.deadlines.filter(
                 deadline__index__lte=projectdeadline.deadline.index,
                 date__lt=datetime.date.today(),
-            ).select_related("project", "deadline", "deadline__confirmation_attribute").prefetch_related("project__deadlines")
+            ).select_related("project", "deadline", "deadline__confirmation_attribute")
             if not dl.confirmed
         ]) > 0
 
@@ -1452,7 +1452,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in self.instance.deadlines.all().select_related("deadline", "deadline__confirmation_attribute")
+            dl.deadline.attribute.identifier for dl in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if self.instance else []
 
@@ -1705,17 +1705,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             project.save()
 
             if old_deadlines:
-                updated_deadlines = old_deadlines.union(project.deadlines.all().select_related("deadline"))
+                project_deadlines = project.deadlines.all().select_related("deadline")
+                updated_deadlines = old_deadlines.union(project_deadlines)
                 for dl in updated_deadlines:
-                    try:
-                        new_date = project.deadlines.get(deadline=dl.deadline).date
-                    except ProjectDeadline.DoesNotExist:
-                        new_date = None
+                    project_deadline = next(filter(lambda _dl: _dl.deadline == dl.deadline, project_deadlines), None)
+                    new_date = project_deadline.date if project_deadline else None
 
-                    try:
-                        old_date = old_deadlines.get(deadline=dl.deadline).date
-                    except ProjectDeadline.DoesNotExist:
-                        old_date = None
+                    old_deadline = next(filter(lambda _dl: _dl.deadline == dl.deadline, old_deadlines), None)
+                    old_date = old_deadline.date if old_deadline else None
 
                     self.create_deadline_updates_log(
                         dl.deadline, project, user, old_date, new_date
