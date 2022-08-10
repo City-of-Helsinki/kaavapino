@@ -237,8 +237,6 @@ class Project(models.Model):
             .prefetch_related("value_choices")
         )
 
-        # generated_attributes = project_attributes.filter(generated=True)
-
         attributes = {a.identifier: a for a in project_attributes}
 
         for identifier, value in data.items():
