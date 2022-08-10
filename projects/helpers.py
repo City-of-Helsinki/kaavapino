@@ -582,7 +582,7 @@ def set_ad_data_in_attribute_data(attribute_data):
     attributes = Attribute.objects.filter(
         ad_key_attribute__isnull=False,
         ad_data_key__isnull=False,
-    ).select_related("ad_key_attribute")
+    ).select_related("ad_key_attribute").prefetch_related("fieldsets")
 
     for attr in attributes:
         fieldset_path = get_fieldset_path(attr)

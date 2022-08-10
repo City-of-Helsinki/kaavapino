@@ -113,3 +113,6 @@ static/
 node_modules/
 
 media/
+
+# MacOS
+.DS_Store

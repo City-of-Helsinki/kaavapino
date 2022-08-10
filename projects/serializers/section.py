@@ -1,4 +1,3 @@
-import collections
 import copy
 import datetime
 import logging
@@ -20,6 +19,7 @@ from projects.models import (
 )
 from projects.serializers.utils import _is_attribute_required
 
+from collections.abc import Mapping
 from collections import namedtuple
 
 from django.contrib.auth import get_user_model
@@ -277,6 +277,7 @@ def create_section_serializer(
             section_attribute.attribute
             for section_attribute
             in section.projectphasedeadlinesectionattribute_set.all()
+            .select_related("attribute").prefetch_related("attribute__deadline")
         ]
     else:
         return None
@@ -324,7 +325,7 @@ def get_attribute_data(request, project=None) -> dict:
 
     # Extract all attribute data that exists in the request
     request_attribute_data = request.data.get("attribute_data", {})
-    if not isinstance(request_attribute_data, collections.Mapping):
+    if not isinstance(request_attribute_data, Mapping):
         request_attribute_data = {}
 
     attribute_data.update(request_attribute_data)

@@ -15,6 +15,7 @@ from django.db.models.expressions import Value
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.functional import cached_property
 from private_storage.fields import PrivateFileField
 from PIL import Image, ImageOps
 
@@ -235,8 +236,6 @@ class Project(models.Model):
             .distinct()
             .prefetch_related("value_choices")
         )
-
-        generated_attributes = project_attributes.filter(generated=True)
 
         attributes = {a.identifier: a for a in project_attributes}
 
@@ -493,9 +492,18 @@ class Project(models.Model):
         # Update automatic deadlines
         self._set_calculated_deadlines(
             [
-                dl.deadline for dl in self.deadlines.all()
-                if dl.deadline.update_calculations.count() \
-                    or dl.deadline.default_to_created_at \
+                dl.deadline for dl in self.deadlines
+                .select_related(
+                    "project", "deadline", "deadline__attribute", "deadline__confirmation_attribute",
+                )
+                .prefetch_related(
+                    "deadline__condition_attributes",
+                    "deadline__initial_calculations",
+                    "deadline__update_calculations",
+                )
+                .all()
+                if dl.deadline.update_calculations.count()
+                    or dl.deadline.default_to_created_at
                     or dl.deadline.attribute
             ],
             user,
@@ -507,7 +515,8 @@ class Project(models.Model):
         # Filter out deadlines that would be deleted
         project_dls = {
             dl.deadline: dl.date
-            for dl in self.deadlines.all()
+            for dl in self.deadlines.all().select_related("deadline", "deadline__phase", "deadline__subtype", "deadline__attribute")
+                                          .prefetch_related("deadline__initial_calculations", "deadline__update_calculations")
             if dl.deadline.subtype == subtype
         }
 
@@ -597,10 +606,12 @@ class Project(models.Model):
         return True
 
     def save(self, *args, **kwargs):
+        fieldset_attributes = {f for f in FieldSetAttribute.objects.all().select_related("attribute_source", "attribute_target")}
+
         def add_fieldset_field_for_attribute(search_fields, attr, fieldset, raw=False):
             key = attr.identifier
             while attr.fieldset_attribute_target.count():
-                attr = attr.fieldset_attribute_target.get().attribute_source
+                attr = next(filter(lambda a: a.attribute_target == attr, fieldset_attributes), None).attribute_source
                 if not fieldset:
                     fieldset = self.attribute_data.get(attr.identifier)
                 if not fieldset:
@@ -613,7 +624,7 @@ class Project(models.Model):
                         continue
 
                     if type(value) is list and attr.value_type == Attribute.TYPE_FIELDSET:
-                        sources = FieldSetAttribute.objects.filter(attribute_source__identifier=key)
+                        sources = filter(lambda a: a.attribute_source.identifier == key, fieldset_attributes)
                         for source in sources:
                             add_fieldset_field_for_attribute(search_fields, source.attribute_target, value)
                     else:
@@ -652,11 +663,13 @@ class Project(models.Model):
         # TODO: check if required
         # set_ad_data_in_attribute_data(self.attribute_data)
         search_fields = set()
-        for attr in Attribute.objects.filter(searchable=True).prefetch_related("fieldset_attribute_target"):
+        for attr in Attribute.objects.filter(searchable=True)\
+                .prefetch_related("fieldsets", "fieldset_attribute_target", "fieldset_attribute_source"):
             add_search_field_for_attribute(search_fields, attr)
 
         # Raw personnels
-        for attr in Attribute.objects.filter(value_type=Attribute.TYPE_PERSONNEL).prefetch_related("fieldset_attribute_target"):
+        for attr in Attribute.objects.filter(value_type=Attribute.TYPE_PERSONNEL)\
+                .prefetch_related("fieldsets", "fieldset_attribute_target", "fieldset_attribute_source"):
             if not attr.fieldset_attribute_target.count():
                 value = self.attribute_data.get(attr.identifier)
                 if value and attr.value_type != Attribute.TYPE_FIELDSET:
@@ -1078,7 +1091,7 @@ class ProjectAttributeFile(models.Model):
         blank=True,
     )
 
-    @property
+    @cached_property
     def fieldset_path(self):
         return [
             {"parent": loc.parent_fieldset, "index": loc.child_index}

@@ -3,6 +3,7 @@ import csv
 from datetime import datetime, timedelta
 import time
 import logging
+import threading
 
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import FieldError
@@ -98,6 +99,7 @@ from projects.serializers.projecttype import (
 )
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer
+from sitecontent.models import ListViewAttributeColumn
 
 log = logging.getLogger(__name__)
 
@@ -160,7 +162,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
 )
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all() \
-            .select_related("user", "subtype", "phase") \
+            .select_related("user", "subtype", "subtype__project_type", "phase") \
             .prefetch_related("deadlines", "target_actions")
     permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
@@ -174,6 +176,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ]
     except Exception:
         ordering_fields = []
+
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -194,11 +197,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         queryset = self.queryset
         if self.request.method in ['PUT', 'PATCH']:
             queryset = queryset \
-                .prefetch_related('deadlines') \
-                .prefetch_related('deadlines__deadline') \
-                .prefetch_related('deadlines__deadline__condition_attributes') \
-                .prefetch_related('deadlines__deadline__initial_calculations') \
-                .prefetch_related('deadlines__deadline__update_calculations')
+                .prefetch_related(
+                    'deadlines',
+                    'deadlines__deadline',
+                    'deadlines__project',
+                    'deadlines__deadline__condition_attributes',
+                    'deadlines__deadline__initial_calculations',
+                    'deadlines__deadline__update_calculations',
+                )
 
         includeds_users = self.request.query_params.get("includes_users", None)
         search = self.request.query_params.get("search", None)
@@ -318,6 +324,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         if self.action == "list":
             context["project_schedule_cache"] = \
                 cache.get("serialized_project_schedules", {})
+            context["listview_attribute_columns"] = ListViewAttributeColumn.objects.all().select_related("attribute")
 
         return context
 
@@ -380,14 +387,17 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ProjectExternalDocumentSectionSerializer(
                 project, context={"section": document_section}
             ).data
-            for document_section in DocumentLinkSection.objects.all()
+            for document_section in DocumentLinkSection.objects.all().prefetch_related(
+                "documentlinkfieldset_set", "documentlinkfieldset_set__fieldset_attribute",
+                "documentlinkfieldset_set__document_link_attribute"
+            )
         ]})
 
     def _get_valid_filters(self, filters_view):
         try:
             attrs = OverviewFilterAttribute.objects.filter(
                 **{filters_view: True},
-            )
+            ).prefetch_related("overview_filter")
         except FieldError:
             return None
 
@@ -509,7 +519,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         url_name="projects-overview-filters",
     )
     def overview_filters(self, request):
-        queryset = OverviewFilter.objects.all()
+        queryset = OverviewFilter.objects.all().prefetch_related("attributes")
         return Response(OverviewFilterSerializer(queryset, many=True).data)
 
     def _parse_date_range(
@@ -589,8 +599,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ]
 
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
-        projects_by_date = {
-            date: [dl.project for dl in ProjectDeadline.objects.filter(
+        project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs + [
@@ -598,20 +607,24 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     "milloin_kaavaehdotus_lautakunnassa_2",
                     "milloin_kaavaehdotus_lautakunnassa_3",
                     "milloin_kaavaehdotus_lautakunnassa_4",
-                ],
-                date=date,
-            ).order_by("project__pk").distinct("project__pk")]
+                ]
+            ).prefetch_related("project", "project__user",
+                               "project__subtype", "project__subtype__project_type",
+                               "project__phase", "project__phase__common_project_phase").\
+            order_by("project__pk").distinct("project__pk")
+        projects_by_date = {
+            date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
             for date in date_range
         }
 
-        projects_in_range_by_date = {
-            date: [dl.project for dl in ProjectDeadline.objects.filter(
+        project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
-                date__lte=date,
-            ).order_by("project__pk").distinct("project__pk")]
+            ).prefetch_related("project").order_by("project__pk").distinct("project__pk")
+        projects_in_range_by_date = {
+            date: [dl.project for dl in filter(lambda dl: dl.date <= date, project_deadlines)]
             for date in date_range
         }
         projects_in_range = projects_in_range_by_date[end_date]
@@ -726,7 +739,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
         query = self._get_query(valid_filters)
-        queryset = ProjectSubtype.objects.all()
+        queryset = ProjectSubtype.objects.all().prefetch_related("phases")
 
         # TODO hard-coded for now; consider a new field for Attribute
         date_range_attrs = [
@@ -754,6 +767,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ).data
         })
 
+    @staticmethod
+    def append_project_on_map_overview_serializer(project, query, serializers):
+        serializers.append(ProjectOnMapOverviewSerializer(project, context={"query": query}).data)
+
     @extend_schema(
         responses={
             200: ProjectOnMapOverviewSerializer(many=True),
@@ -771,23 +788,37 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def overview_on_map(self, request):
         valid_filters = self._get_valid_filters("filters_on_map")
         query = self._get_query(valid_filters)
-        queryset = Project.objects.filter(query, public=True)
-        return Response({
-            "projects": ProjectOnMapOverviewSerializer(
-                queryset, many=True, context={"query": query},
-            ).data
-        })
+        queryset = Project.objects.filter(query, public=True)\
+            .prefetch_related("phase", "phase__common_project_phase", "phase__project_subtype",
+                              "subtype", "subtype__project_type",
+                              "user",
+                              )
+
+        serializers = []
+        threads = []
+
+        # Threaded because ProjectOnMapOverviewSerializer::get_geoserver_data makes API calls that slow down a lot
+        # if called one by one
+        for p in queryset.all():
+            thread = threading.Thread(target=self.append_project_on_map_overview_serializer, args=(p, query, serializers))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        return Response({"projects": serializers})
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectPhase.objects.all()
+    queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase", "project_subtype", "project_subtype__project_type")
     serializer_class = ProjectPhaseSerializer
 
 
 class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectCardSectionAttribute.objects.all().order_by(
-        "section__index", "index"
-    )
+    queryset = ProjectCardSectionAttribute.objects.all()\
+        .select_related("attribute", "section").prefetch_related("attribute__value_choices")\
+        .order_by("section__index", "index")
     serializer_class = ProjectCardSchemaSerializer
 
 
@@ -858,7 +889,7 @@ class ProjectAttributeFileDownloadView(
 
 
 class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = FieldComment.objects.all().select_related("user")
+    queryset = FieldComment.objects.all().select_related("user").prefetch_related("fieldset_path_locations")
     serializer_class = FieldCommentSerializer
     permission_classes = [IsAuthenticated, CommentPermissions]
     filter_backends = (filters.OrderingFilter,)
