@@ -3,7 +3,6 @@ import csv
 from datetime import datetime, timedelta
 import time
 import logging
-import threading
 
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import FieldError
@@ -767,10 +766,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ).data
         })
 
-    @staticmethod
-    def append_project_on_map_overview_serializer(project, query, serializers):
-        serializers.append(ProjectOnMapOverviewSerializer(project, context={"query": query}).data)
-
     @extend_schema(
         responses={
             200: ProjectOnMapOverviewSerializer(many=True),
@@ -788,26 +783,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def overview_on_map(self, request):
         valid_filters = self._get_valid_filters("filters_on_map")
         query = self._get_query(valid_filters)
-        queryset = Project.objects.filter(query, public=True)\
-            .prefetch_related("phase", "phase__common_project_phase", "phase__project_subtype",
-                              "subtype", "subtype__project_type",
-                              "user",
-                              )
-
-        serializers = []
-        threads = []
-
-        # Threaded because ProjectOnMapOverviewSerializer::get_geoserver_data makes API calls that slow down a lot
-        # if called one by one
-        for p in queryset.all():
-            thread = threading.Thread(target=self.append_project_on_map_overview_serializer, args=(p, query, serializers))
-            thread.start()
-            threads.append(thread)
-
-        for thread in threads:
-            thread.join()
-
-        return Response({"projects": serializers})
+        queryset = Project.objects.filter(query, public=True)
+        return Response({
+            "projects": ProjectOnMapOverviewSerializer(
+                queryset, many=True, context={"query": query},
+            ).data
+        })
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
