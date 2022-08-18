@@ -28,9 +28,11 @@ def refresh_on_map_overview_cache():
             headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
         )
         if response.status_code == 200:
-            cache.set(url, response, 90000)
+            cache.set(url, response, 86400)  # 1 day
+        elif response.status_code == 404:
+            cache.set(url, response, 900)  # 15 minutes
         else:
-            cache.set(url, response, 180)
+            cache.set(url, response, 180)  # 3 minutes
 
 def refresh_project_schedule_cache():
     project_schedule_cache = cache.get("serialized_project_schedules", {})

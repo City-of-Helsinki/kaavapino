@@ -783,7 +783,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def overview_on_map(self, request):
         valid_filters = self._get_valid_filters("filters_on_map")
         query = self._get_query(valid_filters)
-        queryset = Project.objects.filter(query, public=True)
+        queryset = Project.objects.filter(query, public=True)\
+            .prefetch_related("phase", "phase__common_project_phase", "phase__project_subtype",
+                              "subtype", "subtype__project_type",
+                              "user",
+                              )
         return Response({
             "projects": ProjectOnMapOverviewSerializer(
                 queryset, many=True, context={"query": query},
