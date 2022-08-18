@@ -380,8 +380,8 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
                     url,
                     headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
                 )
-                if response.status_code == 200:
-                    cache.set(url, response, 90000)
+                if response.status_code in [200, 404]:
+                    cache.set(url, response, 86400)
                 elif response.status_code >= 500:
                     log.error("Kaavoitus-api connection error: {} {}".format(
                         response.status_code,
@@ -650,8 +650,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                     url,
                     headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
                 )
-                if response.status_code == 200:
-                    cache.set(url, response, 90000)
+                if response.status_code in [200, 404]:
+                    cache.set(url, response, 86400)
                 elif response.status_code >= 500:
                     log.error("Kaavoitus-api connection error: {} {}".format(
                         response.status_code,

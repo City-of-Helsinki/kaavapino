@@ -27,8 +27,8 @@ def refresh_on_map_overview_cache():
             url,
             headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
         )
-        if response.status_code == 200:
-            cache.set(url, response, 90000)
+        if response.status_code in [200, 404]:
+            cache.set(url, response, 86400)
         else:
             cache.set(url, response, 180)
 
