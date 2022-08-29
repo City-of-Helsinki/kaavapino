@@ -49,10 +49,17 @@ class UserSerializer(serializers.ModelSerializer):
 class PersonnelSerializer(serializers.Serializer):
     id = serializers.CharField()
     name = serializers.SerializerMethodField()
-    phone = serializers.CharField(source="mobilePhone")
+    phone = serializers.SerializerMethodField()
     email = serializers.CharField(source="mail")
     title = serializers.CharField(source="jobTitle")
     office = serializers.CharField(source="officeLocation")
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_phone(self, user):
+        business_phones = user["businessPhones"]
+        if business_phones and len(business_phones) > 0:
+            return business_phones[0]
+        return user["mobilePhone"]
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_name(self, user):
