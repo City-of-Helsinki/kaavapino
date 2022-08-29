@@ -515,7 +515,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         set_in_attribute_data(attribute_data, path, value)
 
 def get_ad_user(id):
-    url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,surname"
+    url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,businessPhones,officeLocation,surname"
     try:
         response = cache.get(url)
     except TypeError:

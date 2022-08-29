@@ -75,7 +75,7 @@ class PersonnelDetail(APIView):
             )
 
         response = requests.get(
-            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{pk}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,officeLocation,surname",
+            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{pk}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,businessPhones,officeLocation,surname",
             headers={
                 "Authorization": f"Bearer {token}",
             },
