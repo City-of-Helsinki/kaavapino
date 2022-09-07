@@ -58,8 +58,8 @@ def get_rich_text_validator(attribute):
             for item in value["ops"]:
                 total_length += len(item["insert"])
 
-            # 1 reduced from total_length because strings in 'insert' always have line break
-            # so the actual value visible to the user will always be 1 less than the actual one
+            # Decrease 1 from total_length because string in last 'insert' operation will always have line break
+            # so the value visible to the user will always be 1 less than what is added to total_length here
             if attribute.character_limit and total_length - 1 > attribute.character_limit:
                 raise ValidationError(
                     {attribute.identifier: error_msg}
