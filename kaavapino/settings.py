@@ -22,6 +22,7 @@ env = environ.Env(
     DEBUG=(bool, True),
     SECRET_KEY=(str, ""),
     ALLOWED_HOSTS=(list, []),
+    CORS_ALLOWED_ORIGINS=(list, []),
     DATABASE_URL=(str, "postgis://kaavapino:kaavapino@localhost/kaavapino"),
     CACHE_URL=(str, "locmemcache://"),
     EMAIL_URL=(str, "consolemail://"),
@@ -280,8 +281,7 @@ if not DEBUG and NGINX_X_ACCEL:
 
 
 # CORS
-# TODO: Lock down CORS access when things are running in production
-CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS').split(',')
 
 # Django Activity Stream
 USE_NATIVE_JSONFIELD = True
