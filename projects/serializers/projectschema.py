@@ -699,7 +699,7 @@ EditProjectTypeSchemaSerializer = create_project_type_schema_serializer("edit", 
 BrowseProjectTypeSchemaSerializer = create_project_type_schema_serializer("browse", False)
 AdminOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("admin", True)
 CreateOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("create", True)
-
+EditOwnerProjectTypeSchemaSerializer = create_project_type_schema_serializer("edit", True)
 
 class OwnerProjectTypeSchemaSerializer(serializers.Serializer):
     subtypes = serializers.SerializerMethodField()
