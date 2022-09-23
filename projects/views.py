@@ -90,6 +90,7 @@ from projects.serializers.projectschema import (
     BrowseProjectTypeSchemaSerializer,
     AdminOwnerProjectTypeSchemaSerializer,
     CreateOwnerProjectTypeSchemaSerializer,
+    EditOwnerProjectTypeSchemaSerializer,
     ProjectCardSchemaSerializer,
 )
 from projects.serializers.projecttype import (
@@ -840,6 +841,7 @@ class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
             return {
                 "admin": AdminOwnerProjectTypeSchemaSerializer,
                 "create": CreateOwnerProjectTypeSchemaSerializer,
+                "edit": EditOwnerProjectTypeSchemaSerializer,
             }[user.privilege]
         else:
             return {
