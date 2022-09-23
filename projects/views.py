@@ -22,7 +22,7 @@ from drf_spectacular.utils import (
 )
 from drf_spectacular.types import OpenApiTypes
 from private_storage.views import PrivateStorageDetailView
-from rest_framework import viewsets, filters, status
+from rest_framework import viewsets, filters, status, pagination
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
@@ -808,9 +808,14 @@ class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectCardSchemaSerializer
 
 
+class AttributePagination(pagination.PageNumberPagination):
+    page_size = 2000
+
+
 class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Attribute.objects.all()
     serializer_class = SimpleAttributeSerializer
+    pagination_class = AttributePagination
 
 
 @extend_schema(
