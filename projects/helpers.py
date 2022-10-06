@@ -2,17 +2,21 @@ from collections import OrderedDict
 import re
 import requests
 import json
+import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
+from requests import ReadTimeout
 from rest_framework import status
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from users.helpers import get_graph_api_access_token
 from users.serializers import PersonnelSerializer
 
+log = logging.getLogger(__name__)
 
 def get_fieldset_path(attr, attribute_path=[], cached=True, orig_attr=None):
     orig_attr = orig_attr or attr
@@ -127,6 +131,22 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
     flat_attribute_data = get_flat_attribute_data(attribute_data, {})
 
+    # TODO: Timeout should be fixed in Kaavoitus-api
+    """
+    The reason for the timeout should be fixed in Kaavoitus-api and Kaavoitus-api should return the timeout
+    response instead of generating one here manually. This works as a hotfix for now but should be fixed in future.
+    """
+    def get_timeout_response():
+        ret = Response(
+            data='Kaavoitus-api did not return a response in time.',
+            status=status.HTTP_408_REQUEST_TIMEOUT
+        )
+        ret.accepted_renderer = JSONRenderer()
+        ret.accepted_media_type = "application/json"
+        ret.renderer_context = {}
+        ret.render()
+        return ret
+
     def build_request_paths(attr):
         returns = {}
         if attr.key_attribute:
@@ -169,14 +189,22 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
             if cache.get(url) is not None:
                 response = cache.get(url)
             else:
-                response = requests.get(
-                    url,
-                    headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                )
+                try:
+                    response = requests.get(
+                        url,
+                        headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                        timeout=5
+                    )
+                except ReadTimeout:
+                    log.error("Request timed out for url: {}".format(url))
+                    response = get_timeout_response()
+
                 if response.status_code in [200, 400, 404]:
-                    cache.set(url, response, 28800)
+                    cache.set(url, response, 28800)  # 8 hours
+                elif response.status_code == 408:
+                    cache.set(url, response, 3600)  # 1 hour
                 else:
-                    cache.set(url, response, 180)
+                    cache.set(url, response, 900)  # 15 minutes
 
             if response.status_code == 200:
                 fetched_data[attr][key] = response.json()
