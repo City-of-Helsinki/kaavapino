@@ -3,6 +3,7 @@ import re
 import requests
 import json
 import logging
+import threading
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -147,6 +148,25 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         ret.render()
         return ret
 
+    def process_request(_url, _attr, _key, _responses=[]):
+        try:
+            result = requests.get(
+                _url,
+                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                timeout=25
+            )
+        except ReadTimeout:
+            log.error("Request timed out for url: {}".format(_url))
+            result = get_timeout_response()
+
+        _responses.append({
+            "url": _url,
+            "attr": _attr,
+            "key": _key,
+            "cached": False,
+            "response": result
+        })
+
     def build_request_paths(attr):
         returns = {}
         if attr.key_attribute:
@@ -183,26 +203,42 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         ) if attr is not None
     }
 
+    threads = []
+    responses = []
+
     for attr, urls in fetched_data.items():
         for key, value in urls.items():
             url = value
             if cache.get(url) is not None:
-                response = cache.get(url)
+                responses.append({"url": url,
+                                  "attr": attr,
+                                  "key": key,
+                                  "cached": True,
+                                  "response": cache.get(url)
+                                  })
             else:
-                try:
-                    response = requests.get(
-                        url,
-                        headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                        timeout=5
-                    )
-                except ReadTimeout:
-                    log.error("Request timed out for url: {}".format(url))
-                    response = get_timeout_response()
+                thread = threading.Thread(target=process_request, args=(url, attr, key, responses))
+                thread.start()
+                threads.append(thread)
 
+    for thread in threads:
+        thread.join()
+
+    del threads
+
+    try:
+        for r in responses:
+            url = r['url']
+            attr = r['attr']
+            key = r['key']
+            cached = r['cached']
+            response = r['response']
+
+            if not cached:
                 if response.status_code in [200, 400, 404]:
                     cache.set(url, response, 28800)  # 8 hours
-                elif response.status_code == 408:
-                    cache.set(url, response, 3600)  # 1 hour
+                elif response.status_code == 408:  # timeout
+                    cache.set(url, response, 14400)  # 4 hours
                 else:
                     cache.set(url, response, 900)  # 15 minutes
 
@@ -210,6 +246,10 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
                 fetched_data[attr][key] = response.json()
             else:
                 fetched_data[attr][key] = None
+    except Exception as exc:
+        log.error(exc)
+
+    del responses
 
     def get_deep(source, keys, default=None):
         if not keys:
