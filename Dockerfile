@@ -63,6 +63,9 @@ RUN dnf install -y \
 # Upgrade pip
 RUN pip install -U pip
 
+# Install Poetry
+RUN pip install poetry
+
 RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapinouser
 
 
@@ -70,11 +73,9 @@ RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapi
 FROM base AS test
 
 # Install python dependencies
-ADD requirements.txt /$APP_NAME/
-ADD requirements-dev.txt /$APP_NAME/
-
+COPY poetry.lock pyproject.toml /$APP_NAME/
+RUN poetry export -f requirements.txt --output requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r requirements-dev.txt
 
 # Add entrypoint script
 ADD docker-entrypoint.sh /
@@ -84,8 +85,10 @@ RUN chmod +x /docker-entrypoint.sh
 ##### Server image #####
 FROM base AS deploy
 
-ADD requirements.txt .
+# Install python dependencies
+COPY poetry.lock pyproject.toml ./
 ADD deploy/requirements.txt ./deploy/requirements.txt
+RUN poetry export --without dev -f requirements.txt --output requirements.txt
 RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 
 COPY . .

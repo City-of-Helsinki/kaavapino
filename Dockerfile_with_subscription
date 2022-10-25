@@ -44,6 +44,9 @@ RUN rm /etc/rhsm-host && \
 # Upgrade pip
 RUN pip install -U pip
 
+# Install Poetry
+RUN pip install poetry
+
 RUN useradd --system -u 1002 -g 0 kaavapinouser && \
     mkdir -p $STATIC_ROOT $MEDIA_ROOT
 
@@ -55,11 +58,9 @@ RUN useradd --system -u 1002 -g 0 kaavapinouser && \
 FROM base AS test
 
 # Install python dependencies
-COPY requirements.txt /$APP_NAME/
-COPY requirements-dev.txt /$APP_NAME/
-
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r requirements-dev.txt
+COPY poetry.lock pyproject.toml /$APP_NAME/
+RUN poetry export -f requirements.txt --output requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # probably only $STATIC_ROOT needs to be group-writable,
 # check this later!
@@ -74,7 +75,9 @@ RUN chmod +x /docker-entrypoint.sh
 ##### Server image #####
 FROM base AS deploy
 
-COPY requirements.txt .
+# Install python dependencies
+COPY poetry.lock pyproject.toml ./
+RUN poetry export --without dev -f requirements.txt --output requirements.txt
 COPY deploy/requirements.txt ./deploy/requirements.txt
 RUN pip install --no-cache-dir -r ./deploy/requirements.txt
 
