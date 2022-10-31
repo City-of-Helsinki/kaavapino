@@ -18,6 +18,3 @@ docker-compose.yml
 coverage.xml
 .pytest_cache/
 .mypy_cache/
-
-# Project files
-pyproject.toml
