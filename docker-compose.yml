@@ -12,6 +12,17 @@ services:
       - "5432:5432"
     container_name: kaavapino-db
 
+  cache:
+    image: eqalpha/keydb
+    container_name: kaavapino-keydb
+    command: keydb-server /etc/keydb/keydb.conf --server-threads 2
+    volumes:
+      - ./keydb.conf:/etc/keydb/keydb.conf
+      - cache_kaavapino_data:/data
+    ports:
+      - "6379:6379"
+    restart: on-failure
+
   api:
     build:
       target: "test"
@@ -27,6 +38,7 @@ services:
     environment:
       - DEBUG=1
       - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
+      - KEYDB_URL=redis://cache
       - TOKEN_AUTH_ACCEPTED_AUDIENCE=https://api.hel.fi/auth/kaavapinodev
       - TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX=kaavapinodev
       - REQUIRE_API_SCOPE_FOR_AUTHENTICATION=False
@@ -48,6 +60,7 @@ services:
       - "8000:8000"
     depends_on:
       - db
+      - cache
     container_name: kaavapino-api
 
   django-q:
@@ -62,10 +75,12 @@ services:
       - .:/kaavapino
     depends_on:
       - db
+      - cache
       - api
     restart: on-failure
     environment:
       - DATABASE_URL=postgis://kaavapino:kaavapino@db/kaavapino
+      - KEYDB_URL=redis://cache
       - KAAVOITUS_API_BASE_URL=
       - KAAVOITUS_API_AUTH_TOKEN=
       - GRAPH_API_LOGIN_BASE_URL=https://login.microsoftonline.com
@@ -76,8 +91,8 @@ services:
       - ALLOWED_HOSTS=localhost
       - CSRF_TRUSTED_ORIGINS=
       - DOCUMENT_EDIT_URL_FORMAT=
-
     container_name: kaavapino-django-q
 
 volumes:
     db_kaavapino_data:
+    cache_kaavapino_data:

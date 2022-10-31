@@ -24,6 +24,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     DATABASE_URL=(str, "postgis://kaavapino:kaavapino@localhost/kaavapino"),
+    KEYDB_URL=(str, "redis://localhost"),
     CACHE_URL=(str, "locmemcache://"),
     EMAIL_URL=(str, "consolemail://"),
     MEDIA_ROOT=(environ.Path, project_root("media")),
@@ -110,13 +111,14 @@ DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
 DATABASES = {"default": env.db()}
 
-CACHES = {"default": {
-    "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-    "LOCATION": "kaavapino_api_cache_table",
-    "OPTIONS": {
-        "MAX_ENTRIES": 1500,
-    }
-}}
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env.str("KEYDB_URL"),
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "KEY_PREFIX": "kaavapino_api",
+    },
+}
 
 vars().update(env.email_url())  # EMAIL_BACKEND etc.
 
