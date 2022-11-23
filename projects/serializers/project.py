@@ -1721,37 +1721,24 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             return project
 
-    def log_updates_attribute_data(self, attribute_data, project=None, prefix=""):
+    def log_updates_attribute_data(self, attribute_data, project=None, prefix="", attribute_is_from_fieldset=False):
+        """Generate log for changed data
+
+        :param attribute_data normally of shape dict[str, Any] keys being identifiers and values being new values
+        :param attribute_is_from_fieldset if True attribute_data is expected to be of shape
+            (outer_identifier, i, inner_identifier, new_value)
+        """
         project = project or self.instance
         if not project:
             raise ValueError("Can't update attribute data log if no project")
 
         user = self.context["request"].user
-        instance_attribute_date = getattr(self.instance, "attribute_data", {})
-        updated_attribute_values = {}
-
-        for identifier, value in attribute_data.items():
-            existing_value = instance_attribute_date.get(identifier, None)
-
-            if not value and not existing_value:
-                old_file = ProjectAttributeFile.objects \
-                    .filter(
-                        project=project,
-                        archived_at=None,
-                        attribute__identifier=identifier,
-                    ).order_by("-created_at").first()
-                if old_file:
-                    existing_value = old_file.description
-
-            if value != existing_value:
-                updated_attribute_values[identifier] = {
-                    "old": existing_value,
-                    "new": value,
-                }
-
-        updated_attributes = Attribute.objects.filter(
-            identifier__in=updated_attribute_values.keys()
-        )
+        if not attribute_is_from_fieldset:
+            updated_attributes, updated_attribute_values = self._get_updated_attrs_and_vals(attribute_data, project)
+        else:
+            new_value, outer_identifier, i, inner_identifier = attribute_data
+            updated_attributes, updated_attribute_values = self._get_updated_attrs_and_vals_from_fieldset(
+                new_value, outer_identifier, i, inner_identifier, project)
 
         geometry_attributes = []
         for attribute in updated_attributes:
@@ -1765,12 +1752,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             if attribute.value_type == Attribute.TYPE_FIELDSET:
                 for i, children in enumerate(values["new"]):
-                    for k, v in dict(children).items():
+                    for identifier, new_value in dict(children).items():
                         self.log_updates_attribute_data(
-                            {k: v},
+                            (new_value, attribute.identifier, i, identifier),
                             project=project,
                             prefix=f"{prefix}{attribute.identifier}[{i}].",
+                            attribute_is_from_fieldset=True,
                         )
+                continue
 
             if attribute.value_type == Attribute.TYPE_CHOICE:
                 if isinstance(values["new"], list):
@@ -1794,6 +1783,45 @@ class ProjectSerializer(serializers.ModelSerializer):
             new_geometry = attribute_data[geometry_attribute.identifier]
             if geometry_instance and geometry_instance.geometry != new_geometry:
                 self._create_updates_log(geometry_attribute, project, user, None, None)
+
+    def _get_updated_attrs_and_vals(self, attribute_data, project):
+        instance_attribute_data = getattr(self.instance, "attribute_data", {})
+        updated_attribute_values = {}
+
+        for identifier, new_value in attribute_data.items():
+            old_value = instance_attribute_data.get(identifier, None)
+            self._update_if_changed(updated_attribute_values, new_value, old_value, identifier, project)
+
+        updated_attributes = Attribute.objects.filter(identifier__in=updated_attribute_values.keys())
+        return updated_attributes, updated_attribute_values
+
+    def _get_updated_attrs_and_vals_from_fieldset(self, new_value, outer_identifier, i, inner_identifier, project):
+        instance_attribute_data = getattr(self.instance, "attribute_data", {})
+        updated_attribute_values = {}
+
+        try:
+            old_value = instance_attribute_data[outer_identifier][i][inner_identifier]
+        except (KeyError, IndexError):
+            old_value = None
+
+        self._update_if_changed(updated_attribute_values, new_value, old_value, inner_identifier, project)
+        updated_attributes = Attribute.objects.filter(identifier__in=updated_attribute_values.keys())
+        return updated_attributes, updated_attribute_values
+
+    def _update_if_changed(self, updated_attribute_values, new_value, old_value, identifier, project):
+        if not new_value and not old_value:
+            old_file = (ProjectAttributeFile.objects
+                        .filter(project=project, archived_at=None, attribute__identifier=identifier)
+                        .order_by("-created_at")
+                        .first())
+            if old_file:
+                old_value = old_file.description
+
+        if isinstance(new_value, AttributeValueChoice):
+            new_value = new_value.identifier
+
+        if new_value != old_value:
+            updated_attribute_values[identifier] = {"old": old_value, "new": new_value}
 
     def _get_labels(self, values, attribute):
         labels = {}
