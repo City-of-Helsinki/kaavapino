@@ -11,7 +11,7 @@ Project management system for city planning projects.
 It is possible to either use `docker-compose` or set up the development environment manually
 as described below.
 
-### Using docker-compose
+### 1) Using docker-compose
 
 Development environment can be initialized using `docker-compose`.
 You need to have `docker` and `docker-compose` available on your system.
@@ -28,11 +28,9 @@ To manage docker-compose setup:
     docker-compose down -v              # Stop services and remove containers and volumes
     docker exec -it kaavapino-api bash  # Open bash into the django container
 
-### Install required system packages
+### 2) Setup development environment manually
 
 #### PostgreSQL and PostGIS
-
-Install PostgreSQL and PostGIS.
 
     # Ubuntu 16.04
     sudo apt-get install python3-dev libpq-dev postgresql postgis
@@ -42,30 +40,21 @@ Install PostgreSQL and PostGIS.
     # Ubuntu 16.04
     sudo apt-get install binutils libproj-dev gdal-bin
 
-### Creating a Python virtualenv
+#### Install Poetry
 
-Create a Python >=3.6 virtualenv either using the [`venv`](https://docs.python.org/3/library/venv.html) tool or using
-the great [virtualenvwrapper](https://virtualenvwrapper.readthedocs.io/en/latest/) toolset. Assuming the latter,
-once installed, simply do:
+    pip install poetry
 
-    mkvirtualenv -p /usr/bin/python3 kaavapino
+#### Install project dependencies and activate virtual environment
 
-The virtualenv will automatically activate. To activate it in the future, just do:
+    # Installs dependencies and creates a virtual environment for project
+    poetry install
+    # Activates virtual environment
+    poetry shell
 
-    workon kaavapino
+#### Adding / Removing project dependencies
 
-### Creating Python requirements files
-
-* Run `prequ compile`
-
-### Updating Python requirements files
-
-* Run `prequ update`
-
-### Installing Python requirements
-
-* Run `prequ sync`
-* For development run `prequ sync requirements.txt requirements-dev.txt`
+    poetry add/remove <dependency>
+    # Note: Both pyproject.toml and poetry.lock have to be committed to version control
 
 ### Database
 
