@@ -1,3 +1,9 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from . import Project
+
 import datetime
 import logging
 from calendar import isleap
@@ -15,6 +21,7 @@ from . import Attribute
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 
 log = logging.getLogger(__name__)
+
 
 class Deadline(models.Model):
     """Defines a common deadline type shared by multiple projects."""
@@ -138,7 +145,8 @@ class Deadline(models.Model):
     admin_description = "Projektiaikataulun määräaikojen määritykset"
 
     @property
-    def initial_depends_on(self):
+    def initial_depends_on(self) -> list:
+        calc: DeadlineDateCalculation
         return list(set([
             calc.datecalculation.base_date_deadline
             for calc in self.initial_calculations.all().select_related("datecalculation", "datecalculation__base_date_deadline")
@@ -146,7 +154,8 @@ class Deadline(models.Model):
         ]))
 
     @property
-    def update_depends_on(self):
+    def update_depends_on(self) -> list:
+        calc: DeadlineDateCalculation
         return list(set([
             calc.datecalculation.base_date_deadline
             for calc in self.update_calculations.all().select_related("datecalculation", "datecalculation__base_date_deadline")
@@ -154,14 +163,14 @@ class Deadline(models.Model):
         ]))
 
     @property
-    def editable(self):
+    def editable(self) -> bool:
         if not self.edit_privilege:
             return False
 
         return True
 
-    def _check_condition(self, project, condition, preview_attributes={}):
-        attribute_data = {**project.attribute_data, **preview_attributes}
+    def _check_condition(self, project: Project, condition: Attribute, preview_attributes: dict = {}) -> bool:
+        attribute_data: dict[str, str] = {**project.attribute_data, **preview_attributes}
         if attribute_data.get(condition.identifier):
             return True
         elif condition.static_property:
@@ -169,7 +178,13 @@ class Deadline(models.Model):
         else:
             return False
 
-    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}):
+    def _calculate(self,
+                   project: Project,
+                   calculations: list[DeadlineDateCalculation],
+                   datetype: DateType,
+                   valid_dls: list[Deadline] = [],
+                   preview_attributes: dict = {}
+                   ) -> Optional[datetime.date]:
         # TODO hard-coded, maybe change later
         if self.phase.name == "Periaatteet" and not project.create_principles:
             return None
@@ -181,9 +196,9 @@ class Deadline(models.Model):
         # Use first calculation whose condition is met
         # and target has a value
         for calculation in calculations:
-            condition_result = False
-            base_attr = calculation.datecalculation.base_date_attribute
-            base_deadline = calculation.datecalculation.base_date_deadline
+            condition_result: bool = False
+            base_attr: Attribute = calculation.datecalculation.base_date_attribute
+            base_deadline: Deadline = calculation.datecalculation.base_date_deadline
 
             # When calculating previews, do not use base deadlines that will be deleted
             if base_deadline and valid_dls and base_deadline not in valid_dls:
@@ -228,13 +243,13 @@ class Deadline(models.Model):
 
         return None
 
-    def calculate_initial(self, project, preview_attributes={}):
+    def calculate_initial(self, project: Project, preview_attributes: dict = {}) -> Optional[datetime.date]:
         if preview_attributes:
-            valid_dls = project.get_applicable_deadlines(
+            valid_dls: list[Deadline] = project.get_applicable_deadlines(
                 preview_attributes=preview_attributes
             )
         else:
-            valid_dls = []
+            valid_dls: list[Deadline] = []
 
         return self._calculate(
             project,
@@ -244,14 +259,14 @@ class Deadline(models.Model):
             preview_attributes,
         )
 
-    def calculate_updated(self, project, preview_attributes={}):
+    def calculate_updated(self, project: Project, preview_attributes: dict[str, str] = {}) -> Optional[datetime.date]:
         if self.update_calculations.count():
             if preview_attributes:
-                valid_dls = project.get_applicable_deadlines(
+                valid_dls: list[Deadline] = project.get_applicable_deadlines(
                     preview_attributes=preview_attributes
                 )
             else:
-                valid_dls = []
+                valid_dls: list[Deadline] = []
 
             return self._calculate(
                 project,
@@ -263,7 +278,7 @@ class Deadline(models.Model):
                 preview_attributes,
             )
         elif self.attribute:
-            attribute_data = {**project.attribute_data, **preview_attributes}
+            attribute_data: dict[str, str] = {**project.attribute_data, **preview_attributes}
             return attribute_data.get(self.attribute.identifier, None)
 
     def __str__(self):
@@ -356,7 +371,7 @@ class DateType(models.Model):
     )
 
     @staticmethod
-    def _filter_date_list(date_list, business_days_only):
+    def _filter_date_list(date_list: list[datetime.date], business_days_only: bool) -> list[datetime.date]:
         cal = Finland()
 
         if not business_days_only:
@@ -367,22 +382,22 @@ class DateType(models.Model):
             if cal.is_working_day(date)
         ]
 
-    def get_dates(self, year):
-        listed_dates = self.dates or []
-        base_dates = []
-        has_base_datetypes = self.base_datetype.exists()
+    def get_dates(self, year: int) -> list[datetime.date]:
+        listed_dates: list[datetime.date] = self.dates or []
+        base_dates: list = []
+        has_base_datetypes: bool = self.base_datetype.exists()
 
         for base_datetype in self.base_datetype.all().prefetch_related("automatic_dates"):
             base_dates += base_datetype.get_dates(year)
 
-
+        automatic_date: AutomaticDate
         for automatic_date in self.automatic_dates.all():
             listed_dates += automatic_date.calculate(
                 self.business_days_only, year
             )
 
         if self.exclude_selected:
-            def include(date):
+            def include(date: datetime.date) -> bool:
                 if date not in listed_dates \
                     and has_base_datetypes \
                     and date in base_dates:
@@ -404,9 +419,9 @@ class DateType(models.Model):
                 self.business_days_only,
             )
 
-    def valid_days_to(self, date_a, date_b):
-        days = (date_b - date_a).days
-        reverse = 1
+    def valid_days_to(self, date_a: datetime.date, date_b: datetime.date) -> int:
+        days: int = (date_b - date_a).days
+        reverse: int = 1
 
         # Swap a and b if b comes before a
         if days < 0:
@@ -414,7 +429,7 @@ class DateType(models.Model):
             reverse = -1
 
         # Get valid dates for all relevant years
-        valid_dates = []
+        valid_dates: list[datetime.date] = []
         for year in range(date_a.year, date_b.year+1):
             valid_dates += self.get_dates(year)
 
@@ -423,11 +438,11 @@ class DateType(models.Model):
             valid_dates,
         ))) * reverse
 
-    def valid_days_from(self, orig_date, days):
-        year = orig_date.year
-        dates = sorted(self.get_dates(year))
+    def valid_days_from(self, orig_date: datetime.date, days: int):
+        year: int = orig_date.year
+        dates: list[datetime.date] = sorted(self.get_dates(year))
 
-        is_valid = self.is_valid_date(orig_date)
+        is_valid: bool = self.is_valid_date(orig_date)
 
         if days == 0:
             if is_valid:
@@ -471,10 +486,10 @@ class DateType(models.Model):
 
         return dates[abs(days)]
 
-    def is_valid_date(self, date):
+    def is_valid_date(self, date: datetime.date) -> bool:
         return date in self.get_dates(date.year)
 
-    def get_closest_valid_date(self, date):
+    def get_closest_valid_date(self, date: datetime.date) -> datetime.date:
         if self.is_valid_date(date):
             return date
 
@@ -511,7 +526,7 @@ class AutomaticDate(models.Model):
         verbose_name=_("weekdays"),
     )
 
-    def validate_date(date):
+    def validate_date(date) -> None:
         validation_error = ValidationError(_("Invalid date(s): input date in dd.mm. format"))
 
         try:
@@ -564,7 +579,11 @@ class AutomaticDate(models.Model):
         validators=[validate_date],
     )
 
-    def _get_closest_weekday(self, date, business_days_only, previous=False):
+    def _get_closest_weekday(self,
+                             date: datetime.date,
+                             business_days_only: bool,
+                             previous: bool = False
+                             ) -> Optional[datetime.date]:
         cal = Finland()
         if business_days_only:
             weekdays = [weekday for weekday in self.weekdays if weekday < SAT]
@@ -584,7 +603,11 @@ class AutomaticDate(models.Model):
 
         return None
 
-    def _get_weekdays_in_range(self, start_date, end_date, business_days_only):
+    def _get_weekdays_in_range(self,
+                               start_date: datetime.date,
+                               end_date: datetime.date,
+                               business_days_only: bool
+                               ) -> list[datetime.date]:
         cal = Finland()
         if business_days_only:
             weekdays = [weekday for weekday in self.weekdays if weekday < SAT]
@@ -594,7 +617,7 @@ class AutomaticDate(models.Model):
             weekdays = self.weekdays
 
         date = start_date
-        return_dates = []
+        return_dates: list[datetime.date] = []
 
         while date <= end_date:
             ignore_as_holiday = business_days_only and cal.is_holiday(date)
@@ -606,23 +629,23 @@ class AutomaticDate(models.Model):
 
         return return_dates
 
-    def _parse_date(self, date, year):
+    def _parse_date(self, date: str, year: int) -> datetime.date:
         [day, month] = str.split(date, ".")[:2]
         return datetime.date(year, int(month), int(day))
 
-    def calculate(self, business_days_only, year=datetime.datetime.now().year):
+    def calculate(self, business_days_only: bool, year: int = datetime.datetime.now().year) -> list[datetime.date]:
         cal = Finland()
-        holidays = dict(
+        holidays: dict[str, datetime.date] = dict(
             [(name, date) for date, name in cal.holidays(year)]
         )
-        holidays_next = dict(
+        holidays_next: dict[str, datetime.date] = dict(
             [(name, date) for date, name in cal.holidays(year+1)]
         )
-        holidays_previous = dict(
+        holidays_previous: dict[str, datetime.date] = dict(
             [(name, date) for date, name in cal.holidays(year-1)]
         )
 
-        return_dates = []
+        return_dates: list[datetime.date] = []
 
         if self.week:
             start_date = datetime.datetime.strptime( \
@@ -705,7 +728,7 @@ class AutomaticDate(models.Model):
 
         return list(filter(lambda date: date is not None and date.year == year, return_dates))
 
-    def clean(self):
+    def clean(self) -> None:
         filled_date_fields = \
             int(bool(self.week)) + \
             int(bool(self.start_date or self.end_date)) + \
@@ -757,8 +780,8 @@ class DateCalculation(models.Model):
         null=True,
     )
 
-    def calculate(self, project, dl_datetype, preview_attributes={}):
-        attribute_data = {**project.attribute_data, **preview_attributes}
+    def calculate(self, project: Project, dl_datetype: DateType, preview_attributes: dict = {}):
+        attribute_data: dict = {**project.attribute_data, **preview_attributes}
         date = None
 
         if self.base_date_attribute:
@@ -794,6 +817,7 @@ class DateCalculation(models.Model):
         elif date:
             date += datetime.timedelta(days=self.constant)
 
+        attribute: Attribute
         for attribute in self.attributes.all():
             try:
                 date += datetime.timedelta(

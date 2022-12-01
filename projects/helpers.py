@@ -1,3 +1,10 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Union, Optional
+
+if TYPE_CHECKING:
+    from .models import Attribute
+    from django.db.models import QuerySet
+
 from collections import OrderedDict
 import re
 import requests
@@ -18,9 +25,14 @@ from users.serializers import PersonnelSerializer
 
 log = logging.getLogger(__name__)
 
-def get_fieldset_path(attr, attribute_path=[], cached=True, orig_attr=None):
-    orig_attr = orig_attr or attr
-    cache_key = f'projects.helpers.get_fieldset_path.{orig_attr.identifier}'
+
+def get_fieldset_path(attr: Attribute,
+                      attribute_path: list[Attribute] = [],
+                      cached: bool = True,
+                      orig_attr: Optional[Attribute] = None
+                      ) -> list[Attribute]:
+    orig_attr: Attribute = orig_attr or attr
+    cache_key: str = f'projects.helpers.get_fieldset_path.{orig_attr.identifier}'
     if cached:
         cache_value = cache.get(cache_key)
         if cache_value:
@@ -30,14 +42,15 @@ def get_fieldset_path(attr, attribute_path=[], cached=True, orig_attr=None):
         cache.set(cache_key, attribute_path, None)
         return attribute_path
     else:
-        parent_fieldset = attr.fieldsets.first()
+        parent_fieldset: Attribute = attr.fieldsets.first()
         return get_fieldset_path(
             parent_fieldset,
             [parent_fieldset] + attribute_path,
             orig_attr = orig_attr,
         )
 
-def set_attribute_data(data, path, value):
+
+def set_attribute_data(data: Union[dict, list], path: list, value: str) -> None:
     try:
         next_key = path[0].identifier
     except AttributeError:
@@ -58,7 +71,8 @@ def set_attribute_data(data, path, value):
     else:
         data[next_key] = value
 
-def get_attribute_data(attribute_path, data):
+
+def get_attribute_data(attribute_path: list[Attribute], data: dict):
     if len(attribute_path) == 0:
         return data
 
@@ -70,13 +84,20 @@ def get_attribute_data(attribute_path, data):
         data.get(attribute_path[0].identifier, [])[attribute_path[1]]
     )
 
-def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_types={}):
+
+def get_flat_attribute_data(data: dict,
+                            flat: dict[str, list],
+                            first_run: bool = True,
+                            flat_key: str = None,
+                            value_types: dict = None
+                            ) -> dict:
     from projects.models import Attribute
+
     if first_run:
-        id = data.get("pinonumero")
-        cache_key = 'projects.helpers.get_flat_attribute_data'
+        id: str = data.get("pinonumero")
+        cache_key: str = 'projects.helpers.get_flat_attribute_data'
         flats = cache.get_or_set(cache_key, OrderedDict())
-        flat_key = str(data)
+        flat_key: str = str(data)
         cached_flat = flats.get((id, flat_key))
 
         if cached_flat:
@@ -84,6 +105,7 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
             cache.set(cache_key, flats, None)
             return cached_flat
 
+        a: Attribute
         value_types = {a.identifier: a.value_type for a in Attribute.objects.all()}
 
     for key, val in data.items():
@@ -117,13 +139,15 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
 
     return flat
 
-def set_kaavoitus_api_data_in_attribute_data(attribute_data):
+
+def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict) -> None:
     from projects.models import Attribute
-    external_data_attrs = Attribute.objects.filter(
+
+    external_data_attrs: QuerySet[Attribute] = Attribute.objects.filter(
         data_source__isnull=False,
     ).select_related("key_attribute")
 
-    leaf_node_attrs = external_data_attrs.filter(
+    leaf_node_attrs: QuerySet[Attribute] = external_data_attrs.filter(
         data_source__isnull=False,
     ).exclude(
         value_type=Attribute.TYPE_FIELDSET,
@@ -136,7 +160,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
     The reason for the timeout should be fixed in Kaavoitus-api and Kaavoitus-api should return the timeout
     response instead of generating one here manually. This works as a hotfix for now but should be fixed in future.
     """
-    def get_timeout_response():
+    def get_timeout_response() -> Response:
         ret = Response(
             data='Kaavoitus-api did not return a response in time.',
             status=status.HTTP_408_REQUEST_TIMEOUT
@@ -147,17 +171,17 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         ret.render()
         return ret
 
-    def build_request_paths(attr):
-        returns = {}
+    def build_request_paths(attr: Attribute) -> dict[str, str]:
+        returns: dict[str, str] = {}
         if attr.key_attribute:
             key_values = flat_attribute_data.get(
                 attr.key_attribute.identifier, []
             )
         else:
-            parent_attr = Attribute.objects.get(
+            parent_attr: Attribute = Attribute.objects.get(
                 identifier=attr.key_attribute_path.split(".")[0]
             )
-            key_values = flat_attribute_data.get(
+            key_values: list[str] = flat_attribute_data.get(
                 parent_attr.key_attribute.identifier, []
             )
 
@@ -167,16 +191,16 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
             if attr.data_source in [
                 Attribute.SOURCE_FACTA, Attribute.SOURCE_GEOSERVER
             ]:
-                pk = "".join(str(value).split("-"))
+                pk: str = "".join(str(value).split("-"))
             else:
-                pk = str(value)
+                pk: str = str(value)
 
-            path = attr.data_source.replace("<pk>", pk)
+            path: str = attr.data_source.replace("<pk>", pk)
             returns[value] = f"{settings.KAAVOITUS_API_BASE_URL}{path}"
 
         return returns
 
-    fetched_data = {
+    fetched_data: dict[Attribute, dict[str, str]] = {
         attr: build_request_paths(attr)
         for attr in external_data_attrs.exclude(
             data_source=Attribute.SOURCE_PARENT_FIELDSET,
@@ -185,7 +209,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
     for attr, urls in fetched_data.items():
         for key, value in urls.items():
-            url = value
+            url: str = value
             if cache.get(url) is not None:
                 response = cache.get(url)
             else:
@@ -228,7 +252,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         else:
             return source.get(keys[0], None)
 
-    def get_in_attribute_data(attribute_path, data):
+    def get_in_attribute_data(attribute_path, data: Union[dict, list]) -> list:
         if len(attribute_path) == 2:
             data = data.get(attribute_path[0].identifier, [])
             if type(data) is list:
@@ -246,7 +270,14 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
     leaf_paths = []
 
-    def get_branch_paths(data, solved_path, remaining_path, saved_keys={}, first_run=True):
+    def get_branch_paths(data: dict[Attribute, dict[str, str]],
+                         solved_path,
+                         remaining_path: list[Attribute],
+                         saved_keys: dict = None,
+                         first_run: bool = True
+                         ):
+        if saved_keys is None:
+            saved_keys = {}
         if first_run:
             saved_keys = {}
 
@@ -254,8 +285,8 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
             leaf_paths.append([solved_path] if first_run else solved_path)
             return
 
-        data_source_key = None
-        data_source_keys = None
+        data_source_key: Optional[str] = None
+        data_source_keys: Optional[list] = None
         current = remaining_path[0]
         if current.data_source != Attribute.SOURCE_PARENT_FIELDSET \
             and current.key_attribute:
@@ -347,7 +378,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
                 )
 
     for attr in leaf_node_attrs:
-        fieldset_path = get_fieldset_path(attr) + [attr]
+        fieldset_path: list[Attribute] = get_fieldset_path(attr) + [attr]
 
         get_branch_paths(
             fetched_data,
@@ -355,7 +386,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
             fieldset_path,
         )
 
-    def get_in_fetched_data(data, attribute_path):
+    def get_in_fetched_data(data, attribute_path: list):
         if not attribute_path:
             return data
 
@@ -389,9 +420,9 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         else:
             return None
 
-    def set_in_attribute_data(data, path, value):
+    def set_in_attribute_data(data: Union[dict, list], path: list, value) -> None:
         try:
-            next_key = path[0].identifier
+            next_key: str = path[0].identifier
         except AttributeError:
             next_key = path[0][0]
 
@@ -540,7 +571,8 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
         set_in_attribute_data(attribute_data, path, value)
 
-def get_ad_user(id):
+
+def get_ad_user(id: str) -> Union[None, Response, str]:
     url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,businessPhones,officeLocation,surname"
     try:
         response = cache.get(url)
@@ -551,7 +583,7 @@ def get_ad_user(id):
         if response is not None:
             return None
 
-        token = get_graph_api_access_token()
+        token: str = get_graph_api_access_token()
         if not token:
             return Response(
                 "Cannot get access token",
@@ -568,8 +600,10 @@ def get_ad_user(id):
 
     return response.json()
 
-def _add_paths(paths, solved_path, remaining_path, parent_data):
+
+def _add_paths(paths: list, solved_path: list, remaining_path: list, parent_data: dict) -> None:
     from projects.models import Attribute
+
     if remaining_path[0].value_type != Attribute.TYPE_FIELDSET:
         paths.append(solved_path + [remaining_path[0]])
         return
@@ -584,28 +618,30 @@ def _add_paths(paths, solved_path, remaining_path, parent_data):
             child,
         )
 
-def get_in_personnel_data(id, key, is_kaavapino_user):
+
+def get_in_personnel_data(id: str, key: str, is_kaavapino_user: bool) -> Any:
     User = get_user_model()
 
     if is_kaavapino_user:
         try:
-            id = id.uuid
+            id: str = id.uuid
         except AttributeError:
             pass
 
         try:
-            id = User.objects.get(uuid=id).ad_id
+            id: str = User.objects.get(uuid=id).ad_id
         except (User.DoesNotExist, ValidationError):
             return None
 
-    user = get_ad_user(id)
+    user: str = get_ad_user(id)
     return PersonnelSerializer(user).data.get(key)
 
-def set_ad_data_in_attribute_data(attribute_data):
-    from projects.models import Attribute
-    paths = []
 
-    attributes = Attribute.objects.filter(
+def set_ad_data_in_attribute_data(attribute_data) -> None:
+    from projects.models import Attribute
+    paths: list = []
+
+    attributes: QuerySet[Attribute] = Attribute.objects.filter(
         ad_key_attribute__isnull=False,
         ad_data_key__isnull=False,
     ).select_related("ad_key_attribute").prefetch_related("fieldsets")
@@ -622,13 +658,14 @@ def set_ad_data_in_attribute_data(attribute_data):
         if not user_id:
             continue
 
-        is_kaavapino_user = attr.ad_key_attribute.value_type == Attribute.TYPE_USER
+        is_kaavapino_user: bool = attr.ad_key_attribute.value_type == Attribute.TYPE_USER
         value = get_in_personnel_data(user_id, attr.ad_data_key, is_kaavapino_user)
 
         if value:
             set_attribute_data(attribute_data, path, value)
 
-def _find_closest_path(target_path, path_behind, path_ahead):
+
+def _find_closest_path(target_path: list, path_behind: list, path_ahead: list) -> list:
     if len(target_path) == 1:
         return path_behind + target_path
 
@@ -641,7 +678,7 @@ def _find_closest_path(target_path, path_behind, path_ahead):
         current_attr = path_behind.pop()
 
         try:
-            target_index = target_path.index(current_attr)
+            target_index: int = target_path.index(current_attr)
             target_path = target_path[target_index:]
             break
         except ValueError:
@@ -658,14 +695,16 @@ def _find_closest_path(target_path, path_behind, path_ahead):
 
     return path_behind + target_path
 
-def set_automatic_attributes(attribute_data):
+
+def set_automatic_attributes(attribute_data) -> None:
     from projects.models import AttributeAutoValue
 
-    paths = []
+    paths: list = []
+    auto_attr: AttributeAutoValue
     for auto_attr in AttributeAutoValue.objects.all().select_related("key_attribute", "value_attribute").prefetch_related("value_map"):
         key_attr_path = \
             get_fieldset_path(auto_attr.key_attribute) + [auto_attr.key_attribute]
-        new_paths = []
+        new_paths: list = []
         _add_paths(
             new_paths,
             [],
@@ -689,7 +728,7 @@ def set_automatic_attributes(attribute_data):
             set_attribute_data(attribute_data, target, value)
 
 
-def get_file_type(filename):
+def get_file_type(filename: str) -> str:
     return filename.split(".")[-1]
 
 

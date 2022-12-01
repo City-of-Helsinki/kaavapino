@@ -10,13 +10,13 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 
 from users.models import User, PRIVILEGE_LEVELS
 from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 from projects.helpers import get_ad_user
 from users.serializers import PersonnelSerializer
-
 
 class AttributeQuerySet(models.QuerySet):
     def filterable(self):
@@ -513,6 +513,7 @@ class Attribute(models.Model):
             raise Exception('Cannot serialize attribute type "%s".' % self.value_type)
 
     def deserialize_value(self, value):
+        value_choices: QuerySet[AttributeValueChoice]
         if self.value_type == Attribute.TYPE_CHOICE:
             value_choices = self.value_choices.all()
         else:
@@ -558,7 +559,7 @@ class Attribute(models.Model):
         else:
             raise Exception('Cannot deserialize attribute type "%s".' % self.value_type)
 
-    def _get_fieldset_serialization(self, value: Sequence, deserialize: bool = False):
+    def _get_fieldset_serialization(self, value: Sequence, deserialize: bool = False) -> list:
         """Recursively go through the fields in the fieldset and (de)serialize them."""
 
         if isinstance(value, OrderedDict):
@@ -567,7 +568,7 @@ class Attribute(models.Model):
             return None
 
         entities = []
-        fieldset_attributes = self.fieldset_attributes.all()
+        fieldset_attributes: QuerySet[Attribute] = self.fieldset_attributes.all()
 
         for i, listitem in enumerate(value):
             processed_entity = {}
@@ -601,7 +602,7 @@ class Attribute(models.Model):
 
         return entities
 
-    def _get_single_display_value(self, value):
+    def _get_single_display_value(self, value) -> str:
         if value is None or self.value_type == Attribute.TYPE_GEOMETRY:
             return None
 
@@ -642,7 +643,7 @@ class Attribute(models.Model):
         elif self.value_type == Attribute.TYPE_USER:
             if not isinstance(value, User):
                 try:
-                    user = User.objects.get(uuid=value)
+                    user: User = User.objects.get(uuid=value)
                 except ValidationError:
                     return value
             else:
@@ -664,13 +665,13 @@ class Attribute(models.Model):
             return self._get_single_display_value(value)
 
     @property
-    def calculation_attribute_identifiers(self):
+    def calculation_attribute_identifiers(self) -> list:
         if not self.calculations:
             return []
         return self.calculations[0::2]
 
     @property
-    def calculation_operators(self):
+    def calculation_operators(self) -> list:
         if not self.calculations:
             return []
         return self.calculations[1::2]
@@ -728,7 +729,7 @@ class AttributeAutoValue(models.Model):
         verbose_name=_("key attribute"),
     )
 
-    def get_value(self, key):
+    def get_value(self, key) -> str:
         key = str(key)
         try:
             return self.value_map.get(key_str=key).value

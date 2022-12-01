@@ -3,12 +3,14 @@ import csv
 from datetime import datetime, timedelta
 import time
 import logging
+from typing import Optional
 
 from django.contrib.postgres.search import SearchVector
 from django.core.exceptions import FieldError
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
+from django.db.models.query import QuerySet
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -30,6 +32,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
+from rest_framework.serializers import Serializer
+from rest_framework.request import Request
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
@@ -53,7 +57,7 @@ from projects.models import (
     Deadline,
     DocumentLinkSection,
     OverviewFilter,
-    OverviewFilterAttribute,
+    OverviewFilterAttribute, ReportFilter,
 )
 from projects.models.utils import create_identifier
 from projects.permissions.comments import CommentPermissions
@@ -100,6 +104,8 @@ from projects.serializers.projecttype import (
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer
 from sitecontent.models import ListViewAttributeColumn
+from users.models import User
+from datetime import date
 
 log = logging.getLogger(__name__)
 
@@ -123,7 +129,7 @@ class PrivateDownloadViewSetMixin:
 
 
 class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectType.objects.all()
+    queryset: QuerySet[ProjectType] = ProjectType.objects.all()
     serializer_class = ProjectTypeSerializer
 
 
@@ -161,13 +167,13 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     ),
 )
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = Project.objects.all() \
+    queryset: QuerySet[Project] = Project.objects.all() \
             .select_related("user", "subtype", "subtype__project_type", "phase") \
             .prefetch_related("deadlines", "target_actions")
-    permission_classes = [IsAuthenticated, ProjectPermissions]
-    filter_backends = (filters.OrderingFilter,)
+    permission_classes: list = [IsAuthenticated, ProjectPermissions]
+    filter_backends: tuple = (filters.OrderingFilter,)
     try:
-        ordering_fields = [
+        ordering_fields: list[str] = [
             "name", "pino_number", "created_at", "modified_at",
             "user__first_name", "user__last_name", "user__ad_id",
         ] + [
@@ -177,7 +183,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     except Exception:
         ordering_fields = []
 
-
     def get_serializer_class(self):
         if self.action == "list":
             return ProjectListSerializer
@@ -185,16 +190,16 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         if self.request.query_params.get("snapshot"):
             return ProjectSnapshotSerializer
 
-        user = self.request.user
+        user: User = self.request.user
 
         if user.has_privilege('admin'):
             return AdminProjectSerializer
 
         return ProjectSerializer
 
-    def get_queryset(self):
-        user = self.request.user
-        queryset = self.queryset
+    def get_queryset(self) -> QuerySet[Project]:
+        user: User = self.request.user
+        queryset: QuerySet[Project] = self.queryset
         if self.request.method in ['PUT', 'PATCH']:
             queryset = queryset \
                 .prefetch_related(
@@ -206,9 +211,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     'deadlines__deadline__update_calculations',
                 )
 
-        includeds_users = self.request.query_params.get("includes_users", None)
-        search = self.request.query_params.get("search", None)
-        users = self.request.query_params.get("users", None)
+        includeds_users: str = self.request.query_params.get("includes_users", None)
+        search: str = self.request.query_params.get("search", None)
+        users: str = self.request.query_params.get("users", None)
+
         if includeds_users is not None:
             queryset = self._filter_included_users(includeds_users, queryset)
         if users is not None:
@@ -219,7 +225,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         queryset = self._filter_private(queryset, user)
 
         if self.action == "list":
-            status = self.request.query_params.get("status")
+            status: str = self.request.query_params.get("status")
 
             if status == "active":
                 queryset = queryset.exclude(onhold=True).exclude(archived=True)
@@ -230,10 +236,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return queryset
 
-    def _string_filter_to_list(self, filter_string):
+    def _string_filter_to_list(self, filter_string: str) -> list[str]:
         return [_filter.strip().lower() for _filter in filter_string.split(",")]
 
-    def _filter_included_users(self, users, queryset):
+    def _filter_included_users(self, users: str, queryset: QuerySet[Project]) -> QuerySet[Project]:
         """
         Filter on all user attributes
 
@@ -245,34 +251,34 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
               users. At the time of implementation
               no such fields existed.
         """
-        user_queryset = self._filter_users(users, queryset)
-        users_list = self._string_filter_to_list(users)
-        user_attributes = Attribute.objects.filter(
+        user_queryset: QuerySet[Project] = self._filter_users(users, queryset)
+        users_list: list[str] = self._string_filter_to_list(users)
+        user_attributes: QuerySet[Attribute] = Attribute.objects.filter(
             value_type__in=[Attribute.TYPE_USER, Attribute.TYPE_PERSONNEL]
         )
 
-        attribute_data_users = self.queryset.none()
+        attribute_data_users: QuerySet[Project] = self.queryset.none()
         for attribute in user_attributes:
             if attribute.fieldsets.exists():
-                parent_attr = attribute.fieldsets.last()
-                attribute_filter = {
+                parent_attr: Attribute = attribute.fieldsets.last()
+                attribute_filter: dict = {
                     f"attribute_data__{parent_attr.identifier}__contains": [{f"{attribute.identifier}": users_list[0]}]
                 }
             else:
-                attribute_filter = {
+                attribute_filter: dict = {
                     f"attribute_data__{attribute.identifier}__in": users_list
                 }
-            attribute_data_users = attribute_data_users | queryset.filter(
+            attribute_data_users: QuerySet[Project] = attribute_data_users | queryset.filter(
                 **attribute_filter
             )
 
         return attribute_data_users | user_queryset
 
-    def _filter_users(self, users, queryset):
-        users_list = self._string_filter_to_list(users)
+    def _filter_users(self, users: str, queryset: QuerySet[Project]) -> QuerySet[Project]:
+        users_list: list[str] = self._string_filter_to_list(users)
         return queryset.filter(user__uuid__in=users_list)
 
-    def _search(self, search, queryset):
+    def _search(self, search: str, queryset: QuerySet[Project]) -> QuerySet[Project]:
         # def search_field_for_attribute(attr):
         #     if attr.static_property:
         #         return attr.static_property
@@ -298,12 +304,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # Add 'like' condition for partial matching of single lexeme even
         # it prevents bitmap heap scan of gin index. This might be removed
-        # if it cerates performance issues in the future
-        combined_queryset = queryset.filter(Q(vector_column__icontains=search))
+        # if it creates performance issues in the future
+        combined_queryset: QuerySet[Project] = queryset.filter(Q(vector_column__icontains=search))
         # Django creates plainto_tsquery() whereas we want to use to_tsquery(),
         # so we'll create our own query to allow prefix matching
-        terms = search.split()
-        tsquery = " & ".join(terms)
+        terms: list[str] = search.split()
+        tsquery: str = " & ".join(terms)
         tsquery += ":*"
         combined_queryset |= queryset.extra(where=["vector_column @@ to_tsquery(%s)"], params=[tsquery])
 
@@ -311,14 +317,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return combined_queryset
 
     @staticmethod
-    def _filter_private(queryset, user):
+    def _filter_private(queryset: QuerySet[Project], user: User) -> QuerySet[Project]:
         if user.has_privilege("admin"):
             return queryset
 
         return queryset.exclude(~Q(user=user) & Q(public=False))
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
+    def get_serializer_context(self) -> dict:
+        context: dict = super().get_serializer_context()
         context["action"] = self.action
 
         if self.action == "list":
@@ -340,7 +346,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         detail=True,
         permission_classes=[IsAuthenticated, ProjectPermissions],
     )
-    def simple(self, request, pk):
+    def simple(self, request: Request, pk) -> Response:
         return Response(SimpleProjectSerializer(self.get_object()).data)
 
     @extend_schema(
@@ -357,15 +363,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         parser_classes=[MultiPartParser],
         permission_classes=[IsAuthenticated, ProjectPermissions],
     )
-    def files(self, request, pk=None):
-        project = self.get_object()
+    def files(self, request: Request, pk=None) -> Response:
+        project: Project = self.get_object()
 
         # Query dicts are not mutable by default, temporarily change that
         request.data._mutable = True
         request.data["project"] = project.pk
         request.data._mutable = False
 
-        context = self.get_serializer_context()
+        context: dict = self.get_serializer_context()
         serializer = ProjectFileSerializer(data=request.data, context=context)
         serializer.is_valid(raise_exception=True)
 
@@ -381,8 +387,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         detail=True,
         permission_classes=[IsAuthenticated, ProjectPermissions],
     )
-    def external_documents(self, request, pk):
-        project = self.get_object()
+    def external_documents(self, request: Request, pk) -> Response:
+        project: Project = self.get_object()
         return Response({"sections": [
             ProjectExternalDocumentSectionSerializer(
                 project, context={"section": document_section}
@@ -393,15 +399,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             )
         ]})
 
-    def _get_valid_filters(self, filters_view):
+    def _get_valid_filters(self, filters_view) -> Optional[dict]:
         try:
-            attrs = OverviewFilterAttribute.objects.filter(
+            attrs: QuerySet[OverviewFilterAttribute] = OverviewFilterAttribute.objects.filter(
                 **{filters_view: True},
             ).prefetch_related("overview_filter")
         except FieldError:
             return None
 
-        filters = {}
+        filters: dict[OverviewFilter, OverviewFilterAttribute] = {}
 
         for attr in attrs:
             try:
@@ -411,7 +417,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return filters
 
-    def _get_query(self, filters, prefix=""):
+    def _get_query(self, filters: dict, prefix: str = "") -> Q:
         if prefix:
             prefix = f"{prefix}__"
 
@@ -420,16 +426,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         for filter_obj, attrs in filters.items():
             try:
-                split_params = params.get(filter_obj.identifier).split(",")
+                split_params: list[str] = params.get(filter_obj.identifier).split(",")
             except AttributeError:
                 continue
 
-            def get_query_for_filter(param):
+            def get_query_for_filter(param: str) -> Q:
                 q = Q()
-
                 for attr in attrs:
                     # Only supports one-fieldset-deep queries for now
-                    attr = attr.attribute
+                    attr: Attribute = attr.attribute
 
                     # Manipulate search parameter
                     if attr.value_type == Attribute.TYPE_BOOLEAN:
@@ -466,7 +471,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                         except (TypeError, ValueError):
                             continue
                     elif attr.value_type == Attribute.TYPE_CHOICE:
-                        choices = {}
+                        choices: dict = {}
                         for choice in attr.value_choices.all():
                             choices[choice.identifier] = [choice.value, choice.identifier]
                         param_parsed = choices.get(param)
@@ -500,7 +505,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
             param_queries = Q()
 
-
             for param in split_params:
                 param_queries |= get_query_for_filter(param)
 
@@ -518,13 +522,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         url_path="overview/filters",
         url_name="projects-overview-filters",
     )
-    def overview_filters(self, request):
-        queryset = OverviewFilter.objects.all().prefetch_related("attributes")
+    def overview_filters(self, request: Request) -> Response:
+        queryset: QuerySet[OverviewFilter] = OverviewFilter.objects.all().prefetch_related("attributes")
         return Response(OverviewFilterSerializer(queryset, many=True).data)
 
     def _parse_date_range(
-        self, start_date_str, end_date_str, today=datetime.now().date()
-    ):
+        self, start_date_str: str, end_date_str: str, today=datetime.now().date()
+    ) -> (date, date):
         try:
             start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
         except (TypeError, ValueError):
@@ -554,13 +558,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         url_path="overview/floor_area",
         url_name="projects-overview-floor-area"
     )
-    def overview_floor_area(self, request):
+    def overview_floor_area(self, request: Request) -> Response:
         today = datetime.now().date()
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        valid_filters = self._get_valid_filters("filters_floor_area")
-        deadline_query = self._get_query(valid_filters, "project")
-        project_query = self._get_query(valid_filters)
+        valid_filters: dict = self._get_valid_filters("filters_floor_area")
+        deadline_query: Q = self._get_query(valid_filters, "project")
+        project_query: Q = self._get_query(valid_filters)
 
         start_date, end_date = self._parse_date_range(
             start_date,
@@ -579,19 +583,19 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         if end_date.weekday != 1:
             end_date += timedelta(((1-end_date.weekday()) % 7) - 7)
 
-        date_range = [
+        date_range: list = [
             start_date + timedelta(days=i)
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
 
         # TODO hard-coded for now; consider a new field for Attribute
-        floor_area_attrs = [
+        floor_area_attrs: list = [
             "kerrosalan_lisays_yhteensa_asuminen",
             "kerrosalan_lisays_yhteensa_julkinen",
             "kerrosalan_lisays_yhteensa_muut",
             "kerrosalan_lisays_yhteensa_toimitila",
         ]
-        meeting_attrs = [
+        meeting_attrs: list = [
             "milloin_tarkistettu_ehdotus_lautakunnassa",
             "milloin_tarkistettu_ehdotus_lautakunnassa_2",
             "milloin_tarkistettu_ehdotus_lautakunnassa_3",
@@ -599,7 +603,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ]
 
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
-        project_deadlines = ProjectDeadline.objects.filter(
+        project_deadlines: QuerySet[ProjectDeadline] = ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs + [
@@ -612,24 +616,24 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                                "project__subtype", "project__subtype__project_type",
                                "project__phase", "project__phase__common_project_phase").\
             order_by("project__pk").distinct("project__pk")
-        projects_by_date = {
+        projects_by_date: dict = {
             date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
             for date in date_range
         }
 
-        project_deadlines = ProjectDeadline.objects.filter(
+        project_deadlines: QuerySet[ProjectDeadline] = ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
             ).prefetch_related("project").order_by("project__pk").distinct("project__pk")
-        projects_in_range_by_date = {
+        projects_in_range_by_date: dict = {
             date: [dl.project for dl in filter(lambda dl: dl.date <= date, project_deadlines)]
             for date in date_range
         }
-        projects_in_range = projects_in_range_by_date[end_date]
+        projects_in_range: list[Project] = projects_in_range_by_date[end_date]
 
-        confirmed_projects_by_date = {
+        confirmed_projects_by_date: dict = {
             date: Project.objects.filter(
                 project_query, (
                     Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
@@ -642,14 +646,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             for date in date_range
         }
 
-        def get_floor_area(date, attr):
+        def get_floor_area(date, attr) -> int:
             if date < today:
                 projects = confirmed_projects_by_date[date]
             else:
                 projects = projects_in_range_by_date[date]
 
-            total = 0
+            total: int = 0
 
+            project: Project
             for project in projects:
                 total += int(float(project.attribute_data.get(attr, 0)))
 
@@ -734,12 +739,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         url_path="overview/by_subtype",
         url_name="projects-overview-by-subtype"
     )
-    def overview_by_subtype(self, request):
-        valid_filters = self._get_valid_filters("filters_by_subtype")
+    def overview_by_subtype(self, request: Request) -> Response:
+        valid_filters: dict = self._get_valid_filters("filters_by_subtype")
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
-        query = self._get_query(valid_filters)
-        queryset = ProjectSubtype.objects.all().prefetch_related("phases")
+        query: Q = self._get_query(valid_filters)
+        queryset: QuerySet[ProjectSubtype] = ProjectSubtype.objects.all().prefetch_related("phases")
 
         # TODO hard-coded for now; consider a new field for Attribute
         date_range_attrs = [
@@ -781,13 +786,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         url_path="overview/on_map",
         url_name="projects-overview-on-map"
     )
-    def overview_on_map(self, request):
-        valid_filters = self._get_valid_filters("filters_on_map")
-        query = self._get_query(valid_filters)
-        queryset = Project.objects.filter(query, public=True)\
+    def overview_on_map(self, request: Request) -> Response:
+        valid_filters: dict = self._get_valid_filters("filters_on_map")
+        query: Q = self._get_query(valid_filters)
+        queryset: QuerySet[Project] = Project.objects.filter(query, public=True)\
             .prefetch_related("phase", "phase__common_project_phase", "phase__project_subtype",
-                              "subtype", "subtype__project_type",
-                              "user",
+                              "subtype", "subtype__project_type", "user",
                               )
         return Response({
             "projects": ProjectOnMapOverviewSerializer(
@@ -797,12 +801,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase", "project_subtype", "project_subtype__project_type")
+    queryset: QuerySet[ProjectPhase] = ProjectPhase.objects.all()\
+        .prefetch_related("common_project_phase", "project_subtype", "project_subtype__project_type")
     serializer_class = ProjectPhaseSerializer
 
 
 class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectCardSectionAttribute.objects.all()\
+    queryset: QuerySet[ProjectCardSectionAttribute] = ProjectCardSectionAttribute.objects.all()\
         .select_related("attribute", "section").prefetch_related("attribute__value_choices")\
         .order_by("section__index", "index")
     serializer_class = ProjectCardSchemaSerializer
@@ -813,7 +818,7 @@ class AttributePagination(pagination.PageNumberPagination):
 
 
 class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Attribute.objects.all()
+    queryset: QuerySet[Attribute] = Attribute.objects.all()
     serializer_class = SimpleAttributeSerializer
     pagination_class = AttributePagination
 
@@ -825,20 +830,20 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     ],
 )
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectType.objects.all()
+    queryset: QuerySet[ProjectType] = ProjectType.objects.all()
 
-    def get_serializer_class(self):
-        user = self.request.user
-
-        owner = self.request.query_params.get("owner")
-        project = self.request.query_params.get("project")
+    def get_serializer_class(self) -> dict:
+        user: User = self.request.user
+        owner: str = self.request.query_params.get("owner")
+        project_id: str = self.request.query_params.get("project")
+        project: Project
 
         try:
-            project = Project.objects.get(pk=int(project))
+            project = Project.objects.get(pk=int(project_id))
         except Exception:
             project = None
 
-        is_owner = \
+        is_owner: bool = \
             owner in ["1", "true", "True"] or \
             project and project.user == user
 
@@ -858,7 +863,7 @@ class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ProjectSubtypeViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectSubtype.objects.all()
+    queryset: QuerySet[ProjectSubtype] = ProjectSubtype.objects.all()
     serializer_class = ProjectSubtypeSerializer
 
 
@@ -866,88 +871,88 @@ class ProjectAttributeFileDownloadView(
     PrivateDownloadViewSetMixin, PrivateStorageDetailView
 ):
     model = ProjectAttributeFile
-    slug_field = "file"
-    slug_url_kwarg = "path"
-    url_path_postfix = "projects"
+    slug_field: str = "file"
+    slug_url_kwarg: str = "path"
+    url_path_postfix: str = "projects"
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[ProjectAttributeFile]:
         # Queryset that is allowed to be downloaded
         return ProjectAttributeFile.objects.all()
 
-    def can_access_file(self, private_file):
+    def can_access_file(self, private_file) -> bool:
         # NOTE: This overrides PRIVATE_STORAGE_AUTH_FUNCTION
         # TODO: Change permission function when user permissions has been implemented
         return has_project_attribute_file_permissions(private_file, self.request)
 
 
 class FieldCommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = FieldComment.objects.all().select_related("user").prefetch_related("fieldset_path_locations")
+    queryset: QuerySet[FieldComment] = FieldComment.objects.all().select_related("user").prefetch_related("fieldset_path_locations")
     serializer_class = FieldCommentSerializer
-    permission_classes = [IsAuthenticated, CommentPermissions]
-    filter_backends = (filters.OrderingFilter,)
-    ordering_fields = ("created_at", "modified_at")
+    permission_classes: list = [IsAuthenticated, CommentPermissions]
+    filter_backends: tuple = (filters.OrderingFilter,)
+    ordering_fields: tuple = ("created_at", "modified_at")
 
-    def initial(self, request, *args, **kwargs):
+    def initial(self, request: Request, *args, **kwargs) -> None:
         super(FieldCommentViewSet, self).initial(request, *args, **kwargs)
-        self.parent_instance = self.get_parent_instance()
+        self.parent_instance: Project = self.get_parent_instance()
 
-    def get_parent_instance(self):
-        qd = self.get_parents_query_dict()
-        project_id = qd.get("project")
-        project = Project.objects.filter(pk=project_id).first()
+    def get_parent_instance(self) -> Project:
+        qd: dict = self.get_parents_query_dict()
+        project_id: int = qd.get("project")
+        project: Project = Project.objects.filter(pk=project_id).first()
 
         if not project:
             raise Http404
         return project
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
+    def get_serializer_context(self) -> dict:
+        context: dict = super().get_serializer_context()
         context["parent_instance"] = self.get_parent_instance()
         return context
 
     @action(methods=["get"], detail=False, url_path=r"field/(?P<field_identifier>\w+)", url_name="project-field-comments")
-    def field_comments(self, request, *args, **kwargs):
-        identifier = kwargs.get("field_identifier", "")
-        comments = FieldComment.objects \
+    def field_comments(self, request: Request, *args, **kwargs) -> Response:
+        identifier: str = kwargs.get("field_identifier", "")
+        comments: QuerySet[FieldComment] = FieldComment.objects \
             .filter(field__identifier=identifier) \
             .select_related("user")
-        page = self.paginate_queryset(comments)
+        page: list = self.paginate_queryset(comments)
 
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(comments, many=True)
+        serializer: FieldCommentSerializer = self.get_serializer(comments, many=True)
         return Response(serializer.data)
 
 
 class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = ProjectComment.objects.all().select_related("user")
+    queryset: QuerySet[ProjectComment] = ProjectComment.objects.all().select_related("user")
     serializer_class = CommentSerializer
-    permission_classes = [IsAuthenticated, CommentPermissions]
-    filter_backends = (filters.OrderingFilter,)
-    ordering_fields = ("created_at", "modified_at")
+    permission_classes: list = [IsAuthenticated, CommentPermissions]
+    filter_backends: tuple = (filters.OrderingFilter,)
+    ordering_fields: tuple = ("created_at", "modified_at")
 
-    def initial(self, request, *args, **kwargs):
+    def initial(self, request: Request, *args, **kwargs) -> None:
         super(CommentViewSet, self).initial(request, *args, **kwargs)
-        self.parent_instance = self.get_parent_instance()
+        self.parent_instance: Project = self.get_parent_instance()
 
-    def get_parent_instance(self):
-        qd = self.get_parents_query_dict()
-        project_id = qd.get("project")
-        project = Project.objects.filter(pk=project_id).first()
+    def get_parent_instance(self) -> Project:
+        qd: dict = self.get_parents_query_dict()
+        project_id: int = qd.get("project")
+        project: Project = Project.objects.filter(pk=project_id).first()
 
         if not project:
             raise Http404
         return project
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
+    def get_serializer_context(self) -> dict:
+        context: dict = super().get_serializer_context()
         context["parent_instance"] = self.parent_instance
         return context
 
     @action(methods=["get"], detail=False)
-    def unread(self, request, *args, **kwargs):
+    def unread(self, request: Request, *args, **kwargs) -> Response:
         try:
             timestamp = LastReadTimestamp.objects.get(
                 project=self.parent_instance, user=request.user
@@ -955,20 +960,20 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         except LastReadTimestamp.DoesNotExist:
             timestamp = datetime.now(pytz.utc)
 
-        unread = ProjectComment.objects \
+        unread: QuerySet[ProjectComment] = ProjectComment.objects \
             .filter(created_at__gt=timestamp, project=self.parent_instance) \
             .select_related("user")
-        page = self.paginate_queryset(unread)
+        page: list = self.paginate_queryset(unread)
 
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
+            serializer: CommentSerializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(unread, many=True)
         return Response(serializer.data)
 
     @action(methods=["post"], detail=False)
-    def mark_as_read(self, request, *args, **kwargs):
+    def mark_as_read(self, request: Request, *args, **kwargs) -> Response:
         serializer = LastReadTimestampSerializer(data=request.data, many=False)
         if serializer.is_valid():
             timestamp, _ = LastReadTimestamp.objects.update_or_create(
@@ -982,37 +987,37 @@ class CommentViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
 
 class DocumentViewSet(ReadOnlyModelViewSet):
-    queryset = DocumentTemplate.objects.all()
-    permission_classes = [IsAuthenticated, DocumentPermissions]
-    lookup_field = "slug"
+    queryset: QuerySet[DocumentTemplate] = DocumentTemplate.objects.all()
+    permission_classes: list = [IsAuthenticated, DocumentPermissions]
+    lookup_field: str = "slug"
     serializer_class = DocumentTemplateSerializer
 
-    def initial(self, request, *args, **kwargs):
+    def initial(self, request: Request, *args, **kwargs) -> None:
         super().initial(request, *args, **kwargs)
-        self.project = self.get_project()
+        self.project: Project = self.get_project()
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
+    def get_serializer_context(self) -> dict:
+        context: dict = super().get_serializer_context()
         context["project"] = self.project
         return context
 
-    def get_queryset(self):
-        phases = CommonProjectPhase.objects.filter(
+    def get_queryset(self) -> QuerySet[DocumentTemplate]:
+        phases: QuerySet[CommonProjectPhase] = CommonProjectPhase.objects.filter(
             phases__project_subtype=self.project.subtype,
         )
         return DocumentTemplate.objects.filter(
             common_project_phases__in=phases,
         ).distinct()
 
-    def get_project(self):
-        project_id = self.kwargs.get("project_pk")
-        project = Project.objects.filter(pk=project_id).first()
+    def get_project(self) -> Project:
+        project_id: int = self.kwargs.get("project_pk")
+        project: Project = Project.objects.filter(pk=project_id).first()
 
         if not project:
             raise Http404
         return project
 
-    def _set_response_headers(self, response, filename, document_type):
+    def _set_response_headers(self, response: HttpResponse, filename: str, document_type: str) -> None:
         response["Content-Disposition"] = "attachment; filename={}.{}".format(
             filename, document_type
         )
@@ -1027,10 +1032,10 @@ class DocumentViewSet(ReadOnlyModelViewSet):
           OpenApiParameter("preview", OpenApiTypes.BOOL, OpenApiParameter.QUERY),
         ],
     )
-    def retrieve(self, request, *args, **kwargs):
-        task_id = request.query_params.get("task")
-        filename = request.query_params.get("filename")
-        document_template = self.get_object()
+    def retrieve(self, request: Request, *args, **kwargs) -> HttpResponse:
+        task_id: str = request.query_params.get("task")
+        filename: str = request.query_params.get("filename")
+        document_template: DocumentTemplate = self.get_object()
 
         if filename is None:
             filename = "{}-{}-{}".format(
@@ -1039,13 +1044,13 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
-        doc_type = get_file_type(document_template.file.path)
+        doc_type: str = get_file_type(document_template.file.path)
 
-        preview = \
+        preview: bool = \
             True if request.query_params.get("preview") in TRUE \
             else False
 
-        immediate =  \
+        immediate: bool =  \
             True if request.query_params.get("immediate") in TRUE \
             else False
 
@@ -1099,8 +1104,8 @@ class DocumentViewSet(ReadOnlyModelViewSet):
             401: OpenApiTypes.STR,
         },
     )
-    def list(self, request, *args, **kwargs):
-        qs = self.get_queryset().filter(project_card_default_template=False)
+    def list(self, request, *args, **kwargs) -> Response:
+        qs: QuerySet[DocumentTemplate] = self.get_queryset().filter(project_card_default_template=False)
         return Response(
             self.get_serializer(qs, many=True).data,
             status=status.HTTP_200_OK
@@ -1111,15 +1116,15 @@ class DocumentTemplateDownloadView(
     PrivateDownloadViewSetMixin, PrivateStorageDetailView
 ):
     model = DocumentTemplate
-    slug_field = "file"
-    slug_url_kwarg = "path"
-    url_path_postfix = "document_templates"
+    slug_field: str = "file"
+    slug_url_kwarg: str = "path"
+    url_path_postfix: str = "document_templates"
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[DocumentTemplate]:
         # Queryset that is allowed to be downloaded
         return self.model.objects.all()
 
-    def can_access_file(self, private_file):
+    def can_access_file(self, private_file) -> bool:
         return self.request.user.has_privilege("admin")
 
 @action(
@@ -1131,11 +1136,11 @@ class UploadSpecifications(APIView):
     parser_classes = (MultiPartParser,)
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-    def post(self, request, format=None):
+    def post(self, request: Request, format=None) -> Response:
         if request.FILES and request.FILES["specifications"]:
             specifications_file = request.FILES["specifications"]
 
-            options = {"filename": specifications_file}
+            options: dict = {"filename": specifications_file}
             attribute_importer = AttributeImporter(options)
             attribute_importer.run()
 
@@ -1151,7 +1156,7 @@ class UploadAttributeUpdate(APIView):
     parser_classes = (MultiPartParser,)
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-    def post(self, request, format=None):
+    def post(self, request: Request, format=None) -> Response:
         if request.FILES and request.FILES["specifications"]:
             specifications_file = request.FILES["specifications"]
 
@@ -1162,7 +1167,7 @@ class UploadAttributeUpdate(APIView):
         return redirect(".")
 
 
-def admin_attribute_updater_template(request):
+def admin_attribute_updater_template(request: Request) -> HttpResponse:
     response = HttpResponse(
         content_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="muuttuneet-tunnisteet-template.csv"'},
@@ -1176,24 +1181,24 @@ def admin_attribute_updater_template(request):
 
 
 class ReportViewSet(ReadOnlyModelViewSet):
-    queryset = Report.objects.filter(hidden=False)
+    queryset: QuerySet[Report] = Report.objects.filter(hidden=False)
     serializer_class = ReportSerializer
 
-    def get_queryset(self):
-        user = self.request.user
-        queryset = self.queryset
+    def get_queryset(self) -> QuerySet[Report]:
+        user: User = self.request.user
+        queryset: QuerySet[Report] = self.queryset
 
         if not user.has_privilege('admin'):
             queryset = queryset.exclude(is_admin_report=True)
 
         return queryset
 
-    def get_project_queryset(self, report):
+    def get_project_queryset(self, report: Report) -> QuerySet[Project]:
         params = self.request.query_params
-        filters = report.filters.filter(
+        filters: QuerySet[ReportFilter] = report.filters.filter(
             identifier__in=params.keys()
         )
-        projects = Project.objects.filter(onhold=False, public=True)
+        projects: QuerySet[Project] = Project.objects.filter(onhold=False, public=True)
         for report_filter in filters:
             projects = report_filter.filter_projects(
                 params.get(report_filter.identifier),
@@ -1204,9 +1209,8 @@ class ReportViewSet(ReadOnlyModelViewSet):
     def _remove_from_queue(self, *args, **kwargs):
         pass
 
-
-    def retrieve(self, request, *args, **kwargs):
-        task_id = request.query_params.get("task")
+    def retrieve(self, request: Request, *args, **kwargs) -> Response:
+        task_id: str = request.query_params.get("task")
 
         if task_id:
             result = async_result(task_id)
@@ -1227,9 +1231,9 @@ class ReportViewSet(ReadOnlyModelViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-        filename = request.query_params.get("filename")
-        report = self.get_object()
-        preview = self.request.query_params.get("preview", None) in [
+        filename: str = request.query_params.get("filename")
+        report: Report = self.get_object()
+        preview: bool = self.request.query_params.get("preview", None) in [
             "True", "true", "1",
         ]
         try:
@@ -1273,22 +1277,22 @@ class ReportViewSet(ReadOnlyModelViewSet):
             401: OpenApiTypes.STR,
         },
     )
-    def list(self, request, *args, **kwargs):
+    def list(self, request: Request, *args, **kwargs) -> Response:
         self.serializer_class = ReportSerializer
         return super().list(request, *args, **kwargs)
 
 
 class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DeadlineSerializer
-    queryset = Deadline.objects.all()
+    queryset: QuerySet[Deadline] = Deadline.objects.all()
 
-    def get_queryset(self):
+    def get_queryset(self) -> QuerySet[Deadline]:
         try:
             subtype = int(self.request.query_params.get("subtype", None))
         except (ValueError, TypeError):
             subtype = None
 
-        filters = {}
+        filters: dict = {}
 
         if subtype:
             filters["phase__project_subtype__id"] = subtype

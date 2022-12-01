@@ -1,8 +1,9 @@
 import re
 from datetime import datetime
+from typing import Union, Optional
 
 from django.contrib.gis.db import models
-from django.db.models import JSONField, Q
+from django.db.models import JSONField, Q, QuerySet
 from django.db.models.functions import Cast
 from django.db.models.fields.related import ForeignKey
 from django.utils.translation import gettext_lazy as _
@@ -53,7 +54,7 @@ class Report(models.Model):
         return f"{self.name}"
 
     @property
-    def filters(self):
+    def filters(self) -> QuerySet[Attribute]:
         return Attribute.objects.filterable().filter(report_attributes__report=self)
 
 
@@ -113,8 +114,8 @@ class ReportColumn(models.Model):
         verbose_name=_("create new column"),
     )
 
-    def generate_postfix(self, project, attribute_data=None):
-        postfixes = self.postfixes.filter(
+    def generate_postfix(self, project: Project, attribute_data: Optional[dict] = None) -> str:
+        postfixes: QuerySet[ReportColumnPostfix] = self.postfixes.filter(
             subtypes__in=[project.subtype],
         )
         postfix = None
@@ -133,6 +134,8 @@ class ReportColumn(models.Model):
                 and not pf.show_not_conditions.count():
                 postfix = pf
                 break
+
+            cond_attr: Attribute
 
             # do not use this postfix if any hide condition is fulfilled
             hide = False
@@ -313,7 +316,7 @@ class ReportFilter(models.Model):
 
         return value_type(value)
 
-    def _get_query(self, value, key, value_type):
+    def _get_query(self, value, key, value_type) -> Q:
         if value is None:
             return Q()
         elif self.type == ReportFilter.TYPE_EXACT:
@@ -353,7 +356,7 @@ class ReportFilter(models.Model):
         elif self.type == ReportFilter.TYPE_NOT_SET:
             return Q(**{f"{key}__isnull": True})
 
-    def filter_projects(self, value, queryset=Project.objects.all()):
+    def filter_projects(self, value: Union[str, list], queryset: QuerySet[Project] = Project.objects.all()) -> QuerySet[Project]:
         type_field_mapping = {
             Attribute.TYPE_INTEGER: models.IntegerField(),
             Attribute.TYPE_DECIMAL: models.FloatField(),
@@ -384,7 +387,8 @@ class ReportFilter(models.Model):
         }
 
         if not self.attributes_as_choices:
-            choices = {}
+            choices: dict[str, str] = {}
+            attr: Attribute
             for attr in self.attributes.all():
                 for choice in attr.value_choices.all():
                     choices[choice.identifier] = choice.value
@@ -402,7 +406,7 @@ class ReportFilter(models.Model):
             elif choices:
                 value = choices.get(value)
 
-            queryset = queryset \
+            queryset: QuerySet[Project] = queryset \
                 .annotate(**{
                     f"search_key__{attr.identifier}": \
                         KeyTextTransform(attr.identifier, "attribute_data")
@@ -419,6 +423,7 @@ class ReportFilter(models.Model):
             query = Q()
             User = get_user_model()
 
+            attr: Attribute
             for attr in self.attributes.all():
                 # hard-coded special case for phase and subtype
                 q_value = value
@@ -488,7 +493,7 @@ class ReportFilter(models.Model):
             return return_qs
         else:
             try:
-                choices = [
+                choices: list[AttributeValueChoice] = [
                     self.attribute_choices.get(identifier=val)
                     for val in value.split(",")
                 ]

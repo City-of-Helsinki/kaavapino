@@ -1,21 +1,22 @@
 import ast
 import operator
 import hashlib
+from typing import Optional
 
 from django.utils.encoding import force_bytes, force_text
 from django.utils.text import slugify
 from private_storage.storage.files import PrivateFileSystemStorage
 
 
-def create_identifier(text):
+def create_identifier(text: str) -> str:
     return slugify(text).replace("-", "_")
 
 
-def check_identifier(identifier):
+def check_identifier(identifier: str) -> bool:
     return slugify(identifier).replace("-", "_") == identifier
 
 
-def truncate_identifier(identifier: str, length: int = None, hash_len: int = 4):
+def truncate_identifier(identifier: str, length: Optional[int] = None, hash_len: int = 4) -> str:
     """Shorten an identifier to a repeatable mangled version with the given length."""
     if length is None or len(identifier) <= length:
         return identifier
@@ -30,7 +31,7 @@ class KaavapinoPrivateStorage(PrivateFileSystemStorage):
         self.url_postfix = url_postfix
         super().__init__(*args, **kwargs)
 
-    def url(self, name):
+    def url(self, name: str):
         # Make sure reverse_lazy() is evaluated, as Python 3 won't do this here.
         if self.url_postfix:
             self.base_url = force_text(self.base_url).replace(

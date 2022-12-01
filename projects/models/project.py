@@ -1,3 +1,9 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from users.models import User
+
 import datetime
 import itertools
 import logging
@@ -92,7 +98,7 @@ class ProjectSubtype(models.Model):
     def __str__(self):
         return self.name
 
-    def get_phases(self, project=None):
+    def get_phases(self, project: Optional[Project] = None):
         if not project:
             return self.phases.all()
 
@@ -311,7 +317,10 @@ class Project(models.Model):
 
         return False
 
-    def get_applicable_deadlines(self, subtype=None, preview_attributes={}):
+    def get_applicable_deadlines(self,
+                                 subtype: Optional[ProjectSubtype] = None,
+                                 preview_attributes: dict = {}
+                                 ) -> list[Deadline]:
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -334,7 +343,14 @@ class Project(models.Model):
             if self._check_condition(deadline, preview_attributes)
         ]
 
-    def _set_calculated_deadline(self, deadline, date, initial, user, preview, preview_attribute_data={}):
+    def _set_calculated_deadline(self,
+                                 deadline: Deadline,
+                                 date: datetime.date,
+                                 initial: bool,
+                                 user: User,
+                                 preview: bool,
+                                 preview_attribute_data: dict = {}
+                                 ) -> datetime.date:
         try:
             if preview:
                 try:
@@ -379,7 +395,14 @@ class Project(models.Model):
 
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False, preview_attribute_data={}):
+    def _set_calculated_deadlines(self,
+                                  deadlines: list[Deadline],
+                                  user,
+                                  ignore: list[Deadline] = [],
+                                  initial: bool = False,
+                                  preview: bool = False,
+                                  preview_attribute_data: dict = {}
+                                  ) -> None:
         results = {}
         fillers = []
 
@@ -443,7 +466,7 @@ class Project(models.Model):
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, values=None, user=None):
+    def update_deadlines(self, values=None, user: Optional[User] = None):
         deadlines = self.get_applicable_deadlines()
 
         # Delete no longer relevant deadlines and create missing
@@ -663,6 +686,7 @@ class Project(models.Model):
         # TODO: check if required
         # set_ad_data_in_attribute_data(self.attribute_data)
         search_fields = set()
+        attr: Attribute
         for attr in Attribute.objects.filter(searchable=True)\
                 .prefetch_related("fieldsets", "fieldset_attribute_target", "fieldset_attribute_source"):
             add_search_field_for_attribute(search_fields, attr)

@@ -1,5 +1,6 @@
 import logging
 import requests
+from typing import Optional
 
 from django.conf import settings
 from django.core.cache import cache
@@ -12,11 +13,12 @@ from projects.serializers.project import ProjectDeadlineSerializer
 logger = logging.getLogger(__name__)
 
 
-def refresh_on_map_overview_cache():
+def refresh_on_map_overview_cache() -> None:
     logger.info("Requesting new Geoserver data for all projects")
 
+    project: Project
     for project in Project.objects.all():
-        identifier = project.attribute_data.get("hankenumero")
+        identifier: str = project.attribute_data.get("hankenumero")
 
         if not identifier:
             continue
@@ -34,10 +36,12 @@ def refresh_on_map_overview_cache():
         else:
             cache.set(url, response, 180)  # 3 minutes
 
-def refresh_project_schedule_cache():
-    project_schedule_cache = cache.get("serialized_project_schedules", {})
+
+def refresh_project_schedule_cache() -> None:
+    project_schedule_cache: dict = cache.get("serialized_project_schedules", {})
     logger.info(f"Recalculating and caching project schedule for all projects")
 
+    project: Project
     for project in Project.objects.all():
         deadlines = project.deadlines.filter(deadline__subtype=project.subtype)
         schedule = ProjectDeadlineSerializer(
@@ -50,15 +54,17 @@ def refresh_project_schedule_cache():
 
     cache.set("serialized_project_schedules", project_schedule_cache, None)
 
+
 # generate all reports to make sure as much freshly cached data as possible
 # is available when users request reports
-def cache_report_data(project_ids=None):
+def cache_report_data(project_ids: Optional[list] = None) -> None:
     if not project_ids:
         project_ids = [
             project.pk for project in Project.objects.filter(
                 onhold=False, public=True,
             )
         ]
+    report: Report
     for report in Report.objects.all():
         if report.previewable:
             render_report_to_response(
@@ -69,7 +75,8 @@ def cache_report_data(project_ids=None):
             report, project_ids, HttpResponse(), False,
         )
 
-def cache_queued_project_report_data():
+
+def cache_queued_project_report_data() -> None:
     cache_key = 'projects.tasks.cache_selected_report_data.queue'
     queue = cache.get(cache_key)
     cache.set(cache_key, [], None)
