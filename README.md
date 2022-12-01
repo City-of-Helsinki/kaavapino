@@ -4,7 +4,7 @@ Project management system for city planning projects.
 ## Prerequisites
 
 * PostgreSQL (>= 9.3)
-* Python (>= 3.6)
+* Python (>= 3.9)
 
 ## Development
 
