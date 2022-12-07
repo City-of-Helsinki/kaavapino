@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any
 
 if TYPE_CHECKING:
     from . import Project
@@ -243,7 +243,7 @@ class Deadline(models.Model):
 
         return None
 
-    def calculate_initial(self, project: Project, preview_attributes: dict = {}) -> Optional[datetime.date]:
+    def calculate_initial(self, project: Project, preview_attributes: dict[str, Any] = {}) -> Optional[datetime.date]:
         if preview_attributes:
             valid_dls: list[Deadline] = project.get_applicable_deadlines(
                 preview_attributes=preview_attributes
@@ -259,7 +259,7 @@ class Deadline(models.Model):
             preview_attributes,
         )
 
-    def calculate_updated(self, project: Project, preview_attributes: dict[str, str] = {}) -> Optional[datetime.date]:
+    def calculate_updated(self, project: Project, preview_attributes: dict[str, Any] = {}) -> Optional[datetime.date]:
         if self.update_calculations.count():
             if preview_attributes:
                 valid_dls: list[Deadline] = project.get_applicable_deadlines(

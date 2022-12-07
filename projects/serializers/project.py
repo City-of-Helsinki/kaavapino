@@ -4,7 +4,7 @@ import re
 import logging
 import numpy as np
 import requests
-from typing import List, NamedTuple, Type
+from typing import List, NamedTuple, Type, Any, Union, Optional
 
 from actstream import action
 from django.conf import settings
@@ -13,11 +13,12 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field, inline_serializer
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers, status
+from rest_framework.request import Request
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
@@ -37,6 +38,7 @@ from projects.models import (
     ProjectPhase,
     ProjectPhaseLog,
     ProjectPhaseSection,
+    ProjectPhaseDeadlineSection,
     ProjectFloorAreaSection,
     ProjectAttributeFile,
     ProjectDeadline,
@@ -45,10 +47,13 @@ from projects.models import (
     ProjectPhaseSectionAttribute,
     ProjectComment,
     Deadline,
+    DeadlineDistance,
     DeadlineDateCalculation,
     ProjectAttributeFileFieldsetPathLocation,
     OverviewFilter,
+    OverviewFilterAttribute,
     DocumentTemplate,
+    DocumentLinkFieldSet,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -83,15 +88,16 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     generated = serializers.BooleanField()
 
     @extend_schema_field(DeadlineSerializer)
-    def get_deadline(self, projectdeadline):
+    def get_deadline(self, projectdeadline: ProjectDeadline) -> dict[str, Any]:
         return DeadlineSerializer(
             projectdeadline.deadline
         ).data
 
-    def _resolve_distance_conditions(self, distance, project):
+    def _resolve_distance_conditions(self, distance: DeadlineDistance, project: Project) -> bool:
         if distance.conditions.count() == 0:
             return True
 
+        attribute: Attribute
         for attribute in distance.conditions.all():
             if project.attribute_data.get(attribute.identifier):
                 return True
@@ -99,11 +105,11 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         return False
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_is_under_min_distance_next(self, projectdeadline):
+    def get_is_under_min_distance_next(self, projectdeadline: ProjectDeadline) -> bool:
         if not projectdeadline.date:
             return False
 
-        next_deadlines = projectdeadline.deadline.distances_to_next.all()\
+        next_deadlines: QuerySet[DeadlineDistance] = projectdeadline.deadline.distances_to_next.all()\
             .select_related("deadline", "deadline__date_type")
         for next_distance in next_deadlines:
             # Ignore if distance conditions are not met
@@ -137,11 +143,11 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         return False
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_is_under_min_distance_previous(self, projectdeadline):
+    def get_is_under_min_distance_previous(self, projectdeadline: ProjectDeadline) -> bool:
         if not projectdeadline.date:
             return False
 
-        prev_deadlines = projectdeadline.deadline.distances_to_previous.all()\
+        prev_deadlines: QuerySet[DeadlineDistance] = projectdeadline.deadline.distances_to_previous.all()\
             .select_related("previous_deadline", "previous_deadline__date_type")\
             .prefetch_related("previous_deadline__date_type__automatic_dates")
         for prev_distance in prev_deadlines:
@@ -176,7 +182,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         return False
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_past_due(self, projectdeadline):
+    def get_past_due(self, projectdeadline: ProjectDeadline) -> bool:
         return len([
             dl for dl in projectdeadline.project.deadlines.filter(
                 deadline__index__lte=projectdeadline.deadline.index,
@@ -186,7 +192,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         ]) > 0
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_out_of_sync(self, projectdeadline):
+    def get_out_of_sync(self, projectdeadline: ProjectDeadline) -> bool:
         return projectdeadline.project.subtype != \
             projectdeadline.deadline.phase.project_subtype
 
@@ -213,16 +219,16 @@ class ProjectOverviewSerializer(serializers.ModelSerializer):
     subtype = serializers.SerializerMethodField()
     phase = serializers.SerializerMethodField()
 
-    def get_user_name(self, project):
-        first_name = project.user.first_name
-        last_name = project.user.last_name
+    def get_user_name(self, project: Project) -> str:
+        first_name: str = project.user.first_name
+        last_name: str = project.user.last_name
 
         return " ".join([first_name, last_name])
 
-    def get_phase(self, project):
+    def get_phase(self, project: Project) -> dict[str, Any]:
         return ProjectPhaseSerializer(project.phase).data
 
-    def get_subtype(self, project):
+    def get_subtype(self, project: Project) -> dict[str, Any]:
         return ProjectSubtypeSerializer(project.subtype).data
 
     class Meta:
@@ -247,22 +253,22 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
     accepts_year = serializers.SerializerMethodField()
     choices = serializers.SerializerMethodField()
 
-    def _get_filters(self, overview_filter, filters):
+    def _get_filters(self, overview_filter: OverviewFilter, filters: str) -> bool:
         return bool(overview_filter.attributes.filter(**{filters: True}).count())
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_filters_by_subtype(self, overview_filter):
+    def get_filters_by_subtype(self, overview_filter: OverviewFilter) -> bool:
         return self._get_filters(overview_filter, "filters_by_subtype")
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_filters_on_map(self, overview_filter):
+    def get_filters_on_map(self, overview_filter: OverviewFilter) -> bool:
         return self._get_filters(overview_filter, "filters_on_map")
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_filters_floor_area(self, overview_filter):
+    def get_filters_floor_area(self, overview_filter: OverviewFilter) -> bool:
         return self._get_filters(overview_filter, "filters_floor_area")
 
-    def get_value_type(self, overview_filter):
+    def get_value_type(self, overview_filter: OverviewFilter) -> Optional[str]:
         # It's never validated one filter only contains one type of values;
         # trusting the admin user for now
         if overview_filter.attributes.first():
@@ -271,7 +277,8 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
         return None
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_accepts_year(self, overview_filter):
+    def get_accepts_year(self, overview_filter: OverviewFilter) -> bool:
+        attr: OverviewFilterAttribute
         for attr in overview_filter.attributes.all().prefetch_related("attribute"):
             if attr.attribute.value_type == Attribute.TYPE_DATE and \
                 not attr.attribute.fieldsets.count():
@@ -287,10 +294,12 @@ class OverviewFilterSerializer(serializers.ModelSerializer):
         },
         many=True,
     ))
-    def get_choices(self, overview_filter):
-        choices = {}
+    def get_choices(self, overview_filter: OverviewFilter) -> list[dict[str, str]]:
+        choices: dict[str, str] = {}
 
+        attr: OverviewFilterAttribute
         for attr in overview_filter.attributes.all().prefetch_related("attribute__value_choices"):
+            choice: AttributeValueChoice
             for choice in attr.attribute.value_choices.all():
                 choices[choice.identifier] = choice.value
 
@@ -317,13 +326,13 @@ class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
     project_count = serializers.SerializerMethodField()
     projects = serializers.SerializerMethodField()
 
-    def get_project_count(self, phase):
+    def get_project_count(self, phase: ProjectPhase) -> int:
         return phase.projects.filter(
             self.context.get("query", Q()),
             public=True,
         ).count()
 
-    def get_projects(self, phase):
+    def get_projects(self, phase: ProjectPhase) -> dict[str, Any]:
         return ProjectOverviewSerializer(
             phase.projects.filter(
                 self.context.get("query", Q()),
@@ -346,7 +355,7 @@ class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
 class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
     phases = serializers.SerializerMethodField()
 
-    def get_phases(self, subtype):
+    def get_phases(self, subtype: ProjectSubtype) -> dict[str, Any]:
         return ProjectPhaseOverviewSerializer(
             subtype.phases.all().select_related("project_subtype", "project_subtype__project_type", "common_project_phase"),
             many=True,
@@ -368,7 +377,7 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
     subtype = serializers.SerializerMethodField()
     phase = serializers.SerializerMethodField()
 
-    def get_geoserver_data(self, project):
+    def get_geoserver_data(self, project: Project) -> Optional[dict[str, Any]]:
         identifier = project.attribute_data.get("hankenumero")
         if identifier:
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
@@ -398,18 +407,18 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
         return None
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_user_name(self, project):
-        first_name = project.user.first_name
-        last_name = project.user.last_name
+    def get_user_name(self, project: Project) -> str:
+        first_name: str = project.user.first_name
+        last_name: str = project.user.last_name
 
         return " ".join([first_name, last_name])
 
     # @extend_schema_field(ProjectPhaseSerializer)
-    def get_phase(self, project):
+    def get_phase(self, project: Project) -> dict[str, Any]:
         return ProjectPhaseSerializer(project.phase).data
 
     # @extend_schema_field(ProjectSubtypeSerializer)
-    def get_subtype(self, project):
+    def get_subtype(self, project: Project) -> dict[str, Any]:
         return ProjectSubtypeSerializer(project.subtype).data
 
     class Meta:
@@ -461,11 +470,11 @@ class ProjectListSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(OpenApiTypes.INT)
-    def get_type(self, project):
+    def get_type(self, project: Project) -> int:
         return project.type.pk
 
     @extend_schema_field(OpenApiTypes.DATE)
-    def get_phase_start_date(self, project):
+    def get_phase_start_date(self, project: Project) -> Optional[datetime.date]:
         try:
             return project.deadlines \
                 .filter(deadline__phase=project.phase) \
@@ -473,8 +482,8 @@ class ProjectListSerializer(serializers.ModelSerializer):
         except AttributeError:
             return None
 
-    def get_attribute_data(self, project):
-        static_properties = [
+    def get_attribute_data(self, project: Project) -> dict[str, Any]:
+        static_properties: list[str] = [
             "user",
             "name",
             "public",
@@ -482,13 +491,15 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "create_principles",
             "create_draft",
         ]
-        return_data = {}
-        attrs = self.context["listview_attribute_columns"] if self.context.__contains__("listview_attribute_columns")\
+        return_data: dict[str, Any] = {}
+        attrs: list[ListViewAttributeColumn] = \
+            self.context["listview_attribute_columns"] \
+            if self.context.__contains__("listview_attribute_columns") \
             else ListViewAttributeColumn.objects.all().select_related("attribute")
-        attribute_data = getattr(project, "attribute_data", {})
+        attribute_data: dict[str, Any] = getattr(project, "attribute_data", {})
         for attr in attrs:
-            identifier = attr.attribute.identifier
-            value = attribute_data.get(identifier)
+            identifier: str = attr.attribute.identifier
+            value: Any = attribute_data.get(identifier)
             if attr.attribute.static_property in static_properties:
                 return_data[identifier] = getattr(
                     project, attr.attribute.static_property
@@ -499,7 +510,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
         return return_data
 
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
-    def get_deadlines(self, project):
+    def get_deadlines(self, project: Project) -> list[dict[str, Any]]:
         project_schedule_cache = self.context["project_schedule_cache"]
         return project_schedule_cache.get(project.pk, [])
 
@@ -508,7 +519,7 @@ class ProjectExternalDocumentSerializer(serializers.Serializer):
     document_name = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
 
-    def _get_field_as_string(self, fieldset_item, attribute):
+    def _get_field_as_string(self, fieldset_item: dict[str, Any], attribute: Attribute) -> str:
         if not attribute:
             return None
 
@@ -528,23 +539,23 @@ class ProjectExternalDocumentSerializer(serializers.Serializer):
             return value
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_document_name(self, fieldset_item):
-        name_attribute = self.context["document_fieldset"]. \
+    def get_document_name(self, fieldset_item: dict[str, Any]) -> str:
+        name_attribute: Attribute = self.context["document_fieldset"]. \
             document_name_attribute
-        custom_name_attribute = self.context["document_fieldset"]. \
+        custom_name_attribute: Attribute = self.context["document_fieldset"]. \
             document_custom_name_attribute
 
-        name = self._get_field_as_string(
+        name: str = self._get_field_as_string(
             fieldset_item, name_attribute
         )
-        custom_name = self._get_field_as_string(
+        custom_name: str = self._get_field_as_string(
             fieldset_item, custom_name_attribute
         )
 
         return custom_name or name
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_link(self, fieldset_item):
+    def get_link(self, fieldset_item: dict[str, str]) -> str:
         return fieldset_item.get(
             self.context["document_fieldset"].document_link_attribute.identifier
         )
@@ -555,16 +566,17 @@ class ProjectExternalDocumentSectionSerializer(serializers.Serializer):
     documents = serializers.SerializerMethodField()
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_section_name(self, *args):
+    def get_section_name(self, *args) -> str:
         return self.context["section"].name
 
     @extend_schema_field(ProjectExternalDocumentSerializer(many=True))
-    def get_documents(self, project):
+    def get_documents(self, project: Project) -> list[dict[str, Any]]:
         section = self.context["section"]
-        fields = []
+        fields: list[dict[str, Any]] = []
 
+        document_fieldset: DocumentLinkFieldSet
         for document_fieldset in section.documentlinkfieldset_set.all():
-            fieldset_data = project.attribute_data.get(
+            fieldset_data: list = project.attribute_data.get(
                 document_fieldset.fieldset_attribute.identifier, []
             )
 
@@ -640,8 +652,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["type", "created_at", "modified_at", "project_card_document"]
 
-    def get_geoserver_data(self, project):
-        identifier = project.attribute_data.get("hankenumero")
+    def get_geoserver_data(self, project: Project) -> Optional[dict[str, Any]]:
+        identifier: str = project.attribute_data.get("hankenumero")
         if identifier:
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
@@ -666,8 +678,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return None
 
-    def _get_snapshot_date(self, project):
-        query_params = getattr(self.context["request"], "GET", {})
+    def _get_snapshot_date(self, project: Project) -> Optional[datetime.date]:
+        query_params: dict[str, Any] = getattr(self.context["request"], "GET", {})
         snapshot_param = query_params.get("snapshot")
         snapshot = None
 
@@ -703,9 +715,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return None
 
-    def get_fields(self):
-        fields = super(ProjectSerializer, self).get_fields()
-        request = self.context.get('request', None)
+    def get_fields(self) -> dict[str, Any]:
+        fields: dict[str, Any] = super(ProjectSerializer, self).get_fields()
+        request: Request = self.context.get('request', None)
 
         try:
             if request.user.uuid == self.instance.user.uuid:
@@ -720,28 +732,28 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return fields
 
-    def get_attribute_data(self, project):
-        snapshot = self._get_snapshot_date(project)
+    def get_attribute_data(self, project: Project) -> dict[str, Any]:
+        snapshot: datetime.date = self._get_snapshot_date(project)
 
         if snapshot:
-            attribute_data = {
+            attribute_data: dict[str, Any] = {
                 k: v["new_value"]
                 for k, v in self._get_updates(project, Attribute.objects.all(),
                                               cutoff=snapshot, request=self.context.get('request', None)).items()
             }
         else:
-            attribute_data = getattr(project, "attribute_data", {})
+            attribute_data: dict[str, Any] = getattr(project, "attribute_data", {})
 
         self._set_file_attributes(attribute_data, project, snapshot)
 
         if snapshot:
             try:
-                subtype = ProjectPhaseLog.objects.filter(
+                subtype: ProjectSubtype = ProjectPhaseLog.objects.filter(
                     created_at__lte=self._get_snapshot_date(project),
                     project=project
                 ).order_by("-created_at").first().phase.project_subtype
             except AttributeError:
-                subtype = project.phase.project_subtype
+                subtype: ProjectSubtype = project.phase.project_subtype
             attribute_data['kaavaprosessin_kokoluokka'] = subtype.name
 
         # Old versions not available for data from external APIs
@@ -757,7 +769,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             set_ad_data_in_attribute_data(attribute_data)
             set_automatic_attributes(attribute_data)
 
-        static_properties = [
+        static_properties: list[str] = [
             "user",
             "name",
             "public",
@@ -768,7 +780,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if not snapshot:
             # Prevent making database calls within for-loop by getting attributes from database here
-            attributes = Attribute.objects.filter(static_property__in=static_properties)
+            attributes: QuerySet[Attribute] = Attribute.objects.filter(static_property__in=static_properties)
             for static_property in static_properties:
                 attribute = next(filter(lambda attr: attr.static_property == static_property, attributes), None)
                 if attribute:
@@ -782,13 +794,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         return attribute_data
 
     @extend_schema_field(OpenApiTypes.INT)
-    def get_type(self, project):
+    def get_type(self, project: Project) -> int:
         return project.type.pk
 
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
-    def get_deadlines(self, project):
-        project_schedule_cache = cache.get("serialized_project_schedules", {})
-        deadlines = project.deadlines.filter(deadline__subtype=project.subtype)\
+    def get_deadlines(self, project: Project) -> dict[str, Any]:
+        project_schedule_cache: dict[int, dict[str, Any]] = cache.get("serialized_project_schedules", {})
+        deadlines: QuerySet[Deadline] = project.deadlines.filter(deadline__subtype=project.subtype)\
             .select_related("deadline", "project")\
             .prefetch_related("project__subtype", "project__deadlines", "project__deadlines__deadline",
                               "project__deadlines__project", "deadline__distances_to_previous",
@@ -796,7 +808,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                               "deadline__subtype", "deadline__date_type", "deadline__phase__project_subtype")
         schedule = project_schedule_cache.get(project.pk)
         if self.context.get('should_update_deadlines') or not schedule:
-            schedule = ProjectDeadlineSerializer(
+            schedule: dict[str, Any] = ProjectDeadlineSerializer(
                 deadlines,
                 many=True,
                 allow_null=True,
@@ -808,7 +820,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return schedule
 
     @extend_schema_field(serializers.ListSerializer(child=serializers.CharField()))
-    def get_generated_deadline_attributes(self, project):
+    def get_generated_deadline_attributes(self, project: Project) -> list[str]:
         return [
             dl.deadline.attribute.identifier
             for dl in project.deadlines.filter(generated=True).select_related("deadline__attribute")
@@ -816,7 +828,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(serializers.ListSerializer(child=serializers.CharField()))
-    def get_deadline_attributes(self, project):
+    def get_deadline_attributes(self, project: Project) -> list[str]:
         return [
             dl.deadline.attribute.identifier
             for dl in project.deadlines.filter().select_related("deadline__attribute")
@@ -824,11 +836,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_phase_documents_created(self, project):
+    def get_phase_documents_created(self, project: Project) -> bool:
         return project.phase_documents_created
 
-    def get_project_card_document(self, project):
-        template = DocumentTemplate.objects.filter(project_card_default_template=True).first()
+    def get_project_card_document(self, project: Project) -> dict[str, Any]:
+        template: DocumentTemplate = DocumentTemplate.objects.filter(project_card_default_template=True).first()
         if not template:
             return None
 
@@ -838,13 +850,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         ).data
 
     @extend_schema_field(OpenApiTypes.BOOL)
-    def get_phase_documents_creation_started(self, project):
+    def get_phase_documents_creation_started(self, project: Project) -> bool:
         return project.phase_documents_creation_started
 
-    def _set_file_attributes(self, attribute_data, project, snapshot):
+    def _set_file_attributes(self, attribute_data: dict[str, Any], project: Project, snapshot: Optional[datetime.date]):
         request = self.context["request"]
         if snapshot:
-            attribute_files = ProjectAttributeFile.objects \
+            attribute_files: QuerySet[ProjectAttributeFile] = ProjectAttributeFile.objects \
                 .filter(project=project, created_at__lte=snapshot) \
                 .exclude(archived_at__lte=snapshot) \
                 .order_by(
@@ -855,7 +867,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 ) \
                 .distinct("fieldset_path_str", "attribute__pk", "project__pk")
         else:
-            attribute_files = ProjectAttributeFile.objects \
+            attribute_files: QuerySet[ProjectAttributeFile] = ProjectAttributeFile.objects \
                 .filter(project=project, archived_at=None) \
                 .prefetch_related("attribute", "fieldset_path_locations") \
                 .order_by(
@@ -868,7 +880,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # Add file attributes to the attribute data
         # File values are represented as absolute URLs
-        file_attributes = {}
+        file_attributes: dict[str, Union[dict, list]] = {}
         for attribute_file in attribute_files:
             if has_project_attribute_file_permissions(attribute_file, request):
                 if not attribute_file.fieldset_path:
@@ -932,11 +944,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         attribute_data.update(file_attributes)
 
-    def get__metadata(self, project):
-        list_view = self.context.get("action", None) == "list"
-        attributes = Attribute.objects.all().prefetch_related("key_attribute", "fieldsets", "fieldset_attributes"
+    def get__metadata(self, project: Project) -> dict[str, Any]:
+        list_view: bool = self.context.get("action", None) == "list"
+        attributes: QuerySet[Attribute] = Attribute.objects.all().prefetch_related("key_attribute", "fieldsets", "fieldset_attributes"
         )  # perform further filtering of attributes within methods
-        metadata = {
+        metadata: dict[str, Any] = {
             "users": self._get_users(project, attributes, list_view=list_view),
             "personnel": self._get_personnel(project, attributes, list_view=list_view),
         }
@@ -965,15 +977,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         return metadata
 
     @staticmethod
-    def _get_users(project, attributes, list_view=False):
-        users = [project.user]
+    def _get_users(project: Project, attributes: list[Attribute], list_view=False) -> list[dict[str, Any]]:
+        users: list[User] = [project.user]
 
         if not list_view:
-            user_attribute_ids = set()
+            user_attribute_ids: set[str] = set()
             for attribute in filter(lambda a: a.value_type in [Attribute.TYPE_USER, Attribute.TYPE_FIELDSET], attributes):
                 if attribute.value_type == Attribute.TYPE_FIELDSET:
-                    fieldset_user_identifiers = attribute.fieldset_attributes.filter(value_type=Attribute.TYPE_USER)\
-                        .prefetch_related("identifier").values_list("identifier", flat=True)
+                    fieldset_user_identifiers: QuerySet[Attribute] = attribute.fieldset_attributes\
+                        .filter(value_type=Attribute.TYPE_USER)\
+                        .prefetch_related("identifier")\
+                        .values_list("identifier", flat=True)
                     if attribute.identifier in project.attribute_data:
                         user_attribute_ids |= ProjectSerializer._get_fieldset_attribute_values(
                             project, attribute, fieldset_user_identifiers
@@ -994,13 +1008,16 @@ class ProjectSerializer(serializers.ModelSerializer):
         return UserSerializer(users, many=True).data
 
     @staticmethod
-    def _get_personnel(project, attributes, list_view=False):
+    def _get_personnel(project: Project,
+                       attributes: list[Attribute],
+                       list_view: bool = False
+                       ) -> Union[list[dict[str, str]], Response]:
         if list_view:
             return []
 
-        flat_data = get_flat_attribute_data(project.attribute_data, {})
+        flat_data: dict[str, list] = get_flat_attribute_data(project.attribute_data, {})
 
-        ids = []
+        ids: list[str] = []
 
         for attr in filter(lambda a: a.value_type == Attribute.TYPE_PERSONNEL, attributes):
             value = flat_data.get(attr.identifier)
@@ -1012,7 +1029,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             else:
                 ids.append(value)
 
-        return_values = []
+        return_values: list[dict[str, str]] = []
 
         for id in set(ids):
             url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}"
@@ -1039,10 +1056,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         return return_values
 
     @staticmethod
-    def _get_fieldset_attribute_values(
-        project, fieldset_attribute, fieldset_identifiers
-    ):
-        values = set()
+    def _get_fieldset_attribute_values(project: Project,
+                                       fieldset_attribute: Attribute,
+                                       fieldset_identifiers: QuerySet[Attribute]
+                                       ) -> set[Any]:
+        values: set[Any] = set()
         for entry in project.attribute_data[fieldset_attribute.identifier]:
             for identifier in fieldset_identifiers:
                 value = entry.get(identifier, None)
@@ -1052,20 +1070,25 @@ class ProjectSerializer(serializers.ModelSerializer):
         return values
 
     @staticmethod
-    def _get_updates(project, attributes, cutoff=None, request=None):
-        def get_editable(attribute):
+    def _get_updates(project: Project,
+                     attributes: QuerySet[Attribute],
+                     cutoff: Optional[datetime.date] = None,
+                     request: Request = None
+                     ) -> dict[str, dict[str, Any]]:
+
+        def get_editable(attribute: Attribute) -> bool:
             from users.models import privilege_as_int
 
             if not request or not request.user:
                 return False
 
-            user = request.user
-            owner = request.query_params.get("owner", False)
-            is_owner = \
+            user: User = request.user
+            owner: bool = request.query_params.get("owner", False)
+            is_owner: bool = \
                 owner in ["1", "true", "True"] or \
                 project and project.user == user
 
-            privilege = privilege_as_int(user.privilege)
+            privilege: int = privilege_as_int(user.privilege)
 
             # owner can edit owner-editable fields regardless of their role
             if is_owner and attribute.owner_editable:
@@ -1077,7 +1100,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             else:
                 return False
 
-        def get_attribute_schema(attribute_list, schema):
+        def get_attribute_schema(attribute_list: list[Attribute], schema: dict[str, dict[str, Any]]) -> None:
             if not attribute_list or type(attribute_list) != list:
                 return
 
@@ -1095,7 +1118,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         })
                 elif type(attr) == dict:
                     for identifier, value in attr.items():
-                        attribute = next(filter(lambda a: a.identifier == identifier, attributes), None)
+                        attribute: Attribute = next(filter(lambda a: a.identifier == identifier, attributes), None)
                         if attribute:
                             schema.update({
                                 attribute.identifier: {
@@ -1110,10 +1133,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                 else:
                     log.warn('Unsupported schema format: %r' % attr)
 
-        def get_schema(attribute_identifier, data, labels):
-            schema = {}
+        def get_schema(attribute_identifier: str, data: dict[str, list], labels) -> dict[str, dict[str, Any]]:
+            schema: dict[str, dict[str, Any]] = {}
 
-            attribute = next(filter(lambda a: a.identifier == attribute_identifier, attributes), None)
+            attribute: Attribute = next(filter(lambda a: a.identifier == attribute_identifier, attributes), None)
             # log.info('%s: %s' % (attribute_identifier, attribute))
             if attribute:
                 schema.update({
@@ -1178,7 +1201,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 .prefetch_related("actor")
             )
 
-        updates = {}
+        updates: dict[str, dict[str, Any]] = {}
         for _action in actions:
             attribute_identifier = (
                 _action.data.get("attribute_identifier", None)
@@ -1201,7 +1224,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return updates
 
-    def should_validate_attributes(self):
+    def should_validate_attributes(self) -> bool:
         # Always validate if not explicitly turned off
         if "validate_attribute_data" in self.context["request"].data:
             validate_field_data = self.context["request"].data.get(
@@ -1212,7 +1235,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return serializers.BooleanField().to_internal_value(validate_field_data)
 
-    def _get_keys(self):
+    def _get_keys(self) -> list[str]:
         try:
             return self.context["request"].data.get('attribute_data').keys()
         except AttributeError:
@@ -1224,11 +1247,11 @@ class ProjectSerializer(serializers.ModelSerializer):
     def generate_sections_data(
         self,
         phase: ProjectPhase,
-        preview,
+        preview: dict[Deadline, datetime.date],
         validation: bool = True,
     ) -> List[SectionData]:
-        sections = []
-        sections_to_serialize = phase.sections \
+        sections: list[SectionData] = []
+        sections_to_serialize: QuerySet[ProjectPhaseSection] = phase.sections \
             .filter(attributes__identifier__in=self._get_keys()) \
             .order_by("index")
         for section in sections_to_serialize:
@@ -1245,10 +1268,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def generate_floor_area_sections_data(
-        self, floor_area_sections, preview, validation: bool = True
+            self,
+            floor_area_sections: QuerySet[ProjectFloorAreaSection],
+            preview: dict[Deadline, datetime.date],
+            validation: bool = True
     ) -> List[SectionData]:
-        sections = []
-        sections_to_serialize = floor_area_sections \
+        sections: list[SectionData] = []
+        sections_to_serialize: QuerySet[ProjectFloorAreaSection] = floor_area_sections \
             .filter(attributes__identifier__in=self._get_keys()) \
             .order_by("index")
         for section in sections_to_serialize:
@@ -1264,9 +1290,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return sections
 
-    def generate_schedule_sections_data(self, phase, preview, validation=True):
-        sections = []
-        deadline_sections = phase.deadline_sections.filter(
+    def generate_schedule_sections_data(
+            self,
+            phase: ProjectPhase,
+            preview: dict[Deadline, datetime.date],
+            validation: bool = True
+    ) -> list[SectionData]:
+        sections: list[SectionData] = []
+        deadline_sections: QuerySet[ProjectPhaseDeadlineSection] = phase.deadline_sections.filter(
             attributes__identifier__in=self._get_keys()
         )
         for section in deadline_sections:
@@ -1282,9 +1313,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return sections
 
-    def validate(self, attrs):
-        archived = attrs.get('archived')
-        was_archived = self.instance and self.instance.archived
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        archived: bool = attrs.get('archived')
+        was_archived: bool = self.instance and self.instance.archived
 
         if archived is not False and was_archived:
             raise ValidationError(
@@ -1322,11 +1353,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
+    def _get_should_update_deadlines(self,
+                                     subtype_changed: bool,
+                                     instance: Project,
+                                     attribute_data: dict[str, Any]
+                                     ) -> bool:
         if subtype_changed:
             should_update_deadlines = False
         elif instance:
-            attr_identifiers = list(attribute_data.keys())
+            attr_identifiers: list[str] = list(attribute_data.keys())
             should_update_deadlines = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
                     deadline__attribute__identifier__in=attr_identifiers
@@ -1334,7 +1369,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
             if not should_update_deadlines:
-                should_update_deadlines = bool(
+                should_update_deadlines: bool = bool(
                     Deadline.objects.filter(
                         subtype=instance.subtype,
                         condition_attributes__identifier__in=attr_identifiers,
@@ -1342,7 +1377,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
 
             if not should_update_deadlines:
-                should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
+                should_update_deadlines = bool(DeadlineDateCalculation.objects.filter(
                     deadline__project_deadlines__project=instance
                 ).filter(
                     Q(conditions__identifier__in=attr_identifiers) | \
@@ -1353,10 +1388,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return should_update_deadlines
 
-    def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
-        static_property_attributes = {}
+    def _validate_attribute_data(self,
+                                 attribute_data: dict[str, Any],
+                                 validate_attributes: dict[str, Attribute],
+                                 user: User,
+                                 owner_edit_override: bool
+                                 ) -> dict[str, Any]:
+        static_property_attributes: dict[str, Attribute] = {}
         if self.instance:
-            static_properties = [
+            static_properties: list[str] = [
                 "user",
                 "name",
                 "public",
@@ -1381,26 +1421,26 @@ class ProjectSerializer(serializers.ModelSerializer):
             return static_property_attributes
 
         # Get serializers for all sections in all phases
-        sections_data = []
-        current_phase = getattr(self.instance, "phase", None)
-        subtype = getattr(self.instance, "subtype", None) or \
+        sections_data: list[SectionData] = []
+        current_phase: ProjectPhase = getattr(self.instance, "phase", None)
+        subtype: ProjectSubtype = getattr(self.instance, "subtype", None) or \
             validate_attributes.get("subtype")
             # TODO: check if this subtype should be an attribute of phase object instead
             #validate_attributes.get("phase").project_subtype
-        should_validate = self.should_validate_attributes()
-        min_phase_index = current_phase.index if current_phase else 1
+        should_validate: bool = self.should_validate_attributes()
+        min_phase_index: int = current_phase.index if current_phase else 1
 
         try:
-            is_owner = self.context["request"].user == self.user
+            is_owner: bool = self.context["request"].user == self.user
             if owner_edit_override and is_owner:
                 min_phase_index = 1
         except AttributeError:
             pass
 
-        should_update_deadlines = self._get_should_update_deadlines(
+        should_update_deadlines: bool = self._get_should_update_deadlines(
             False, self.instance, attribute_data,
         )
-        preview = None
+        preview: dict[Deadline, datetime.date] = None
         if self.instance and should_update_deadlines:
             preview = self.instance.get_preview_deadlines(
                 attribute_data,
@@ -1408,6 +1448,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
+        phase: ProjectPhase
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
             .exclude(index__range=[2, min_phase_index-1]):
             sections_data += self.generate_sections_data(
@@ -1452,7 +1493,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             raise ValidationError(errors)
 
         # Confirmed deadlines can't be edited
-        confirmed_deadlines = [
+        confirmed_deadlines: list[str] = [
             dl.deadline.attribute.identifier for dl in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if self.instance else []
@@ -1469,8 +1510,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             list(valid_attributes.keys()),
         ))
 
-        invalid_identifiers = []
-        files_to_archive = []
+        invalid_identifiers: list[str] = []
+        files_to_archive: list[tuple[str, ProjectAttributeFile]] = []
         for identifier in unusual_identifiers:
             try:
                 attribute_file = ProjectAttributeFile.objects.get(
@@ -1483,9 +1524,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist):
                 invalid_identifiers.append(identifier)
 
-
         if len(invalid_identifiers):
-            invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
+            invalids: list[str] = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
             log.warn(", ".join(invalids))
 
         for identifier, attribute_file in files_to_archive:
@@ -1513,8 +1553,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return {**static_property_attributes, **valid_attributes}
 
-    def _validate_public(self, attrs):
-        public = attrs.get("public")
+    def _validate_public(self, attrs: dict[str, Any]) -> bool:
+        public: bool = attrs.get("public")
 
         # Do not validate if this is a new project
         if not self.instance:
@@ -1522,9 +1562,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # A project is always public if it has exited the starting phase
         try:
-            phase_index = attrs["phase"].index
+            phase_index: int = attrs["phase"].index
         except KeyError:
-            phase_index = self.instance.phase.index
+            phase_index: int = self.instance.phase.index
 
         if not self.instance.public and (phase_index > 1):
             return True
@@ -1534,7 +1574,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return public
 
-    def _validate_owner_edit_override(self, attrs):
+    def _validate_owner_edit_override(self, attrs: dict[str, Any]) -> bool:
         owner_edit_override = attrs.get("owner_edit_override", False)
         is_admin = self.context["request"].user.has_privilege("admin")
 
@@ -1548,17 +1588,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         else:
             return False
 
-    def validate_phase(self, phase, subtype_id=None):
+    def validate_phase(self, phase: ProjectPhase, subtype_id: int = None) -> ProjectPhase:
         if not subtype_id:
             try:
                 subtype_id = int(self.get_initial()["subtype"])
             except KeyError:
                 subtype_id = self.instance.subtype.pk
 
-        def _get_relative_phase(phase, offset):
+        def _get_relative_phase(phase: ProjectPhase, offset: int):
             return phase.project_subtype.phases.get(index=phase.index + offset)
 
-        offset = None
+        offset: int = None
 
         # TODO hard-coded for now
         if phase.name == "Suunnitteluperiaatteet":
@@ -1593,7 +1633,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     {"phase": _("Invalid phase for project subtype, no substitute found")}
                 )
 
-    def _validate_phase(self, attrs):
+    def _validate_phase(self, attrs: dict[str, Any]) -> ProjectPhase:
         try:
             return attrs["phase"]
         except KeyError:
@@ -1602,7 +1642,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 subtype_id=attrs["subtype"].id
             )
 
-    def validate_user(self, user):
+    def validate_user(self, user: User) -> User:
         if not user.has_privilege('create'):
             raise ValidationError(
                 {"user": _("Selected user does not have the required role")}
@@ -1610,7 +1650,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return user
 
-    def create(self, validated_data: dict) -> Project:
+    def create(self, validated_data: dict[str, Any]) -> Project:
         validated_data["phase"] = ProjectPhase.objects.filter(
             project_subtype=validated_data["subtype"]
         ).first()
@@ -1625,7 +1665,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 pass
 
             project: Project = super().create(validated_data)
-            user = self.context["request"].user
+            user: User = self.context["request"].user
             action.send(
                 user,
                 verb=verbs.CREATED_PROJECT,
@@ -1642,8 +1682,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(attribute_data)
                 project.save()
 
-            user=self.context["request"].user
+            user: User = self.context["request"].user
             project.update_deadlines(user=user)
+            dl: ProjectDeadline
             for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
@@ -1651,16 +1692,16 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return project
 
-    def update(self, instance: Project, validated_data: dict) -> Project:
-        attribute_data = validated_data.pop("attribute_data", {})
-        subtype = validated_data.get("subtype")
-        subtype_changed = subtype is not None and subtype != instance.subtype
-        phase = validated_data.get("phase")
-        phase_changed = phase is not None and phase != instance.phase
-        should_generate_deadlines = getattr(
+    def update(self, instance: Project, validated_data: dict[str, Any]) -> Project:
+        attribute_data: dict[str, Any] = validated_data.pop("attribute_data", {})
+        subtype: ProjectSubtype = validated_data.get("subtype")
+        subtype_changed: bool = subtype is not None and subtype != instance.subtype
+        phase: ProjectPhase = validated_data.get("phase")
+        phase_changed: bool = phase is not None and phase != instance.phase
+        should_generate_deadlines: bool = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
-        user=self.context["request"].user
+        user: User = self.context["request"].user
 
         if phase_changed:
             ProjectPhaseLog.objects.create(
@@ -1669,7 +1710,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 user=user,
             )
 
-        should_update_deadlines = self._get_should_update_deadlines(
+        should_update_deadlines: bool = self._get_should_update_deadlines(
             subtype_changed, instance, attribute_data,
         )
         self.context['should_update_deadlines'] = \
@@ -1684,14 +1725,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
-            project = super(ProjectSerializer, self).update(instance, validated_data)
+            project: Project = super(ProjectSerializer, self).update(instance, validated_data)
 
-            old_deadlines = None
+            old_deadlines: QuerySet[ProjectDeadline] = None
             if should_update_deadlines or should_generate_deadlines:
                 old_deadlines = project.deadlines.all().select_related("deadline")
 
             if should_generate_deadlines:
-                cleared_attributes = {
+                cleared_attributes: dict[str, None] = {
                     project_dl.deadline.attribute.identifier: None
                     for project_dl in project.deadlines.all().select_related("deadline", "deadline__attribute")
                     if project_dl.deadline.attribute
@@ -1706,13 +1747,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             project.save()
 
             if old_deadlines:
-                project_deadlines = project.deadlines.all().select_related("deadline")
+                project_deadlines: QuerySet[ProjectDeadline] = project.deadlines.all().select_related("deadline")
                 updated_deadlines = old_deadlines.union(project_deadlines)
                 for dl in updated_deadlines:
-                    project_deadline = next(filter(lambda _dl: _dl.deadline == dl.deadline, project_deadlines), None)
+                    project_deadline: ProjectDeadline = \
+                        next(filter(lambda _dl: _dl.deadline == dl.deadline, project_deadlines), None)
                     new_date = project_deadline.date if project_deadline else None
 
-                    old_deadline = next(filter(lambda _dl: _dl.deadline == dl.deadline, old_deadlines), None)
+                    old_deadline: ProjectDeadline = \
+                        next(filter(lambda _dl: _dl.deadline == dl.deadline, old_deadlines), None)
                     old_date = old_deadline.date if old_deadline else None
 
                     self.create_deadline_updates_log(
@@ -1721,20 +1764,20 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             return project
 
-    def log_updates_attribute_data(self, attribute_data, project=None, prefix=""):
+    def log_updates_attribute_data(self, attribute_data: dict[str, Any], project: Project = None, prefix: str = ""):
         project = project or self.instance
         if not project:
             raise ValueError("Can't update attribute data log if no project")
 
-        user = self.context["request"].user
-        instance_attribute_date = getattr(self.instance, "attribute_data", {})
-        updated_attribute_values = {}
+        user: User = self.context["request"].user
+        instance_attribute_date: dict[str, Any] = getattr(self.instance, "attribute_data", {})
+        updated_attribute_values: dict[str, Any] = {}
 
         for identifier, value in attribute_data.items():
             existing_value = instance_attribute_date.get(identifier, None)
 
             if not value and not existing_value:
-                old_file = ProjectAttributeFile.objects \
+                old_file: ProjectAttributeFile = ProjectAttributeFile.objects \
                     .filter(
                         project=project,
                         archived_at=None,
@@ -1749,11 +1792,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                     "new": value,
                 }
 
-        updated_attributes = Attribute.objects.filter(
+        updated_attributes: QuerySet[Attribute] = Attribute.objects.filter(
             identifier__in=updated_attribute_values.keys()
         )
 
-        geometry_attributes = []
+        geometry_attributes: list[Attribute] = []
         for attribute in updated_attributes:
             # Add additional checks for geometries since they are not actually stored
             # in the attribute_data but in their own model
@@ -1761,7 +1804,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 geometry_attributes.append(attribute)
                 continue
 
-            values = updated_attribute_values[attribute.identifier]
+            values: dict[str, Any] = updated_attribute_values[attribute.identifier]
 
             if attribute.value_type == Attribute.TYPE_FIELDSET:
                 for i, children in enumerate(values["new"]):
@@ -1788,15 +1831,16 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
         for geometry_attribute in geometry_attributes:
-            geometry_instance = ProjectAttributeMultipolygonGeometry.objects.filter(
-                project=project, attribute=geometry_attribute
-            ).first()
+            geometry_instance: ProjectAttributeMultipolygonGeometry =\
+                ProjectAttributeMultipolygonGeometry.objects.filter(
+                    project=project, attribute=geometry_attribute
+                ).first()
             new_geometry = attribute_data[geometry_attribute.identifier]
             if geometry_instance and geometry_instance.geometry != new_geometry:
                 self._create_updates_log(geometry_attribute, project, user, None, None)
 
-    def _get_labels(self, values, attribute):
-        labels = {}
+    def _get_labels(self, values: list[str], attribute: Attribute) -> dict[str, str]:
+        labels: dict[str, str] = {}
 
         for val in values:
             try:
@@ -1806,10 +1850,17 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return labels
 
-    def _create_updates_log(self, attribute, project, user, new_value, old_value, prefix=""):
-        new_value = json.loads(json.dumps(new_value, default=str))
-        old_value = json.loads(json.dumps(old_value, default=str))
-        labels = {}
+    def _create_updates_log(self,
+                            attribute: Attribute,
+                            project: Project,
+                            user: User,
+                            new_value: str,
+                            old_value: str,
+                            prefix: str = ""
+                            ) -> None:
+        new_value: str = json.loads(json.dumps(new_value, default=str))
+        old_value: str = json.loads(json.dumps(old_value, default=str))
+        labels: dict[str, str] = {}
 
         if attribute.value_type == Attribute.TYPE_CHOICE:
             if new_value:
@@ -1860,9 +1911,15 @@ class ProjectSerializer(serializers.ModelSerializer):
                 old_file.archived_at = timestamp
                 old_file.save()
 
-    def create_deadline_updates_log(self, deadline, project, user, old_date, new_date):
-        old_value = json.loads(json.dumps(old_date, default=str))
-        new_value = json.loads(json.dumps(new_date, default=str))
+    def create_deadline_updates_log(self,
+                                    deadline: Deadline,
+                                    project: Project,
+                                    user: User,
+                                    old_date: datetime.date,
+                                    new_date: datetime.date
+                                    ) -> None:
+        old_value: str = json.loads(json.dumps(old_date, default=str))
+        new_value: str = json.loads(json.dumps(new_date, default=str))
 
         if old_value != new_value:
             action.send(
@@ -1939,35 +1996,35 @@ class ProjectSnapshotSerializer(ProjectSerializer):
         ]
         read_only_fields = fields
 
-    def _get_static_property(self, project, static_property):
-        attribute_data = self.get_attribute_data(project)
+    def _get_static_property(self, project: Project, static_property: str) -> Any:
+        attribute_data: dict[str, Any] = self.get_attribute_data(project)
         try:
-            identifier = \
+            identifier: str = \
                 Attribute.objects.get(static_property=static_property).identifier
             return attribute_data[identifier]
         except (Attribute.DoesNotExist, KeyError):
             return getattr(project, static_property)
 
-    def get_user(self, project):
-        value = getattr(project, "user")
+    def get_user(self, project: Project) -> str:
+        value: User = getattr(project, "user")
         if value:
             return value.uuid
 
         return self._get_static_property(project, "user")  # .uuid
 
-    def get_name(self, project):
+    def get_name(self, project: Project) -> str:
         return self._get_static_property(project, "name")
 
-    def get_pino_number(self, project):
+    def get_pino_number(self, project: Project) -> str:
         return self._get_static_property(project, "pino_number")
 
-    def get_create_principles(self, project):
+    def get_create_principles(self, project: Project) -> Any:
         return self._get_static_property(project, "create_principles")
 
-    def get_create_draft(self, project):
+    def get_create_draft(self, project: Project) -> Any:
         return self._get_static_property(project, "create_draft")
 
-    def get_subtype(self, project):
+    def get_subtype(self, project: Project) -> int:
         try:
             return ProjectPhaseLog.objects.filter(
                 created_at__lte=self._get_snapshot_date(project),
@@ -1976,7 +2033,7 @@ class ProjectSnapshotSerializer(ProjectSerializer):
         except (ProjectPhaseLog.DoesNotExist, AttributeError):
             return project.subtype.id
 
-    def get_phase(self, project):
+    def get_phase(self, project: Project) -> int:
         try:
             return ProjectPhaseLog.objects.filter(
                 created_at__lte=self._get_snapshot_date(project),
@@ -1985,7 +2042,7 @@ class ProjectSnapshotSerializer(ProjectSerializer):
         except (ProjectPhaseLog.DoesNotExist, AttributeError):
             return project.phase.id
 
-    def get_deadlines(self, project):
+    def get_deadlines(self, project: Project) -> list[dict[str, Any]]:
         snapshot = self._get_snapshot_date(project)
 
         actions = (
@@ -2011,8 +2068,8 @@ class ProjectSnapshotSerializer(ProjectSerializer):
 
 
 class AdminProjectSerializer(ProjectSerializer):
-    def get_fields(self):
-        fields = super(AdminProjectSerializer, self).get_fields()
+    def get_fields(self) -> dict[str, Any]:
+        fields: dict[str, Any] = super(AdminProjectSerializer, self).get_fields()
         request = self.context.get('request', None)
 
         fields["archived"] = serializers.BooleanField(
@@ -2058,7 +2115,7 @@ class ProjectPhaseSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(OpenApiTypes.INT)
-    def get_project_type(self, project):
+    def get_project_type(self, project: Project) -> int:
         return project.project_type.pk
 
 
@@ -2075,12 +2132,12 @@ class ProjectSubtypeSerializer(serializers.ModelSerializer):
         ]
 
     @extend_schema_field(OpenApiTypes.INT)
-    def get_project_type(self, project):
+    def get_project_type(self, project: Project) -> int:
         return project.project_type.pk
 
 
 class FieldsetPathField(serializers.JSONField):
-    def to_representation(self, value):
+    def to_representation(self, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return [
             {
                 "parent": i["parent"].identifier,
@@ -2106,7 +2163,7 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         fields = ["file", "attribute", "project", "description", "fieldset_path"]
 
     @staticmethod
-    def _validate_attribute(attribute: Attribute, project: Project):
+    def _validate_attribute(attribute: Attribute, project: Project) -> None:
         # Check if the attribute is part of the project
         try:
             # Field belongs to a fieldset
@@ -2124,14 +2181,14 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             # Using the same error message as SlugRelatedField
             raise ValidationError(_("Object with {slug_name}={value} does not exist."))
 
-    def validate(self, attrs: dict):
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
         self._validate_attribute(attrs["attribute"], attrs["project"])
 
         return attrs
 
-    def create(self, validated_data):
-        fieldset_path = validated_data.pop("fieldset_path", [])
-        attribute = validated_data["attribute"]
+    def create(self, validated_data) -> None:
+        fieldset_path: list[dict[str, Any]] = validated_data.pop("fieldset_path", [])
+        attribute: Attribute = validated_data["attribute"]
 
         # Save new path as a string for easier querying
         if fieldset_path:
@@ -2144,7 +2201,7 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         else:
             path_string = None
 
-        old_files = list(ProjectAttributeFile.objects.filter(
+        old_files: list[ProjectAttributeFile] = list(ProjectAttributeFile.objects.filter(
             project=validated_data["project"],
             attribute=attribute,
             archived_at=None,

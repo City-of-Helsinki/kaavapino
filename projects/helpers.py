@@ -34,7 +34,7 @@ def get_fieldset_path(attr: Attribute,
     orig_attr: Attribute = orig_attr or attr
     cache_key: str = f'projects.helpers.get_fieldset_path.{orig_attr.identifier}'
     if cached:
-        cache_value = cache.get(cache_key)
+        cache_value: list[Attribute] = cache.get(cache_key)
         if cache_value:
             return cache_value
 
@@ -50,7 +50,9 @@ def get_fieldset_path(attr: Attribute,
         )
 
 
-def set_attribute_data(data: Union[dict, list], path: list, value: str) -> None:
+def set_attribute_data(data: Union[dict[str, list], list[dict]],
+                       path: list[Union[Attribute, str]],
+                       value: str) -> None:
     try:
         next_key = path[0].identifier
     except AttributeError:
@@ -85,12 +87,12 @@ def get_attribute_data(attribute_path: list[Attribute], data: dict):
     )
 
 
-def get_flat_attribute_data(data: dict,
+def get_flat_attribute_data(data: dict[str, Any],
                             flat: dict[str, list],
                             first_run: bool = True,
                             flat_key: str = None,
                             value_types: dict = None
-                            ) -> dict:
+                            ) -> dict[str, list]:
     from projects.models import Attribute
 
     if first_run:
@@ -106,7 +108,7 @@ def get_flat_attribute_data(data: dict,
             return cached_flat
 
         a: Attribute
-        value_types = {a.identifier: a.value_type for a in Attribute.objects.all()}
+        value_types: dict[str, str] = {a.identifier: a.value_type for a in Attribute.objects.all()}
 
     for key, val in data.items():
         flat[key] = flat.get(key, [])
@@ -140,7 +142,7 @@ def get_flat_attribute_data(data: dict,
     return flat
 
 
-def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict) -> None:
+def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict[str, Any]) -> None:
     from projects.models import Attribute
 
     external_data_attrs: QuerySet[Attribute] = Attribute.objects.filter(
@@ -153,7 +155,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict) -> None:
         value_type=Attribute.TYPE_FIELDSET,
     ).select_related("key_attribute")
 
-    flat_attribute_data = get_flat_attribute_data(attribute_data, {})
+    flat_attribute_data: dict[str, list] = get_flat_attribute_data(attribute_data, {})
 
     # TODO: Timeout should be fixed in Kaavoitus-api
     """
@@ -233,7 +235,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict) -> None:
             else:
                 fetched_data[attr][key] = None
 
-    def get_deep(source, keys, default=None):
+    def get_deep(source: dict, keys: Union[str, list], default: dict = None) -> dict:
         if not keys:
             return source
 
@@ -252,7 +254,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict) -> None:
         else:
             return source.get(keys[0], None)
 
-    def get_in_attribute_data(attribute_path, data: Union[dict, list]) -> list:
+    def get_in_attribute_data(attribute_path: list[Attribute], data: Union[dict, list]) -> list:
         if len(attribute_path) == 2:
             data = data.get(attribute_path[0].identifier, [])
             if type(data) is list:
@@ -420,11 +422,11 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict) -> None:
         else:
             return None
 
-    def set_in_attribute_data(data: Union[dict, list], path: list, value) -> None:
+    def set_in_attribute_data(data: Union[dict, list], path: list[Union[Attribute, tuple[int]]], value: str) -> None:
         try:
             next_key: str = path[0].identifier
         except AttributeError:
-            next_key = path[0][0]
+            next_key: int = path[0][0]
 
         if len(path) > 1:
             if type(data) is dict:
@@ -637,7 +639,7 @@ def get_in_personnel_data(id: str, key: str, is_kaavapino_user: bool) -> Any:
     return PersonnelSerializer(user).data.get(key)
 
 
-def set_ad_data_in_attribute_data(attribute_data) -> None:
+def set_ad_data_in_attribute_data(attribute_data: dict[str, Any]) -> None:
     from projects.models import Attribute
     paths: list = []
 
@@ -696,7 +698,7 @@ def _find_closest_path(target_path: list, path_behind: list, path_ahead: list) -
     return path_behind + target_path
 
 
-def set_automatic_attributes(attribute_data) -> None:
+def set_automatic_attributes(attribute_data: dict[str, Any]) -> None:
     from projects.models import AttributeAutoValue
 
     paths: list = []

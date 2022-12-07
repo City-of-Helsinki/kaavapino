@@ -4,8 +4,8 @@ from django.conf import settings
 from django.core.cache import cache
 
 
-def get_graph_api_access_token():
-    token = cache.get("GRAPH_API_token")
+def get_graph_api_access_token() -> str:
+    token: str = cache.get("GRAPH_API_token")
     if not token:
         response = requests.post(
             f"{settings.GRAPH_API_LOGIN_BASE_URL}/{settings.GRAPH_API_TENANT_ID}/oauth2/v2.0/token",

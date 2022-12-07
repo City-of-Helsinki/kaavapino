@@ -1,13 +1,14 @@
 from projects.models import Attribute
 
 
-def _is_attribute_required(attribute: Attribute):
+def _is_attribute_required(attribute: Attribute) -> bool:
     if not attribute.generated:
         return attribute.required
     else:
         return False
 
-def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value):
+
+def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value) -> None:
     parent_id = path[i]["parent"].identifier
     index = path[i]["index"]
 
@@ -20,7 +21,6 @@ def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value)
     except IndexError:
         parent_obj[parent_id] += [None] * (index + 1 - len(parent_obj[parent_id]))
         next_obj = parent_obj[parent_id][index]
-
 
     # TODO multi-level fieldset image uploads not needed/supported for now
     if False and i < len(path) - 1:

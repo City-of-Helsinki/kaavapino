@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Any, Union
 
 if TYPE_CHECKING:
     from users.models import User
+    from projects.models import DocumentTemplate
 
 import datetime
 import itertools
@@ -16,7 +17,7 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.db.models.expressions import Value
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -98,7 +99,7 @@ class ProjectSubtype(models.Model):
     def __str__(self):
         return self.name
 
-    def get_phases(self, project: Optional[Project] = None):
+    def get_phases(self, project: Optional[Project] = None) -> QuerySet[ProjectPhase]:
         if not project:
             return self.phases.all()
 
@@ -197,15 +198,16 @@ class Project(models.Model):
     def __str__(self):
         return self.name
 
-    def get_attribute_data(self):
+    def get_attribute_data(self) -> dict[str, Any]:
         """Returns deserialized attribute data for the project."""
-        ret = {}
+        ret: dict[str, Any] = {}
 
+        attribute: Attribute
         for attribute in Attribute.objects.all().prefetch_related("value_choices"):
             deserialized_value = None
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
-                geometry = ProjectAttributeMultipolygonGeometry.objects.filter(
+                geometry: ProjectAttributeMultipolygonGeometry = ProjectAttributeMultipolygonGeometry.objects.filter(
                     attribute=attribute, project=self
                 ).first()
                 if not geometry:
@@ -226,33 +228,35 @@ class Project(models.Model):
             ret[attribute.identifier] = deserialized_value
         return ret
 
-    def set_attribute_data(self, data):
-        self.attribute_data = {}
+    def set_attribute_data(self, data: dict[str, Any]) -> None:
+        self.attribute_data: dict[str, Any] = {}
         self.update_attribute_data(data)
 
-    def update_attribute_data(self, data):
+    def update_attribute_data(self, data: dict[str, Any]) -> bool:
         if not isinstance(self.attribute_data, dict):
-            self.attribute_data = {}
+            self.attribute_data: dict[str, Any] = {}
 
         if not data:
             return False
 
-        project_attributes = (
+        project_attributes: tuple[Attribute] = (
             Attribute.objects.all()
             .distinct()
             .prefetch_related("value_choices")
         )
 
-        attributes = {a.identifier: a for a in project_attributes}
+        attributes: dict[str, Attribute] = {a.identifier: a for a in project_attributes}
 
+        identifier: str
+        value: Any
         for identifier, value in data.items():
-            attribute = attributes.get(identifier)
+            attribute: Attribute = attributes.get(identifier)
 
             if not attribute:
                 continue
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
-                geometry_query_params = {"attribute": attribute, "project": self}
+                geometry_query_params: dict[str, Union[Attribute, Project]] = {"attribute": attribute, "project": self}
                 if not value:
                     ProjectAttributeMultipolygonGeometry.objects.filter(
                         **geometry_query_params
@@ -281,15 +285,15 @@ class Project(models.Model):
         return True
 
     # TODO disabled for now; frontend generates and sends values but we need to develop this later
-    def update_generated_values(self, generated_attributes, attribute_data):
+    def update_generated_values(self, generated_attributes: list[Attribute], attribute_data: dict[str, Any]) -> None:
         for attribute in generated_attributes:
-            calculation_operators = attribute.calculation_operators
-            attribute_values = [
+            calculation_operators: list[str] = attribute.calculation_operators
+            attribute_values: list[Any] = [
                 attribute_data.get(identifier, 0) or 0
                 for identifier in attribute.calculation_attribute_identifiers
             ]
 
-            calculation_string = "".join(
+            calculation_string: str = "".join(
                 [
                     str(value) + (operator or "")
                     for value, operator in itertools.zip_longest(
@@ -306,11 +310,12 @@ class Project(models.Model):
 
             attribute_data[attribute.identifier] = calculated_value
 
-    def _check_condition(self, deadline, preview_attributes={}):
+    def _check_condition(self, deadline: Deadline, preview_attributes: dict[str, Any] = {}) -> bool:
         if not deadline.condition_attributes.count():
             return True
 
-        attribute_data = {**self.attribute_data, **preview_attributes}
+        attribute_data: dict[str, Any] = {**self.attribute_data, **preview_attributes}
+        attr: Attribute
         for attr in deadline.condition_attributes.all():
             if bool(attribute_data.get(attr.identifier, None)):
                 return True
@@ -319,7 +324,7 @@ class Project(models.Model):
 
     def get_applicable_deadlines(self,
                                  subtype: Optional[ProjectSubtype] = None,
-                                 preview_attributes: dict = {}
+                                 preview_attributes: dict[str, Any] = {}
                                  ) -> list[Deadline]:
         excluded_phases = []
 
@@ -397,25 +402,25 @@ class Project(models.Model):
 
     def _set_calculated_deadlines(self,
                                   deadlines: list[Deadline],
-                                  user,
+                                  user: Optional[User],
                                   ignore: list[Deadline] = [],
                                   initial: bool = False,
                                   preview: bool = False,
                                   preview_attribute_data: dict = {}
-                                  ) -> None:
-        results = {}
-        fillers = []
+                                  ) -> dict[Deadline, datetime.date]:
+        results: dict[Deadline, datetime.date] = {}
+        fillers: list[Deadline] = []
 
         for deadline in deadlines:
             if initial:
                 calculate_deadline = deadline.calculate_initial
-                dependencies = [
+                dependencies: list[Deadline] = [
                     dl for dl in deadline.initial_depends_on
                     if dl not in ignore
                 ]
             else:
                 calculate_deadline = deadline.calculate_updated
-                dependencies = [
+                dependencies: list[Deadline] = [
                     dl for dl in deadline.update_depends_on
                     if dl not in ignore
                 ]
@@ -466,18 +471,19 @@ class Project(models.Model):
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, values=None, user: Optional[User] = None):
-        deadlines = self.get_applicable_deadlines()
+    def update_deadlines(self, values=None, user: Optional[User] = None) -> None:
+        deadlines: list[Deadline] = self.get_applicable_deadlines()
 
         # Delete no longer relevant deadlines and create missing
-        to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
+        to_be_deleted: QuerySet[ProjectDeadline] = self.deadlines.exclude(deadline__in=deadlines)
 
         for dl in to_be_deleted:
             self.deadlines.remove(dl)
 
-        generated_deadlines = []
-        project_deadlines = list(self.deadlines.all())
+        generated_deadlines: list[ProjectDeadline] = []
+        project_deadlines: list[ProjectDeadline] = list(self.deadlines.all())
 
+        deadline: Deadline
         for deadline in deadlines:
             project_deadline, created = ProjectDeadline.objects.get_or_create(
                 project=self,
@@ -497,7 +503,7 @@ class Project(models.Model):
             if not dl.deadline.attribute:
                 continue
 
-            value = self.attribute_data.get(dl.deadline.attribute.identifier)
+            value: datetime.date = self.attribute_data.get(dl.deadline.attribute.identifier)
             dl.date = value
             dl.save()
 
@@ -534,9 +540,12 @@ class Project(models.Model):
         )
 
     # Calculate a preview schedule without saving anything
-    def get_preview_deadlines(self, updated_attributes, subtype):
+    def get_preview_deadlines(self,
+                              updated_attributes: dict[str, Any],
+                              subtype: ProjectSubtype
+                              ) -> dict[Deadline, datetime.date]:
         # Filter out deadlines that would be deleted
-        project_dls = {
+        project_dls: dict[Deadline, datetime.date] = {
             dl.deadline: dl.date
             for dl in self.deadlines.all().select_related("deadline", "deadline__phase", "deadline__subtype", "deadline__attribute")
                                           .prefetch_related("deadline__initial_calculations", "deadline__update_calculations")
@@ -544,7 +553,7 @@ class Project(models.Model):
         }
 
         # List deadlines that would be created
-        new_dls = {
+        new_dls: dict[Deadline, None] = {
             dl: None
             for dl in self.get_applicable_deadlines(
                 subtype=subtype,
@@ -553,10 +562,10 @@ class Project(models.Model):
             if dl not in project_dls
         }
 
-        project_dls = {**new_dls, **project_dls}
+        project_dls: dict[Deadline, datetime.date] = {**new_dls, **project_dls}
 
         # Update attribute-based deadlines
-        updated_attribute_data = {**self.attribute_data, **updated_attributes}
+        updated_attribute_data: dict[str, Any] = {**self.attribute_data, **updated_attributes}
         for dl in project_dls.keys():
             if not dl.attribute:
                 continue
@@ -568,7 +577,7 @@ class Project(models.Model):
 
 
         # Generate newly added deadlines
-        project_dls = {**project_dls, **self._set_calculated_deadlines(
+        project_dls: dict[Deadline, datetime.date] = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in new_dls.keys()
                 if dl.initial_calculations.count() or dl.default_to_created_at
@@ -579,7 +588,7 @@ class Project(models.Model):
         )}
 
         # Update all deadlines
-        project_dls = {**project_dls, **self._set_calculated_deadlines(
+        project_dls: dict[Deadline, datetime.date] = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in project_dls
                 if dl.update_calculations.count() \
@@ -595,12 +604,13 @@ class Project(models.Model):
         return project_dls
 
     @property
-    def type(self):
+    def type(self) -> ProjectType:
         return self.subtype.project_type
 
     @property
-    def phase_documents_creation_started(self):
+    def phase_documents_creation_started(self) -> bool:
         # True if any documents in current phase has been downloaded at least once
+        template: DocumentTemplate
         for template in \
             self.phase.common_project_phase.document_templates.filter(
                 silent_downloads=False,
@@ -614,8 +624,9 @@ class Project(models.Model):
         return False
 
     @property
-    def phase_documents_created(self):
+    def phase_documents_created(self) -> bool:
         # True if all documents in current phase have been downloaded at least once
+        template: DocumentTemplate
         for template in \
             self.phase.common_project_phase.document_templates.filter(
                 silent_downloads=False,
@@ -628,18 +639,20 @@ class Project(models.Model):
 
         return True
 
-    def save(self, *args, **kwargs):
-        fieldset_attributes = {f for f in FieldSetAttribute.objects.all().select_related("attribute_source", "attribute_target")}
+    def save(self, *args, **kwargs) -> None:
+        fieldset_attributes: list[FieldSetAttribute] = \
+            [f for f in FieldSetAttribute.objects.all().select_related("attribute_source", "attribute_target")]
 
-        def add_fieldset_field_for_attribute(search_fields, attr, fieldset, raw=False):
-            key = attr.identifier
+        def add_fieldset_field_for_attribute(search_fields: set[Value], attr: Attribute, fieldset: list[dict[str, Any]], raw=False):
+            key: str = attr.identifier
             while attr.fieldset_attribute_target.count():
-                attr = next(filter(lambda a: a.attribute_target == attr, fieldset_attributes), None).attribute_source
+                attr: Attribute = next(filter(lambda a: a.attribute_target == attr, fieldset_attributes), None).attribute_source
                 if not fieldset:
                     fieldset = self.attribute_data.get(attr.identifier)
                 if not fieldset:
                     return
 
+                field: dict[str, Any]
                 for field in fieldset:
                     value = field.get(key)
                     # log.info('%s__%s: %s' % (attr.identifier, key, value))
@@ -656,13 +669,13 @@ class Project(models.Model):
                         else:
                             search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
 
-        def add_search_field_for_attribute(search_fields, attr):
+        def add_search_field_for_attribute(search_fields: set[Value], attr: Attribute) -> None:
             if attr.static_property:
-                value = getattr(self, attr.static_property, None)
+                value: Any = getattr(self, attr.static_property, None)
                 if value:
                     search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
             elif not attr.fieldset_attribute_target.count():
-                value = self.attribute_data.get(attr.identifier)
+                value: Any = self.attribute_data.get(attr.identifier)
                 if value and attr.value_type != Attribute.TYPE_FIELDSET:
                     search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
             else:
@@ -670,7 +683,7 @@ class Project(models.Model):
 
             return
 
-        def check_get_name(value):
+        def check_get_name(value: Any) -> Any:
             if type(value) != str:
                 return value
 
@@ -685,7 +698,7 @@ class Project(models.Model):
 
         # TODO: check if required
         # set_ad_data_in_attribute_data(self.attribute_data)
-        search_fields = set()
+        search_fields: set[Value] = set()
         attr: Attribute
         for attr in Attribute.objects.filter(searchable=True)\
                 .prefetch_related("fieldsets", "fieldset_attribute_target", "fieldset_attribute_source"):
@@ -739,7 +752,7 @@ class ProjectFloorAreaSection(models.Model):
     def __str__(self):
         return f"{self.name} ({self.project_subtype.name})"
 
-    def get_attribute_identifiers(self):
+    def get_attribute_identifiers(self) -> list[str]:
         return [a.identifier for a in self.attributes.all()]
 
 
@@ -820,13 +833,13 @@ class CommonProjectPhase(models.Model):
         return f"{self.name}"
 
     @property
-    def subtypes(self):
+    def subtypes(self) -> QuerySet[ProjectSubtype]:
         return ProjectSubtype.objects.filter(
             phases__in=self.phases.all(),
         )
 
     @property
-    def prefixed_name(self):
+    def prefixed_name(self) -> str:
         return f"{self.list_prefix}. {self.name}"
 
 
@@ -866,27 +879,27 @@ class ProjectPhase(models.Model):
         return f"{self.common_project_phase} ({self.project_subtype.name})"
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self.common_project_phase.name
 
     @property
-    def color(self):
+    def color(self) -> str:
         return self.common_project_phase.color
 
     @property
-    def color_code(self):
+    def color_code(self) -> str:
         return self.common_project_phase.color_code
 
     @property
-    def list_prefix(self):
+    def list_prefix(self) -> str:
         return self.common_project_phase.list_prefix
 
     @property
-    def project_type(self):
+    def project_type(self) -> ProjectType:
         return self.project_subtype.project_type
 
     @property
-    def prefixed_name(self):
+    def prefixed_name(self) -> str:
         return self.common_project_phase.prefixed_name
 
 
@@ -953,7 +966,7 @@ class ProjectPhaseSection(models.Model):
     def __str__(self):
         return f"{self.name} ({self.phase.name}, {self.phase.project_subtype.name})"
 
-    def get_attribute_identifiers(self):
+    def get_attribute_identifiers(self) -> list[str]:
         return [a.identifier for a in self.attributes.all()]
 
 
@@ -1116,13 +1129,13 @@ class ProjectAttributeFile(models.Model):
     )
 
     @cached_property
-    def fieldset_path(self):
+    def fieldset_path(self) -> list[dict[str, Union[Attribute, int]]]:
         return [
             {"parent": loc.parent_fieldset, "index": loc.child_index}
             for loc in self.fieldset_path_locations.all()
         ]
 
-    def get_upload_subfolder(self):
+    def get_upload_subfolder(self) -> list[str]:
         project_id = str(self.project.pk)
         if not project_id:
             raise ValueError("No project id could be found, can't save file!")
@@ -1138,7 +1151,7 @@ class ProjectAttributeFile(models.Model):
         max_length=255,
     )
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, **kwargs) -> None:
         super(ProjectAttributeFile, self).save(*args, **kwargs)
         # portrait a4 paper @ 200dpi
         paper_size_in_pixels = (1654, 2339)
@@ -1229,9 +1242,9 @@ class ProjectDeadline(models.Model):
     )
 
     @property
-    def confirmed(self):
+    def confirmed(self) -> Union[bool, None]:
         try:
-            identifier = self.deadline.confirmation_attribute.identifier
+            identifier: str = self.deadline.confirmation_attribute.identifier
         except AttributeError:
             return None
 
@@ -1302,7 +1315,7 @@ class ProjectPhaseDeadlineSection(models.Model):
     admin_description = "Aikataulumodaalin osiot ja kentät"
 
     @property
-    def name(self):
+    def name(self) -> str:
         return f"{self.phase.list_prefix}. {self.phase.name}"
 
     class Meta:

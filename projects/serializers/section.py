@@ -1,3 +1,5 @@
+from typing import Union, Any
+
 import copy
 import datetime
 import logging
@@ -5,6 +7,7 @@ import logging
 from django.utils import formats, translation
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from rest_framework.request import Request
 from rest_framework.exceptions import ValidationError
 from rest_framework_gis.fields import GeometryField
 
@@ -13,9 +16,14 @@ from projects.models import (
     Project,
     ProjectDeadline,
     ProjectFloorAreaSection,
+    ProjectFloorAreaSectionAttribute,
     ProjectPhaseSection,
+    ProjectPhaseSectionAttribute,
     ProjectPhaseDeadlineSection,
+    ProjectPhaseDeadlineSectionAttribute,
     ProjectSubtype,
+    Deadline,
+    DeadlineDistance
 )
 from projects.serializers.utils import _is_attribute_required
 
@@ -49,12 +57,13 @@ format_code = formats.get_format("SHORT_DATE_FORMAT", lang=translation.get_langu
 FieldData = namedtuple("FieldData", ["field_class", "field_arguments"])
 
 
-def get_rich_text_validator(attribute):
-    def validate(value):
-        error_msg = attribute.error_message or _("Character limit exceeded")
+def get_rich_text_validator(attribute: Attribute):
+    def validate(value: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+        error_msg: str = attribute.error_message or _("Character limit exceeded")
         try:
-            total_length = 0
+            total_length: int = 0
 
+            item: dict[str, str]
             for item in value["ops"]:
                 total_length += len(item["insert"])
 
@@ -74,10 +83,11 @@ def get_rich_text_validator(attribute):
 
     return validate
 
-def get_unique_validator(attribute, project_id):
+
+def get_unique_validator(attribute: Attribute, project_id):
     def validate(value):
-        column = f"attribute_data__{attribute.identifier}"
-        error_msg = attribute.error_message or _("Value must be unique")
+        column: str = f"attribute_data__{attribute.identifier}"
+        error_msg: str = attribute.error_message or _("Value must be unique")
         if Project.objects.filter(**{column: value}).exclude(pk=project_id).count() > 0:
             raise ValidationError(
                 {attribute.identifier: error_msg}
@@ -85,11 +95,15 @@ def get_unique_validator(attribute, project_id):
 
     return validate
 
-def get_deadline_validator(attribute, subtype, preview):
-    def validate(value):
+
+def get_deadline_validator(attribute: Attribute,
+                           subtype: ProjectSubtype,
+                           preview: dict[Deadline, Union[str, datetime.date]]):
+    def validate(value: datetime.date):
         if not preview:
             return
 
+        attr_dl: Deadline
         for attr_dl in attribute.deadline.filter(subtype=subtype):
             # validate datetype
             try:
@@ -97,7 +111,7 @@ def get_deadline_validator(attribute, subtype, preview):
             except AttributeError:
                 pass
             except AssertionError:
-                valid_date = attr_dl.date_type.get_closest_valid_date(value)
+                valid_date: datetime.date = attr_dl.date_type.get_closest_valid_date(value)
                 raise ValidationError(
                     (_(attr_dl.error_date_type_mismatch or \
                     f"Invalid date selection for date type {attr_dl.date_type}"),
@@ -105,15 +119,16 @@ def get_deadline_validator(attribute, subtype, preview):
                 )
 
             # validate minimum distance to previous deadline(s)
+            distance: DeadlineDistance
             for distance in attr_dl.distances_to_previous.all():
-                prev_dl = preview.get(distance.previous_deadline)
+                prev_dl: Union[str, datetime.date] = preview.get(distance.previous_deadline)
                 if not prev_dl:
                     continue
 
-                default_error = _(f"Minimum distance to {distance.previous_deadline.abbreviation} not met")
+                default_error: str = _(f"Minimum distance to {distance.previous_deadline.abbreviation} not met")
 
                 if type(prev_dl) == str:
-                    prev_dl = datetime.datetime.strptime(prev_dl, "%Y-%m-%d").date()
+                    prev_dl: datetime.date = datetime.datetime.strptime(prev_dl, "%Y-%m-%d").date()
 
                 if distance.date_type:
                     first_valid_day = distance.date_type.valid_days_from(
@@ -151,9 +166,14 @@ def get_deadline_validator(attribute, subtype, preview):
 
     return validate
 
-def create_attribute_field_data(attribute, validation, project, preview):
+
+def create_attribute_field_data(attribute: Attribute,
+                                validation,
+                                project,
+                                preview: dict[Deadline, Union[str, datetime.date]]
+                                ) -> FieldData:
     """Create data for initializing attribute field serializer."""
-    field_arguments = {}
+    field_arguments: dict[str, Any] = {}
     field_class = FIELD_TYPES.get(attribute.value_type, None)
 
     field_arguments["validators"] = []
@@ -207,14 +227,15 @@ def create_attribute_field_data(attribute, validation, project, preview):
     return FieldData(field_class, field_arguments)
 
 
-def create_fieldset_field_data(attribute, validation, project, preview):
+def create_fieldset_field_data(attribute: Attribute, validation, project: Project, preview) -> FieldData:
     """Dynamically create a serializer for a fieldset type Attribute instance."""
-    serializer_fields = {}
-    field_arguments = {}
+    serializer_fields: dict[str, Any] = {}
+    field_arguments: dict[str, Any] = {}
 
     if attribute.multiple_choice:
         field_arguments["many"] = True
 
+    attr: Attribute
     for attr in attribute.fieldset_attributes.order_by("fieldset_attribute_source"):
         field_data = create_attribute_field_data(attr, validation, project, preview)
         if not field_data.field_class:
@@ -237,7 +258,11 @@ def create_fieldset_field_data(attribute, validation, project, preview):
 
 
 def create_section_serializer(
-    section, context, project=None, validation=True, preview=None,
+        section: Union[ProjectPhaseSection, ProjectFloorAreaSection, ProjectPhaseDeadlineSection],
+        context: dict[str, Any],
+        project: Project = None,
+        validation: bool = True,
+        preview: dict[Deadline, datetime.date] = None,
 ):
     """
     Dynamically create a serializer for a ProjectPhaseSection or
@@ -254,28 +279,28 @@ def create_section_serializer(
     other fields values.
     """
 
-    request = context.get("request", None)
-    attribute_data = get_attribute_data(request, project)
+    request: Request = context.get("request", None)
+    attribute_data: dict[str, Any] = get_attribute_data(request, project)
 
     if not request:
         return None
 
     if isinstance(section, ProjectPhaseSection):
-        section_attributes = [
+        section_attributes: list[Attribute] = [
             section_attribute.attribute
             for section_attribute
             in section.projectphasesectionattribute_set.order_by("index").select_related("attribute")
             if is_relevant_attribute(section_attribute, attribute_data)
         ]
     elif isinstance(section, ProjectFloorAreaSection):
-        section_attributes = [
+        section_attributes: list[Attribute] = [
             section_attribute.attribute
             for section_attribute
             in section.projectfloorareasectionattribute_set.order_by("index")
             if is_relevant_attribute(section_attribute, attribute_data)
         ]
     elif isinstance(section, ProjectPhaseDeadlineSection):
-        section_attributes = [
+        section_attributes: list[Attribute] = [
             section_attribute.attribute
             for section_attribute
             in section.projectphasedeadlinesectionattribute_set.all()
@@ -284,7 +309,7 @@ def create_section_serializer(
     else:
         return None
 
-    serializer_fields = {}
+    serializer_fields: dict[str, Any] = {}
     for attribute in section_attributes:
         if attribute.value_type == Attribute.TYPE_FIELDSET:
             field_data = create_fieldset_field_data(
@@ -308,7 +333,7 @@ def create_section_serializer(
     return serializer
 
 
-def get_attribute_data(request, project=None) -> dict:
+def get_attribute_data(request: Request, project: Project = None) -> dict[str, Any]:
     """
     Extract attribute data from request
 
@@ -323,19 +348,23 @@ def get_attribute_data(request, project=None) -> dict:
     # Include any existing project attribute data
     # If we do not copy here then we will override the instance data
     # when doing updates.
-    attribute_data = copy.deepcopy(getattr(project, "attribute_data", {}))
+    attribute_data: dict[str, Any] = copy.deepcopy(getattr(project, "attribute_data", {}))
 
     # Extract all attribute data that exists in the request
-    request_attribute_data = request.data.get("attribute_data", {})
+    request_attribute_data: dict[str, Any] = request.data.get("attribute_data", {})
     if not isinstance(request_attribute_data, Mapping):
-        request_attribute_data = {}
+        request_attribute_data: dict[str, Any] = {}
 
     attribute_data.update(request_attribute_data)
 
     return attribute_data
 
 
-def is_relevant_attribute(section_attribute, attribute_data) -> bool:
+def is_relevant_attribute(section_attribute: Union[ProjectFloorAreaSectionAttribute,
+                                                   ProjectPhaseSectionAttribute,
+                                                   ProjectPhaseDeadlineSectionAttribute],
+                          attribute_data: dict[str, Any]
+                          ) -> bool:
     """
     Check a section attribute is relevant during serialization
 
@@ -347,7 +376,7 @@ def is_relevant_attribute(section_attribute, attribute_data) -> bool:
     if not relies_on_section_attribute:
         return True
 
-    relies_on_attribute_identifier = relies_on_section_attribute.attribute.identifier
-    attribute_data_value = attribute_data.get(relies_on_attribute_identifier)
+    relies_on_attribute_identifier: str = relies_on_section_attribute.attribute.identifier
+    attribute_data_value: Any = attribute_data.get(relies_on_attribute_identifier)
 
     return bool(attribute_data_value)
