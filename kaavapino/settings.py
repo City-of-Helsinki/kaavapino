@@ -24,7 +24,8 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     DATABASE_URL=(str, "postgis://kaavapino:kaavapino@localhost/kaavapino"),
-    KEYDB_URL=(str, "redis://localhost"),
+    REDIS_URL=(str, "redis://localhost:6379/0"),
+    REDIS_PASSWORD=(str, None),
     CACHE_URL=(str, "locmemcache://"),
     EMAIL_URL=(str, "consolemail://"),
     MEDIA_ROOT=(environ.Path, project_root("media")),
@@ -111,13 +112,28 @@ DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
 DATABASES = {"default": env.db()}
 
+DJANGO_REDIS_CONNECTION_FACTORY = 'django_redis.pool.SentinelConnectionFactory'
+
+SENTINELS = []
+
+if env.str("REDIS_SENTINELS"):
+    for sentinel in env.str("REDIS_SENTINELS").split(","):
+        host, port = sentinel.split(":")
+        SENTINELS.append((host, port))
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env.str("KEYDB_URL"),
-        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        "LOCATION": env.str("REDIS_URL"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.SentinelClient",
+            "CONNECTION_POOL_CLASS": "redis.sentinel.SentinelConnectionPool",
+            "PASSWORD": env.str("REDIS_PASSWORD"),
+            "SENTINELS": SENTINELS,
+            "SENTINEL_KWARGS": {"password": env.str("REDIS_PASSWORD")},
+        },
         "KEY_PREFIX": "kaavapino_api",
-    },
+    }
 }
 
 vars().update(env.email_url())  # EMAIL_BACKEND etc.
