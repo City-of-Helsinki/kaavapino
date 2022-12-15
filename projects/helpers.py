@@ -193,7 +193,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
                     response = requests.get(
                         url,
                         headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                        timeout=5
+                        timeout=90
                     )
                 except ReadTimeout:
                     log.error("Request timed out for url: {}".format(url))
