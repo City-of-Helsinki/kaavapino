@@ -281,6 +281,8 @@ class Deadline(models.Model):
             attribute_data: dict[str, str] = {**project.attribute_data, **preview_attributes}
             return attribute_data.get(self.attribute.identifier, None)
 
+        return None
+
     def __str__(self):
         return f"{self.phase} {self.deadline_types} {self.abbreviation}"
 
@@ -529,6 +531,8 @@ class AutomaticDate(models.Model):
     def validate_date(date) -> None:
         validation_error = ValidationError(_("Invalid date(s): input date in dd.mm. format"))
 
+        day: int
+        month: int
         try:
             [day, month] = str.split(date, ".")[:2]
             day = int(day)
@@ -645,7 +649,7 @@ class AutomaticDate(models.Model):
             [(name, date) for date, name in cal.holidays(year-1)]
         )
 
-        return_dates: list[datetime.date] = []
+        return_dates: list[Optional[datetime.date]] = []
 
         if self.week:
             start_date = datetime.datetime.strptime( \

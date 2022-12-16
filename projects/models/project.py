@@ -250,7 +250,7 @@ class Project(models.Model):
         identifier: str
         value: Any
         for identifier, value in data.items():
-            attribute: Attribute = attributes.get(identifier)
+            attribute: Optional[Attribute] = attributes.get(identifier)
 
             if not attribute:
                 continue
@@ -350,12 +350,12 @@ class Project(models.Model):
 
     def _set_calculated_deadline(self,
                                  deadline: Deadline,
-                                 date: datetime.date,
+                                 date: Optional[datetime.date],
                                  initial: bool,
-                                 user: User,
+                                 user: Optional[User],
                                  preview: bool,
-                                 preview_attribute_data: dict = {}
-                                 ) -> datetime.date:
+                                 preview_attribute_data: dict[str, Any] = {}
+                                 ) -> Union[datetime.date, None]:
         try:
             if preview:
                 try:
@@ -367,7 +367,7 @@ class Project(models.Model):
             else:
                 project_deadline = self.deadlines.get(deadline=deadline)
         except ProjectDeadline.DoesNotExist:
-            return
+            return None
 
         if project_deadline and date:
             if preview:
@@ -399,6 +399,8 @@ class Project(models.Model):
                         )
 
             return date
+
+        return None
 
     def _set_calculated_deadlines(self,
                                   deadlines: list[Deadline],
@@ -643,7 +645,11 @@ class Project(models.Model):
         fieldset_attributes: list[FieldSetAttribute] = \
             [f for f in FieldSetAttribute.objects.all().select_related("attribute_source", "attribute_target")]
 
-        def add_fieldset_field_for_attribute(search_fields: set[Value], attr: Attribute, fieldset: list[dict[str, Any]], raw=False):
+        def add_fieldset_field_for_attribute(search_fields: set[Value],
+                                             attr: Attribute,
+                                             fieldset: Optional[list[dict[str, Any]]],
+                                             raw=False
+                                             ):
             key: str = attr.identifier
             while attr.fieldset_attribute_target.count():
                 attr: Attribute = next(filter(lambda a: a.attribute_target == attr, fieldset_attributes), None).attribute_source

@@ -3,6 +3,7 @@ import re
 from collections.abc import Sequence
 from collections import OrderedDict
 from html import escape
+from typing import Optional
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -602,7 +603,7 @@ class Attribute(models.Model):
 
         return entities
 
-    def _get_single_display_value(self, value) -> str:
+    def _get_single_display_value(self, value) -> Optional[str]:
         if value is None or self.value_type == Attribute.TYPE_GEOMETRY:
             return None
 
@@ -729,7 +730,7 @@ class AttributeAutoValue(models.Model):
         verbose_name=_("key attribute"),
     )
 
-    def get_value(self, key) -> str:
+    def get_value(self, key) -> Optional[str]:
         key = str(key)
         try:
             return self.value_map.get(key_str=key).value
