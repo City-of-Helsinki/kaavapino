@@ -63,6 +63,7 @@ numpy = "1.21.5"
 elastic-apm = "6.8.1"
 drf-spectacular = "0.21.1"
 pyrsistent = "0.17.3"
+django-redis = "5.2.0"
 
 [tool.poetry.group.dev.dependencies]
 flake8 = "4.0.1"
