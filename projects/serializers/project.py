@@ -370,7 +370,7 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
 
     def get_geoserver_data(self, project):
         identifier = project.attribute_data.get("hankenumero")
-        if identifier and re.match("^(\d{4}_\d{1,3})$"):
+        if identifier and re.compile("^(\d{4}_\d{1,3})$").match(identifier):
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
             if cache.get(url) is not None:
@@ -642,13 +642,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_geoserver_data(self, project):
         identifier = project.attribute_data.get("hankenumero")
-        if identifier and re.match("^(\d{4}_\d{1,3})$"):
+        if identifier and re.compile("^(\d{4}_\d{1,3})$").match(identifier):
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
             response = requests.get(
                 url,
                 headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
             )
+            print(f'Received response {response.status_code} for identifier {identifier}')
             if response.status_code == 200:
                 cache.set(url, response, 86400)  # 1 day
             elif response.status_code == 404:
