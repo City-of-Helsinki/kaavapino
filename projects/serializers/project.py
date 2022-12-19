@@ -379,7 +379,7 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
 
     def get_geoserver_data(self, project: Project) -> Optional[dict[str, Any]]:
         identifier = project.attribute_data.get("hankenumero")
-        if identifier:
+        if identifier and re.compile("^\d{4}_\d{1,3}$").match(identifier):
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
             if cache.get(url) is not None:
@@ -392,14 +392,14 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
                 if response.status_code == 200:
                     cache.set(url, response, 86400)  # 1 day
                 elif response.status_code == 404:
-                    cache.set(url, response, 900)  # 15 minutes
+                    cache.set(url, response, 28800)  # 8 hours
                 elif response.status_code >= 500:
                     log.error("Kaavoitus-api connection error: {} {}".format(
                         response.status_code,
                         response.text
                     ))
                 else:
-                    cache.set(url, response, 180)  # 3 minutes
+                    cache.set(url, response, 3600)  # 1 hour
 
             if response.status_code == 200:
                 return response.json()
@@ -654,7 +654,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_geoserver_data(self, project: Project) -> Optional[dict[str, Any]]:
         identifier: str = project.attribute_data.get("hankenumero")
-        if identifier:
+        if identifier and re.compile("^\d{4}_\d{1,3}$").match(identifier):
             url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
             response = requests.get(
@@ -664,14 +664,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             if response.status_code == 200:
                 cache.set(url, response, 86400)  # 1 day
             elif response.status_code == 404:
-                cache.set(url, response, 900)  # 15 minutes
+                cache.set(url, response, 28800)  # 8 hours
             elif response.status_code >= 500:
                 log.error("Kaavoitus-api connection error: {} {}".format(
                     response.status_code,
                     response.text
                 ))
             else:
-                cache.set(url, response, 180)  # 3 minutes
+                cache.set(url, response, 3600)  # 1 hour
 
             if response.status_code == 200:
                 return response.json()

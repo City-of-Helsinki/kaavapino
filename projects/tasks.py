@@ -1,4 +1,6 @@
 import logging
+import re
+
 import requests
 from typing import Optional, Any
 
@@ -20,7 +22,7 @@ def refresh_on_map_overview_cache() -> None:
     for project in Project.objects.all():
         identifier: str = project.attribute_data.get("hankenumero")
 
-        if not identifier:
+        if not identifier or not re.compile("^\d{4}_\d{1,3}$").match(identifier):
             continue
 
         url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
@@ -32,9 +34,9 @@ def refresh_on_map_overview_cache() -> None:
         if response.status_code == 200:
             cache.set(url, response, 86400)  # 1 day
         elif response.status_code == 404:
-            cache.set(url, response, 900)  # 15 minutes
+            cache.set(url, response, 28800)  # 8 hours
         else:
-            cache.set(url, response, 180)  # 3 minutes
+            cache.set(url, response, 3600)  # 1 hour
 
 
 def refresh_project_schedule_cache() -> None:
