@@ -20,7 +20,7 @@ def refresh_on_map_overview_cache():
     for project in Project.objects.all():
         identifier = project.attribute_data.get("hankenumero")
 
-        if not identifier or not re.compile("^(\d{4}_\d{1,3})$").match(identifier):
+        if not identifier or not re.compile("^\d{4}_\d{1,3}$").match(identifier):
             continue
 
         url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
