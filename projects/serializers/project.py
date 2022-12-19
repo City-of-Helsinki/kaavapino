@@ -390,7 +390,7 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
                         response.text
                     ))
                 else:
-                    cache.set(url, response, 3600)  # 1 hours
+                    cache.set(url, response, 3600)  # 1 hour
 
             if response.status_code == 200:
                 return response.json()
