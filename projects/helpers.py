@@ -232,14 +232,14 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
                     response = requests.get(
                         url,
                         headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                        timeout=90
+                        timeout=180
                     )
                 except ReadTimeout:
                     log.error("Request timed out for url: {}".format(url))
                     response = get_timeout_response()
 
                 if response.status_code in [200, 400, 404, 408]:
-                    cache.set(url, response, 28800)  # 8 hours
+                    cache.set(url, response, 86400)  # 24 hours
                 else:
                     cache.set(url, response, 900)  # 15 minutes
 
