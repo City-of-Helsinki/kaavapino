@@ -14,6 +14,7 @@ import sys
 import environ
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
 
 
 project_root = environ.Path(__file__) - 2
@@ -71,7 +72,7 @@ if env('SENTRY_DSN'):
     sentry_sdk.init(
         dsn=env('SENTRY_DSN'),
         environment=env('SENTRY_ENVIRONMENT'),
-        integrations=[DjangoIntegration()]
+        integrations=[DjangoIntegration(), RedisIntegration()]
     )
 
 SOCIAL_AUTH_TUNNISTAMO_SECRET = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_SECRET")

@@ -142,7 +142,44 @@ def get_flat_attribute_data(data: dict[str, Any],
     return flat
 
 
-def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict[str, Any]) -> None:
+# Updates fetched kiinteistotunnukset from Kaavoitus-API to suunnittelualueella_kiinteisto_fieldset.
+# These values can't be edited or deleted in the UI and area always automatically fetched and displayed.
+def update_suunnittelualueella_kiinteisto_fieldset(attribute_data):
+    if not attribute_data.get("hankenumero"):
+        return
+
+    hankenumero = attribute_data["hankenumero"]
+
+    if not attribute_data or not hankenumero or not re.compile("^\d{4}_\d{1,3}$").match(hankenumero):
+        return
+
+    url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/kiinteistotunnukset/{hankenumero}"
+    if cache.get(url) is not None:
+        response = cache.get(url)
+    else:
+        response = requests.get(
+            url,
+            headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+            timeout=5
+        )
+        if response.status_code == 200:
+            cache.set(url, response, 3600)  # 1 hour
+
+    if response.status_code != 200:
+        return
+
+    if not attribute_data.get("suunnittelualueella_kiinteisto_fieldset"):
+        attribute_data["suunnittelualueella_kiinteisto_fieldset"] = []
+
+    kiinteistotunnukset = response.json()["kiinteistotunnukset"]
+    for kiinteistotunnus in kiinteistotunnukset:
+        attribute_data["suunnittelualueella_kiinteisto_fieldset"].append({
+            "_deleted": False,
+            "_automatically_added": True,
+            "kiinteistoa_koskee": kiinteistotunnus
+        })
+
+def set_kaavoitus_api_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
 
     external_data_attrs: QuerySet[Attribute] = Attribute.objects.filter(
@@ -155,7 +192,8 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict[str, Any]) -> 
         value_type=Attribute.TYPE_FIELDSET,
     ).select_related("key_attribute")
 
-    flat_attribute_data: dict[str, list] = get_flat_attribute_data(attribute_data, {})
+    update_suunnittelualueella_kiinteisto_fieldset(attribute_data)
+    flat_attribute_data = get_flat_attribute_data(attribute_data, {})
 
     # TODO: Timeout should be fixed in Kaavoitus-api
     """
@@ -219,14 +257,14 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data: dict[str, Any]) -> 
                     response = requests.get(
                         url,
                         headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                        timeout=90
+                        timeout=180
                     )
                 except ReadTimeout:
                     log.error("Request timed out for url: {}".format(url))
                     response = get_timeout_response()
 
                 if response.status_code in [200, 400, 404, 408]:
-                    cache.set(url, response, 28800)  # 8 hours
+                    cache.set(url, response, 86400)  # 24 hours
                 else:
                     cache.set(url, response, 900)  # 15 minutes
 
