@@ -169,7 +169,7 @@ def get_deadline_validator(attribute: Attribute,
 
 def create_attribute_field_data(attribute: Attribute,
                                 validation,
-                                project,
+                                project: Project,
                                 preview: dict[Deadline, Union[str, datetime.date]]
                                 ) -> FieldData:
     """Create data for initializing attribute field serializer."""

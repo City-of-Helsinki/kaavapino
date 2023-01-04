@@ -240,7 +240,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
         return returns
 
-    fetched_data: dict[Attribute, dict[str, str]] = {
+    fetched_data: dict[Attribute, dict[str, Optional[str]]] = {
         attr: build_request_paths(attr)
         for attr in external_data_attrs.exclude(
             data_source=Attribute.SOURCE_PARENT_FIELDSET,
@@ -273,7 +273,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
             else:
                 fetched_data[attr][key] = None
 
-    def get_deep(source: dict, keys: Union[str, list], default: dict = None) -> dict:
+    def get_deep(source: Union[dict, str], keys: Union[str, list], default: dict = None) -> dict:
         if not keys:
             return source
 
@@ -641,7 +641,7 @@ def get_ad_user(id: str) -> Union[None, Response, str]:
     return response.json()
 
 
-def _add_paths(paths: list, solved_path: list, remaining_path: list, parent_data: dict) -> None:
+def _add_paths(paths: list[Attribute], solved_path: list[Attribute], remaining_path: list[Attribute], parent_data: dict) -> None:
     from projects.models import Attribute
 
     if remaining_path[0].value_type != Attribute.TYPE_FIELDSET:
@@ -659,7 +659,7 @@ def _add_paths(paths: list, solved_path: list, remaining_path: list, parent_data
         )
 
 
-def get_in_personnel_data(id: str, key: str, is_kaavapino_user: bool) -> Any:
+def get_in_personnel_data(id: Any, key: str, is_kaavapino_user: bool) -> Any:
     User = get_user_model()
 
     if is_kaavapino_user:

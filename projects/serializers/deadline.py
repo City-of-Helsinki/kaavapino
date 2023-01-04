@@ -23,7 +23,7 @@ class DeadlineSerializer(serializers.Serializer):
     warning_min_distance_next = serializers.CharField()
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_attribute(self, deadline):
+    def get_attribute(self, deadline: Deadline):
         if deadline.attribute:
             return deadline.attribute.identifier
         else:

@@ -2,6 +2,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field, inline_serializer
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from typing import Any
 
 from projects.models import (
     FieldComment,
@@ -50,7 +51,7 @@ class CommentSerializer(serializers.ModelSerializer):
             "_metadata",
         ]
 
-    def create(self, validated_data: dict) -> ProjectComment:
+    def create(self, validated_data: dict[str, Any]) -> ProjectComment:
         validated_data["user"] = self.context["request"].user
         validated_data["project"] = self.context.get("parent_instance")
         return super().create(validated_data)
@@ -77,7 +78,7 @@ class FieldCommentSerializer(CommentSerializer):
         model = FieldComment
         fields = CommentSerializer.Meta.fields + ["field", "fieldset_path"]
 
-    def create(self, validated_data):
+    def create(self, validated_data: dict[str, Any]):
         fieldset_path = validated_data.pop("fieldset_path", [])
         comment = super().create(validated_data)
         for i, location in enumerate(fieldset_path):
@@ -106,7 +107,7 @@ class LastReadTimestampSerializer(serializers.ModelSerializer):
             "user",
         ]
 
-    def create(self, validated_data: dict) -> ProjectComment:
+    def create(self, validated_data: dict[str, Any]) -> ProjectComment:
         validated_data["user"] = self.context["request"].user
         validated_data["project"] = self.context.get("parent_instance")
         return super().create(validated_data)

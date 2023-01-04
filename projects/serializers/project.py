@@ -519,7 +519,7 @@ class ProjectExternalDocumentSerializer(serializers.Serializer):
     document_name = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
 
-    def _get_field_as_string(self, fieldset_item: dict[str, Any], attribute: Attribute) -> str:
+    def _get_field_as_string(self, fieldset_item: dict[str, Any], attribute: Attribute) -> Optional[str]:
         if not attribute:
             return None
 
@@ -1325,7 +1325,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
 
-        public = self._validate_public(attrs)
+        public: bool = self._validate_public(attrs)
 
         if public:
             attrs["public"] = public
@@ -1362,7 +1362,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             should_update_deadlines = False
         elif instance:
             attr_identifiers: list[str] = list(attribute_data.keys())
-            should_update_deadlines = bool(
+            should_update_deadlines: bool = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
                     deadline__attribute__identifier__in=attr_identifiers
                 ).count()
@@ -1377,7 +1377,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
 
             if not should_update_deadlines:
-                should_update_deadlines = bool(DeadlineDateCalculation.objects.filter(
+                should_update_deadlines: bool = bool(DeadlineDateCalculation.objects.filter(
                     deadline__project_deadlines__project=instance
                 ).filter(
                     Q(conditions__identifier__in=attr_identifiers) | \
@@ -1471,7 +1471,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
-        valid_attributes = {}
+        valid_attributes: dict[str, Any] = {}
         # if self.should_validate_attributes() and self.instance.attribute_data:
         #     # Make a deep copy of the attribute data if we are validating.
         #     # Can't assign straight since the values would be a reference
@@ -1544,6 +1544,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_file.save()
 
         if self.instance:
+            dl: ProjectDeadline
             for dl in ProjectDeadline.objects.filter(
                 project=self.instance,
                 deadline__attribute__identifier__in=valid_attributes.keys()
@@ -1575,8 +1576,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         return public
 
     def _validate_owner_edit_override(self, attrs: dict[str, Any]) -> bool:
-        owner_edit_override = attrs.get("owner_edit_override", False)
-        is_admin = self.context["request"].user.has_privilege("admin")
+        owner_edit_override: bool = attrs.get("owner_edit_override", False)
+        is_admin: bool = self.context["request"].user.has_privilege("admin")
 
         if self.instance and is_admin:
             if owner_edit_override is None:
@@ -1900,8 +1901,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if attribute.value_type in [Attribute.TYPE_FILE, Attribute.TYPE_IMAGE] \
             and new_value is None:
-            fieldset_path_str = prefix + attribute.identifier if prefix else None
-            timestamp = entry[0][1].timestamp
+            fieldset_path_str: str = prefix + attribute.identifier if prefix else None
+            timestamp: datetime.date = entry[0][1].timestamp
+            old_file: ProjectAttributeFile
             for old_file in ProjectAttributeFile.objects.filter(
                 project=project,
                 attribute=attribute,
@@ -2070,7 +2072,7 @@ class ProjectSnapshotSerializer(ProjectSerializer):
 class AdminProjectSerializer(ProjectSerializer):
     def get_fields(self) -> dict[str, Any]:
         fields: dict[str, Any] = super(AdminProjectSerializer, self).get_fields()
-        request = self.context.get('request', None)
+        request: Request = self.context.get('request', None)
 
         fields["archived"] = serializers.BooleanField(
             allow_null=True, required=False,
@@ -2186,7 +2188,7 @@ class ProjectFileSerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def create(self, validated_data) -> None:
+    def create(self, validated_data: dict[str, Any]) -> None:
         fieldset_path: list[dict[str, Any]] = validated_data.pop("fieldset_path", [])
         attribute: Attribute = validated_data["attribute"]
 

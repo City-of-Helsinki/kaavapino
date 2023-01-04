@@ -2,8 +2,9 @@ from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field, inline_serializer
 from drf_spectacular.types import OpenApiTypes
 from rest_framework import serializers
+from typing import Optional, Any
 
-from projects.models import DocumentTemplate, ProjectPhase
+from projects.models import DocumentTemplate, ProjectPhase, CommonProjectPhase
 
 
 class DocumentTemplateSerializer(serializers.ModelSerializer):
@@ -27,22 +28,22 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "name", "image_template"]
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_file(self, document_template):
+    def get_file(self, document_template: DocumentTemplate) -> str:
         request = self.context["request"]
-        project_id = self.context["project"].id
+        project_id: int = self.context["project"].id
         url = reverse(
             "documenttemplate-detail",
             kwargs={"project_pk": project_id, "slug": document_template.slug},
         )
-        absolute_url = request.build_absolute_uri(url)
+        absolute_url: str = request.build_absolute_uri(url)
         return absolute_url
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_preview_file(self, document_template):
+    def get_preview_file(self, document_template: DocumentTemplate) -> str:
         return self.get_file(document_template) + "?preview=true"
 
     @extend_schema_field(OpenApiTypes.DATE)
-    def get_last_downloaded(self, document_template):
+    def get_last_downloaded(self, document_template: DocumentTemplate) -> Optional[int]:
         try:
             last_downloaded = document_template.document_download_log \
                 .filter(project=self.context["project"]) \
@@ -63,9 +64,9 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
         },
         many=True,
     ))
-    def get_phases(self, document_template):
-        phases = document_template.common_project_phases.all()
-        phase_list = []
+    def get_phases(self, document_template: DocumentTemplate):
+        phases: list[CommonProjectPhase] = document_template.common_project_phases.all()
+        phase_list: list[dict[str, Any]] = []
         project = self.context["project"]
 
         for phase in phases:
@@ -85,7 +86,7 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
             except AttributeError:
                 last_downloaded = None
 
-            phase_ended = project_phase.index < project.phase.index
+            phase_ended: bool = project_phase.index < project.phase.index
             phase_list.append({
                 "phase_index": project_phase.index or project_phase.common_project_phase.index,
                 "phase_name": phase.prefixed_name,

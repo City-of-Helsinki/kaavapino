@@ -1,6 +1,7 @@
 from django.db.models import Case, When
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from typing import Any
 
 from projects.models import ProjectType, ProjectSubtype, Attribute
 from projects.serializers.projectschema import AttributeSchemaSerializer
@@ -20,11 +21,11 @@ class ProjectTypeMetadataCardAttributeSerializer(serializers.ModelSerializer):
     choices = serializers.SerializerMethodField()
 
     @staticmethod
-    def get_choices(attribute):
+    def get_choices(attribute: Attribute) -> dict[str, Any]:
         return AttributeSchemaSerializer.get_choices(attribute)
 
     @staticmethod
-    def get_fieldset_attributes(attribute):
+    def get_fieldset_attributes(attribute: Attribute) -> list[Attribute]:
         return AttributeSchemaSerializer.get_fieldset_attributes(attribute)
 
     class Meta:

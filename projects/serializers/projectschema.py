@@ -1,8 +1,10 @@
 import re
 import logging
 from collections import namedtuple
+from typing import Optional, Any
 
 from django.db import models
+from django.db.models import QuerySet
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from drf_spectacular.utils import extend_schema_field
@@ -181,13 +183,13 @@ class AttributeSchemaSerializer(serializers.Serializer):
 
         return False
 
-    def get_fieldset_attributes(self, attribute):
+    def get_fieldset_attributes(self, attribute: Attribute) -> list[Attribute]:
         try:
             context = self.context
         except AttributeError:
             context = {}
 
-        def take_index(attribute):
+        def take_index(attribute: Attribute):
             try:
                 return attribute["fieldset_index"] or 0
             except KeyError:
@@ -210,11 +212,11 @@ class AttributeSchemaSerializer(serializers.Serializer):
             return None
 
     @staticmethod
-    def get_required(attribute):
+    def get_required(attribute: Attribute):
         return _is_attribute_required(attribute)
 
     @staticmethod
-    def get_choices(attribute):
+    def get_choices(attribute: Attribute) -> Optional[dict[str, Any]]:
         foreign_key_choice = FOREIGN_KEY_TYPE_MODELS.get(attribute.value_type, None)
 
         if foreign_key_choice:
@@ -249,9 +251,9 @@ class AttributeSchemaSerializer(serializers.Serializer):
         return choices
 
     @staticmethod
-    def _get_attribute_choices(attribute):
-        choices = []
-        choice_instances = attribute.value_choices.all()
+    def _get_attribute_choices(attribute: Attribute) -> list[dict[str, Any]]:
+        choices: list[dict[str, Any]] = []
+        choice_instances: QuerySet[AttributeValueChoice] = attribute.value_choices.all()
         for choice in choice_instances:
             choices.append({"label": choice.value, "value": choice.identifier})
         return choices
@@ -420,7 +422,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
         try:
             sections = sections_cache[(privilege, owner, phase)]
         except KeyError:
-            sections = [
+            sections: list[dict[str, Any]] = [
                 ProjectSectionSchemaSerializer(
                     section,
                     context={"privilege": privilege, "owner": owner},
@@ -625,7 +627,7 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
     def get_deadline_sections(self, instance):
         query_params = getattr(self.context["request"], "GET", {})
         try:
-            project = Project.objects.get(pk=int(query_params.get("project")))
+            project: Project = Project.objects.get(pk=int(query_params.get("project")))
         except (ValueError, TypeError, Project.DoesNotExist):
             return ProjectPhaseSchemaSerializer(
                 instance.phases.all(),
