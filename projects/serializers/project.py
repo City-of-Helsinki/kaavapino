@@ -1146,47 +1146,27 @@ class ProjectSerializer(serializers.ModelSerializer):
                     verb=verbs.UPDATED_ATTRIBUTE,
                     timestamp__lte=cutoff,
                 )
-                .order_by(
-                    "data__attribute_identifier",
-                    "action_object_content_type",
-                    "action_object_object_id",
-                    "-timestamp",
-                )
-                .distinct(
-                    "data__attribute_identifier",
-                    "action_object_content_type",
-                    "action_object_object_id",
-                )
-
+                .order_by("-timestamp")
                 .prefetch_related("actor")
             )
         else:
             actions = (
-                project.target_actions.filter(verb=verbs.UPDATED_ATTRIBUTE)
-                .order_by(
-                    "data__attribute_identifier",
-                    "action_object_content_type",
-                    "action_object_object_id",
-                    "-timestamp",
-                )
-                .distinct(
-                    "data__attribute_identifier",
-                    "action_object_content_type",
-                    "action_object_object_id",
-                )
-
+                project.target_actions
+                .filter(verb=verbs.UPDATED_ATTRIBUTE)
+                .order_by("-timestamp")
                 .prefetch_related("actor")
             )
 
-        updates = {}
+        updates = []
         for _action in actions:
             attribute_identifier = (
                 _action.data.get("attribute_identifier", None)
                 or _action.action_object.identifier
             )
             # Filter out fieldset[x].attribute entries
-            if not '].' in attribute_identifier:
-                updates[attribute_identifier] = {
+            if '].' not in attribute_identifier:
+                updates.append({
+                    "attribute_identifier": attribute_identifier,
                     "user": _action.actor.uuid,
                     "user_name": _action.actor.get_display_name(),
                     "timestamp": _action.timestamp,
@@ -1197,7 +1177,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         _action.data,
                         _action.data.get("labels", {}),
                     ),
-                }
+                })
 
         return updates
 
