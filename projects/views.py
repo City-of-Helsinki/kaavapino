@@ -161,9 +161,7 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     ),
 )
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = Project.objects.all() \
-            .select_related("user", "subtype", "subtype__project_type", "phase") \
-            .prefetch_related("deadlines", "target_actions")
+    queryset = Project.objects.all().select_related("user", "subtype", "subtype__project_type", "phase")
     permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
     try:
@@ -204,6 +202,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     'deadlines__deadline__condition_attributes',
                     'deadlines__deadline__initial_calculations',
                     'deadlines__deadline__update_calculations',
+                    'target_actions'
                 )
 
         includeds_users = self.request.query_params.get("includes_users", None)
