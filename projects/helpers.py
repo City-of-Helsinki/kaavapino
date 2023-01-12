@@ -31,8 +31,8 @@ def get_fieldset_path(attr: Attribute,
                       cached: bool = True,
                       orig_attr: Optional[Attribute] = None
                       ) -> list[Attribute]:
-    orig_attr: Attribute = orig_attr or attr
-    cache_key: str = f'projects.helpers.get_fieldset_path.{orig_attr.identifier}'
+    orig_attr_local: Attribute = orig_attr or attr
+    cache_key: str = f'projects.helpers.get_fieldset_path.{orig_attr_local.identifier}'
     if cached:
         cache_value: list[Attribute] = cache.get(cache_key)
         if cache_value:
@@ -46,7 +46,7 @@ def get_fieldset_path(attr: Attribute,
         return get_fieldset_path(
             parent_fieldset,
             [parent_fieldset] + attribute_path,
-            orig_attr = orig_attr,
+            orig_attr=orig_attr_local,
         )
 
 
@@ -54,17 +54,17 @@ def set_attribute_data(data: Union[dict[str, list], list[dict]],
                        path: list[Union[Attribute, str]],
                        value: str) -> None:
     try:
-        next_key = path[0].identifier
+        next_key = path[0].identifier  # type: ignore
     except AttributeError:
         next_key = path[0]
 
     if len(path) > 1:
-        if type(data) is dict:
+        if isinstance(data, dict):
             if not data.get(next_key):
                 data[next_key] = []
 
             set_attribute_data(data.get(next_key), path[1:], value)
-        elif type(data) is list:
+        elif isinstance(data, list):
             for __ in range(len(data), next_key+1):
                 data.append({})
 
@@ -179,7 +179,8 @@ def update_suunnittelualueella_kiinteisto_fieldset(attribute_data):
             "kiinteistoa_koskee": kiinteistotunnus
         })
 
-def set_kaavoitus_api_data_in_attribute_data(attribute_data):
+
+def set_kaavoitus_api_data_in_attribute_data(attribute_data: Any) -> None:
     from projects.models import Attribute
 
     external_data_attrs: QuerySet[Attribute] = Attribute.objects.filter(
@@ -213,6 +214,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
 
     def build_request_paths(attr: Attribute) -> dict[str, str]:
         returns: dict[str, str] = {}
+        key_values: list[str]
         if attr.key_attribute:
             key_values = flat_attribute_data.get(
                 attr.key_attribute.identifier, []
@@ -221,7 +223,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
             parent_attr: Attribute = Attribute.objects.get(
                 identifier=attr.key_attribute_path.split(".")[0]
             )
-            key_values: list[str] = flat_attribute_data.get(
+            key_values = flat_attribute_data.get(
                 parent_attr.key_attribute.identifier, []
             )
 

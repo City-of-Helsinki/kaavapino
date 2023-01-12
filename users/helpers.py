@@ -1,3 +1,5 @@
+from typing import Protocol, Any
+
 import requests
 
 from django.conf import settings
@@ -25,3 +27,12 @@ def get_graph_api_access_token() -> str:
             cache.set("GRAPH_API_token", token, expires_in-30)
 
     return token
+
+
+class DjangoAdminAttributes(Protocol):
+    short_description: str
+
+
+def has_django_admin_attributes(func: Any) -> DjangoAdminAttributes:
+    """This function has django admin attributes like short_description."""
+    return func
