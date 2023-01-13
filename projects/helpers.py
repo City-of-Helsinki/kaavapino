@@ -120,7 +120,7 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
 
 # Updates fetched kiinteistotunnukset from Kaavoitus-API to suunnittelualueella_kiinteisto_fieldset.
 # These values can't be edited or deleted in the UI and area always automatically fetched and displayed.
-def update_suunnittelualueella_kiinteisto_fieldset(attribute_data):
+def update_suunnittelualueella_kiinteisto_fieldset(attribute_data, use_cached=True):
     if not attribute_data.get("hankenumero"):
         return
 
@@ -130,7 +130,7 @@ def update_suunnittelualueella_kiinteisto_fieldset(attribute_data):
         return
 
     url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/kiinteistotunnukset/{hankenumero}"
-    if cache.get(url) is not None:
+    if use_cached and cache.get(url) is not None:
         response = cache.get(url)
     else:
         response = requests.get(
@@ -155,7 +155,7 @@ def update_suunnittelualueella_kiinteisto_fieldset(attribute_data):
             "kiinteistoa_koskee": kiinteistotunnus
         })
 
-def set_kaavoitus_api_data_in_attribute_data(attribute_data):
+def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
     from projects.models import Attribute
     external_data_attrs = Attribute.objects.filter(
         data_source__isnull=False,
@@ -167,7 +167,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
         value_type=Attribute.TYPE_FIELDSET,
     ).select_related("key_attribute")
 
-    update_suunnittelualueella_kiinteisto_fieldset(attribute_data)
+    update_suunnittelualueella_kiinteisto_fieldset(attribute_data, use_cached)
     flat_attribute_data = get_flat_attribute_data(attribute_data, {})
 
     # TODO: Timeout should be fixed in Kaavoitus-api
@@ -225,7 +225,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data):
     for attr, urls in fetched_data.items():
         for key, value in urls.items():
             url = value
-            if cache.get(url) is not None:
+            if use_cached and cache.get(url) is not None:
                 response = cache.get(url)
             else:
                 try:

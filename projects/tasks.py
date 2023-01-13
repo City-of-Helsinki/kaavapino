@@ -1,3 +1,4 @@
+import copy
 import logging
 import re
 
@@ -10,6 +11,7 @@ from django.http import HttpResponse
 from projects.exporting.report import render_report_to_response
 from projects.models import Project, Report
 from projects.serializers.project import ProjectDeadlineSerializer
+from projects.helpers import set_kaavoitus_api_data_in_attribute_data
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,7 @@ def cache_report_data(project_ids=None):
             report, project_ids, HttpResponse(), False,
         )
 
+
 def cache_queued_project_report_data():
     cache_key = 'projects.tasks.cache_selected_report_data.queue'
     queue = cache.get(cache_key)
@@ -78,3 +81,17 @@ def cache_queued_project_report_data():
 
     if queue:
         cache_report_data(queue)
+
+
+def cache_kaavoitus_api_data():
+    projects = Project.objects.all()
+    logger.info(f"Caching Kaavoitus-API data for {len(projects)} projects")
+
+    for project in projects:
+        try:
+            data = copy.deepcopy(project.attribute_data)
+            set_kaavoitus_api_data_in_attribute_data(data, use_cached=False)
+        except Exception as e:
+            logger.error(e)
+
+    logger.info(f"Finished caching Kaavoitus-API data for {len(projects)} projects")
