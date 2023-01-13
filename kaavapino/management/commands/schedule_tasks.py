@@ -37,6 +37,13 @@ class Command(BaseCommand):
                     "minutes": 20,
                 }
             },
+            {
+                "func": "projects.tasks.cache_kaavoitus_api_data",
+                "defaults": {
+                    "schedule_type": Schedule.MINUTES,
+                    "minutes": 720,
+                }
+            }
         ]
         for schedule in schedules:
             if options.get("overwrite"):
