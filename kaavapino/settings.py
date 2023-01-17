@@ -132,6 +132,9 @@ CACHES = {
             "PASSWORD": env.str("REDIS_PASSWORD"),
             "SENTINELS": SENTINELS,
             "SENTINEL_KWARGS": {"password": env.str("REDIS_PASSWORD")},
+        } if SENTINELS else
+        {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
         "KEY_PREFIX": "kaavapino_api",
     }

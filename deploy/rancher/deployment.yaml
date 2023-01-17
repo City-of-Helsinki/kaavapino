@@ -63,11 +63,11 @@ spec:
               secretKeyRef:
                 name: api
                 key: DATABASE_URL
-          - name: KEYDB_URL
+          - name: REDIS_URL
             valueFrom:
               secretKeyRef:
                 name: api
-                key: KEYDB_URL
+                key: REDIS_URL
           - name: TOKEN_AUTH_ACCEPTED_AUDIENCE
             valueFrom:
               secretKeyRef:
@@ -213,11 +213,11 @@ spec:
               secretKeyRef:
                 name: api
                 key: DATABASE_URL
-          - name: KEYDB_URL
+          - name: REDIS_URL
             valueFrom:
               secretKeyRef:
                 name: api
-                key: KEYDB_URL
+                key: REDIS_URL
           - name: KAAVOITUS_API_AUTH_TOKEN
             valueFrom:
               secretKeyRef:
