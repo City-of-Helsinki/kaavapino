@@ -1,5 +1,5 @@
 ##### Compile image #####
-FROM registry.access.redhat.com/ubi8/python-39 as compile-image
+FROM registry.access.redhat.com/ubi9/python-39 as compile-image
 
 USER root
 ENV APP_NAME kaavapino
@@ -27,7 +27,7 @@ make install
 
 
 ##### Base image #####
-FROM registry.access.redhat.com/ubi8/python-39 as base
+FROM registry.access.redhat.com/ubi9/python-39 as base
 
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND noninteractive

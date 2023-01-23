@@ -1,5 +1,5 @@
 ##### Base image #####
-FROM registry.access.redhat.com/ubi8/python-39 as base
+FROM registry.access.redhat.com/ubi9/python-39 as base
 
 ENV PYTHONUNBUFFERED 1
 ENV DEBIAN_FRONTEND noninteractive
