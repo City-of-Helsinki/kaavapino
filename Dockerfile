@@ -4,7 +4,7 @@ FROM registry.access.redhat.com/ubi9/python-39 as compile-image
 USER root
 ENV APP_NAME kaavapino
 
-RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
 
 RUN cd /tmp
 RUN wget http://download.osgeo.org/geos/geos-3.9.2.tar.bz2
