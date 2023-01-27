@@ -26,9 +26,9 @@ RUN rm /etc/rhsm-host && \
     # See <https://access.redhat.com/solutions/1443553>
     yum repolist --disablerepo=* && \
     # Enable the repos you need
-    subscription-manager repos --enable codeready-builder-for-rhel-8-x86_64-rpms && \
+    subscription-manager repos --enable codeready-builder-for-rhel-9-x86_64-rpms && \
     dnf -y update && \
-    dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm && \
+    dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
     dnf install -y \
         git \
         binutils \
