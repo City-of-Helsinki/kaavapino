@@ -2,6 +2,7 @@
 FROM registry.access.redhat.com/ubi8/python-39 as base
 
 ENV PYTHONUNBUFFERED 1
+ENV SMDEV_CONTAINER_OFF=1
 ENV DEBIAN_FRONTEND noninteractive
 ENV APP_NAME kaavapino
 # Set defaults for Django paths as appropriate for this container
