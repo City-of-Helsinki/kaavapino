@@ -113,11 +113,10 @@ DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
 DATABASES = {"default": env.db()}
 
-DJANGO_REDIS_CONNECTION_FACTORY = 'django_redis.pool.SentinelConnectionFactory'
-
 SENTINELS = []
 
 if env.str("REDIS_SENTINELS"):
+    DJANGO_REDIS_CONNECTION_FACTORY = 'django_redis.pool.SentinelConnectionFactory'
     for sentinel in env.str("REDIS_SENTINELS").split(","):
         host, port = sentinel.split(":")
         SENTINELS.append((host, port))
