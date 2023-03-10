@@ -1134,7 +1134,6 @@ class AttributeImporter:
                 except (ValueError, AttributeError):
                     return None
 
-                print(f'label: {label} locations: {locations}')
                 return {
                     "label": label,
                     "section_location": locations[0] if locations else None,
