@@ -144,14 +144,14 @@ class Phases(Enum):
 
 
 ATTRIBUTE_PHASE_COLUMNS = {
-    Phases.START: "käynnistysvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    Phases.PRINCIPLES: "periaatteet -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    Phases.OAS: "oas-vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    Phases.DRAFT: "luonnosvaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    Phases.PROPOSAL: " ehdotusvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    Phases.REVISED_PROPOSAL: "tarkistettu ehdotus -vaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    Phases.APPROVAL: "hyväksymisvaiheen otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
-    Phases.GOING_INTO_EFFECT: "voimaantulovaiheen  otsikot ja kenttien järjestys tietojen muokkaus -näkymässä ",
+    Phases.START: ("käynnistys vaiheen otsikot", "käynnistys vaiheen järjestys"),
+    Phases.PRINCIPLES: ("periaatteet vaiheen otsikot", "periaatteet vaiheen järjestys"),
+    Phases.OAS: ("oas vaiheen otsikot", "oas vaiheen järjestys"),
+    Phases.DRAFT: ("luonnos vaiheen otsikot", "luonnos vaiheen järjestys"),
+    Phases.PROPOSAL: ("ehdotus vaiheen otsikot", "ehdotus vaiheen järjestys"),
+    Phases.REVISED_PROPOSAL: ("tarkistettu ehdotus vaiheen otsikot", "tarkistettu ehdotus vaiheen järjestys"),
+    Phases.APPROVAL: ("hyväksyminen vaiheen otsikot", "hyväksyminen vaiheen järjestys"),
+    Phases.GOING_INTO_EFFECT: ("voimaantulo vaiheen otsikot", "voimaantulo vaiheen järjestys"),
 }
 
 ATTRIBUTE_DEADLINE_SECTION_COLUMNS = {
@@ -1120,24 +1120,25 @@ class AttributeImporter:
                 raise Exception(f"Could not add attribute {attribute.identifier}")
 
     def _get_attribute_locations(self, row, phase_name):
-        for phase, column in ATTRIBUTE_PHASE_COLUMNS.items():
-            if phase.value == phase_name:
-                value = row[self.column_index[column]]
+        for phase, (column_label, column_location) in ATTRIBUTE_PHASE_COLUMNS.items():
+            if phase.value == phase_name:  # e.g. Käynnistys
+                label = row[self.column_index[column_label]]
+                location = row[self.column_index[column_location]]
                 try:
-                    [label, location] = value.split(";")
                     locations = [
                         # location format is section.field(set).field
                         # where : acts as optional decimal separator
-                        int(float(".".join(loc.split(':')))*10000)
+                        int(float(".".join(loc.split(':'))) * 10000)
                         for loc in location.split(".")
                     ]
                 except (ValueError, AttributeError):
                     return None
 
+                print(f'label: {label} locations: {locations}')
                 return {
                     "label": label,
-                    "section_location": locations[0],
-                    "field_location": locations[1],
+                    "section_location": locations[0] if locations else None,
+                    "field_location": locations[1] if len(locations) > 1 else 0,
                     "child_locations": locations[2:],
                 }
 
