@@ -770,6 +770,35 @@ class AttributeAutoValueMapping(models.Model):
         verbose_name_plural = _("attribute auto value mappings")
 
 
+class AttributeLock(models.Model):
+
+    project = models.ForeignKey(
+        "Project",
+        verbose_name=_("project"),
+        related_name="attribute_lock",
+        on_delete=models.CASCADE
+    )
+    attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("attribute"),
+        related_name="attribute_lock",
+        on_delete=models.CASCADE
+    )
+    user = models.ForeignKey(
+        User,
+        verbose_name=_("user"),
+        related_name="attribute_lock",
+        on_delete=models.CASCADE
+    )
+    timestamp = models.DateTimeField(
+        verbose_name=_("timestamp"),
+        auto_now_add=True
+    )
+
+    class Meta:
+        unique_together = ('project', 'attribute')
+
+
 class FieldSetAttribute(models.Model):
 
     attribute_source = models.ForeignKey(

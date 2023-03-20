@@ -9,7 +9,7 @@ from django.core.exceptions import FieldError
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django_q.tasks import async_task, result as async_result
@@ -55,7 +55,9 @@ from projects.models import (
     OverviewFilter,
     OverviewFilterAttribute,
 )
+from projects.models.attribute import AttributeLock
 from projects.models.utils import create_identifier
+from projects.permissions.attributes import AttributeLockPermissions
 from projects.permissions.comments import CommentPermissions
 from projects.permissions.documents import DocumentPermissions
 from projects.permissions.media_file_permissions import (
@@ -84,6 +86,7 @@ from projects.serializers.project import (
 )
 from projects.serializers.projectschema import (
     SimpleAttributeSerializer,
+    AttributeLockSerializer,
     AdminProjectTypeSchemaSerializer,
     CreateProjectTypeSchemaSerializer,
     EditProjectTypeSchemaSerializer,
@@ -815,6 +818,69 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Attribute.objects.all()
     serializer_class = SimpleAttributeSerializer
     pagination_class = AttributePagination
+
+    @extend_schema(
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            403: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="lock",
+        url_name="lock"
+    )
+    def lock(self, request):
+        project = Project.objects.filter(name=request.data["project_name"]).first()
+        attribute = Attribute.objects.filter(identifier=request.data["attribute_identifier"]).first()
+
+        if not project or not attribute:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+
+        attribute_lock = AttributeLock.objects.filter(project=project, attribute=attribute).first()
+        if attribute_lock:
+            if (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 15:  # 15 minutes
+                attribute_lock.delete()
+            else:
+                return HttpResponse(
+                    status=status.HTTP_403_FORBIDDEN if request.user != attribute_lock.user else status.HTTP_200_OK
+                )
+
+        attribute_lock = AttributeLock.objects.create(
+            project=project,
+            attribute=attribute,
+            user=request.user
+        )
+        return HttpResponse(status=status.HTTP_200_OK)
+
+    @extend_schema(
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            403: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=False,
+        permission_classes=[IsAuthenticated, AttributeLockPermissions],
+        url_path="unlock",
+        url_name="unlock"
+    )
+    def unlock(self, request):
+        try:
+            attribute_lock = AttributeLock.objects.get(
+                project__name=request.data["project_name"],
+                attribute__identifier=request.data["attribute_identifier"],
+                user=request.user,
+            )
+            attribute_lock.delete()
+            return HttpResponse(status=status.HTTP_200_OK)
+        except AttributeLock.DoesNotExist:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(

@@ -1,5 +1,6 @@
 import re
 import logging
+import datetime
 from collections import namedtuple
 
 from django.db import models
@@ -16,6 +17,7 @@ from projects.models import (
     ProjectSubtype,
     ProjectCardSectionAttribute,
 )
+from projects.models.attribute import AttributeLock
 from projects.models.project import (
     PhaseAttributeMatrixCell,
     ProjectFloorAreaSectionAttributeMatrixCell,
@@ -128,6 +130,17 @@ class AutofillRuleSerializer(serializers.Serializer):
 class SimpleAttributeSerializer(serializers.Serializer):
     label = serializers.CharField(source="name")
     name = serializers.CharField(source="identifier")
+
+
+class AttributeLockSerializer(serializers.Serializer):
+    class Meta:
+        model = AttributeLock
+        fields = [
+            "project",
+            "attribute",
+            "user",
+            "timestamp",
+        ]
 
 
 class AttributeSchemaSerializer(serializers.Serializer):
