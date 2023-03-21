@@ -137,6 +137,7 @@ class AttributeLockSerializer(serializers.Serializer):
     project_name = serializers.SerializerMethodField()
     attribute_identifier = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
+    user_email = serializers.SerializerMethodField()
     timestamp = serializers.DateTimeField()
     owner = serializers.SerializerMethodField()
 
@@ -147,7 +148,10 @@ class AttributeLockSerializer(serializers.Serializer):
         return attribute_lock.attribute.identifier
 
     def get_user_name(self, attribute_lock):
-        return f'{attribute_lock.user.first_name} {attribute_lock.user.last_name} ({attribute_lock.user.email})'
+        return f'{attribute_lock.user.first_name} {attribute_lock.user.last_name}'
+
+    def get_user_email(self, attribute_lock):
+        return attribute_lock.user.email
 
     def get_owner(self, attribute_lock):
         return self.context["request"].user == attribute_lock.user
