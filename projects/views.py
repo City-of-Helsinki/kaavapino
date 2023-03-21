@@ -842,7 +842,7 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
 
         attribute_lock = AttributeLock.objects.filter(project=project, attribute=attribute).first()
         if attribute_lock:
-            if (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 15:  # 15 minutes
+            if (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 900:  # 15 minutes
                 attribute_lock.delete()
             else:
                 return HttpResponse(
