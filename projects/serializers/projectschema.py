@@ -133,14 +133,27 @@ class SimpleAttributeSerializer(serializers.Serializer):
 
 
 class AttributeLockSerializer(serializers.Serializer):
+
+    project_name = serializers.SerializerMethodField()
+    attribute_identifier = serializers.SerializerMethodField()
+    user_name = serializers.SerializerMethodField()
+    timestamp = serializers.DateTimeField()
+    owner = serializers.SerializerMethodField()
+
+    def get_project_name(self, attribute_lock):
+        return attribute_lock.project.name
+
+    def get_attribute_identifier(self, attribute_lock):
+        return attribute_lock.attribute.identifier
+
+    def get_user_name(self, attribute_lock):
+        return f'{attribute_lock.user.first_name} {attribute_lock.user.last_name} ({attribute_lock.user.email})'
+
+    def get_owner(self, attribute_lock):
+        return self.context["request"].user == attribute_lock.user
+
     class Meta:
         model = AttributeLock
-        fields = [
-            "project",
-            "attribute",
-            "user",
-            "timestamp",
-        ]
 
 
 class AttributeSchemaSerializer(serializers.Serializer):
