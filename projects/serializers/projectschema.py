@@ -1,6 +1,5 @@
 import re
 import logging
-import datetime
 from collections import namedtuple
 
 from django.db import models

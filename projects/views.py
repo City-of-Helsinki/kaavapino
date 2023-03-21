@@ -9,7 +9,7 @@ from django.core.exceptions import FieldError
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
 from django_q.tasks import async_task, result as async_result
