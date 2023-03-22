@@ -863,7 +863,7 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         responses={
             200: OpenApiTypes.STR,
-            404: OpenApiTypes.STR
+            500: OpenApiTypes.STR
         },
     )
     @action(
@@ -881,9 +881,14 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
                 user=request.user,
             )
             attribute_lock.delete()
-            return HttpResponse(status=status.HTTP_200_OK)
         except AttributeLock.DoesNotExist:
-            return HttpResponse(status=status.HTTP_404_NOT_FOUND)
+            pass  # No attribute to unlock, request was still successful
+        except Exception as exc:
+            log.error(exc)
+            return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return HttpResponse(status=status.HTTP_200_OK)
+
 
 
 @extend_schema(
