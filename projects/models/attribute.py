@@ -784,6 +784,17 @@ class AttributeLock(models.Model):
         related_name="attribute_lock",
         on_delete=models.CASCADE
     )
+    fieldset_attribute = models.ForeignKey(
+        Attribute,
+        verbose_name=_("fieldset_attribute"),
+        related_name="attribute_lock_fieldset",
+        on_delete=models.CASCADE,
+        null=True
+    )
+    fieldset_attribute_index = models.IntegerField(
+        verbose_name=_("index"),
+        null=True
+    )
     user = models.ForeignKey(
         User,
         verbose_name=_("user"),
