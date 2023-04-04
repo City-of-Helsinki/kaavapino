@@ -135,6 +135,9 @@ class AttributeLockSerializer(serializers.Serializer):
 
     project_name = serializers.SerializerMethodField()
     attribute_identifier = serializers.SerializerMethodField()
+    fieldset_attribute_identifier = serializers.SerializerMethodField()
+    fieldset_attribute_index = serializers.IntegerField()
+    field_identifier = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
     user_email = serializers.SerializerMethodField()
     timestamp = serializers.DateTimeField()
@@ -144,6 +147,15 @@ class AttributeLockSerializer(serializers.Serializer):
         return attribute_lock.project.name
 
     def get_attribute_identifier(self, attribute_lock):
+        return attribute_lock.attribute.identifier
+
+    def get_fieldset_attribute_identifier(self, attribute_lock):
+        return attribute_lock.fieldset_attribute.identifier \
+            if attribute_lock.fieldset_attribute else None
+
+    def get_field_identifier(self, attribute_lock):
+        if attribute_lock.fieldset_attribute and attribute_lock.fieldset_attribute_index:
+            return f'{attribute_lock.fieldset_attribute.identifier}[{attribute_lock.fieldset_attribute_index}].{attribute_lock.attribute.identifier}'
         return attribute_lock.attribute.identifier
 
     def get_user_name(self, attribute_lock):
