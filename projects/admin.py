@@ -33,6 +33,7 @@ from projects.models.project import (
 from .exporting import get_document_response
 from .models import (
     Attribute,
+    AttributeLock,
     AttributeValueChoice,
     AttributeAutoValue,
     AttributeAutoValueMapping,
@@ -171,6 +172,18 @@ class AttributeAdmin(admin.ModelAdmin):
         except NotImplementedError as e:
             messages.set_level(request, messages.ERROR)
             messages.error(request, e)
+
+
+@admin.register(AttributeLock)
+class AttributeLockAdmin(admin.ModelAdmin):
+    list_display = [
+        "project",
+        "attribute",
+        "fieldset_attribute",
+        "fieldset_attribute_index",
+        "user",
+        "timestamp",
+    ]
 
 
 def build_create_document_action(template):

@@ -786,7 +786,7 @@ class AttributeLock(models.Model):
     )
     fieldset_attribute = models.ForeignKey(
         Attribute,
-        verbose_name=_("fieldset_attribute"),
+        verbose_name=_("fieldset attribute"),
         related_name="attribute_lock_fieldset",
         on_delete=models.CASCADE,
         null=True
@@ -808,6 +808,8 @@ class AttributeLock(models.Model):
 
     class Meta:
         unique_together = ('project', 'attribute')
+        verbose_name = _("attribute lock")
+        verbose_name_plural = _("attribute locks")
 
 
 class FieldSetAttribute(models.Model):
