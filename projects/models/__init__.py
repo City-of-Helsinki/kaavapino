@@ -1,5 +1,6 @@
 from .attribute import (  # noqa
     Attribute,
+    AttributeLock,
     AttributeAutoValue,
     AttributeAutoValueMapping,
     AttributeValueChoice,

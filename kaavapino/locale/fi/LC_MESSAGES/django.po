@@ -363,6 +363,14 @@ msgstr "kenttä"
 msgid "attributes"
 msgstr "kentät"
 
+#: projects/models/attribute.py:811
+msgid "attribute lock"
+msgstr "kentän lukitus"
+
+#: projects/models/attribute.py:812
+msgid "attribute locks"
+msgstr "kenttien lukitukset"
+
 #: projects/models/attribute.py:687 projects/models/attribute.py:756
 msgid "value"
 msgstr "arvo"
