@@ -154,7 +154,7 @@ class AttributeLockSerializer(serializers.Serializer):
             if attribute_lock.fieldset_attribute else None
 
     def get_field_identifier(self, attribute_lock):
-        if attribute_lock.fieldset_attribute and attribute_lock.fieldset_attribute_index:
+        if attribute_lock.fieldset_attribute is not None and attribute_lock.fieldset_attribute_index is not None:
             return f'{attribute_lock.fieldset_attribute.identifier}[{attribute_lock.fieldset_attribute_index}].{attribute_lock.attribute.identifier}'
         return attribute_lock.attribute.identifier
 
