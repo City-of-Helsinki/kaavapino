@@ -789,11 +789,13 @@ class AttributeLock(models.Model):
         verbose_name=_("fieldset attribute"),
         related_name="attribute_lock_fieldset",
         on_delete=models.CASCADE,
-        null=True
+        null=True,
+        blank=True
     )
     fieldset_attribute_index = models.IntegerField(
         verbose_name=_("index"),
-        null=True
+        null=True,
+        blank=True
     )
     user = models.ForeignKey(
         User,
@@ -807,7 +809,7 @@ class AttributeLock(models.Model):
     )
 
     class Meta:
-        unique_together = ('project', 'attribute')
+        unique_together = ('project', 'attribute', 'fieldset_attribute', 'fieldset_attribute_index')
         verbose_name = _("attribute lock")
         verbose_name_plural = _("attribute locks")
 
