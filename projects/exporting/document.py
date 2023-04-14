@@ -30,7 +30,6 @@ from projects.models import ProjectDocumentDownloadLog
 
 log = logging.getLogger(__name__)
 
-IMAGE_WIDTH = Mm(136)
 
 def _get_raw_value(value, attribute):
     if attribute.value_type == Attribute.TYPE_DATE and isinstance(value, str):
@@ -170,7 +169,7 @@ def render_template(project, document_template, preview):
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
-                display_value = InlineImage(doc, value, width=IMAGE_WIDTH)
+                display_value = InlineImage(doc, value)
             else:
                 display_value = value
         else:
