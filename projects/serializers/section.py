@@ -264,7 +264,12 @@ def create_section_serializer(
         section_attributes = [
             section_attribute.attribute
             for section_attribute
-            in section.projectphasesectionattribute_set.order_by("index").select_related("attribute")
+            in (
+                section.projectphasesectionattribute_set
+                .order_by("index")
+                .select_related("attribute")
+                .prefetch_related("attribute__deadline")
+            )
             if is_relevant_attribute(section_attribute, attribute_data)
         ]
     elif isinstance(section, ProjectFloorAreaSection):
