@@ -41,6 +41,7 @@ from .models import (
     DataRetentionPlan,
     DocumentTemplate,
     Project,
+    ProjectPriority,
     ProjectAttributeFile,
     ProjectCardSection,
     ProjectCardSectionAttribute,
@@ -225,6 +226,7 @@ class ProjectAdmin(OSMGeoAdmin):
     fields = (
         *readonly_fields,
         "phase",
+        "priority",
         "public",
         "archived",
         "onhold",
@@ -305,6 +307,11 @@ class ProjectPhaseAdmin(admin.ModelAdmin):
     exclude = ("index",)
     inlines = (ProjectPhaseSectionInline,)
     ordering = ("project_subtype__id", "index")
+
+
+@admin.register(ProjectPriority)
+class ProjectPriorityAdmin(admin.ModelAdmin):
+    list_display = ("name", "priority")
 
 
 class ProjectPhaseSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):

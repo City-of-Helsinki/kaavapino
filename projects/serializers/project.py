@@ -40,6 +40,7 @@ from projects.models import (
     ProjectFloorAreaSection,
     ProjectAttributeFile,
     ProjectDeadline,
+    ProjectPriority,
     Attribute,
     AttributeValueChoice,
     ProjectPhaseSectionAttribute,
@@ -203,6 +204,17 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             "distance_reference_deadline_id",
         ]
 
+
+class ProjectPrioritySerializer(serializers.ModelSerializer):
+    priority = serializers.IntegerField()
+    name = serializers.CharField()
+
+    class Meta:
+        model = ProjectPriority
+        fields = [
+            "priority",
+            "name",
+        ]
 
 class ProjectOverviewSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
@@ -431,15 +443,18 @@ class ProjectListSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
+    user_email = serializers.SerializerMethodField()
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
     phase_start_date = serializers.SerializerMethodField()
     deadlines = serializers.SerializerMethodField()
+    priority = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = [
             "user",
+            "user_email",
             "created_at",
             "modified_at",
             "name",
@@ -458,7 +473,12 @@ class ProjectListSerializer(serializers.ModelSerializer):
             "create_draft",
             "phase_start_date",
             "deadlines",
+            "priority",
         ]
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_user_email(self, project):
+        return project.user.email
 
     @extend_schema_field(OpenApiTypes.INT)
     def get_type(self, project):
@@ -502,6 +522,10 @@ class ProjectListSerializer(serializers.ModelSerializer):
     def get_deadlines(self, project):
         project_schedule_cache = self.context["project_schedule_cache"]
         return project_schedule_cache.get(project.pk, [])
+
+    @extend_schema_field(ProjectPrioritySerializer(many=False))
+    def get_priority(self, project):
+        return ProjectPrioritySerializer(project.priority).data if project.priority else None
 
 
 class ProjectExternalDocumentSerializer(serializers.Serializer):
@@ -582,8 +606,10 @@ class ProjectSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
+    user_email = serializers.SerializerMethodField()
     attribute_data = AttributeDataField(allow_null=True, required=False)
     type = serializers.SerializerMethodField()
+    priority = serializers.SerializerMethodField()
     deadlines = serializers.SerializerMethodField()
     public = serializers.BooleanField(
         allow_null=True, required=False, read_only=True,
@@ -612,6 +638,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "user",
+            "user_email",
             "created_at",
             "modified_at",
             "phase_documents_created",
@@ -621,6 +648,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "identifier",
             "pino_number",
             "type",
+            "priority",
             "subtype",
             "attribute_data",
             "phase",
@@ -781,9 +809,17 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return attribute_data
 
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_user_email(self, project):
+        return project.user.email
+
     @extend_schema_field(OpenApiTypes.INT)
     def get_type(self, project):
         return project.type.pk
+
+    @extend_schema_field(ProjectPrioritySerializer(many=False))
+    def get_priority(self, project):
+        return ProjectPrioritySerializer(project.priority).data if project.priority else None
 
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
@@ -1880,13 +1916,19 @@ class SimpleProjectSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
+    user_email = serializers.SerializerMethodField()
     type = serializers.CharField(source="subtype.id")
     phase = serializers.CharField(source="phase.id")
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_user_email(self, project):
+        return project.user.email
 
     class Meta:
         model = Project
         fields = [
             "user",
+            "user_email",
             "created_at",
             "modified_at",
             "name",

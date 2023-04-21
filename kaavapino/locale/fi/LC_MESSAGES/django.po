@@ -721,6 +721,22 @@ msgstr "käytä sääntöä jos kentän arvo on epätosi tai tyhjä"
 msgid "project phase"
 msgstr "projektin vaihe"
 
+#: projects/models/project.py:112
+msgid "priority"
+msgstr "prioriteetti"
+
+#: projects/models/project.py:117
+msgid "priority name"
+msgstr "prioriteetin nimi"
+
+#: projects/models/project.py:125
+msgid "project priority"
+msgstr "projektin prioriteetti"
+
+#: projects/models/project.py:126
+msgid "project priorities"
+msgstr "projektin prioriteetit"
+
 #: projects/models/document.py:25
 msgid "Downloading document doesn't trigger warnings"
 msgstr "Dokumentin lataus ei aiheuta varoitusta"

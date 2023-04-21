@@ -60,6 +60,10 @@ env = environ.Env(
     ELASTIC_APM_SECRET_TOKEN=(str, ""),
 )
 
+env_file = project_root(".env")
+if os.path.exists(env_file):
+    env.read_env(env_file)
+
 if env.str("ELASTIC_APM_SERVER_URL") and env.str("ELASTIC_APM_SECRET_TOKEN"):
     ELASTIC_APM = {
         "DEBUG": True,
@@ -90,12 +94,7 @@ GRAPH_API_CLIENT_SECRET = os.environ.get("GRAPH_API_CLIENT_SECRET")
 
 SOCIAL_AUTH_TUNNISTAMO_AUTH_EXTRA_ARGUMENTS = {'ui_locales': 'fi'}
 
-env_file = project_root(".env")
-
 FILE_UPLOAD_PERMISSIONS = None
-
-if os.path.exists(env_file):
-    env.read_env(env_file)
 
 DEBUG = env.bool("DEBUG")
 SECRET_KEY = env.str("SECRET_KEY")

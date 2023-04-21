@@ -25,6 +25,7 @@ from .document import (  #noqa
 )
 from .project import (  # noqa
     Project,
+    ProjectPriority,
     ProjectAttributeFile,
     ProjectCardSection,
     ProjectCardSectionAttribute,

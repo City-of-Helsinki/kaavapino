@@ -30,27 +30,41 @@ def add_admin_group_post_user_creation(sender, instance, created, *args, **kwarg
         instance.is_superuser = True
         instance.save()
 
+
 @receiver(post_save, sender=User)
-def add_ad_uuid(sender, instance, *args, **kwargs):
+def update_user_ad_data(sender, instance, *args, **kwargs):
+    if instance.ad_id and instance.department_name:
+        return
+
+    token = get_graph_api_access_token()
+    if not token or not instance.email:
+        return
+
+    response = requests.get(
+        f"{settings.GRAPH_API_BASE_URL}/v1.0/users/?$search=\"mail:{instance.email}\"",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "consistencyLevel": "eventual",
+        },
+    )
+
+    if not response:
+        return
+
     if not instance.ad_id:
-        token = get_graph_api_access_token()
-        if not token or not instance.email:
-            return
+        try:
+            instance.ad_id = response.json().get("value")[0]["id"]
+        except (TypeError, IndexError, KeyError):
+            pass
 
-        response = requests.get(
-            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/?$search=\"mail:{instance.email}\"",
-            headers={
-                "Authorization": f"Bearer {token}",
-                "consistencyLevel": "eventual",
-            },
-        )
+    if not instance.department_name:
+        try:
+            instance.department_name = response.json().get("value")[0]["officeLocation"]
+        except (TypeError, IndexError, KeyError):
+            pass
 
-        if response:
-            try:
-                instance.ad_id = response.json().get("value")[0]["id"]
-                instance.save()
-            except (TypeError, IndexError, KeyError):
-                pass
+    instance.save()
+
 
 @receiver(m2m_changed, sender=User.additional_groups.through)
 def handle_additional_groups(sender, instance, action, pk_set, **kwargs):
