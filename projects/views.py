@@ -130,6 +130,10 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectTypeSerializer
 
 
+class ProjectPagination(pagination.PageNumberPagination):
+    page_size_query_param = "page_size"
+
+
 @extend_schema_view(
     retrieve=extend_schema(
         responses={
@@ -167,6 +171,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user", "subtype", "subtype__project_type", "phase")
     permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
+    pagination_class = ProjectPagination
+
     try:
         ordering_fields = [
             "name", "pino_number", "created_at", "modified_at",
