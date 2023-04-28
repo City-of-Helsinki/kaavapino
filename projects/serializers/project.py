@@ -212,6 +212,7 @@ class ProjectPrioritySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPriority
         fields = [
+            "id",
             "priority",
             "name",
         ]
