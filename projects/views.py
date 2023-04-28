@@ -54,6 +54,7 @@ from projects.models import (
     DocumentLinkSection,
     OverviewFilter,
     OverviewFilterAttribute,
+    ProjectPriority,
 )
 from projects.models.attribute import AttributeLock
 from projects.models.utils import create_identifier
@@ -83,6 +84,7 @@ from projects.serializers.project import (
     ProjectExternalDocumentSectionSerializer,
     OverviewFilterSerializer,
     SimpleProjectSerializer,
+    ProjectPrioritySerializer,
 )
 from projects.serializers.projectschema import (
     SimpleAttributeSerializer,
@@ -802,6 +804,26 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "projects": ProjectOnMapOverviewSerializer(
                 queryset, many=True, context={"query": query},
             ).data
+        })
+
+    @extend_schema(
+        responses={
+            200: ProjectPrioritySerializer(many=True),
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="priorities",
+        url_name="project-priorities"
+    )
+    def priorities(self, request):
+        queryset = ProjectPriority.objects.all()
+        return Response({
+            "priorities": ProjectPrioritySerializer(queryset, many=True).data
         })
 
 
