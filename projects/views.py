@@ -218,13 +218,17 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     'target_actions'
                 )
 
-        includeds_users = self.request.query_params.get("includes_users", None)
-        search = self.request.query_params.get("search", None)
         users = self.request.query_params.get("users", None)
-        if includeds_users is not None:
-            queryset = self._filter_included_users(includeds_users, queryset)
+        includes_users = self.request.query_params.get("includes_users", None)
+        department = self.request.query_params.get("department", None)
+        search = self.request.query_params.get("search", None)
+
         if users is not None:
             queryset = self._filter_users(users, queryset)
+        if includes_users is not None:
+            queryset = self._filter_included_users(includes_users, queryset)
+        if department is not None:
+            queryset = self._search(department, queryset)
         if search is not None:
             queryset = self._search(search, queryset)
 
@@ -282,7 +286,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def _filter_users(self, users, queryset):
         users_list = self._string_filter_to_list(users)
-        return queryset.filter(user__uuid__in=users_list)
+        return queryset.filter(Q(user__uuid__in=users_list) | Q(user__ad_id__in=users_list))
 
     def _search(self, search, queryset):
         # def search_field_for_attribute(attr):
