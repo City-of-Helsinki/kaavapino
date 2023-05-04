@@ -54,6 +54,7 @@ from projects.models import (
     DocumentLinkSection,
     OverviewFilter,
     OverviewFilterAttribute,
+    ProjectPriority,
 )
 from projects.models.attribute import AttributeLock
 from projects.models.utils import create_identifier
@@ -83,6 +84,7 @@ from projects.serializers.project import (
     ProjectExternalDocumentSectionSerializer,
     OverviewFilterSerializer,
     SimpleProjectSerializer,
+    ProjectPrioritySerializer,
 )
 from projects.serializers.projectschema import (
     SimpleAttributeSerializer,
@@ -130,6 +132,10 @@ class ProjectTypeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectTypeSerializer
 
 
+class ProjectPagination(pagination.PageNumberPagination):
+    page_size_query_param = "page_size"
+
+
 @extend_schema_view(
     retrieve=extend_schema(
         responses={
@@ -167,10 +173,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all().select_related("user", "subtype", "subtype__project_type", "phase")
     permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
+    pagination_class = ProjectPagination
+
     try:
         ordering_fields = [
             "name", "pino_number", "created_at", "modified_at",
             "user__first_name", "user__last_name", "user__ad_id",
+            "priority__priority", "subtype__name", "subtype__index",
+            "phase__common_project_phase__name",
         ] + [
             f"attribute_data__{attribute.identifier}"
             for attribute in Attribute.objects.filter(searchable=True)
@@ -208,13 +218,17 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     'target_actions'
                 )
 
-        includeds_users = self.request.query_params.get("includes_users", None)
-        search = self.request.query_params.get("search", None)
         users = self.request.query_params.get("users", None)
-        if includeds_users is not None:
-            queryset = self._filter_included_users(includeds_users, queryset)
+        includes_users = self.request.query_params.get("includes_users", None)
+        department = self.request.query_params.get("department", None)
+        search = self.request.query_params.get("search", None)
+
         if users is not None:
             queryset = self._filter_users(users, queryset)
+        if includes_users is not None:
+            queryset = self._filter_included_users(includes_users, queryset)
+        if department is not None:
+            queryset = self._search(department, queryset)
         if search is not None:
             queryset = self._search(search, queryset)
 
@@ -272,7 +286,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def _filter_users(self, users, queryset):
         users_list = self._string_filter_to_list(users)
-        return queryset.filter(user__uuid__in=users_list)
+        return queryset.filter(Q(user__uuid__in=users_list) | Q(user__ad_id__in=users_list))
 
     def _search(self, search, queryset):
         # def search_field_for_attribute(attr):
@@ -795,6 +809,26 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "projects": ProjectOnMapOverviewSerializer(
                 queryset, many=True, context={"query": query},
             ).data
+        })
+
+    @extend_schema(
+        responses={
+            200: ProjectPrioritySerializer(many=True),
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR,
+        },
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="priorities",
+        url_name="project-priorities"
+    )
+    def priorities(self, request):
+        queryset = ProjectPriority.objects.all()
+        return Response({
+            "priorities": ProjectPrioritySerializer(queryset, many=True).data
         })
 
 

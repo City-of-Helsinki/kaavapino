@@ -9,6 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.core.serializers.json import DjangoJSONEncoder, json
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.db.models import Q
 from django.db.models.expressions import Value
@@ -105,6 +106,35 @@ class ProjectSubtype(models.Model):
 
         return phases
 
+
+class ProjectPriority(models.Model):
+
+    priority = models.PositiveIntegerField(
+        verbose_name=_("priority"),
+        default=1,
+        unique=True,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(10),
+        ]
+    )
+    name = models.CharField(
+        verbose_name=_("priority name"),
+        max_length=64,
+        unique=True,
+        blank=False,
+        null=False,
+    )
+
+    class Meta:
+        verbose_name = _("project priority")
+        verbose_name_plural = _("project priorities")
+        ordering = ("-priority",)
+
+    def __str__(self):
+        return self.name
+
+
 class Project(models.Model):
     """Represents a single project in the system."""
 
@@ -144,6 +174,14 @@ class Project(models.Model):
         verbose_name=_("subtype"),
         related_name="projects",
         on_delete=models.PROTECT,
+    )
+    priority = models.ForeignKey(
+        ProjectPriority,
+        verbose_name=_("project priority"),
+        related_name="projects",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
     )
     attribute_data = models.JSONField(
         verbose_name=_("attribute data"),
