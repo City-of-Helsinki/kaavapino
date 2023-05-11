@@ -11,7 +11,6 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from users.serializers import (
-    PersonnelDetailSerializer,
     PersonnelSerializer,
     UserSerializer,
 )
@@ -28,7 +27,8 @@ class PersonnelList(APIView):
     @extend_schema(
         responses=PersonnelSerializer(many=True),
         parameters=[
-          OpenApiParameter("search", OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter("search", OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter("company_name", OpenApiTypes.STR, OpenApiParameter.QUERY),
         ],
     )
     def get(self, request):
@@ -40,9 +40,17 @@ class PersonnelList(APIView):
             )
 
         search = request.query_params.get("search")
+        company_name = request.query_params.get("company_name", None if request.user.has_privilege('admin') else "KYMP")
+
+        url = \
+            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/" + \
+            f"?$search=\"displayName:{search}\"" + \
+            f"&$filter=endsWith(mail, \'@hel.fi\')" + \
+            (f" and companyName eq \'{company_name}\'" if company_name else "") + \
+            f"&$select=id,givenName,surname,mobilePhone,businessPhones,companyName,mail,jobTitle,officeLocation"
 
         response = requests.get(
-            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/?$search=\"displayName:{search}\"",
+            url,
             headers={
                 "Authorization": f"Bearer {token}",
                 "consistencyLevel": "eventual",
@@ -64,7 +72,7 @@ class PersonnelList(APIView):
 
 class PersonnelDetail(APIView):
     @extend_schema(
-        responses=PersonnelDetailSerializer,
+        responses=PersonnelSerializer(many=False),
     )
     def get(self, __, pk):
         token = get_graph_api_access_token()
@@ -75,14 +83,15 @@ class PersonnelDetail(APIView):
             )
 
         response = requests.get(
-            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{pk}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,businessPhones,officeLocation,surname",
+            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{pk}"
+            f"?$select=id,givenName,surname,mobilePhone,businessPhones,companyName,mail,jobTitle,officeLocation",
             headers={
                 "Authorization": f"Bearer {token}",
             },
         )
 
         if response:
-            return Response(PersonnelDetailSerializer(response.json()).data)
+            return Response(PersonnelSerializer(response.json(), many=False).data)
         elif response.status_code == 404:
             raise Http404
         elif response.status_code == 401:

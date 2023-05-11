@@ -50,9 +50,16 @@ class PersonnelSerializer(serializers.Serializer):
     id = serializers.CharField()
     name = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
+    company = serializers.SerializerMethodField()
     email = serializers.CharField(source="mail")
     title = serializers.CharField(source="jobTitle")
     office = serializers.CharField(source="officeLocation")
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_name(self, user):
+        return " ".join([
+            name for name in [user["givenName"], user["surname"]] if name
+        ])
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_phone(self, user):
@@ -62,27 +69,13 @@ class PersonnelSerializer(serializers.Serializer):
         return user["mobilePhone"]
 
     @extend_schema_field(OpenApiTypes.STR)
-    def get_name(self, user):
-        return " ".join([
-            name for name in [user["givenName"], user["surname"]] if name
-        ])
-
-
-
-class PersonnelDetailSerializer(PersonnelSerializer):
-    def get_fields(self):
-        fields = super(PersonnelDetailSerializer, self).get_fields()
-        fields["company"] = serializers.SerializerMethodField()
-        return fields
-
-    @extend_schema_field(OpenApiTypes.STR)
     def get_company(self, user):
         try:
             return {
                 "KYMP": "Kaupunkiympäristön toimiala",
                 "KUVA": "Kulttuurin ja vapaa-ajan toimiala",
-                "KASKO": "kasvatuksen ja koulutuksen toimiala",
-                "SOTE": "sosiaali- ja terveystoimiala",
+                "KASKO": "Kasvatuksen ja koulutuksen toimiala",
+                "SOTE": "Sosiaali- ja terveystoimiala",
                 "KEHA": "Keskushallinto"
             }[user["companyName"]]
         except KeyError:
