@@ -51,19 +51,28 @@ def update_user_ad_data(sender, instance, *args, **kwargs):
     if not response:
         return
 
+    changed = False
+
     if not instance.ad_id:
         try:
-            instance.ad_id = response.json().get("value")[0]["id"]
+            ad_id = response.json().get("value")[0]["id"]
+            if ad_id:
+                instance.ad_id = ad_id
+                changed = True
         except (TypeError, IndexError, KeyError):
             pass
 
     if not instance.department_name:
         try:
-            instance.department_name = response.json().get("value")[0]["officeLocation"]
+            department_name = response.json().get("value")[0]["officeLocation"]
+            if department_name:
+                instance.department_name = department_name
+                changed = True
         except (TypeError, IndexError, KeyError):
             pass
 
-    instance.save()
+    if changed:
+        instance.save()
 
 
 @receiver(m2m_changed, sender=User.additional_groups.through)
