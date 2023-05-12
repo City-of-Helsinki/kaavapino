@@ -43,6 +43,7 @@ class UserSerializer(serializers.ModelSerializer):
             "privilege",
             "privilege_name",
             "role_name",
+            "ad_id",
         ]
 
 
