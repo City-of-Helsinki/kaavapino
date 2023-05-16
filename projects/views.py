@@ -922,6 +922,7 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     @extend_schema(
         responses={
             200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
             500: OpenApiTypes.STR
         },
     )
@@ -935,6 +936,10 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     def unlock(self, request):
         try:
             project_name = request.data["project_name"]
+
+            if not project_name:
+                return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+
             attribute_lock_data = get_attribute_lock_data(request.data["attribute_identifier"])
 
             attribute_lock = AttributeLock.objects.get(
@@ -947,6 +952,37 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
             attribute_lock.delete()
         except AttributeLock.DoesNotExist:
             pass  # No attribute to unlock, request was still successful
+        except Exception as exc:
+            log.error(exc)
+            return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return HttpResponse(status=status.HTTP_200_OK)
+
+    @extend_schema(
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="unlock_all",
+        url_name="unlock_all"
+    )
+    def unlock_all(self, request):
+        project_name = request.data["project_name"]
+
+        if not project_name:
+            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            AttributeLock.objects.filter(
+                project__name=project_name,
+                user=request.user,
+            ).delete()
         except Exception as exc:
             log.error(exc)
             return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
