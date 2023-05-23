@@ -155,7 +155,14 @@ def update_suunnittelualueella_kiinteisto_fieldset(attribute_data, use_cached=Tr
             "kiinteistoa_koskee": kiinteistotunnus
         })
 
+
 def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
+
+    # Properties information is not displayed in the UI currently and there are future
+    # changes coming where they'll be fetched and displayed in a different way.
+    # return added here for now to prevent unnecessary data fetching from Kaavoitus-API
+    return
+
     from projects.models import Attribute
     external_data_attrs = Attribute.objects.filter(
         data_source__isnull=False,
