@@ -4,13 +4,22 @@ info:
   version: 1.0.0
   description: Kaavapino API for planning data
 paths:
+  /admin/upload_attribute_updater:
+    post:
+      operationId: admin_upload_attribute_updater_create
+      tags:
+      - admin
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
   /admin/upload_specifications:
     post:
       operationId: admin_upload_specifications_create
       tags:
       - admin
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -135,7 +144,6 @@ paths:
       tags:
       - schema
       security:
-      - jwtAuth: []
       - cookieAuth: []
       - {}
       responses:
@@ -171,7 +179,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -193,7 +200,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -201,6 +207,120 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SimpleAttribute'
+          description: ''
+  /v1/attributes/lock/:
+    post:
+      operationId: v1_attributes_lock_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttributeLock'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+  /v1/attributes/unlock/:
+    post:
+      operationId: v1_attributes_unlock_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+  /v1/attributes/unlock_all/:
+    post:
+      operationId: v1_attributes_unlock_all_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SimpleAttribute'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
           description: ''
   /v1/cardschema/:
     get:
@@ -215,7 +335,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -238,7 +357,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -260,7 +378,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -277,12 +394,11 @@ paths:
         name: id
         schema:
           type: integer
-        description: A unique integer value identifying this deadline.
+        description: A unique integer value identifying this määräaika.
         required: true
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -304,7 +420,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -319,7 +434,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -333,13 +447,16 @@ paths:
       operationId: v1_personnel_list
       parameters:
       - in: query
+        name: company_name
+        schema:
+          type: string
+      - in: query
         name: search
         schema:
           type: string
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -363,14 +480,13 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PersonnelDetail'
+                $ref: '#/components/schemas/Personnel'
           description: ''
   /v1/phases/:
     get:
@@ -385,7 +501,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -407,7 +522,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -432,10 +546,15 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -461,7 +580,6 @@ paths:
               $ref: '#/components/schemas/Project'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -506,7 +624,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -538,7 +655,6 @@ paths:
               $ref: '#/components/schemas/Comment'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '201':
@@ -565,7 +681,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -603,7 +718,6 @@ paths:
               $ref: '#/components/schemas/Comment'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -640,7 +754,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedComment'
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -666,7 +779,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '204':
@@ -695,7 +807,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -727,7 +838,6 @@ paths:
               $ref: '#/components/schemas/FieldComment'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '201':
@@ -754,7 +864,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -792,7 +901,6 @@ paths:
               $ref: '#/components/schemas/FieldComment'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -829,7 +937,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedFieldComment'
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -855,7 +962,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '204':
@@ -878,7 +984,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -911,7 +1016,6 @@ paths:
               $ref: '#/components/schemas/Comment'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -932,7 +1036,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -954,7 +1057,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -999,7 +1101,6 @@ paths:
               $ref: '#/components/schemas/Project'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1043,7 +1144,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProject'
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1076,7 +1176,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '204':
@@ -1094,7 +1193,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1122,7 +1220,6 @@ paths:
               $ref: '#/components/schemas/ProjectFile'
         required: true
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1156,7 +1253,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1195,7 +1291,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1245,7 +1340,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1271,7 +1365,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1292,10 +1385,15 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1321,7 +1419,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1342,10 +1439,15 @@ paths:
         description: A page number within the paginated result set.
         schema:
           type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1353,6 +1455,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedProjectOnMapOverviewList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+  /v1/projects/priorities/:
+    get:
+      operationId: v1_projects_priorities_list
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProjectPriorityList'
           description: ''
         '400':
           content:
@@ -1379,7 +1526,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1401,7 +1547,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1423,7 +1568,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1445,7 +1589,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1467,7 +1610,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1501,7 +1643,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1525,7 +1666,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1551,7 +1691,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1562,7 +1701,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1584,7 +1722,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1606,7 +1743,6 @@ paths:
       tags:
       - v1
       security:
-      - jwtAuth: []
       - cookieAuth: []
       responses:
         '200':
@@ -1627,6 +1763,49 @@ components:
       required:
       - label
       - value
+    AttributeLock:
+      type: object
+      properties:
+        project_name:
+          type: string
+          readOnly: true
+        attribute_identifier:
+          type: string
+          readOnly: true
+        fieldset_attribute_identifier:
+          type: string
+          readOnly: true
+        fieldset_attribute_index:
+          type: integer
+        field_identifier:
+          type: string
+          readOnly: true
+        field_data:
+          type: string
+          readOnly: true
+        user_name:
+          type: string
+          readOnly: true
+        user_email:
+          type: string
+          readOnly: true
+        timestamp:
+          type: string
+          format: date-time
+        owner:
+          type: string
+          readOnly: true
+      required:
+      - attribute_identifier
+      - field_data
+      - field_identifier
+      - fieldset_attribute_identifier
+      - fieldset_attribute_index
+      - owner
+      - project_name
+      - timestamp
+      - user_email
+      - user_name
     Comment:
       type: object
       properties:
@@ -1639,6 +1818,7 @@ components:
           title: Projekti
         user:
           type: string
+          format: uuid
           readOnly: true
         created_at:
           type: string
@@ -1695,6 +1875,9 @@ components:
           type: string
         attribute:
           type: string
+          description: |-
+            Given the *outgoing* object instance, return the primitive value
+            that should be used for this field.
           readOnly: true
         deadline_types:
           type: array
@@ -1795,6 +1978,7 @@ components:
           title: Projekti
         user:
           type: string
+          format: uuid
           readOnly: true
         created_at:
           type: string
@@ -1820,6 +2004,7 @@ components:
           title: ' metadata'
         field:
           type: string
+          title: Tunniste
         fieldset_path:
           type: array
           items:
@@ -1839,6 +2024,7 @@ components:
       properties:
         parent:
           type: string
+          title: Tunniste
         index:
           type: integer
       required:
@@ -2118,6 +2304,26 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProjectPhase'
+    PaginatedProjectPriorityList:
+      type: object
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectPriority'
     PaginatedProjectSubtypeList:
       type: object
       properties:
@@ -2230,6 +2436,7 @@ components:
           title: Projekti
         user:
           type: string
+          format: uuid
           readOnly: true
         created_at:
           type: string
@@ -2265,6 +2472,7 @@ components:
           title: Projekti
         user:
           type: string
+          format: uuid
           readOnly: true
         created_at:
           type: string
@@ -2290,6 +2498,7 @@ components:
           title: ' metadata'
         field:
           type: string
+          title: Tunniste
         fieldset_path:
           type: array
           items:
@@ -2299,6 +2508,10 @@ components:
       properties:
         user:
           type: string
+          format: uuid
+        user_email:
+          type: string
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -2334,6 +2547,10 @@ components:
           maxLength: 7
         type:
           type: integer
+          readOnly: true
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/ProjectPriority'
           readOnly: true
         subtype:
           type: integer
@@ -2381,9 +2598,17 @@ components:
           items:
             type: string
           readOnly: true
+        deadline_attributes:
+          type: array
+          items:
+            type: string
+          readOnly: true
         geoserver_data:
           type: string
           readOnly: true
+        project_type:
+          type: string
+          nullable: true
         _metadata:
           type: string
           readOnly: true
@@ -2398,38 +2623,16 @@ components:
           readOnly: true
         phone:
           type: string
-        email:
-          type: string
-        title:
-          type: string
-        office:
-          type: string
-      required:
-      - email
-      - id
-      - name
-      - office
-      - phone
-      - title
-    PersonnelDetail:
-      type: object
-      properties:
-        id:
-          type: string
-        name:
-          type: string
           readOnly: true
-        phone:
-          type: string
-        email:
-          type: string
-        title:
-          type: string
-        office:
-          type: string
         company:
           type: string
           readOnly: true
+        email:
+          type: string
+        title:
+          type: string
+        office:
+          type: string
       required:
       - company
       - email
@@ -2443,6 +2646,10 @@ components:
       properties:
         user:
           type: string
+          format: uuid
+        user_email:
+          type: string
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -2478,6 +2685,10 @@ components:
           maxLength: 7
         type:
           type: integer
+          readOnly: true
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/ProjectPriority'
           readOnly: true
         subtype:
           type: integer
@@ -2525,9 +2736,17 @@ components:
           items:
             type: string
           readOnly: true
+        deadline_attributes:
+          type: array
+          items:
+            type: string
+          readOnly: true
         geoserver_data:
           type: string
           readOnly: true
+        project_type:
+          type: string
+          nullable: true
         _metadata:
           type: string
           readOnly: true
@@ -2536,6 +2755,7 @@ components:
       - _metadata
       - archived
       - created_at
+      - deadline_attributes
       - deadlines
       - generated_deadline_attributes
       - geoserver_data
@@ -2546,19 +2766,28 @@ components:
       - owner_edit_override
       - phase_documents_created
       - phase_documents_creation_started
+      - priority
       - project_card_document
       - public
       - subtype
       - type
       - user
+      - user_email
     ProjectCardSchema:
       type: object
       properties:
+        section_id:
+          type: integer
+          title: Projektikortin osio
+          readOnly: true
         label:
           type: string
+          readOnly: true
         name:
           type: string
         section_name:
+          type: string
+        section_key:
           type: string
         choices:
           type: array
@@ -2577,6 +2806,8 @@ components:
       - choices
       - label
       - name
+      - section_id
+      - section_key
       - section_name
     ProjectDeadline:
       type: object
@@ -2647,6 +2878,7 @@ components:
           format: uri
         attribute:
           type: string
+          title: Tunniste
         project:
           type: integer
         description:
@@ -2665,6 +2897,10 @@ components:
       properties:
         user:
           type: string
+          format: uuid
+        user_email:
+          type: string
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -2729,6 +2965,10 @@ components:
           items:
             $ref: '#/components/schemas/ProjectDeadline'
           readOnly: true
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/ProjectPriority'
+          readOnly: true
       required:
       - created_at
       - deadlines
@@ -2736,9 +2976,11 @@ components:
       - modified_at
       - name
       - phase_start_date
+      - priority
       - subtype
       - type
       - user
+      - user_email
     ProjectOnMapOverview:
       type: object
       properties:
@@ -2818,6 +3060,20 @@ components:
       - name
       - project_subtype
       - project_type
+    ProjectPriority:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        priority:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+      - priority
     ProjectSubtype:
       type: object
       properties:
@@ -2940,6 +3196,10 @@ components:
       properties:
         user:
           type: string
+          format: uuid
+        user_email:
+          type: string
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -3002,6 +3262,7 @@ components:
       - subtype
       - type
       - user
+      - user_email
     TargetFloorAreas:
       type: object
       properties:
@@ -3050,6 +3311,11 @@ components:
         role_name:
           type: string
           readOnly: true
+        ad_id:
+          type: string
+          nullable: true
+          title: AD-käyttäjä-ID
+          maxLength: 255
       required:
       - id
       - privilege
@@ -3096,7 +3362,3 @@ components:
       type: apiKey
       in: cookie
       name: sessionid
-    jwtAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
