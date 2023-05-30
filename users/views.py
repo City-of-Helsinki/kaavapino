@@ -40,13 +40,13 @@ class PersonnelList(APIView):
             )
 
         search = request.query_params.get("search")
-        company_name = request.query_params.get("company_name", None if request.user.has_privilege('admin') else "KYMP")
+        company_name = request.query_params.get("company_name", None)
 
         url = \
             f"{settings.GRAPH_API_BASE_URL}/v1.0/users/" + \
             f"?$search=\"displayName:{search}\"" + \
             f"&$filter=endsWith(mail, \'@hel.fi\')" + \
-            (f" and companyName eq \'{company_name}\'" if company_name else "") + \
+            (f" and companyName eq \'{company_name}\'" if company_name else " and companyName in('KYMP', 'KUVA', 'KASKO', 'KEHA')") + \
             f"&$select=id,givenName,surname,mobilePhone,businessPhones,companyName,mail,jobTitle,officeLocation"
 
         response = requests.get(
