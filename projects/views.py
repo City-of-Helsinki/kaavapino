@@ -218,13 +218,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     'target_actions'
                 )
 
-        users = self.request.query_params.get("users", None)
+        status = self.request.query_params.get("status", None)
         includes_users = self.request.query_params.get("includes_users", None)
         department = self.request.query_params.get("department", None)
         search = self.request.query_params.get("search", None)
 
-        if users is not None:
-            queryset = self._filter_users(users, queryset)
+        if status is not None and status == "own":
+            queryset = self._filter_users(str(self.request.user.uuid), queryset)
         if includes_users is not None:
             queryset = self._filter_included_users(includes_users, queryset)
         if department is not None:
@@ -234,10 +234,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         queryset = self._filter_private(queryset, user)
 
-        if self.action == "list":
-            status = self.request.query_params.get("status")
-
-            if status == "active":
+        if self.action == "list" and status is not None:
+            if status == "active" or status == "own":
                 queryset = queryset.exclude(onhold=True).exclude(archived=True)
             elif status == "onhold":
                 queryset = queryset.filter(onhold=True)
