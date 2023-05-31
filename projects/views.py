@@ -224,7 +224,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         search = self.request.query_params.get("search", None)
 
         if status is not None and status == "own":
-            queryset = self._filter_included_users(str(self.request.user.uuid), queryset)
+            queryset = self._filter_included_users(
+                str(self.request.user.ad_id if self.request.user.ad_id else self.request.user.uuid),
+                queryset
+            )
         if includes_users is not None:
             queryset = self._filter_included_users(includes_users, queryset)
         if department is not None:
