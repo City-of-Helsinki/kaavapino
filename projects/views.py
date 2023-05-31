@@ -224,12 +224,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         search = self.request.query_params.get("search", None)
 
         if status is not None and status == "own":
-            queryset = self._filter_included_users(
-                str(self.request.user.ad_id if self.request.user.ad_id else self.request.user.uuid),
-                queryset
-            )
+            queryset = self._filter_included_users([str(self.request.user.uuid), self.request.user.ad_id], queryset)
         if includes_users is not None:
-            queryset = self._filter_included_users(includes_users, queryset)
+            queryset = self._filter_included_users(self._string_filter_to_list(includes_users), queryset)
         if department is not None:
             queryset = self._search(department, queryset)
         if search is not None:
@@ -250,7 +247,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def _string_filter_to_list(self, filter_string):
         return [_filter.strip().lower() for _filter in filter_string.split(",")]
 
-    def _filter_included_users(self, users, queryset):
+    def _filter_included_users(self, users_list, queryset):
         """
         Filter on all user attributes
 
@@ -262,8 +259,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
               users. At the time of implementation
               no such fields existed.
         """
-        user_queryset = self._filter_users(users, queryset)
-        users_list = self._string_filter_to_list(users)
+        user_queryset = self._filter_users(users_list, queryset)
         user_attributes = Attribute.objects.filter(
             value_type__in=[Attribute.TYPE_USER, Attribute.TYPE_PERSONNEL]
         )
@@ -285,8 +281,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return attribute_data_users | user_queryset
 
-    def _filter_users(self, users, queryset):
-        users_list = self._string_filter_to_list(users)
+    def _filter_users(self, users_list, queryset):
         return queryset.filter(Q(user__uuid__in=users_list) | Q(user__ad_id__in=users_list))
 
     def _search(self, search, queryset):
