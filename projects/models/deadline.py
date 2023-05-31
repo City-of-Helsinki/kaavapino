@@ -141,7 +141,8 @@ class Deadline(models.Model):
     def initial_depends_on(self):
         return list(set([
             calc.datecalculation.base_date_deadline
-            for calc in self.initial_calculations.all().select_related("datecalculation", "datecalculation__base_date_deadline")
+            for calc in self.initial_calculations.all().select_related("datecalculation",
+                                                                       "datecalculation__base_date_deadline")
             if calc.datecalculation.base_date_deadline
         ]))
 
@@ -149,7 +150,8 @@ class Deadline(models.Model):
     def update_depends_on(self):
         return list(set([
             calc.datecalculation.base_date_deadline
-            for calc in self.update_calculations.all().select_related("datecalculation", "datecalculation__base_date_deadline")
+            for calc in self.update_calculations.all().select_related("datecalculation",
+                                                                      "datecalculation__base_date_deadline")
             if calc.datecalculation.base_date_deadline
         ]))
 
