@@ -888,6 +888,16 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
         if not project or not attribute or (attribute_lock_data.get("fieldset_attribute_identifier") and not fieldset_attribute):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
 
+        # Delete other existing AttributeLocks for request user
+        AttributeLock.objects.filter(
+            project=project,
+            user=request.user
+        ).exclude(
+            attribute=attribute,
+            fieldset_attribute=fieldset_attribute,
+            fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
+        ).delete()
+
         attribute_lock = AttributeLock.objects.filter(
             project=project,
             attribute=attribute,
