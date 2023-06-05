@@ -829,7 +829,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase", "project_subtype", "project_subtype__project_type")
+    queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase",
+                                                           "project_subtype",
+                                                           "project_subtype__project_type")
     serializer_class = ProjectPhaseSerializer
 
 
@@ -882,10 +884,12 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
 
         project = Project.objects.filter(name=project_name).first()
         attribute = Attribute.objects.filter(identifier=attribute_lock_data.get("attribute_identifier")).first()
-        fieldset_attribute = Attribute.objects.filter(identifier=attribute_lock_data.get("fieldset_attribute_identifier")).first() \
-            if attribute_lock_data.get("fieldset_attribute_identifier") else None
+        fieldset_attribute = Attribute.objects.filter(
+            identifier=attribute_lock_data.get("fieldset_attribute_identifier")
+        ).first() if attribute_lock_data.get("fieldset_attribute_identifier") else None
 
-        if not project or not attribute or (attribute_lock_data.get("fieldset_attribute_identifier") and not fieldset_attribute):
+        if not project or not attribute \
+                or (attribute_lock_data.get("fieldset_attribute_identifier") and not fieldset_attribute):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
 
         # Delete other existing AttributeLocks for request user
@@ -905,7 +909,7 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
             fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
         ).first()
 
-        if attribute_lock and (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 900:  # 15 minutes
+        if attribute_lock and (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 900:  # 15 min
             attribute_lock.delete()
             attribute_lock = None
 

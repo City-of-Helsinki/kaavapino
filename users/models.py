@@ -72,7 +72,8 @@ class User(AbstractUser):
 
     @cached_property
     def all_groups(self):
-        return self.groups.all().select_related("groupprivilege").union(self.additional_groups.all().select_related("groupprivilege"))
+        return self.groups.all().select_related("groupprivilege") \
+            .union(self.additional_groups.all().select_related("groupprivilege"))
 
     @cached_property
     def privilege(self):

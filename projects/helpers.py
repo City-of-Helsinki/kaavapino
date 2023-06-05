@@ -177,22 +177,6 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
     update_suunnittelualueella_kiinteisto_fieldset(attribute_data, use_cached)
     flat_attribute_data = get_flat_attribute_data(attribute_data, {})
 
-    # TODO: Timeout should be fixed in Kaavoitus-api
-    """
-    The reason for the timeout should be fixed in Kaavoitus-api and Kaavoitus-api should return the timeout
-    response instead of generating one here manually. This works as a hotfix for now but should be fixed in future.
-    """
-    def get_timeout_response():
-        ret = Response(
-            data='Kaavoitus-api did not return a response in time.',
-            status=status.HTTP_408_REQUEST_TIMEOUT
-        )
-        ret.accepted_renderer = JSONRenderer()
-        ret.accepted_media_type = "application/json"
-        ret.renderer_context = {}
-        ret.render()
-        return ret
-
     def build_request_paths(attr):
         returns = {}
         if attr.key_attribute:
@@ -243,7 +227,10 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
                     )
                 except ReadTimeout:
                     log.error("Request timed out for url: {}".format(url))
-                    response = get_timeout_response()
+                    response = Response(
+                        data="Kaavoitus-api did not return a response in time.",
+                        status=status.HTTP_408_REQUEST_TIMEOUT
+                    )
 
                 if response.status_code in [200, 400, 404, 408]:
                     cache.set(url, response, 86400)  # 24 hours
@@ -586,8 +573,10 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
 
         set_in_attribute_data(attribute_data, path, value)
 
+
 def get_ad_user(id):
-    url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,businessPhones,officeLocation,surname"
+    url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}" \
+          "?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,businessPhones,officeLocation,surname"
     try:
         response = cache.get(url)
     except TypeError:
