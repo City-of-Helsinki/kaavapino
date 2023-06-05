@@ -218,15 +218,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     'target_actions'
                 )
 
-        users = self.request.query_params.get("users", None)
+        status = self.request.query_params.get("status", None)
         includes_users = self.request.query_params.get("includes_users", None)
         department = self.request.query_params.get("department", None)
         search = self.request.query_params.get("search", None)
 
-        if users is not None:
-            queryset = self._filter_users(users, queryset)
+        if status is not None and status == "own":
+            queryset = self._filter_included_users([self.request.user.ad_id, str(self.request.user.uuid)], queryset)
         if includes_users is not None:
-            queryset = self._filter_included_users(includes_users, queryset)
+            queryset = self._filter_included_users(self._string_filter_to_list(includes_users), queryset)
         if department is not None:
             queryset = self._search(department, queryset)
         if search is not None:
@@ -234,10 +234,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         queryset = self._filter_private(queryset, user)
 
-        if self.action == "list":
-            status = self.request.query_params.get("status")
-
-            if status == "active":
+        if self.action == "list" and status is not None:
+            if status == "active" or status == "own":
                 queryset = queryset.exclude(onhold=True).exclude(archived=True)
             elif status == "onhold":
                 queryset = queryset.filter(onhold=True)
@@ -249,7 +247,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def _string_filter_to_list(self, filter_string):
         return [_filter.strip().lower() for _filter in filter_string.split(",")]
 
-    def _filter_included_users(self, users, queryset):
+    def _filter_included_users(self, users_list, queryset):
         """
         Filter on all user attributes
 
@@ -261,8 +259,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
               users. At the time of implementation
               no such fields existed.
         """
-        user_queryset = self._filter_users(users, queryset)
-        users_list = self._string_filter_to_list(users)
+        user_queryset = self._filter_users(users_list, queryset)
         user_attributes = Attribute.objects.filter(
             value_type__in=[Attribute.TYPE_USER, Attribute.TYPE_PERSONNEL]
         )
@@ -284,8 +281,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         return attribute_data_users | user_queryset
 
-    def _filter_users(self, users, queryset):
-        users_list = self._string_filter_to_list(users)
+    def _filter_users(self, users_list, queryset):
         return queryset.filter(Q(user__uuid__in=users_list) | Q(user__ad_id__in=users_list))
 
     def _search(self, search, queryset):
@@ -891,6 +887,16 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
 
         if not project or not attribute or (attribute_lock_data.get("fieldset_attribute_identifier") and not fieldset_attribute):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+
+        # Delete other existing AttributeLocks for request user
+        AttributeLock.objects.filter(
+            project=project,
+            user=request.user
+        ).exclude(
+            attribute=attribute,
+            fieldset_attribute=fieldset_attribute,
+            fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
+        ).delete()
 
         attribute_lock = AttributeLock.objects.filter(
             project=project,
