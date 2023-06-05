@@ -361,7 +361,9 @@ class ProjectSubtypeOverviewSerializer(serializers.ModelSerializer):
 
     def get_phases(self, subtype):
         return ProjectPhaseOverviewSerializer(
-            subtype.phases.all().select_related("project_subtype", "project_subtype__project_type", "common_project_phase"),
+            subtype.phases.all().select_related("project_subtype",
+                                                "project_subtype__project_type",
+                                                "common_project_phase"),
             many=True,
             context=self.context,
         ).data
@@ -980,7 +982,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         query_params = getattr(self.context["request"], "GET", {})
         snapshot_param = query_params.get("snapshot")
         if not list_view and not snapshot_param:
-            metadata["updates"] = self._get_updates(project, attributes, cutoff=None, request=self.context.get('request', None))
+            metadata["updates"] = self._get_updates(
+                project,
+                attributes,
+                cutoff=None,
+                request=self.context.get('request', None)
+            )
 
         created = project.target_actions.filter(verb=verbs.CREATED_PROJECT) \
             .prefetch_related("actor").first()
@@ -1007,7 +1014,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if not list_view:
             user_attribute_ids = set()
-            for attribute in filter(lambda a: a.value_type in [Attribute.TYPE_USER, Attribute.TYPE_FIELDSET], attributes):
+            for attribute in filter(
+                    lambda a: a.value_type in [Attribute.TYPE_USER, Attribute.TYPE_FIELDSET], attributes
+            ):
                 if attribute.value_type == Attribute.TYPE_FIELDSET:
                     fieldset_user_identifiers = attribute.fieldset_attributes.filter(value_type=Attribute.TYPE_USER)\
                         .prefetch_related("identifier").values_list("identifier", flat=True)
@@ -1490,7 +1499,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
+            dl.deadline.attribute.identifier for dl
+            in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
             if dl.confirmed and dl.deadline.attribute
         ] if self.instance else []
 
