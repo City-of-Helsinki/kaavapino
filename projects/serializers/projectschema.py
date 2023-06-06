@@ -163,7 +163,14 @@ class AttributeLockSerializer(serializers.Serializer):
 
     def get_field_data(self, attribute_lock):
         try:
-            return attribute_lock.project.attribute_data[attribute_lock.attribute.identifier]
+            attribute_lock_data = self.context["attribute_lock_data"]
+            if attribute_lock_data.get("fieldset_attribute_identifier") is not None:
+                f_data = attribute_lock.project.attribute_data[attribute_lock_data.get("fieldset_attribute_identifier")]
+                if f_data and isinstance(f_data, list) and len(f_data) > 0:
+                    f_index_data = f_data[int(attribute_lock_data.get("fieldset_attribute_index"))]
+                    return f_index_data.get(attribute_lock_data.get("attribute_identifier"))
+                return None
+            return attribute_lock.project.attribute_data[attribute_lock_data.get("attribute_identifier")]
         except KeyError:  # Attribute doesn't exist in projects attribute_data
             return None
 
