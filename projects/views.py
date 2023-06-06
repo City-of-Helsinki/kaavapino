@@ -924,7 +924,10 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
 
         if attribute_lock:
             return Response({
-                "attribute_lock": AttributeLockSerializer(attribute_lock, context={'request': request}).data
+                "attribute_lock": AttributeLockSerializer(
+                    attribute_lock,
+                    context={'request': request, 'attribute_lock_data': attribute_lock_data}
+                ).data
             }, status=status.HTTP_200_OK)
 
         return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
