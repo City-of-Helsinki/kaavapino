@@ -169,10 +169,11 @@ class AttributeLockSerializer(serializers.Serializer):
                 if f_data and isinstance(f_data, list) and len(f_data) > 0:
                     f_index_data = f_data[int(attribute_lock_data.get("fieldset_attribute_index"))]
                     return f_index_data.get(attribute_lock_data.get("attribute_identifier"))
-                return None
-            return attribute_lock.project.attribute_data[attribute_lock_data.get("attribute_identifier")]
+            else:
+                return attribute_lock.project.attribute_data[attribute_lock_data.get("attribute_identifier")]
         except KeyError:  # Attribute doesn't exist in projects attribute_data
-            return None
+            pass
+        return None
 
     def get_user_name(self, attribute_lock):
         return f'{attribute_lock.user.first_name} {attribute_lock.user.last_name}'
