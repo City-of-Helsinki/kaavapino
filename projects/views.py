@@ -180,7 +180,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "name", "pino_number", "created_at", "modified_at",
             "user__first_name", "user__last_name", "user__ad_id",
             "priority__priority", "subtype__name", "subtype__index",
-            "phase__common_project_phase__name",
+            "phase__common_project_phase__index",
         ] + [
             f"attribute_data__{attribute.identifier}"
             for attribute in Attribute.objects.filter(searchable=True)
