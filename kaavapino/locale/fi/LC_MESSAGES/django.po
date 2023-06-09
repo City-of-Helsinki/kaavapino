@@ -348,6 +348,14 @@ msgstr "avainkenttä AD-käyttäjätietojen hakemiseen"
 msgid "AD user data key"
 msgstr "AD-käyttäjätiedon avain"
 
+#: projects/models/attribute.py:368
+msgid "Field roles"
+msgstr "Rooli kenen kenttä"
+
+#: projects/models/attribute.py:374
+msgid "Field subroles"
+msgstr "Alirooli kenen kenttä"
+
 #: projects/models/attribute.py:371 projects/models/attribute.py:683
 #: projects/models/attribute.py:887 projects/models/deadline.py:46
 #: projects/models/project.py:713 projects/models/project.py:927

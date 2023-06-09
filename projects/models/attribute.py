@@ -364,6 +364,18 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    field_roles = models.CharField(
+        verbose_name=_("Field roles"),
+        max_length=64,
+        null=True,
+        blank=True,
+    )
+    field_subroles = models.CharField(
+        verbose_name=_("Field subroles"),
+        max_length=64,
+        null=True,
+        blank=True,
+    )
     objects = AttributeQuerySet.as_manager()
 
     admin_description = "Projektin kenttien hallinta. Muutokset tänne vaatii mahdollisesti myös muutoksia dokumenttipohjiin."
