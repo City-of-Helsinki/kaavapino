@@ -668,6 +668,7 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
     subtype = serializers.IntegerField(source="id")
     phases = serializers.SerializerMethodField()
     deadline_sections = serializers.SerializerMethodField()
+    filters = serializers.SerializerMethodField()
 
     def get_phases(self, instance):
         query_params = getattr(self.context["request"], "GET", {})
@@ -711,6 +712,34 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
         )
 
         return fields
+
+    def get_filters(self, instance):
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.get(pk=int(query_params.get("project")))
+        except (ValueError, TypeError, Project.DoesNotExist):
+            project = None
+
+        filters_cache = cache.get("project_phase_section_filters", {})
+
+        if not filters_cache.get(project.name):
+            attributes = set()
+
+            for phase in instance.get_phases(project):
+                for phase_section in phase.sections.all():
+                    attributes.update([attribute for attribute in phase_section.attributes.all()])
+
+            roles = set()
+            subroles = set()
+
+            for attr in attributes:
+                roles.update(set(attr.field_roles.split(";")) if attr.field_roles else ())
+                subroles.update(set(attr.field_subroles.split(";")) if attr.field_subroles else ())
+
+            filters_cache[project.name] = {"roles": roles, "subroles": subroles}
+            cache.set("project_phase_section_filters", filters_cache, 60 * 60 * 6)  # 6 hours
+
+        return filters_cache[project.name]
 
     class Meta:
         list_serializer_class = ProjectSubtypeListFilterSerializer
