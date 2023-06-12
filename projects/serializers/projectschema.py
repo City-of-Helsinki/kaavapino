@@ -217,6 +217,8 @@ class AttributeSchemaSerializer(serializers.Serializer):
     display = serializers.CharField()
     editable = serializers.SerializerMethodField("get_editable")
     disable_fieldset_delete_add = serializers.SerializerMethodField()
+    field_roles = serializers.CharField()
+    field_subroles = serializers.CharField()
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
