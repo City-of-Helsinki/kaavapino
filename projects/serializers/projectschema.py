@@ -129,8 +129,8 @@ class AutofillRuleSerializer(serializers.Serializer):
 class SimpleAttributeSerializer(serializers.Serializer):
     label = serializers.CharField(source="name")
     name = serializers.CharField(source="identifier")
-    roles = serializers.CharField(source="field_roles")
-    subroles = serializers.CharField(source="field_subroles")
+    field_roles = serializers.CharField()
+    field_subroles = serializers.CharField()
 
 
 class AttributeLockSerializer(serializers.Serializer):
