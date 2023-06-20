@@ -973,7 +973,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get__metadata(self, project):
         list_view = self.context.get("action", None) == "list"
-        attributes = Attribute.objects.all().prefetch_related("key_attribute", "fieldsets", "fieldset_attributes"
+        attributes = Attribute.objects.all().select_related("key_attribute").prefetch_related("fieldsets", "fieldset_attributes"
         )  # perform further filtering of attributes within methods
         metadata = {
             "users": self._get_users(project, attributes, list_view=list_view),

@@ -214,8 +214,12 @@ def create_fieldset_field_data(attribute, validation, project, preview):
 
     if attribute.multiple_choice:
         field_arguments["many"] = True
-
-    for attr in attribute.fieldset_attributes.order_by("fieldset_attribute_source"):
+    
+    for attr in (
+        attribute.fieldset_attributes
+        .order_by("fieldset_attribute_source")
+        .prefetch_related("deadline")
+    ):
         field_data = create_attribute_field_data(attr, validation, project, preview)
         if not field_data.field_class:
             # TODO: Handle this by failing instead of continuing
@@ -264,7 +268,12 @@ def create_section_serializer(
         section_attributes = [
             section_attribute.attribute
             for section_attribute
-            in section.projectphasesectionattribute_set.order_by("index").select_related("attribute")
+            in (
+                section.projectphasesectionattribute_set
+                .order_by("index")
+                .select_related("attribute")
+                .prefetch_related("attribute__deadline")
+            )
             if is_relevant_attribute(section_attribute, attribute_data)
         ]
     elif isinstance(section, ProjectFloorAreaSection):
