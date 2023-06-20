@@ -78,6 +78,8 @@ ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 ATTRIBUTE_EDIT_PRIVILEGE = "kenellä on oikeus muokata tietoa"
 ATTRIBUTE_ERROR = "virhetilanne"
 ATTRIBUTE_PLACEHOLDER = "syöttökentässä näkyvä ohjeistusteksti"
+ATTRIBUTE_FIELD_ROLE = "rooli kenen kenttä"
+ATTRIBUTE_FIELD_SUBROLE = "alirooli kenen kenttä"
 # TODO: ask for a dedicated column for uniqueness at some point
 ATTRIBUTE_ERROR_UNIQUE = [
     "Virhe. Nimi on jo käytössä",
@@ -818,6 +820,13 @@ class AttributeImporter:
                         edit_privilege = privilege
                         break
 
+            field_roles = row[self.column_index[ATTRIBUTE_FIELD_ROLE]]
+            if field_roles == "automaattinen tieto, jota ei voi muokata":
+                field_roles = None
+            field_subroles = row[self.column_index[ATTRIBUTE_FIELD_SUBROLE]]
+            if field_subroles == "automaattinen tieto, jota ei voi muokata":
+                field_subroles = None
+
             data_source = row[self.column_index[EXT_DATA_SOURCE]]
             data_source_key = row[self.column_index[EXT_DATA_SOURCE_KEY]]
             key_attribute_path = row[self.column_index[EXT_DATA_PARENT_KEY_ATTRIBUTE]]
@@ -860,6 +869,8 @@ class AttributeImporter:
                     "data_source_key": data_source_key,
                     "key_attribute_path": key_attribute_path,
                     "ad_data_key": ad_data_key,
+                    "field_roles": field_roles,
+                    "field_subroles": field_subroles,
                 },
             )
             if created:
