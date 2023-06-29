@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from datetime import datetime
 
 from projects.models import (
     Attribute,
@@ -474,6 +475,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     color_code = serializers.CharField()
     list_prefix = serializers.CharField()
     sections = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     @staticmethod
     def _get_sections(privilege, owner, phase, project=None):
@@ -528,6 +530,37 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             phase,
             project,
         )
+
+    def get_status(self, phase):
+        try:
+            query_params = getattr(self.context["request"], "GET", {})
+            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
+        except (KeyError, ValueError, TypeError, Project.DoesNotExist):
+            project = None
+
+        if project:
+            phase_deadlines = project.deadlines.filter(deadline__phase=phase)
+            print(f'phase: {phase} - deadlines: {phase_deadlines}')
+
+            now = datetime.now().date()
+            past_deadlines = False
+            future_deadlines = False
+            for deadline in phase_deadlines:
+                if deadline.date is not None:
+                    deadline_date = deadline.date
+                    if deadline_date >= now:
+                        future_deadlines = True
+                    else:
+                        past_deadlines = True
+
+            if past_deadlines is True and future_deadlines is True:
+                return "Vaihe käynnissä"
+            elif past_deadlines is True:
+                return "Vaihe suoritettu"
+            elif future_deadlines is True:
+                return "Vaihe käynnistämättä"
+
+        return "Vaiheen tila ei tiedossa"
 
 
 class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
