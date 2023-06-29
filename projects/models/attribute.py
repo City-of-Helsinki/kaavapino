@@ -366,13 +366,13 @@ class Attribute(models.Model):
     )
     field_roles = models.CharField(
         verbose_name=_("Field roles"),
-        max_length=64,
+        max_length=256,
         null=True,
         blank=True,
     )
     field_subroles = models.CharField(
         verbose_name=_("Field subroles"),
-        max_length=64,
+        max_length=256,
         null=True,
         blank=True,
     )
