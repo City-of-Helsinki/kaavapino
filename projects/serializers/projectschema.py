@@ -534,30 +534,14 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
     def get_status(self, phase):
         try:
             query_params = getattr(self.context["request"], "GET", {})
-            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
+            project = Project.objects.select_related("phase", "phase__common_project_phase") \
+                .get(pk=int(query_params.get("project")))
+            project_phase = project.phase.common_project_phase
+            return "Vaihe suoritettu" if project_phase.index > phase.common_project_phase.index \
+                else "Vaihe aloittamatta" if project_phase.index < phase.common_project_phase.index \
+                else "Vaihe käynnissä"
         except (KeyError, ValueError, TypeError, Project.DoesNotExist):
-            project = None
-
-        if project:
-            phase_deadlines = project.deadlines.filter(deadline__phase=phase)
-            now = datetime.now().date()
-            past_deadlines = False
-            future_deadlines = False
-
-            for deadline in phase_deadlines:
-                if deadline.date is not None:
-                    deadline_date = deadline.date
-                    if deadline_date >= now:
-                        future_deadlines = True
-                    else:
-                        past_deadlines = True
-
-            if past_deadlines is True and future_deadlines is True:
-                return "Vaihe käynnissä"
-            elif past_deadlines is True:
-                return "Vaihe suoritettu"
-            elif future_deadlines is True:
-                return "Vaihe käynnistämättä"
+            pass
 
         return "Vaiheen tila ei tiedossa"
 
