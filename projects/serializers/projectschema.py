@@ -254,7 +254,6 @@ class AttributeSchemaSerializer(serializers.Serializer):
     @staticmethod
     def _format_roles(roles, subtype):
         if subtype and roles and "{%" in roles:
-            print(f'_format_roles: {roles} subtype: {subtype}')
             jinja_env = jinja2.Environment()
             template = jinja_env.from_string(roles)
             return template.render(kaavaprosessin_kokoluokka_readonly=subtype.name).strip()
