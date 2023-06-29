@@ -8,6 +8,7 @@ from django.core.cache import cache
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from datetime import datetime
+import jinja2
 
 from projects.models import (
     Attribute,
@@ -218,8 +219,8 @@ class AttributeSchemaSerializer(serializers.Serializer):
     display = serializers.CharField()
     editable = serializers.SerializerMethodField("get_editable")
     disable_fieldset_delete_add = serializers.SerializerMethodField()
-    field_roles = serializers.CharField()
-    field_subroles = serializers.CharField()
+    field_roles = serializers.SerializerMethodField()
+    field_subroles = serializers.SerializerMethodField()
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
@@ -243,6 +244,21 @@ class AttributeSchemaSerializer(serializers.Serializer):
             return True
 
         return False
+
+    def get_field_roles(self, attribute):
+        return self._format_roles(attribute.field_roles, self.context.get("subtype", None))
+
+    def get_field_subroles(self, attribute):
+        return self._format_roles(attribute.field_subroles, self.context.get("subtype", None))
+
+    @staticmethod
+    def _format_roles(roles, subtype):
+        if subtype and roles and "{%" in roles:
+            print(f'_format_roles: {roles} subtype: {subtype}')
+            jinja_env = jinja2.Environment()
+            template = jinja_env.from_string(roles)
+            return template.render(kaavaprosessin_kokoluokka_readonly=subtype.name).strip()
+        return roles
 
     def get_fieldset_attributes(self, attribute):
         try:
@@ -412,6 +428,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attribute.attribute,
             context={
                 "phase": section_attribute.section.phase,
+                "subtype": section_attribute.section.phase.project_subtype,
                 "owner": owner,
                 "privilege": privilege,
             }
@@ -765,8 +782,8 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
             subroles = set()
 
             for attr in attributes:
-                roles.update(set(attr.field_roles.split(";")) if attr.field_roles else ())
-                subroles.update(set(attr.field_subroles.split(";")) if attr.field_subroles else ())
+                roles.update(set(attr.field_roles.split(";")) if attr.field_roles and "{%" not in attr.field_roles else ())
+                subroles.update(set(attr.field_subroles.split(";")) if attr.field_subroles and "{%" not in attr.field_subroles else ())
 
             filters_cache[project.name] = {"roles": roles, "subroles": subroles}
             cache.set("project_phase_section_filters", filters_cache, 60 * 60 * 6)  # 6 hours
