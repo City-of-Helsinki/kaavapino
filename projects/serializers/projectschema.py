@@ -540,11 +540,10 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
 
         if project:
             phase_deadlines = project.deadlines.filter(deadline__phase=phase)
-            print(f'phase: {phase} - deadlines: {phase_deadlines}')
-
             now = datetime.now().date()
             past_deadlines = False
             future_deadlines = False
+
             for deadline in phase_deadlines:
                 if deadline.date is not None:
                     deadline_date = deadline.date
