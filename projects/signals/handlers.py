@@ -72,6 +72,8 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
     # TODO: hard-coded attribute identifiers are not ideal
     instance.attribute_data["kaavaprosessin_kokoluokka"] = \
         instance.phase.project_subtype.name
+    instance.attribute_data["kaavaprosessin_kokoluokka_readonly"] = \
+        instance.phase.project_subtype.name
 
     instance.attribute_data["kaavan_vaihe"] = \
         instance.phase.prefixed_name
