@@ -85,3 +85,4 @@ class ProjectDocumentDownloadLog(models.Model):
         related_name="document_download_log",
         on_delete=models.CASCADE,
     )
+    invalidated = models.BooleanField(default=False)

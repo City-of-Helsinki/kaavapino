@@ -45,7 +45,7 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
     def get_last_downloaded(self, document_template):
         try:
             last_downloaded = document_template.document_download_log \
-                .filter(project=self.context["project"]) \
+                .filter(project=self.context["project"], invalidated=False) \
                 .order_by("-created_at") \
                 .first().created_at
         except AttributeError:
@@ -80,6 +80,7 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
                 last_downloaded = document_template.document_download_log \
                     .filter(project=project) \
                     .filter(phase=phase) \
+                    .filter(invalidated=False) \
                     .order_by("-created_at") \
                     .first().created_at
             except AttributeError:
