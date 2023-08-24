@@ -20,6 +20,7 @@ from projects.models import (
     DeadlineDateCalculation,
     DocumentLinkFieldSet,
     DocumentLinkSection,
+    ProjectDocumentDownloadLog
 )
 from projects.models.project import (
     ProjectPhaseLog,
@@ -256,6 +257,10 @@ class ProjectAdmin(OSMGeoAdmin):
 
         return actions
 
+    def save_model(self, request, obj, form, change):
+        super(ProjectAdmin, self).save_model(request, obj, form, change)
+        if 'phase' in form.changed_data:
+            ProjectDocumentDownloadLog.objects.filter(project=obj).update(invalidated=True)
 
 class ProjectCardSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectCardSectionAttribute
