@@ -1,4 +1,5 @@
 import datetime
+import logging
 import re
 from collections.abc import Sequence
 from collections import OrderedDict
@@ -17,6 +18,7 @@ from .helpers import DATE_SERIALIZATION_FORMAT, validate_identifier
 from projects.helpers import get_ad_user
 from users.serializers import PersonnelSerializer
 
+log = logging.getLogger(__name__)
 
 class AttributeQuerySet(models.QuerySet):
     def filterable(self):
@@ -637,8 +639,12 @@ class Attribute(models.Model):
         elif self.value_type == Attribute.TYPE_DECIMAL and self.unit in ["ha", "k-m2"]:
             return '{:,}'.format(int(float(value))).replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DATE:
-            date_value = datetime.datetime.strptime(value, "%Y-%m-%d")
-            return '{d.day}.{d.month}.{d.year}'.format(d=date_value)
+            try:
+                date_value = datetime.datetime.strptime(value, "%Y-%m-%d")
+                return '{d.day}.{d.month}.{d.year}'.format(d=date_value)
+            except ValueError:
+                log.error(f'Failed to format date_value {value} with datetime.strptime')
+                return value
         elif self.value_type == Attribute.TYPE_CHOICE:
             try:
                 return self.value_choices.get(identifier=value).value
