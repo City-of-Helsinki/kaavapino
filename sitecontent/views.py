@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
 from drf_spectacular.utils import extend_schema, inline_serializer
+from drf_spectacular.types import OpenApiTypes
 from sitecontent.models import FooterSection, TargetFloorArea
 from sitecontent.serializers import FooterSectionSerializer
 from projects.models import CommonProjectPhase
@@ -39,3 +40,11 @@ class Legend(APIView):
                 many=True,
             ).data
         })
+
+
+class Ping(APIView):
+    @extend_schema(
+        responses={200: OpenApiTypes.STR}
+    )
+    def get(self, __):
+        return Response("pong")
