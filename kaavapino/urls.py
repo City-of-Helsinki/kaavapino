@@ -13,7 +13,7 @@ from rest_framework import routers
 from projects import views as project_views
 from projects.urls import router as projects_router
 from sitecontent.urls import router as sitecontent_router
-from sitecontent.views import Legend, TargetFloorAreas
+from sitecontent.views import Legend, TargetFloorAreas, Ping
 from users.views import PersonnelDetail, PersonnelList
 from users.urls import router as users_router
 
@@ -54,6 +54,7 @@ urlpatterns = [
     path("v1/legend/", Legend.as_view(), name="legend"),
     path("v1/targetfloorareas/", TargetFloorAreas.as_view(), name="targetfloorareas"),
     path("v1/personnel/", PersonnelList.as_view(), name="personnellist"),
+    path("v1/ping/", Ping.as_view(), name="ping"),
     path("v1/", include(router.urls)),
     re_path(
         r"v1/personnel/(?P<pk>.*)$",
