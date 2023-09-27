@@ -870,36 +870,44 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
         attribute_lock_data = get_attribute_lock_data(request.data["attribute_identifier"])
 
         project = Project.objects.filter(name=project_name).first()
-        attribute = Attribute.objects.filter(identifier=attribute_lock_data.get("attribute_identifier")).first()
+        attribute = Attribute.objects.filter(
+            identifier=attribute_lock_data.get("attribute_identifier")
+        ).first() if attribute_lock_data.get("attribute_identifier") else None
         fieldset_attribute = Attribute.objects.filter(
             identifier=attribute_lock_data.get("fieldset_attribute_identifier")
         ).first() if attribute_lock_data.get("fieldset_attribute_identifier") else None
 
-        if not project or not attribute \
-                or (attribute_lock_data.get("fieldset_attribute_identifier") and not fieldset_attribute):
+        if not project or (not attribute and not fieldset_attribute):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
 
         # Delete other existing AttributeLocks for request user
-        AttributeLock.objects.filter(
+        queryset = AttributeLock.objects.filter(
             project=project,
             user=request.user
-        ).exclude(
-            attribute=attribute,
-            fieldset_attribute=fieldset_attribute,
-            fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
-        ).delete()
+        )
+        if attribute:
+            queryset.exclude(attribute=attribute)
+        elif fieldset_attribute:
+            queryset.exclude(
+                fieldset_attribute=fieldset_attribute,
+                fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
+            )
+        queryset.delete()
 
-        if not fieldset_attribute:
+        if attribute:
             attribute_lock = AttributeLock.objects.filter(
                 project=project,
                 attribute=attribute
             ).first()
-        else:
+        elif fieldset_attribute:
             attribute_lock = AttributeLock.objects.filter(
                 project=project,
                 fieldset_attribute=fieldset_attribute,
                 fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
             ).first()
+        else:  # Should not happen
+            log.error("Unknown error, no attribute or fieldset_attribute exists")
+            return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if attribute_lock and (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 900:  # 15 min
             attribute_lock.delete()
@@ -947,21 +955,19 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
 
             attribute_lock_data = get_attribute_lock_data(request.data["attribute_identifier"])
 
-            if not attribute_lock_data.get("fieldset_attribute"):
-                attribute_lock = AttributeLock.objects.filter(
+            if attribute_lock_data.get("attribute_identifier"):
+                AttributeLock.objects.filter(
                     project__name=project_name,
                     attribute__identifier=attribute_lock_data.get("attribute_identifier"),
                     user=request.user,
-                )
+                ).delete()
             else:
-                attribute_lock = AttributeLock.objects.filter(
+                AttributeLock.objects.filter(
                     project__name=project_name,
                     fieldset_attribute__identifier=attribute_lock_data.get("fieldset_attribute_identifier"),
                     fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index"),
                     user=request.user,
-                )
-            if attribute_lock:
-                attribute_lock.delete()
+                ).delete()
         except Exception as exc:
             log.error(exc)
             return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
