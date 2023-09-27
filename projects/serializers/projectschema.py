@@ -152,7 +152,8 @@ class AttributeLockSerializer(serializers.Serializer):
         return attribute_lock.project.name
 
     def get_attribute_identifier(self, attribute_lock):
-        return attribute_lock.attribute.identifier
+        return attribute_lock.attribute.identifier \
+            if attribute_lock.attribute else None
 
     def get_fieldset_attribute_identifier(self, attribute_lock):
         return attribute_lock.fieldset_attribute.identifier \
