@@ -706,9 +706,9 @@ def get_file_type(filename):
 
 
 def get_attribute_lock_data(attribute_identifier):
-    if "[" in attribute_identifier and "]." in attribute_identifier:
+    if "[" in attribute_identifier and "]" in attribute_identifier:
         fieldset_attribute_identifier = attribute_identifier.split("[")[0]
-        fieldset_attribute_index = attribute_identifier.split("[")[1].split("].")[0]
+        fieldset_attribute_index = attribute_identifier.split("[")[1].split("]")[0]
         return {
             "fieldset_attribute_identifier": fieldset_attribute_identifier,
             "fieldset_attribute_index": fieldset_attribute_index
