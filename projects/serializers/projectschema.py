@@ -237,7 +237,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
             return False
 
     def get_disable_fieldset_delete_add(self, attribute):
-        if attribute.value_type != Attribute.TYPE_FIELDSET:
+        if attribute.value_type not in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             return None
 
         if attribute.data_source and not attribute.key_attribute:
@@ -271,7 +271,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
             except KeyError:
                 return 0
 
-        if attribute.value_type == Attribute.TYPE_FIELDSET:
+        if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             return sorted([
                 AttributeSchemaSerializer(attr, context=context).data
                 for attr in attribute.fieldset_attributes.all()

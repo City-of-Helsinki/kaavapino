@@ -296,7 +296,7 @@ class Project(models.Model):
             elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
                 if not value:
                     self.attribute_data.pop(identifier, None)
-            elif attribute.value_type == Attribute.TYPE_FIELDSET:
+            elif attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                 serialized_value = attribute.serialize_value(value)
                 if not serialized_value:
                     self.attribute_data.pop(identifier, None)
@@ -662,7 +662,7 @@ class Project(models.Model):
                     if not value:
                         continue
 
-                    if type(value) is list and attr.value_type == Attribute.TYPE_FIELDSET:
+                    if type(value) is list and attr.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                         sources = filter(lambda a: a.attribute_source.identifier == key, fieldset_attributes)
                         for source in sources:
                             add_fieldset_field_for_attribute(search_fields, source.attribute_target, value)
@@ -679,7 +679,7 @@ class Project(models.Model):
                     search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
             elif not attr.fieldset_attribute_target.count():
                 value = self.attribute_data.get(attr.identifier)
-                if value and attr.value_type != Attribute.TYPE_FIELDSET:
+                if value and attr.value_type not in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                     search_fields.add(Value(check_get_name(value), output_field=models.TextField()))
             else:
                 add_fieldset_field_for_attribute(search_fields, attr, None)
@@ -711,7 +711,7 @@ class Project(models.Model):
                 .prefetch_related("fieldsets", "fieldset_attribute_target", "fieldset_attribute_source"):
             if not attr.fieldset_attribute_target.count():
                 value = self.attribute_data.get(attr.identifier)
-                if value and attr.value_type != Attribute.TYPE_FIELDSET:
+                if value and attr.value_type not in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                     search_fields.add(Value(value, output_field=models.TextField()))
             else:
                 add_fieldset_field_for_attribute(search_fields, attr, None, raw=True)

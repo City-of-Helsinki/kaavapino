@@ -126,7 +126,7 @@ def render_template(project, document_template, preview):
         text_args = None
         element_data = {}
 
-        if attribute.value_type == Attribute.TYPE_FIELDSET:
+        if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             result = []
             for fieldset_item in value or []:
                 fieldset_object = {}
@@ -140,7 +140,7 @@ def render_template(project, document_template, preview):
 
                     fieldset_object[k] = display_value
 
-                    if item_attr.value_type != Attribute.TYPE_FIELDSET:
+                    if item_attr.value_type not in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                         fieldset_object[f"{k}__raw"] = raw_value
 
                 if fieldset_object:

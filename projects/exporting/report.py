@@ -75,7 +75,7 @@ def _get_fieldset_display(data, path, indent, index, column):
                 except Attribute.DoesNotExist:
                     continue
 
-                if attribute.value_type == Attribute.TYPE_FIELDSET:
+                if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                     if j == 0:
                         return_items.append(f"{' '*indent}{i}. {attribute.name}:\n")
                     else:
@@ -235,7 +235,7 @@ def render_report_to_response(
                 else:
                     for attr in col.attributes.all():
                         try:
-                            if attr.value_type == Attribute.TYPE_FIELDSET:
+                            if attr.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                                 path = get_fieldset_path(attr) + [attr]
 
                                 if not path[0].identifier in data:

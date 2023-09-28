@@ -85,7 +85,7 @@ class Command(BaseCommand):
                 project.save()
 
     def _log_updates(self, attribute, project, value, converted, prefix=""):
-        if attribute.value_type == Attribute.TYPE_FIELDSET:
+        if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             for i, children in enumerate(converted):
                 for key, child_converted in dict(children).items():
                     try:

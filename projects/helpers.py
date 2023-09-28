@@ -90,7 +90,7 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
         flat[key] = flat.get(key, [])
         value_type = value_types.get(key, None)
 
-        if type(val) is list and value_type == Attribute.TYPE_FIELDSET:
+        if type(val) is list and value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             for item in val:
                 get_flat_attribute_data(
                     item, flat, first_run=False, flat_key=flat_key, value_types=value_types
@@ -171,7 +171,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
     leaf_node_attrs = external_data_attrs.filter(
         data_source__isnull=False,
     ).exclude(
-        value_type=Attribute.TYPE_FIELDSET,
+        value_type__in=[Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET],
     ).select_related("key_attribute")
 
     update_suunnittelualueella_kiinteisto_fieldset(attribute_data, use_cached)
@@ -344,7 +344,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
                 data_index = None
                 data_item = get_deep(data, current.data_source_key)
 
-            if current.value_type == Attribute.TYPE_FIELDSET:
+            if current.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                 if type(data_item) is list:
                     for j in range(0, len(data_item)):
                         get_branch_paths(
@@ -605,7 +605,7 @@ def get_ad_user(id):
 
 def _add_paths(paths, solved_path, remaining_path, parent_data):
     from projects.models import Attribute
-    if remaining_path[0].value_type != Attribute.TYPE_FIELDSET:
+    if remaining_path[0].value_type not in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
         paths.append(solved_path + [remaining_path[0]])
         return
 

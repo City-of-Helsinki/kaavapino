@@ -295,7 +295,7 @@ def create_section_serializer(
 
     serializer_fields = {}
     for attribute in section_attributes:
-        if attribute.value_type == Attribute.TYPE_FIELDSET:
+        if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             field_data = create_fieldset_field_data(
                 attribute, validation, project, preview,
             )
