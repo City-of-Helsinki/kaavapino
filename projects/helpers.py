@@ -117,51 +117,28 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
 
     return flat
 
-
-# Updates fetched kiinteistotunnukset from Kaavoitus-API to suunnittelualueella_kiinteisto_fieldset.
-# These values can't be edited or deleted in the UI and area always automatically fetched and displayed.
-def update_suunnittelualueella_kiinteisto_fieldset(attribute_data, use_cached=True):
+def update_paikkatieto(attribute_data):
     if not attribute_data.get("hankenumero"):
         return
 
     hankenumero = attribute_data["hankenumero"]
 
-    if not attribute_data or not hankenumero or not re.compile("^\d{4}_\d{1,3}$").match(hankenumero):
-        return
-
-    url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/kiinteistotunnukset/{hankenumero}"
-    if use_cached and cache.get(url) is not None:
-        response = cache.get(url)
-    else:
+    url = f"{settings.KAAVOITUS_API_BASE_URL}/hel/v1/paikkatieto/{hankenumero}"
+    response = cache.get(url)
+    if response is None:
         response = requests.get(
             url,
             headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-            timeout=5
+            timeout=180
         )
         if response.status_code == 200:
             cache.set(url, response, 3600)  # 1 hour
 
-    if response.status_code != 200:
-        return
-
-    if not attribute_data.get("suunnittelualueella_kiinteisto_fieldset"):
-        attribute_data["suunnittelualueella_kiinteisto_fieldset"] = []
-
-    kiinteistotunnukset = response.json()["kiinteistotunnukset"]
-    for kiinteistotunnus in kiinteistotunnukset:
-        attribute_data["suunnittelualueella_kiinteisto_fieldset"].append({
-            "_deleted": False,
-            "_automatically_added": True,
-            "kiinteistoa_koskee": kiinteistotunnus
-        })
+    if response and response.status_code == 200:
+        return attribute_data.update(response.json())
 
 
 def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
-
-    # Properties information is not displayed in the UI currently and there are future
-    # changes coming where they'll be fetched and displayed in a different way.
-    # return added here for now to prevent unnecessary data fetching from Kaavoitus-API
-    return
 
     from projects.models import Attribute
     external_data_attrs = Attribute.objects.filter(
@@ -174,8 +151,8 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
         value_type__in=[Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET],
     ).select_related("key_attribute")
 
-    update_suunnittelualueella_kiinteisto_fieldset(attribute_data, use_cached)
     flat_attribute_data = get_flat_attribute_data(attribute_data, {})
+    update_paikkatieto(attribute_data)
 
     def build_request_paths(attr):
         returns = {}
