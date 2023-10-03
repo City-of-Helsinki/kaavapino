@@ -705,6 +705,17 @@ def get_file_type(filename):
     return filename.split(".")[-1]
 
 
+def get_attribute_lock_data(attribute_identifier):
+    if "[" in attribute_identifier and "]" in attribute_identifier:
+        fieldset_attribute_identifier = attribute_identifier.split("[")[0]
+        fieldset_attribute_index = attribute_identifier.split("[")[1].split("]")[0]
+        return {
+            "fieldset_attribute_identifier": fieldset_attribute_identifier,
+            "fieldset_attribute_index": fieldset_attribute_index
+        }
+    return {"attribute_identifier": attribute_identifier}
+
+
 DOCUMENT_CONTENT_TYPES = {
     'docx': "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     'pptx': "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"

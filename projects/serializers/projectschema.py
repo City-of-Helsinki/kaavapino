@@ -152,7 +152,8 @@ class AttributeLockSerializer(serializers.Serializer):
         return attribute_lock.project.name
 
     def get_attribute_identifier(self, attribute_lock):
-        return attribute_lock.attribute.identifier
+        return attribute_lock.attribute.identifier \
+            if attribute_lock.attribute else None
 
     def get_fieldset_attribute_identifier(self, attribute_lock):
         return attribute_lock.fieldset_attribute.identifier \
@@ -161,8 +162,7 @@ class AttributeLockSerializer(serializers.Serializer):
     def get_field_identifier(self, attribute_lock):
         if attribute_lock.fieldset_attribute is not None and attribute_lock.fieldset_attribute_index is not None:
             return f'{attribute_lock.fieldset_attribute.identifier}' \
-                   f'[{attribute_lock.fieldset_attribute_index}]' \
-                   f'.{attribute_lock.attribute.identifier}'
+                   f'[{attribute_lock.fieldset_attribute_index}]'
         return attribute_lock.attribute.identifier
 
     def get_field_data(self, attribute_lock):
@@ -171,8 +171,7 @@ class AttributeLockSerializer(serializers.Serializer):
             if attribute_lock_data.get("fieldset_attribute_identifier") is not None:
                 f_data = attribute_lock.project.attribute_data[attribute_lock_data.get("fieldset_attribute_identifier")]
                 if f_data and isinstance(f_data, list) and len(f_data) > 0:
-                    f_index_data = f_data[int(attribute_lock_data.get("fieldset_attribute_index"))]
-                    return f_index_data.get(attribute_lock_data.get("attribute_identifier"))
+                    return f_data[int(attribute_lock_data.get("fieldset_attribute_index"))]
             else:
                 return attribute_lock.project.attribute_data[attribute_lock_data.get("attribute_identifier")]
         except KeyError:  # Attribute doesn't exist in projects attribute_data

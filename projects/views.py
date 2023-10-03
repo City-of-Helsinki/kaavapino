@@ -33,7 +33,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
-from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE
+from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE, get_attribute_lock_data
 from projects.importing import AttributeImporter, AttributeUpdater
 from projects.models import (
     FieldComment,
@@ -846,19 +846,6 @@ class AttributePagination(pagination.PageNumberPagination):
     page_size = 2000
 
 
-def get_attribute_lock_data(attribute_identifier):
-    if "[" in attribute_identifier and "]." in attribute_identifier:
-        fieldset_attribute_identifier = attribute_identifier.split("[")[0]
-        fieldset_attribute_index = attribute_identifier.split("[")[1].split("].")[0]
-        attribute_identifier = attribute_identifier.split("].")[1]
-        return {
-            "attribute_identifier": attribute_identifier,
-            "fieldset_attribute_identifier": fieldset_attribute_identifier,
-            "fieldset_attribute_index": fieldset_attribute_index
-        }
-    return {"attribute_identifier": attribute_identifier}
-
-
 class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Attribute.objects.all()
     serializer_class = SimpleAttributeSerializer
@@ -883,38 +870,51 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
         attribute_lock_data = get_attribute_lock_data(request.data["attribute_identifier"])
 
         project = Project.objects.filter(name=project_name).first()
-        attribute = Attribute.objects.filter(identifier=attribute_lock_data.get("attribute_identifier")).first()
+        attribute = Attribute.objects.filter(
+            identifier=attribute_lock_data.get("attribute_identifier")
+        ).first() if attribute_lock_data.get("attribute_identifier") else None
         fieldset_attribute = Attribute.objects.filter(
             identifier=attribute_lock_data.get("fieldset_attribute_identifier")
         ).first() if attribute_lock_data.get("fieldset_attribute_identifier") else None
 
-        if not project or not attribute \
-                or (attribute_lock_data.get("fieldset_attribute_identifier") and not fieldset_attribute):
+        if not project or (not attribute and not fieldset_attribute):
             return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
 
         # Delete other existing AttributeLocks for request user
-        AttributeLock.objects.filter(
+        queryset = AttributeLock.objects.filter(
             project=project,
             user=request.user
-        ).exclude(
-            attribute=attribute,
-            fieldset_attribute=fieldset_attribute,
-            fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
-        ).delete()
+        )
+        if attribute:
+            queryset.exclude(attribute=attribute)
+        elif fieldset_attribute:
+            queryset.exclude(
+                fieldset_attribute=fieldset_attribute,
+                fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
+            )
+        queryset.delete()
 
-        attribute_lock = AttributeLock.objects.filter(
-            project=project,
-            attribute=attribute,
-            fieldset_attribute=fieldset_attribute,
-            fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
-        ).first()
+        if attribute:
+            attribute_lock = AttributeLock.objects.filter(
+                project=project,
+                attribute=attribute
+            ).first()
+        elif fieldset_attribute:
+            attribute_lock = AttributeLock.objects.filter(
+                project=project,
+                fieldset_attribute=fieldset_attribute,
+                fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index")
+            ).first()
+        else:  # Should not happen
+            log.error("Unknown error, no attribute or fieldset_attribute exists")
+            return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if attribute_lock and (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 900:  # 15 min
             attribute_lock.delete()
             attribute_lock = None
 
         if not attribute_lock:
-            attribute_lock = AttributeLock.objects.create(
+            attribute_lock, created = AttributeLock.objects.get_or_create(
                 project=project,
                 attribute=attribute,
                 fieldset_attribute=fieldset_attribute,
@@ -955,16 +955,19 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
 
             attribute_lock_data = get_attribute_lock_data(request.data["attribute_identifier"])
 
-            attribute_lock = AttributeLock.objects.get(
-                project__name=project_name,
-                attribute__identifier=attribute_lock_data.get("attribute_identifier"),
-                fieldset_attribute__identifier=attribute_lock_data.get("fieldset_attribute_identifier"),
-                fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index"),
-                user=request.user,
-            )
-            attribute_lock.delete()
-        except AttributeLock.DoesNotExist:
-            pass  # No attribute to unlock, request was still successful
+            if attribute_lock_data.get("attribute_identifier"):
+                AttributeLock.objects.filter(
+                    project__name=project_name,
+                    attribute__identifier=attribute_lock_data.get("attribute_identifier"),
+                    user=request.user,
+                ).delete()
+            else:
+                AttributeLock.objects.filter(
+                    project__name=project_name,
+                    fieldset_attribute__identifier=attribute_lock_data.get("fieldset_attribute_identifier"),
+                    fieldset_attribute_index=attribute_lock_data.get("fieldset_attribute_index"),
+                    user=request.user,
+                ).delete()
         except Exception as exc:
             log.error(exc)
             return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -800,7 +800,9 @@ class AttributeLock(models.Model):
         Attribute,
         verbose_name=_("attribute"),
         related_name="attribute_lock",
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
     )
     fieldset_attribute = models.ForeignKey(
         Attribute,
