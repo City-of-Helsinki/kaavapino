@@ -146,14 +146,14 @@ class Phases(Enum):
 
 
 ATTRIBUTE_PHASE_COLUMNS = {
-    Phases.START: ("käynnistys vaiheen otsikot", "käynnistys vaiheen järjestys"),
-    Phases.PRINCIPLES: ("periaatteet vaiheen otsikot", "periaatteet vaiheen järjestys"),
-    Phases.OAS: ("oas vaiheen otsikot", "oas vaiheen järjestys"),
-    Phases.DRAFT: ("luonnos vaiheen otsikot", "luonnos vaiheen järjestys"),
-    Phases.PROPOSAL: ("ehdotus vaiheen otsikot", "ehdotus vaiheen järjestys"),
-    Phases.REVISED_PROPOSAL: ("tarkistettu ehdotus vaiheen otsikot", "tarkistettu ehdotus vaiheen järjestys"),
-    Phases.APPROVAL: ("hyväksyminen vaiheen otsikot", "hyväksyminen vaiheen järjestys"),
-    Phases.GOING_INTO_EFFECT: ("voimaantulo vaiheen otsikot", "voimaantulo vaiheen järjestys"),
+    Phases.START: ("käynnistys vaiheen otsikot", "käynnistys vaiheen alaotsikko", "käynnistys vaiheen järjestys"),
+    Phases.PRINCIPLES: ("periaatteet vaiheen otsikot", "periaatteet vaiheen alaotsikko", "periaatteet vaiheen järjestys"),
+    Phases.OAS: ("oas vaiheen otsikot", "oas vaiheen alaotsikko", "oas vaiheen järjestys"),
+    Phases.DRAFT: ("luonnos vaiheen otsikot", "luonnos vaiheen alaotsikko", "luonnos vaiheen järjestys"),
+    Phases.PROPOSAL: ("ehdotus vaiheen otsikot", "ehdotus vaiheen alaotsikko", "ehdotus vaiheen järjestys"),
+    Phases.REVISED_PROPOSAL: ("tarkistettu ehdotus vaiheen otsikot", "tarkistettu ehdotus vaiheen alaotsikko", "tarkistettu ehdotus vaiheen järjestys"),
+    Phases.APPROVAL: ("hyväksyminen vaiheen otsikot", "hyväksyminen vaiheen alaotsikko", "hyväksyminen vaiheen järjestys"),
+    Phases.GOING_INTO_EFFECT: ("voimaantulo vaiheen otsikot", "voimaantulo vaiheen alaotsikko", "voimaantulo vaiheen järjestys"),
 }
 
 ATTRIBUTE_DEADLINE_SECTION_COLUMNS = {
@@ -1132,9 +1132,10 @@ class AttributeImporter:
                 raise Exception(f"Could not add attribute {attribute.identifier}")
 
     def _get_attribute_locations(self, row, phase_name):
-        for phase, (column_label, column_location) in ATTRIBUTE_PHASE_COLUMNS.items():
+        for phase, (column_label, column_ingress, column_location) in ATTRIBUTE_PHASE_COLUMNS.items():
             if phase.value == phase_name:  # e.g. Käynnistys
                 label = row[self.column_index[column_label]]
+                ingress = row[self.column_index[column_ingress]]
                 location = row[self.column_index[column_location]]
                 try:
                     locations = [
@@ -1148,6 +1149,7 @@ class AttributeImporter:
 
                 return {
                     "label": label,
+                    "ingress": ingress,
                     "section_location": locations[0] if locations else None,
                     "field_location": locations[1] if len(locations) > 1 else 0,
                     "child_locations": locations[2:],
@@ -1297,15 +1299,16 @@ class AttributeImporter:
                 try:
                     location = self._get_attribute_locations(row, phase.name)
                     section_phase_name = location["label"]
+                    section_phase_ingress = location["ingress"]
                     index = location["section_location"]
                 except TypeError:
                     continue
 
-                phase_sections.add((section_phase_name, index))
+                phase_sections.add((section_phase_name, section_phase_ingress, index))
 
-            for phase_section_name, index in phase_sections:
+            for phase_section_name, section_phase_ingress, index in phase_sections:
                 section = ProjectPhaseSection.objects.create(
-                    phase=phase, index=index, name=phase_section_name
+                    phase=phase, index=index, name=phase_section_name, ingress=section_phase_ingress
                 )
                 logger.info(f"Created {section}")
 
@@ -1366,6 +1369,7 @@ class AttributeImporter:
                     continue
 
                 section_phase_name = locations["label"]
+                section_phase_ingress = locations["ingress"]
 
                 try:
                     child_location = locations["child_locations"][-1]
@@ -1376,6 +1380,7 @@ class AttributeImporter:
                 section = ProjectPhaseSection.objects.get(
                     phase=phase,
                     name=section_phase_name,
+                    ingress=section_phase_ingress,
                     index=locations["section_location"],
                 )
 
