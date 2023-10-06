@@ -465,6 +465,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
 
 class ProjectSectionSchemaSerializer(BaseMatrixableSchemaSerializer):
     title = serializers.CharField(source="name")
+    ingress = serializers.CharField()
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):

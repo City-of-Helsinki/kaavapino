@@ -949,6 +949,7 @@ class ProjectPhaseSection(models.Model):
         on_delete=models.CASCADE,
     )
     name = models.CharField(max_length=255, verbose_name=_("name"))
+    ingress = models.CharField(max_length=255, verbose_name=_("ingress"), default="")
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     attributes = models.ManyToManyField(
         Attribute,
