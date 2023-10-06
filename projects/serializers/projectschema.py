@@ -213,6 +213,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     autofill_readonly = serializers.BooleanField()
     updates_autofill = serializers.BooleanField()
     related_fields = serializers.ListField(child=serializers.CharField())
+    linked_fields = serializers.ListField(child=serializers.CharField())
     searchable = serializers.BooleanField()
     highlight_group = serializers.CharField()
     display = serializers.CharField()
