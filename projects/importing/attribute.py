@@ -360,6 +360,7 @@ VALUE_TYPES = {
     "automaattinen (valinta), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
     "Desimaaliluvun syöttö": Attribute.TYPE_DECIMAL,
     "fieldset": Attribute.TYPE_FIELDSET,
+    "info fieldset": Attribute.TYPE_INFO_FIELDSET,
     "Kokonaisluvun syöttö.": Attribute.TYPE_INTEGER,
     "Kuvan lataaminen.": Attribute.TYPE_IMAGE,
     "Kyllä/Ei": Attribute.TYPE_BOOLEAN,
@@ -1742,6 +1743,11 @@ class AttributeImporter:
         logger.info(
             "FieldSets {}".format(
                 Attribute.objects.filter(value_type=Attribute.TYPE_FIELDSET).count()
+            )
+        )
+        logger.info(
+            "Info FieldSets {}".format(
+                Attribute.objects.filter(value_type=Attribute.TYPE_INFO_FIELDSET).count()
             )
         )
         logger.info("Phase sections {}".format(ProjectPhaseSection.objects.count()))

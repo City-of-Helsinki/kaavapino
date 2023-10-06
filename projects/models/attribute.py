@@ -38,6 +38,7 @@ class AttributeQuerySet(models.QuerySet):
         return self.filter(
             value_type__in=[
                 Attribute.TYPE_FIELDSET,
+                Attribute.TYPE_INFO_FIELDSET,
                 Attribute.TYPE_INTEGER,
                 Attribute.TYPE_DECIMAL,
                 Attribute.TYPE_SHORT_STRING,
@@ -107,6 +108,7 @@ class Attribute(models.Model):
     """
 
     TYPE_FIELDSET = "fieldset"
+    TYPE_INFO_FIELDSET = "info_fieldset"
     TYPE_INTEGER = "integer"
     TYPE_DECIMAL = "decimal"
     TYPE_SHORT_STRING = "short_string"
@@ -127,6 +129,7 @@ class Attribute(models.Model):
 
     TYPE_CHOICES = (
         (TYPE_FIELDSET, _("fieldset")),
+        (TYPE_INFO_FIELDSET, _("info fieldset")),
         (TYPE_INTEGER, _("integer")),
         (TYPE_DECIMAL, _("decimal")),
         (TYPE_SHORT_STRING, _("short string")),
@@ -567,7 +570,7 @@ class Attribute(models.Model):
                 return get_user_model().objects.get(uuid=value)
             except get_user_model().DoesNotExist:
                 return None
-        elif self.value_type == Attribute.TYPE_FIELDSET:
+        elif self.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             return self._get_fieldset_serialization(value, deserialize=True)
         else:
             raise Exception('Cannot deserialize attribute type "%s".' % self.value_type)
@@ -672,7 +675,7 @@ class Attribute(models.Model):
 
     def get_attribute_display(self, value):
         if isinstance(value, list):
-            if self.value_type == Attribute.TYPE_FIELDSET:
+            if self.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                 return [
                     {k: self._get_single_display_value(v) for k, v in item.items()}
                     for item in value

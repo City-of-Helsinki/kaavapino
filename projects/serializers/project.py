@@ -1018,9 +1018,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not list_view:
             user_attribute_ids = set()
             for attribute in filter(
-                    lambda a: a.value_type in [Attribute.TYPE_USER, Attribute.TYPE_FIELDSET], attributes
+                    lambda a:
+                    a.value_type in [Attribute.TYPE_USER, Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET],
+                    attributes
             ):
-                if attribute.value_type == Attribute.TYPE_FIELDSET:
+                if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                     fieldset_user_identifiers = attribute.fieldset_attributes.filter(value_type=Attribute.TYPE_USER)\
                         .prefetch_related("identifier").values_list("identifier", flat=True)
                     if attribute.identifier in project.attribute_data:
@@ -1813,7 +1815,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             values = updated_attribute_values[attribute.identifier]
 
-            if attribute.value_type == Attribute.TYPE_FIELDSET:
+            if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
                 for i, children in enumerate(values["new"]):
                     for k, v in dict(children).items():
                         self.log_updates_attribute_data(
