@@ -194,13 +194,6 @@ class Attribute(models.Model):
     value_type = models.CharField(
         max_length=64, verbose_name=_("value type"), choices=TYPE_CHOICES
     )
-    ingress = models.CharField(
-        max_length=128,
-        verbose_name=_("ingress"),
-        default=None,
-        blank=True,
-        null=True
-    )
     display = models.CharField(
         max_length=64,
         verbose_name=_("display style"),

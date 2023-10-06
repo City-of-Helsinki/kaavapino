@@ -201,7 +201,6 @@ class AttributeSchemaSerializer(serializers.Serializer):
     fieldset_attributes = serializers.SerializerMethodField()
     fieldset_index = serializers.SerializerMethodField("get_fieldset_index")
     type = serializers.CharField(source="value_type")
-    ingress = serializers.CharField()
     required = serializers.SerializerMethodField()
     placeholder_text = serializers.CharField()
     choices = serializers.SerializerMethodField()
