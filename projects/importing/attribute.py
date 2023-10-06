@@ -61,6 +61,7 @@ CHOICES_SHEET_NAME = "Pudotusvalikot"
 ATTRIBUTE_NAME = "projektitieto"
 ATTRIBUTE_IDENTIFIER = "projektitieto tunniste"
 ATTRIBUTE_TYPE = "kenttätyyppi"
+ATTRIBUTE_INGRESS = "ingressi"
 ATTRIBUTE_CHOICES_REF = "pudotusvalikko/vaihtoehdot"
 ATTRIBUTE_UNIT = "mittayksikkö"
 ATTRIBUTE_BROADCAST_CHANGES = "muutos näkyy viestit-ikkunassa"
@@ -694,6 +695,7 @@ class AttributeImporter:
                 if value_type_string
                 else None
             )
+            ingress = row[self.column_index[ATTRIBUTE_INGRESS]] or None
             visibility_row = row[self.column_index[ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY]] or ""
             ifs = re.findall(
                 r"\{%\s*if\s*(.*?)\s*%\}",
@@ -839,6 +841,7 @@ class AttributeImporter:
                     "name": name,
                     "value_type": value_type,
                     "display": display,
+                    "ingress": ingress,
                     "visibility_conditions": visibility_conditions,
                     "hide_conditions": hide_conditions,
                     "help_text": help_text,
