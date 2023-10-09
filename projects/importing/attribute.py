@@ -69,6 +69,7 @@ ATTRIBUTE_DATA_RETENTION = "tiedon säilytysaika"
 ATTRIBUTE_MULTIPLE_CHOICE = "tietoa voi olla useita" # kyllä/ei
 ATTRIBUTE_SEARCHABLE = "tietoa käytetään hakutietona (hakuruudussa) projektit-näkymässä"
 ATTRIBUTE_RELATED_FIELDS = "mihin tietoon kytkeytyy"
+ATTRIBUTE_LINKED_FIELDS = "mihin tieto siirtyy"
 ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY = "sääntö: kenttä näkyy vain toiseen kenttään tehdyn valinnan perusteella"
 ATTRIBUTE_RULE_AUTOFILL = "sääntö: tieto muodostuu toiseen kenttään merkityn tiedon perusteella automaattisesti"
 ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunutta tietoa muokata "
@@ -776,12 +777,16 @@ class AttributeImporter:
             except KeyError:
                 highlight_group = None
 
-            # autofill
-
             related_fields = re.findall(
                 r"\{\{(.*?)\}\}",
                 row[self.column_index[ATTRIBUTE_RELATED_FIELDS]] or ""
             )
+            linked_fields_string = row[self.column_index[ATTRIBUTE_LINKED_FIELDS]] or ""
+            linked_fields = linked_fields_string.split(";") if ";" in linked_fields_string \
+                else [linked_fields_string]
+            print(f'Original string: {linked_fields_string} , parsed array: {linked_fields}')
+
+            # autofill
             try:
                 autofill_rule = parse_autofill_rule(
                     row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]],
@@ -855,6 +860,7 @@ class AttributeImporter:
                     "generated": generated,
                     "calculations": calculations,
                     "related_fields": related_fields,
+                    "linked_fields": linked_fields,
                     "unit": unit,
                     "broadcast_changes": broadcast_changes,
                     "autofill_rule": autofill_rule,

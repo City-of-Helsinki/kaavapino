@@ -245,6 +245,9 @@ class Attribute(models.Model):
     related_fields = ArrayField(
         models.TextField(blank=True), blank=True, null=True
     )
+    linked_fields = ArrayField(
+        models.TextField(blank=True), blank=True, null=True
+    )
     required = models.BooleanField(verbose_name=_("required"), default=False)
     multiple_choice = models.BooleanField(
         verbose_name=_("multiple choice"), default=False
