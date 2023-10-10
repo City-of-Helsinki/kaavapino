@@ -784,7 +784,6 @@ class AttributeImporter:
             linked_fields_string = row[self.column_index[ATTRIBUTE_LINKED_FIELDS]] or ""
             linked_fields = linked_fields_string.split(";") if ";" in linked_fields_string \
                 else [linked_fields_string]
-            print(f'Original string: {linked_fields_string} , parsed array: {linked_fields}')
 
             # autofill
             try:
