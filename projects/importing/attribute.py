@@ -1342,6 +1342,17 @@ class AttributeImporter:
             )
             logger.info(f"Created {section}")
 
+    @staticmethod
+    def calculate_index(locations):
+        field_location = locations["field_location"]
+        child_locations = locations["child_locations"]
+        if child_locations:
+            child_index = 0
+            for index, child_location in enumerate(child_locations, start=1):
+                child_index += int(child_location / int(10 ** index))
+            return field_location + child_index
+        return field_location
+
     def _create_attribute_section_links(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing attribute section links...")
 
@@ -1376,18 +1387,14 @@ class AttributeImporter:
                 section_phase_name = locations["label"]
                 section_phase_ingress = locations["ingress"]
 
-                try:
-                    child_location = locations["child_locations"][-1]
-                except IndexError:
-                    child_location = 0
-                attribute_index = locations["field_location"] + int(child_location / 100)
-
                 section = ProjectPhaseSection.objects.get(
                     phase=phase,
                     name=section_phase_name,
                     ingress=section_phase_ingress,
                     index=locations["section_location"],
                 )
+
+                attribute_index = self.calculate_index(locations)
 
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(
                     attribute=attribute,
