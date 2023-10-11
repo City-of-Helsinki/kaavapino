@@ -145,7 +145,6 @@ class AttributeLockSerializer(serializers.Serializer):
     field_data = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
     user_email = serializers.SerializerMethodField()
-    timestamp = serializers.DateTimeField()
     owner = serializers.SerializerMethodField()
 
     def get_project_name(self, attribute_lock):
