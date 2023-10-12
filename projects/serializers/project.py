@@ -1570,7 +1570,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # Do not validate if this is a new project
         if not self.instance:
-            return public or True
+            return public if public is not None else True
 
         # A project is always public if it has exited the starting phase
         try:
