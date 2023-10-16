@@ -361,7 +361,7 @@ VALUE_TYPES = {
     "automaattinen (valinta), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
     "Desimaaliluvun syöttö": Attribute.TYPE_DECIMAL,
     "fieldset": Attribute.TYPE_FIELDSET,
-    "info fieldset": Attribute.TYPE_INFO_FIELDSET,
+    "info_fieldset": Attribute.TYPE_INFO_FIELDSET,
     "Kokonaisluvun syöttö.": Attribute.TYPE_INTEGER,
     "Kuvan lataaminen.": Attribute.TYPE_IMAGE,
     "Kyllä/Ei": Attribute.TYPE_BOOLEAN,
