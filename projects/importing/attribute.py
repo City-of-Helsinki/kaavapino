@@ -1343,6 +1343,13 @@ class AttributeImporter:
             logger.info(f"Created {section}")
 
     @staticmethod
+    def calculate_deadline_index(locations):
+        deadline_index = 0
+        for index, location in enumerate(locations, start=1):
+            deadline_index += int(int(location) * 10000 / int(10 ** index))
+        return deadline_index
+
+    @staticmethod
     def calculate_index(locations):
         field_location = locations["field_location"]
         child_locations = locations["child_locations"]
@@ -1567,7 +1574,8 @@ class AttributeImporter:
                     defaults = {"admin_field": True}
 
                 try:
-                    index = int("".join(re.split(r";\s*", section_string)[-1].split(".")[1:]))
+                    locations = re.split(r";\s*", section_string)[-1].split(".")
+                    index = self.calculate_deadline_index(locations)
                 except Exception:
                     index = 0
 
