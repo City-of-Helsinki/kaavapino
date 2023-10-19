@@ -274,6 +274,10 @@ msgstr "merkkiraja"
 msgid "placeholder text"
 msgstr "tyhjän kentän ohjeteksti"
 
+#: projects/models/attribute.py:266
+msgid "assistive text"
+msgstr "kentän ohjeteksti"
+
 #: projects/models/attribute.py:257
 msgid "unique"
 msgstr "uniikki"
