@@ -1243,6 +1243,12 @@ class ProjectDeadline(models.Model):
         verbose_name=_("generated"),
         default=False,
     )
+    edited = models.DateTimeField(
+        verbose_name=_("modified at"),
+        editable=False,
+        null=True,
+        blank=True,
+    )
 
     @property
     def confirmed(self):
