@@ -14,6 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
 from django.db.models import Prefetch, Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field, inline_serializer
 from drf_spectacular.types import OpenApiTypes
@@ -82,6 +83,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     abbreviation = serializers.CharField(source="deadline.abbreviation")
     deadline = serializers.SerializerMethodField()
     generated = serializers.BooleanField()
+    edited = serializers.DateTimeField()
 
     @extend_schema_field(DeadlineSerializer)
     def get_deadline(self, projectdeadline):
@@ -1570,7 +1572,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # Do not validate if this is a new project
         if not self.instance:
-            return public or True
+            return public if public is not None else True
 
         # A project is always public if it has exited the starting phase
         try:
@@ -1754,6 +1756,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_deadlines(user=user)
             elif should_update_deadlines:
                 project.update_deadlines(user=user)
+                project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
+                    .update(edited=timezone.now())
 
             project.save()
 

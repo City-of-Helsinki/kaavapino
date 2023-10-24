@@ -361,7 +361,7 @@ VALUE_TYPES = {
     "automaattinen (valinta), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
     "Desimaaliluvun syöttö": Attribute.TYPE_DECIMAL,
     "fieldset": Attribute.TYPE_FIELDSET,
-    "info fieldset": Attribute.TYPE_INFO_FIELDSET,
+    "info_fieldset": Attribute.TYPE_INFO_FIELDSET,
     "Kokonaisluvun syöttö.": Attribute.TYPE_INTEGER,
     "Kuvan lataaminen.": Attribute.TYPE_IMAGE,
     "Kyllä/Ei": Attribute.TYPE_BOOLEAN,
@@ -784,7 +784,6 @@ class AttributeImporter:
             linked_fields_string = row[self.column_index[ATTRIBUTE_LINKED_FIELDS]] or ""
             linked_fields = linked_fields_string.split(";") if ";" in linked_fields_string \
                 else [linked_fields_string]
-            print(f'Original string: {linked_fields_string} , parsed array: {linked_fields}')
 
             # autofill
             try:
@@ -1343,6 +1342,24 @@ class AttributeImporter:
             )
             logger.info(f"Created {section}")
 
+    @staticmethod
+    def calculate_deadline_index(locations):
+        deadline_index = 0
+        for index, location in enumerate(locations, start=1):
+            deadline_index += int(int(location) * 10000 / int(10 ** index))
+        return deadline_index
+
+    @staticmethod
+    def calculate_index(locations):
+        field_location = locations["field_location"]
+        child_locations = locations["child_locations"]
+        if child_locations:
+            child_index = 0
+            for index, child_location in enumerate(child_locations, start=1):
+                child_index += int(child_location / int(10 ** index))
+            return field_location + child_index
+        return field_location
+
     def _create_attribute_section_links(self, rows, subtype: ProjectSubtype):
         logger.info("\nReplacing attribute section links...")
 
@@ -1377,18 +1394,14 @@ class AttributeImporter:
                 section_phase_name = locations["label"]
                 section_phase_ingress = locations["ingress"]
 
-                try:
-                    child_location = locations["child_locations"][-1]
-                except IndexError:
-                    child_location = 0
-                attribute_index = locations["field_location"] + int(child_location / 100)
-
                 section = ProjectPhaseSection.objects.get(
                     phase=phase,
                     name=section_phase_name,
                     ingress=section_phase_ingress,
                     index=locations["section_location"],
                 )
+
+                attribute_index = self.calculate_index(locations)
 
                 section_attribute = ProjectPhaseSectionAttribute.objects.create(
                     attribute=attribute,
@@ -1561,7 +1574,8 @@ class AttributeImporter:
                     defaults = {"admin_field": True}
 
                 try:
-                    index = int("".join(re.split(r";\s*", section_string)[-1].split(".")[1:]))
+                    locations = re.split(r";\s*", section_string)[-1].split(".")
+                    index = self.calculate_deadline_index(locations)
                 except Exception:
                     index = 0
 
