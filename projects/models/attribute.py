@@ -267,6 +267,11 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    assistive_text = models.TextField(
+        verbose_name=_("assistive text"),
+        null=True,
+        blank=True,
+    )
     unique = models.BooleanField(
         verbose_name=_("unique"),
         default=False,

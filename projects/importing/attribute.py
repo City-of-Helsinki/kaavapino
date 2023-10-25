@@ -80,6 +80,7 @@ ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 ATTRIBUTE_EDIT_PRIVILEGE = "kenellä on oikeus muokata tietoa"
 ATTRIBUTE_ERROR = "virhetilanne"
 ATTRIBUTE_PLACEHOLDER = "syöttökentässä näkyvä ohjeistusteksti"
+ATTRIBUTE_ASSISTIVE_TEXT = "kentän alla näkyvä lyhyt vinkki"
 ATTRIBUTE_FIELD_ROLE = "rooli kenen kenttä"
 ATTRIBUTE_FIELD_SUBROLE = "alirooli kenen kenttä"
 # TODO: ask for a dedicated column for uniqueness at some point
@@ -768,6 +769,7 @@ class AttributeImporter:
             # TODO: ask for a dedicated column for uniqueness at some point
             is_unique = row[self.column_index[ATTRIBUTE_ERROR]] in ATTRIBUTE_ERROR_UNIQUE
             placeholder_text = row[self.column_index[ATTRIBUTE_PLACEHOLDER]]
+            assistive_text = row[self.column_index[ATTRIBUTE_ASSISTIVE_TEXT]]
             error_message = row[self.column_index[ATTRIBUTE_ERROR]]
             static_property = STATIC_ATTRIBUTES_MAPPING.get(
                 row[self.column_index[ATTRIBUTE_IDENTIFIER]]
@@ -862,6 +864,7 @@ class AttributeImporter:
                     "character_limit": character_limit,
                     "validation_regex": validation_regex,
                     "placeholder_text": placeholder_text,
+                    "assistive_text": assistive_text,
                     "unique": is_unique,
                     "error_message": error_message,
                     "generated": generated,

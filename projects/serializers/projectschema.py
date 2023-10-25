@@ -203,6 +203,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     type = serializers.CharField(source="value_type")
     required = serializers.SerializerMethodField()
     placeholder_text = serializers.CharField()
+    assistive_text = serializers.CharField()
     choices = serializers.SerializerMethodField()
     generated = serializers.BooleanField(read_only=True)
     unit = serializers.CharField()
