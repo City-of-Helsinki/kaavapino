@@ -257,6 +257,11 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    validation_regex = models.CharField(
+        verbose_name=_("validation regex"),
+        null=True,
+        blank=True,
+    )
     placeholder_text = models.TextField(
         verbose_name=_("placeholder text"),
         null=True,

@@ -1,6 +1,7 @@
 import copy
 import datetime
 import logging
+import re
 
 from django.utils import formats, translation
 from django.utils.translation import gettext_lazy as _
@@ -74,6 +75,7 @@ def get_rich_text_validator(attribute):
 
     return validate
 
+
 def get_unique_validator(attribute, project_id):
     def validate(value):
         column = f"attribute_data__{attribute.identifier}"
@@ -84,6 +86,14 @@ def get_unique_validator(attribute, project_id):
             )
 
     return validate
+
+
+def get_regex_validator(attribute):
+    def validate(value):
+        return re.match(attribute.validation_regex, value)
+
+    return validate
+
 
 def get_deadline_validator(attribute, subtype, preview):
     def validate(value):
@@ -163,6 +173,9 @@ def create_attribute_field_data(attribute, validation, project, preview):
 
     if attribute.unique:
         field_arguments["validators"] += [get_unique_validator(attribute, project.pk)]
+
+    if attribute.validation_regex:
+        field_arguments["validators"] += [get_regex_validator(attribute)]
 
     if attribute.deadline.count():
         field_arguments["validators"] += [get_deadline_validator(

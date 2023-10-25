@@ -75,6 +75,7 @@ ATTRIBUTE_RULE_AUTOFILL = "sääntö: tieto muodostuu toiseen kenttään merkity
 ATTRIBUTE_RULE_AUTOFILL_READONLY = "sääntö: voiko automaattisesti muodostunutta tietoa muokata "
 ATTRIBUTE_RULE_UPDATE_AUTOFILL = "sääntö: vaikuttaako tiedon muokkaus aiemmin täytettyyn tietokenttään"
 ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
+ATTRIBUTE_VALIDATION_REGEX = "regex sääntö"
 ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 ATTRIBUTE_EDIT_PRIVILEGE = "kenellä on oikeus muokata tietoa"
 ATTRIBUTE_ERROR = "virhetilanne"
@@ -746,6 +747,12 @@ class AttributeImporter:
                 character_limit = None
 
             try:
+                validation_regex = row[self.column_index[ATTRIBUTE_VALIDATION_REGEX]]
+                re.compile(validation_regex)  # Check that given regex is valid
+            except re.error:
+                validation_regex = None
+
+            try:
                 help_text = row[self.column_index[HELP_TEXT]].strip()
             except (IndexError, AttributeError):
                 help_text = ""
@@ -853,6 +860,7 @@ class AttributeImporter:
                     "multiple_choice": multiple_choice,
                     "data_retention_plan": data_retention_plan,
                     "character_limit": character_limit,
+                    "validation_regex": validation_regex,
                     "placeholder_text": placeholder_text,
                     "unique": is_unique,
                     "error_message": error_message,
