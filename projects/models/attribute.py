@@ -261,6 +261,7 @@ class Attribute(models.Model):
         verbose_name=_("validation regex"),
         null=True,
         blank=True,
+        max_length=64,
     )
     placeholder_text = models.TextField(
         verbose_name=_("placeholder text"),
