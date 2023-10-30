@@ -270,6 +270,10 @@ msgstr "monivalinta"
 msgid "character limit"
 msgstr "merkkiraja"
 
+#: projects/models/attribute.py:261
+msgid "validation regex"
+msgstr "regex sääntö"
+
 #: projects/models/attribute.py:252
 msgid "placeholder text"
 msgstr "tyhjän kentän ohjeteksti"
