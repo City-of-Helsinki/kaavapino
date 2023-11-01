@@ -749,7 +749,8 @@ class AttributeImporter:
 
             try:
                 validation_regex = row[self.column_index[ATTRIBUTE_VALIDATION_REGEX]]
-                re.compile(validation_regex)  # Check that given regex is valid
+                if validation_regex:
+                    re.compile(validation_regex)  # Check that given regex is valid
             except re.error:
                 validation_regex = None
 
