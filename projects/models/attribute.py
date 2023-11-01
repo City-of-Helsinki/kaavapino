@@ -851,6 +851,37 @@ class AttributeLock(models.Model):
         verbose_name_plural = _("attribute locks")
 
 
+class AttributeCategorization(models.Model):
+
+    attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.CASCADE,
+        related_name="categorizations",
+        verbose_name=_("attribute"),
+    )
+    common_project_phase = models.ForeignKey(
+        "CommonProjectPhase",
+        on_delete=models.CASCADE,
+        related_name="categorizations",
+        verbose_name=_("phase"),
+    )
+    includes_principles = models.BooleanField(
+        verbose_name=_("includes principles"),
+    )
+    includes_draft = models.BooleanField(
+        verbose_name=_("includes draft"),
+    )
+    value = models.CharField(
+        max_length=128,
+        verbose_name=_("value"),
+    )
+
+    class Meta:
+        unique_together = ('attribute', 'common_project_phase', 'includes_principles', 'includes_draft')
+        verbose_name = _("attribute categorization")
+        verbose_name_plural = _("attribute categorizations")
+
+
 class FieldSetAttribute(models.Model):
 
     attribute_source = models.ForeignKey(

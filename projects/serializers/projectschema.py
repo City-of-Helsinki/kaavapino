@@ -18,7 +18,7 @@ from projects.models import (
     ProjectSubtype,
     ProjectCardSectionAttribute,
 )
-from projects.models.attribute import AttributeLock
+from projects.models.attribute import AttributeLock, AttributeCategorization
 from projects.models.project import (
     PhaseAttributeMatrixCell,
     ProjectFloorAreaSectionAttributeMatrixCell,
@@ -222,6 +222,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     disable_fieldset_delete_add = serializers.SerializerMethodField()
     field_roles = serializers.SerializerMethodField()
     field_subroles = serializers.SerializerMethodField()
+    categorization = serializers.SerializerMethodField()
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
@@ -251,6 +252,18 @@ class AttributeSchemaSerializer(serializers.Serializer):
 
     def get_field_subroles(self, attribute):
         return self._format_roles(attribute.field_subroles, self.context.get("subtype", None))
+
+    def get_categorization(self, attribute):
+        try:
+            project = self.context["project"]
+            return attribute.categorizations.get(
+                common_project_phase=project.phase.common_project_phase,
+                includes_principles=project.create_principles,
+                includes_draft=project.create_draft
+            ).value
+        except (KeyError, AttributeCategorization.DoesNotExist):
+            pass
+        return ""
 
     @staticmethod
     def _format_roles(roles, subtype):
@@ -416,7 +429,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
             section_attributes.insert(insert_index, attribute)
 
     @staticmethod
-    def _serialize_section_attribute(section_attribute, owner, privilege):
+    def _serialize_section_attribute(section_attribute, owner, privilege, project=None):
         if hasattr(section_attribute, "matrix"):
             return ProjectSectionAttributeMatrixSchemaSerializer(section_attribute).data
 
@@ -431,6 +444,7 @@ class BaseMatrixableSchemaSerializer(serializers.Serializer):
                 "subtype": section_attribute.section.phase.project_subtype,
                 "owner": owner,
                 "privilege": privilege,
+                "project": project,
             }
         ).data)
 
@@ -471,7 +485,7 @@ class ProjectSectionSchemaSerializer(BaseMatrixableSchemaSerializer):
     fields = serializers.SerializerMethodField("_get_fields")
 
     def _get_fields(self, section):
-        section_attributes = list(section.projectphasesectionattribute_set.all())
+        section_attributes = list(section.projectphasesectionattribute_set.all().prefetch_related("attribute__categorizations"))
         self._create_matrix_fields(PhaseAttributeMatrixCell, section_attributes)
 
         # Create a list of serialized fields
@@ -481,6 +495,7 @@ class ProjectSectionSchemaSerializer(BaseMatrixableSchemaSerializer):
                 section_attribute,
                 self.context["owner"],
                 self.context["privilege"],
+                self.context["project"],
             ))
 
         return data
@@ -505,7 +520,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             sections = [
                 ProjectSectionSchemaSerializer(
                     section,
-                    context={"privilege": privilege, "owner": owner},
+                    context={"privilege": privilege, "owner": owner, "project": project},
                 ).data
                 for section in phase.sections.all()
             ]
