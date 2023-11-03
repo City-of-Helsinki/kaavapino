@@ -1275,6 +1275,10 @@ msgstr "Epäkelpo tekstimuotoilu"
 msgid "Value must be unique"
 msgstr "Arvon on oltava uniikki"
 
+#: projects/serializers/section.py:95
+msgid "Value is in wrong format"
+msgstr "Arvo on väärässä muodossa"
+
 #: projects/serializers/section.py:101
 #, python-brace-format
 msgid "Invalid date selection for date type {attr_dl.date_type}"

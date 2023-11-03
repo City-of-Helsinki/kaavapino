@@ -90,7 +90,10 @@ def get_unique_validator(attribute, project_id):
 
 def get_regex_validator(attribute):
     def validate(value):
-        return re.match(attribute.validation_regex, value)
+        if not re.match(attribute.validation_regex, value):
+            raise ValidationError(
+                {attribute.identifier: _("Value is in wrong format")}
+            )
 
     return validate
 
