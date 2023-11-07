@@ -515,7 +515,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
         sections_cache = cache.get("serialized_phase_sections", {})
 
         try:
-            sections = sections_cache[(privilege, owner, phase)]
+            sections = sections_cache[(privilege, owner, phase, project)]
         except KeyError:
             sections = [
                 ProjectSectionSchemaSerializer(
@@ -525,7 +525,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
                 for section in phase.sections.all()
             ]
 
-            sections_cache[(privilege, owner, phase)] = sections
+            sections_cache[(privilege, owner, phase, project)] = sections
             cache.set("serialized_phase_sections", sections_cache, None)
 
         confirmed_deadlines = [
