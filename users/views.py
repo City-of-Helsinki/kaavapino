@@ -47,7 +47,7 @@ class PersonnelList(APIView):
             f"?$search=\"displayName:{search}\"" + \
             "&$filter=endsWith(mail, \'@hel.fi\')" + \
             (f" and companyName eq \'{company_name}\'" if company_name
-             else " and companyName in('KYMP', 'KUVA', 'KASKO', 'KEHA')") + \
+             else " and companyName in('KYMP', 'KUVA', 'KASKO', 'KEHA', 'KANSLIA')") + \
             "&$select=id,givenName,surname,mobilePhone,businessPhones,companyName,mail,jobTitle,officeLocation"
 
         response = requests.get(

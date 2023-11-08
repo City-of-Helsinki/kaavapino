@@ -930,7 +930,7 @@ class AttributeImporter:
         # Remove any attributes that was not imported
         old_attribute_ids = existing_attribute_ids - imported_attribute_ids
         logger.info(f"Old Attributes: {old_attribute_ids}")
-        for old_id in old_attribute_ids:
+        for old_id in sorted(old_attribute_ids, reverse=True):
             attr = Attribute.objects.get(identifier=old_id)
             deadlines = attr.deadline.all()
 
