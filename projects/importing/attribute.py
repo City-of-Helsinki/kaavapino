@@ -46,6 +46,7 @@ from ..models import (
     ProjectPhaseDeadlineSection,
     ProjectPhaseDeadlineSectionAttribute,
 )
+from ..models.attribute import AttributeCategorization
 from ..models.utils import create_identifier, truncate_identifier, check_identifier
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,48 @@ ATTRIBUTE_DEADLINE_SECTION_COLUMNS = {
     "owner": "vastuuhenkilön aikataulun muokkaus -näkymän osiot ja kenttien järjestys",
     "admin": "pääkäyttäjän päivämäärätietojen vahvistus -näkymän osiot ja kenttien järjestys",
 }
+
+ATTRIBUTE_CATEGORIZATION_COLUMNS = [
+    ("tiedon luokitus käynnistys vaiheessa", Phases.START, []),
+    ("tiedon luokitus käynnistys vaiheessa", Phases.START, [Phases.PRINCIPLES]),
+    ("tiedon luokitus käynnistys vaiheessa", Phases.START, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus käynnistys vaiheessa", Phases.START, [Phases.DRAFT]),
+
+    ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, []),
+    ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, [Phases.PRINCIPLES]),
+    ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, [Phases.DRAFT]),
+
+    ("tiedon luokitus oas vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.OAS, []),
+    ("tiedon luokitus oas vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.OAS, [Phases.PRINCIPLES]),
+    ("tiedon luokitus oas vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.OAS, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus oas vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.OAS, [Phases.DRAFT]),
+
+    ("tiedon luokitus luonnos vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.DRAFT, []),
+    ("tiedon luokitus luonnos vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.DRAFT, [Phases.PRINCIPLES]),
+    ("tiedon luokitus luonnos vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.DRAFT, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus luonnos vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.DRAFT, [Phases.DRAFT]),
+
+    ("tiedon luokitus ehdotus vaiheessa, kun prosessi ei sisällä periaatteet- eikä luonnos-vaihetta", Phases.PROPOSAL, []),
+    ("tiedon luokitus ehdotus vaiheessa, kun prosessi sisältää periaatteet-vaiheen, mutta ei luonnos-vaihetta", Phases.PROPOSAL, [Phases.PRINCIPLES]),
+    ("tiedon luokitus ehdotus vaiheessa, kun prosessi sisältää periaatteet- ja luonnos-vaiheen", Phases.PROPOSAL, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus ehdotus vaiheessa, kun prosessi sisältää luonnos-vaiheen, mutta ei periaatteet-vaihetta", Phases.PROPOSAL, [Phases.DRAFT]),
+
+    ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi ei sisällä periaatteet- eikä luonnos-vaihetta", Phases.REVISED_PROPOSAL, []),
+    ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi sisältää periaatteet-vaiheen, mutta ei luonnos-vaihetta", Phases.REVISED_PROPOSAL, [Phases.PRINCIPLES]),
+    ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi sisältää periaatteet- ja luonnos-vaiheen", Phases.REVISED_PROPOSAL, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi sisältää luonnos-vaiheen, mutta ei periaatteet-vaihetta", Phases.REVISED_PROPOSAL, [Phases.DRAFT]),
+
+    ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, []),
+    ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, [Phases.PRINCIPLES]),
+    ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, [Phases.DRAFT]),
+
+    ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, []),
+    ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, [Phases.PRINCIPLES]),
+    ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, [Phases.DRAFT]),
+]
 
 ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
 ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW = "kerrosalatietojen muokkaus -näkymän alaotsikot"
@@ -1605,6 +1648,41 @@ class AttributeImporter:
                         index=index,
                     )
 
+    def _create_attribute_categorizations(self, rows: Iterable[Sequence[str]]):
+        logger.info("\nCreating attribute categorizations")
+
+        attribute_categorizations = {attr.pk: attr for attr in AttributeCategorization.objects.all()}
+        common_project_phases = {phase.name: phase for phase in CommonProjectPhase.objects.all()}
+
+        for row in rows:
+            attribute_identifier = self._get_attribute_row_identifier(row)
+            try:
+                attribute = Attribute.objects.get(identifier=attribute_identifier)
+                for (column_label, phase, included_phases) in ATTRIBUTE_CATEGORIZATION_COLUMNS:
+                    value = row[self.column_index[column_label]]
+                    if not value:
+                        continue
+
+                    principle = Phases.PRINCIPLES in included_phases
+                    draft = Phases.DRAFT in included_phases
+                    attribute_categorization, created = AttributeCategorization.objects.update_or_create(
+                        attribute=attribute,
+                        common_project_phase=common_project_phases.get(phase.value),
+                        includes_principles=principle,
+                        includes_draft=draft,
+                        defaults={"value": value}
+                    )
+                    try:
+                        if not created:
+                            del attribute_categorizations[attribute_categorization.pk]
+                    except KeyError:
+                        pass  # Object doesn't exist in attribute_categorizations dict
+            except Attribute.DoesNotExist:
+                logger.warning(f"Attribute not found by identifier: {attribute_identifier}")
+
+        for ag in attribute_categorizations.values():
+            ag.delete()
+
 
     def get_subtypes_from_cell(self, cell_content: Optional[str]) -> List[str]:
         # If the subtype is missing we assume it is to be included in all subtypes
@@ -1762,6 +1840,7 @@ class AttributeImporter:
         self._create_card_sections(all_data_rows)
         self._create_document_link_sections(all_data_rows)
         self._create_overview_filters(all_data_rows)
+        self._create_attribute_categorizations(all_data_rows)
 
         # Clear cached sections
         cache.delete("serialized_phase_sections")
