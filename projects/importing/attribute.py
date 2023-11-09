@@ -167,21 +167,44 @@ ATTRIBUTE_DEADLINE_SECTION_COLUMNS = {
 
 ATTRIBUTE_CATEGORIZATION_COLUMNS = [
     ("tiedon luokitus käynnistys vaiheessa", Phases.START, []),
+    ("tiedon luokitus käynnistys vaiheessa", Phases.START, [Phases.PRINCIPLES]),
+    ("tiedon luokitus käynnistys vaiheessa", Phases.START, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus käynnistys vaiheessa", Phases.START, [Phases.DRAFT]),
+
     ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, []),
+    ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, [Phases.PRINCIPLES]),
+    ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus periaatteet vaiheessa", Phases.PRINCIPLES, [Phases.DRAFT]),
+
     ("tiedon luokitus oas vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.OAS, []),
     ("tiedon luokitus oas vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.OAS, [Phases.PRINCIPLES]),
+    ("tiedon luokitus oas vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.OAS, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus oas vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.OAS, [Phases.DRAFT]),
+
     ("tiedon luokitus luonnos vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.DRAFT, []),
     ("tiedon luokitus luonnos vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.DRAFT, [Phases.PRINCIPLES]),
+    ("tiedon luokitus luonnos vaiheessa, kun prosessi sisältää periaate-vaiheen", Phases.DRAFT, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus luonnos vaiheessa, kun prosessi ei sisällä periaatteet-vaihetta", Phases.DRAFT, [Phases.DRAFT]),
+
     ("tiedon luokitus ehdotus vaiheessa, kun prosessi ei sisällä periaatteet- eikä luonnos-vaihetta", Phases.PROPOSAL, []),
     ("tiedon luokitus ehdotus vaiheessa, kun prosessi sisältää periaatteet-vaiheen, mutta ei luonnos-vaihetta", Phases.PROPOSAL, [Phases.PRINCIPLES]),
     ("tiedon luokitus ehdotus vaiheessa, kun prosessi sisältää periaatteet- ja luonnos-vaiheen", Phases.PROPOSAL, [Phases.PRINCIPLES, Phases.DRAFT]),
     ("tiedon luokitus ehdotus vaiheessa, kun prosessi sisältää luonnos-vaiheen, mutta ei periaatteet-vaihetta", Phases.PROPOSAL, [Phases.DRAFT]),
+
     ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi ei sisällä periaatteet- eikä luonnos-vaihetta", Phases.REVISED_PROPOSAL, []),
     ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi sisältää periaatteet-vaiheen, mutta ei luonnos-vaihetta", Phases.REVISED_PROPOSAL, [Phases.PRINCIPLES]),
     ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi sisältää periaatteet- ja luonnos-vaiheen", Phases.REVISED_PROPOSAL, [Phases.PRINCIPLES, Phases.DRAFT]),
     ("tiedon luokitus tarkistettu ehdotus vaiheessa, kun prosessi sisältää luonnos-vaiheen, mutta ei periaatteet-vaihetta", Phases.REVISED_PROPOSAL, [Phases.DRAFT]),
+
     ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, []),
+    ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, [Phases.PRINCIPLES]),
+    ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus hyväksyminen vaihe", Phases.APPROVAL, [Phases.DRAFT]),
+
     ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, []),
+    ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, [Phases.PRINCIPLES]),
+    ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, [Phases.PRINCIPLES, Phases.DRAFT]),
+    ("tiedon luokitus voimaantulo vaihe", Phases.GOING_INTO_EFFECT, [Phases.DRAFT]),
 ]
 
 ATTRIBUTE_FLOOR_AREA_SECTION = "kerrosalatietojen muokkaus -näkymän osiot pääotsikot"
