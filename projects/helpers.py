@@ -132,7 +132,7 @@ def update_paikkatieto(attribute_data):
             timeout=180
         )
         if response.status_code == 200:
-            cache.set(url, response, 3600)  # 1 hour
+            cache.set(url, response, 28800)  # 8 hours
 
     if response and response.status_code == 200:
         return attribute_data.update(response.json())
