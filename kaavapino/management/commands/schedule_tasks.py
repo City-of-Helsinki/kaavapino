@@ -40,8 +40,8 @@ class Command(BaseCommand):
             {
                 "func": "projects.tasks.cache_kaavoitus_api_data",
                 "defaults": {
-                    "schedule_type": Schedule.MINUTES,
-                    "minutes": 720,
+                    "schedule_type": Schedule.CRON,
+                    "cron": "0 4 * * *",
                 }
             }
         ]
