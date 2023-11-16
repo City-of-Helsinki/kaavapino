@@ -117,22 +117,33 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
 
     return flat
 
-def update_paikkatieto(attribute_data):
+
+def update_paikkatieto(attribute_data, use_cached=True):
     if not attribute_data.get("hankenumero"):
         return
 
     hankenumero = attribute_data["hankenumero"]
 
     url = f"{settings.KAAVOITUS_API_BASE_URL}/hel/v1/paikkatieto/{hankenumero}"
-    response = cache.get(url)
+    response = cache.get(url) if use_cached else None
     if response is None:
-        response = requests.get(
-            url,
-            headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-            timeout=180
-        )
-        if response.status_code == 200:
-            cache.set(url, response, 28800)  # 8 hours
+        try:
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                timeout=300
+            )
+            if response.status_code == 200:
+                cache.set(url, response, 86400)  # 24 hours
+            else:
+                cache.set(url, response, 900)  # 15 minutes
+        except ReadTimeout:
+            log.error("Request timed out for url: {}".format(url))
+            response = Response(
+                data="Kaavoitus-api did not return a response in time.",
+                status=status.HTTP_408_REQUEST_TIMEOUT
+            )
+            cache.set(url, response, 3600)  # 1 hour
 
     if response and response.status_code == 200:
         return attribute_data.update(response.json())
@@ -152,7 +163,7 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
     ).select_related("key_attribute")
 
     flat_attribute_data = get_flat_attribute_data(attribute_data, {})
-    update_paikkatieto(attribute_data)
+    update_paikkatieto(attribute_data, use_cached)
 
     def build_request_paths(attr):
         returns = {}
