@@ -259,6 +259,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
               users. At the time of implementation
               no such fields existed.
         """
+
+        users_list = [i for i in users_list if i is not None]
+
         user_queryset = self._filter_users(users_list, queryset)
         user_attributes = Attribute.objects.filter(
             value_type__in=[Attribute.TYPE_USER, Attribute.TYPE_PERSONNEL]
