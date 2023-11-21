@@ -512,11 +512,9 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
 
     @staticmethod
     def _get_sections(privilege, owner, phase, project=None):
-        sections_cache = cache.get("serialized_phase_sections", {})
+        sections = cache.get(f'{privilege}:{owner}:{phase}:{project.pk if project else None}')
 
-        try:
-            sections = sections_cache[(privilege, owner, phase, project)]
-        except KeyError:
+        if not sections:
             sections = [
                 ProjectSectionSchemaSerializer(
                     section,
@@ -524,9 +522,7 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
                 ).data
                 for section in phase.sections.all()
             ]
-
-            sections_cache[(privilege, owner, phase, project)] = sections
-            cache.set("serialized_phase_sections", sections_cache, None)
+            cache.set(f'{privilege}:{owner}:{phase}:{project.pk if project else None}', sections, None)
 
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl in project.deadlines.all()
