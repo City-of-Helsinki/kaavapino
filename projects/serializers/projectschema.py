@@ -512,17 +512,13 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
 
     @staticmethod
     def _get_sections(privilege, owner, phase, project=None):
-        sections = cache.get(f'{privilege}:{owner}:{phase}:{project.pk if project else None}')
-
-        if not sections:
-            sections = [
-                ProjectSectionSchemaSerializer(
-                    section,
-                    context={"privilege": privilege, "owner": owner, "project": project},
-                ).data
-                for section in phase.sections.all()
-            ]
-            cache.set(f'{privilege}:{owner}:{phase}:{project.pk if project else None}', sections, None)
+        sections = [
+            ProjectSectionSchemaSerializer(
+                section,
+                context={"privilege": privilege, "owner": owner, "project": project},
+            ).data
+            for section in phase.sections.all()
+        ]
 
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl in project.deadlines.all()
@@ -642,21 +638,13 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
 
     @staticmethod
     def _get_sections(privilege, owner, phase, project=None):
-        sections_cache = cache.get("serialized_deadline_sections", {})
-
-        try:
-            deadline_sections = sections_cache[(privilege, owner, phase)]
-        except KeyError:
-            deadline_sections = [
-                ProjectPhaseDeadlineSectionSerializer(
-                    section,
-                    context={"privilege": privilege, "owner": owner},
-                ).data
-                for section in phase.deadline_sections.all()
-            ]
-
-            sections_cache[(privilege, owner, phase)] = deadline_sections
-            cache.set("serialized_deadline_sections", sections_cache, None)
+        deadline_sections = [
+            ProjectPhaseDeadlineSectionSerializer(
+                section,
+                context={"privilege": privilege, "owner": owner},
+            ).data
+            for section in phase.deadline_sections.all()
+        ]
 
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl in project.deadlines.all()
@@ -726,28 +714,46 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
                 context=self.context,
             ).data
 
-        return ProjectPhaseSchemaSerializer(
-            instance.get_phases(project),
-            many=True,
-            context=self.context,
-        ).data
+        privilege = self.context['privilege']
+        owner = self.context['owner']
+        cache_key = f'phase_schema:{privilege}:{owner}:{project.pk if project else None}'
+        phase_schema_serializer = cache.get(cache_key)
+
+        if not phase_schema_serializer:
+            phase_schema_serializer = ProjectPhaseSchemaSerializer(
+                instance.get_phases(project),
+                many=True,
+                context=self.context,
+            ).data
+            cache.set(cache_key, phase_schema_serializer, None)
+
+        return phase_schema_serializer
 
     def get_deadline_sections(self, instance):
         query_params = getattr(self.context["request"], "GET", {})
         try:
             project = Project.objects.get(pk=int(query_params.get("project")))
         except (ValueError, TypeError, Project.DoesNotExist):
-            return ProjectPhaseSchemaSerializer(
+            return ProjectPhaseDeadlineSectionsSerializer(
                 instance.phases.all(),
                 many=True,
                 context=self.context,
             ).data
 
-        return ProjectPhaseDeadlineSectionsSerializer(
-            instance.get_phases(project),
-            many=True,
-            context=self.context,
-        ).data
+        privilege = self.context['privilege']
+        owner = self.context['owner']
+        cache_key = f'deadline_sections:{privilege}:{owner}:{project.pk if project else None}'
+        phase_deadline_sections_serializer = cache.get(cache_key)
+
+        if not phase_deadline_sections_serializer:
+            phase_deadline_sections_serializer = ProjectPhaseDeadlineSectionsSerializer(
+                instance.get_phases(project),
+                many=True,
+                context=self.context,
+            ).data
+            cache.set(cache_key, phase_deadline_sections_serializer, None)
+
+        return phase_deadline_sections_serializer
 
     def get_fields(self):
         fields = super(ProjectSubTypeSchemaSerializer, self).get_fields()
