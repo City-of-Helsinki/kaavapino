@@ -1204,9 +1204,10 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         return project
 
     def _set_response_headers(self, response, filename, document_type):
-        response["Content-Disposition"] = "attachment; filename={}.{}".format(
-            filename, document_type
-        )
+        if filename and document_type:
+            response["Content-Disposition"] = "attachment; filename={}.{}".format(
+                filename, document_type
+            )
         # Since we are not using DRFs response here, we set a custom CORS control header
         response["Access-Control-Expose-Headers"] = "content-disposition"
         response["Access-Control-Allow-Origin"] = "*"
@@ -1242,21 +1243,29 @@ class DocumentViewSet(ReadOnlyModelViewSet):
 
         if immediate:
             document = render_template(self.project, document_template, preview)
-            response = HttpResponse(
-                document,
-                content_type=DOCUMENT_CONTENT_TYPES[doc_type],
-            )
-            self._set_response_headers(response, filename, doc_type)
+            if document and document != "error":
+                response = HttpResponse(
+                    document,
+                    content_type=DOCUMENT_CONTENT_TYPES[doc_type],
+                )
+                self._set_response_headers(response, filename, doc_type)
+            else:
+                response = HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                self._set_response_headers(response, None, None)
             return response
 
         if task_id:
             result = async_result(task_id)
             if result:
-                response = HttpResponse(
-                    result,
-                    content_type=DOCUMENT_CONTENT_TYPES[doc_type],
-                )
-                self._set_response_headers(response, filename, doc_type)
+                if result != "error":
+                    response = HttpResponse(
+                        result,
+                        content_type=DOCUMENT_CONTENT_TYPES[doc_type],
+                    )
+                    self._set_response_headers(response, filename, doc_type)
+                else:
+                    response = HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    self._set_response_headers(response, None, None)
                 return response
 
             queued_ids = [
