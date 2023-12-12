@@ -332,10 +332,15 @@ def render_template(project, document_template, preview):
     jinja_env = jinja2.Environment()
     jinja_env.filters['distinct'] = distinct
 
+    output = None
+
     if doc_type == 'docx':
-        doc.render(attribute_data_display, jinja_env)
-        output = io.BytesIO()
-        doc.save(output)
+        try:
+            doc.render(attribute_data_display, jinja_env)
+            output = io.BytesIO()
+            doc.save(output)
+        except Exception as exc:
+            log.error('Error while rendering document', exc)
     else:
         data = {
             'data': attribute_data_display,
@@ -351,7 +356,7 @@ def render_template(project, document_template, preview):
             phase=project.phase.common_project_phase,
         )
 
-    return output.getvalue()
+    return output.getvalue() if output else "error"
 
 
 # Custom filter for filtering objects from list by unique key
