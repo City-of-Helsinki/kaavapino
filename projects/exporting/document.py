@@ -329,6 +329,9 @@ def render_template(project, document_template, preview):
                 display_value,
             )
 
+    # Add preview information to attribute_data_display so that it can be used as condition in documents
+    attribute_data_display.update({'is_preview': preview})
+
     jinja_env = jinja2.Environment()
     jinja_env.filters['distinct'] = distinct
 
