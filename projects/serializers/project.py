@@ -1433,6 +1433,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         if not attribute_data:
             return static_property_attributes
 
+        tmp_attribute_data = {}
+        for attribute_identifier, value in attribute_data.items():
+            try:
+                attribute = Attribute.objects.get(identifier=attribute_identifier)
+                if attribute.value_type == Attribute.TYPE_CHOICE:
+                    if value is None:
+                        tmp_attribute_data[attribute_identifier] = []
+            except Attribute.DoesNotExist:
+                pass  # Attribute not found by attribute_identifier
+        attribute_data.update(tmp_attribute_data)
+
         # Get serializers for all sections in all phases
         sections_data = []
         current_phase = getattr(self.instance, "phase", None)
