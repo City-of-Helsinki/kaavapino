@@ -624,6 +624,41 @@ def get_in_personnel_data(id, key, is_kaavapino_user):
     user = get_ad_user(id)
     return PersonnelSerializer(user).data.get(key)
 
+
+def set_geoserver_data_in_attribute_data(attribute_data):
+    if not attribute_data.get("hankenumero"):
+        return
+
+    identifier = attribute_data["hankenumero"]
+
+    if identifier and re.compile("^\d{4}_\d{1,3}$").match(identifier):
+        url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
+
+        if cache.get(url) is not None:
+            response = cache.get(url)
+        else:
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+            )
+            if response.status_code == 200:
+                cache.set(url, response, 86400)  # 1 day
+            elif response.status_code == 404:
+                cache.set(url, response, 28800)  # 8 hours
+            elif response.status_code >= 500:
+                log.error("Kaavoitus-api connection error: {} {}".format(
+                    response.status_code,
+                    response.text
+                ))
+            else:
+                cache.set(url, response, 3600)  # 1 hour
+
+        if response.status_code == 200:
+            attribute_data.update(response.json())
+
+    return None
+
+
 def set_ad_data_in_attribute_data(attribute_data):
     from projects.models import Attribute
     paths = []
