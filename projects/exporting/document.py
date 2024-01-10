@@ -23,6 +23,7 @@ from projects.helpers import (
     DOCUMENT_CONTENT_TYPES,
     get_file_type,
     set_kaavoitus_api_data_in_attribute_data,
+    set_geoserver_data_in_attribute_data,
     set_ad_data_in_attribute_data,
     set_automatic_attributes,
 )
@@ -242,6 +243,7 @@ def render_template(project, document_template, preview):
     except Exception:
         pass
 
+    set_geoserver_data_in_attribute_data(attribute_data)
     set_ad_data_in_attribute_data(attribute_data)
     set_automatic_attributes(attribute_data)
 
