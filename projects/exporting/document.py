@@ -23,6 +23,7 @@ from projects.helpers import (
     DOCUMENT_CONTENT_TYPES,
     get_file_type,
     set_kaavoitus_api_data_in_attribute_data,
+    set_geoserver_data_in_attribute_data,
     set_ad_data_in_attribute_data,
     set_automatic_attributes,
 )
@@ -107,6 +108,59 @@ def get_closest_phase(project, identifier):
     # was editable
     phase = phases.filter(index__gte=project.phase.index).first()
     return phase or phases.reverse().first()
+
+
+def get_rich_text_display_value(value, **text_args):
+    if not value:
+        return RichText("Tieto puuttuu", **text_args)
+
+    rich_text = RichText(None)
+
+    try:
+        url_id = text_args.get("url_id", None)
+        color = text_args.get("color", None)
+
+        for operation in value["ops"]:
+            insert = operation.get("insert", None)
+            if not insert:
+                continue
+
+            attributes = operation.get("attributes", None)
+            if not attributes:
+                rich_text.add(insert,
+                              url_id=url_id,
+                              color=color
+                              )
+                continue
+
+            _color = color if color else attributes.get("color", None)
+            _size = attributes.get("size", None)
+            _script = attributes.get("script", None)
+            _sub = True if _script == "sub" else False
+            _super = True if _script == "super" else False
+            _bold = attributes.get("bold", False)
+            _italic = attributes.get("italic", False)
+            _underline = attributes.get("underline", False)
+            _strike = attributes.get("strike", False)
+            _font = attributes.get("font", None)
+
+            rich_text.add(insert,
+                          color=_color,
+                          size=_size,
+                          subscript=_sub,
+                          superscript=_super,
+                          bold=_bold,
+                          italic=_italic,
+                          underline=_underline,
+                          strike=_strike,
+                          font=_font,
+                          url_id=url_id
+                          )
+    except Exception as exc:
+        log.error("Error while formatting RichText value", exc)
+        return RichText("Virhe arvoa generoitaessa", **text_args)
+
+    return rich_text
 
 
 def render_template(project, document_template, preview):
@@ -232,7 +286,10 @@ def render_template(project, document_template, preview):
                 text_args = {}
 
             if doc_type == 'docx':
-                display_value = RichText(display_value, **text_args)
+                if attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+                    display_value = get_rich_text_display_value(value, **text_args)
+                else:
+                    display_value = RichText(display_value, **text_args)
 
         return (display_value, _get_raw_value(value, attribute), text_args)
 
@@ -242,6 +299,7 @@ def render_template(project, document_template, preview):
     except Exception:
         pass
 
+    set_geoserver_data_in_attribute_data(attribute_data)
     set_ad_data_in_attribute_data(attribute_data)
     set_automatic_attributes(attribute_data)
 

@@ -282,6 +282,10 @@ msgstr "tyhjän kentän ohjeteksti"
 msgid "assistive text"
 msgstr "kentän ohjeteksti"
 
+#: projects/models/attribute.py:277
+msgid "error text"
+msgstr "virheteksti"
+
 #: projects/models/attribute.py:257
 msgid "unique"
 msgstr "uniikki"
