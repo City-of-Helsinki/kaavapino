@@ -103,7 +103,7 @@ def get_attribute_subtitle(attribute, project):
             attribute=attribute,
             section__phase=project.phase
         )
-        return projectphasesectionattribute.section.name.replace('ö', 'o').replace('ä', 'a').replace(' ', '-').lower()
+        return projectphasesectionattribute.section.name
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
