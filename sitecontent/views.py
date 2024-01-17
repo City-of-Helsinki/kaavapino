@@ -43,6 +43,8 @@ class Legend(APIView):
 
 
 class Ping(APIView):
+    permission_classes = []  # Enable ping request without authentication
+
     @extend_schema(
         responses={200: OpenApiTypes.STR}
     )
