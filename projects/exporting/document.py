@@ -31,7 +31,7 @@ from projects.models import ProjectDocumentDownloadLog
 
 log = logging.getLogger(__name__)
 
-MAX_WIDTH_MM = 180  # Max InlineImage width
+MAX_WIDTH_MM = 170  # Max InlineImage width
 
 
 def _get_raw_value(value, attribute):
