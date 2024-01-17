@@ -273,6 +273,11 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    error_text = models.TextField(
+        verbose_name=_("error text"),
+        null=True,
+        blank=True
+    )
     unique = models.BooleanField(
         verbose_name=_("unique"),
         default=False,

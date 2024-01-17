@@ -16,7 +16,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
-
+from PIL import Image as PImage
 from ..models import Attribute, ProjectPhase, ProjectAttributeFile, ProjectPhaseSectionAttribute
 from ..models.utils import create_identifier
 from projects.helpers import (
@@ -30,6 +30,8 @@ from projects.helpers import (
 from projects.models import ProjectDocumentDownloadLog
 
 log = logging.getLogger(__name__)
+
+MAX_WIDTH_MM = 170  # Max InlineImage width
 
 
 def _get_raw_value(value, attribute):
@@ -234,7 +236,12 @@ def render_template(project, document_template, preview):
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
-                display_value = InlineImage(doc, value)
+                try:
+                    width_mm = int(PImage.open(value).width * 0.2645833333)
+                    display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else None)
+                except FileNotFoundError:
+                    log.error(f'Image not found at {value}')
+                    display_value = None
             else:
                 display_value = value
         else:
