@@ -16,8 +16,8 @@ from django.http import HttpResponse
 from django.utils import timezone
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
-
-from ..models import Attribute, ProjectPhase, ProjectAttributeFile
+from PIL import Image as PImage
+from ..models import Attribute, ProjectPhase, ProjectAttributeFile, ProjectPhaseSectionAttribute
 from ..models.utils import create_identifier
 from projects.helpers import (
     DOCUMENT_CONTENT_TYPES,
@@ -30,6 +30,8 @@ from projects.helpers import (
 from projects.models import ProjectDocumentDownloadLog
 
 log = logging.getLogger(__name__)
+
+MAX_WIDTH_MM = 170  # Max InlineImage width
 
 
 def _get_raw_value(value, attribute):
@@ -95,6 +97,17 @@ def get_top_level_attribute(attribute):
         return attribute
     else:
         return get_top_level_attribute(attribute.fieldsets.first())
+
+
+def get_attribute_subtitle(attribute, project):
+    try:
+        projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.get(
+            attribute=attribute,
+            section__phase=project.phase
+        )
+        return projectphasesectionattribute.section.name
+    except ProjectPhaseSectionAttribute.DoesNotExist:
+        return None
 
 
 def get_closest_phase(project, identifier):
@@ -223,7 +236,12 @@ def render_template(project, document_template, preview):
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
-                display_value = InlineImage(doc, value)
+                try:
+                    width_mm = int(PImage.open(value).width * 0.2645833333)
+                    display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else None)
+                except FileNotFoundError:
+                    log.error(f'Image not found at {value}')
+                    display_value = None
             else:
                 display_value = value
         else:
@@ -250,11 +268,14 @@ def render_template(project, document_template, preview):
                     get_top_level_attribute(attribute).identifier
 
                 target_phase_id = None
+                target_section_name = None
                 if target_identifier:
                     try:
                         target_phase_id = get_closest_phase(project, identifier).id
                     except AttributeError:
                         pass
+                    target_section_name = get_attribute_subtitle(attribute, project)
+
 
                 # attribute: editable attribute field
                 # phase: closest phase where attribute field is located
@@ -271,12 +292,11 @@ def render_template(project, document_template, preview):
                 else:
                     view = "default"
 
-                if target_identifier and target_phase_id:
-                    edit_url += f"?attribute={target_identifier}&phase={target_phase_id}&view={view}"
-                elif target_identifier:
-                    edit_url += f"?attribute={target_identifier}&view={view}"
-                elif target_property:
-                    edit_url += f"?property={target_property}&view={view}"
+                edit_url += f"?view={view}"
+                edit_url += f"&attribute={target_identifier}" if target_identifier else ""
+                edit_url += f"&phase={target_phase_id}" if target_phase_id else ""
+                edit_url += f"&section={target_section_name}" if target_section_name else ""
+                edit_url += f"&property={target_property}" if (target_property and not target_identifier) else ""
 
                 text_args = {
                     "color": "#d0c873" if empty else "#79a6b5",
