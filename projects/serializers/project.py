@@ -1734,6 +1734,13 @@ class ProjectSerializer(serializers.ModelSerializer):
                 user=user,
             )
 
+        if subtype_changed:
+            #  Clear project from cache
+            privilege = self.context['privilege']
+            owner = self.context['owner']
+            key = f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}'
+            cache.delete(key)
+
         should_update_deadlines = self._get_should_update_deadlines(
             subtype_changed, instance, attribute_data,
         )
