@@ -62,7 +62,7 @@ from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
 from sitecontent.models import ListViewAttributeColumn
-from users.models import User
+from users.models import User, PRIVILEGE_LEVELS
 from users.serializers import PersonnelSerializer, UserSerializer
 from users.helpers import get_graph_api_access_token
 
@@ -1733,6 +1733,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 phase=phase,
                 user=user,
             )
+
+        if subtype_changed:
+            #  Clear project from cache
+            for owner in ['True', 'False']:
+                for privilege, role in PRIVILEGE_LEVELS:
+                    cache.delete(f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}')
 
         should_update_deadlines = self._get_should_update_deadlines(
             subtype_changed, instance, attribute_data,
