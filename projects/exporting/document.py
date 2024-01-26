@@ -99,11 +99,11 @@ def get_top_level_attribute(attribute):
         return get_top_level_attribute(attribute.fieldsets.first())
 
 
-def get_attribute_subtitle(attribute, project):
+def get_attribute_subtitle(target_identifier, target_phase_id):
     try:
         projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.get(
-            attribute=attribute,
-            section__phase=project.phase
+            attribute__identifier=target_identifier,
+            section__phase=target_phase_id
         )
         return projectphasesectionattribute.section.name
     except ProjectPhaseSectionAttribute.DoesNotExist:
@@ -272,10 +272,9 @@ def render_template(project, document_template, preview):
                 if target_identifier:
                     try:
                         target_phase_id = get_closest_phase(project, identifier).id
+                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id)
                     except AttributeError:
                         pass
-                    target_section_name = get_attribute_subtitle(attribute, project)
-
 
                 # attribute: editable attribute field
                 # phase: closest phase where attribute field is located
