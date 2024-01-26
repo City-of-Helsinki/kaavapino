@@ -17,7 +17,7 @@ class Ping(APIView):
     @extend_schema(
         responses={200: OpenApiTypes.STR}
     )
-    def get(self, __):
+    def get(self, request, *args, **kwargs):
         return Response("pong")
 
 
@@ -30,7 +30,7 @@ class Status(APIView):
             503: OpenApiTypes.STR
         }
     )
-    def get(self, __):
+    def get(self, request, *args, **kwargs):
         try:
             User.objects.count()
             return Response("Kaavapino ok")
