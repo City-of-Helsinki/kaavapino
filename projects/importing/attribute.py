@@ -1404,7 +1404,10 @@ class AttributeImporter:
     def calculate_deadline_index(locations):
         deadline_index = 0
         for index, location in enumerate(locations, start=1):
-            deadline_index += int(int(location) * 10000 / int(10 ** index))
+            if index == 3:
+                deadline_index += int(int(location) * 10000 / int(10 ** 4))
+            else:
+                deadline_index += int(int(location) * 10000 / int(10 ** index))
         return deadline_index
 
     @staticmethod
