@@ -829,7 +829,39 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return Response({
             "priorities": ProjectPrioritySerializer(queryset, many=True).data
         })
+    @extend_schema(
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="attribute_data",
+        url_name="project-attribute-data"
+    )
+    def attribute_data(self, request):
+        attribute_identifier = request.query_params.get("attribute_identifier", None)
+        try:
+            project_name = request.query_params.get("project_name")
+            project = Project.objects.get(name=project_name)
 
+            if attribute_identifier is not None:
+                return Response({attribute_identifier: project.attribute_data[attribute_identifier]})
+
+            return Response({"attribute_data": project.attribute_data})
+        except Project.DoesNotExist as exc:
+            log.error("Project not found")
+            return Response("Project not found", status=status.HTTP_400_BAD_REQUEST)
+        except KeyError:
+            #  attribute_identifier not found in attribute_data
+            return Response({attribute_identifier: ""})
+        except Exception as exc:
+            log.error("Error in projects/attribute_data %s", exc)
+            return Response("Error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase",
