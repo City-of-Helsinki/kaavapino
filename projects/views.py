@@ -829,7 +829,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return Response({
             "priorities": ProjectPrioritySerializer(queryset, many=True).data
         })
-    
     @extend_schema(
         responses={
             200: OpenApiTypes.STR,
