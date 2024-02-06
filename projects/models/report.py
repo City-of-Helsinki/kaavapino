@@ -430,7 +430,9 @@ class ReportFilter(models.Model):
                 elif attr.value_type == Attribute.TYPE_USER:
                     for i, qv in enumerate(q_value):
                         try:
-                            q_value[i] = str(User.objects.get(ad_id=qv, hide_from_ui=False).uuid)
+                            q_value[i] = str(
+                                User.objects.get(username__startswith="u-", ad_id=qv, hide_from_ui=False).uuid
+                            )
                         except User.DoesNotExist:
                             pass
 
