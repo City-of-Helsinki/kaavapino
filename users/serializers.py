@@ -66,7 +66,7 @@ class PersonnelSerializer(serializers.Serializer):
     def get_phone(self, user):
         business_phones = user["businessPhones"]
         if business_phones and len(business_phones) > 0:
-            return business_phones[0]
+            return business_phones[0].replace('+358', '0')
         return user["mobilePhone"]
 
     @extend_schema_field(OpenApiTypes.STR)
