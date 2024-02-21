@@ -133,8 +133,14 @@ def get_rich_text_display_value(value, **text_args):
         url_id = text_args.get("url_id", None)
         color = text_args.get("color", None)
 
-        for operation in value["ops"]:
+        operations = value["ops"]
+
+        for index, operation in enumerate(operations, start=1):
             insert = operation.get("insert", None)
+
+            if index == len(operations):
+                insert = insert.strip() if insert else None
+
             if not insert:
                 continue
 
