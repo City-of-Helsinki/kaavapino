@@ -768,7 +768,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # TODO hard-coded for now; consider a new field for Attribute
         date_range_attrs = [
-            "toteutunut_kirje_kaupunginhallitukselle",
+            "projektin_kaynnistys_pvm",
             "tarkistettu_ehdotus_hyvaksytty_kylk",
             "milloin_tarkistettu_ehdotus_lautakunnassa",
             "milloin_tarkistettu_ehdotus_lautakunnassa_2",
