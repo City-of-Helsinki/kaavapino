@@ -105,6 +105,7 @@ from projects.serializers.projecttype import (
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer
 from sitecontent.models import ListViewAttributeColumn
+from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
 log = logging.getLogger(__name__)
 
@@ -380,13 +381,22 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         request.data["project"] = project.pk
         request.data._mutable = False
 
-        context = self.get_serializer_context()
-        serializer = ProjectFileSerializer(data=request.data, context=context)
-        serializer.is_valid(raise_exception=True)
+        try:
+            file = request.data["file"]
+            clamav_client.scan(file.name, file.file)
 
-        serializer.save()
+            context = self.get_serializer_context()
+            serializer = ProjectFileSerializer(data=request.data, context=context)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
 
-        return Response(serializer.data)
+            return Response(serializer.data)
+        except FileScanException as fse:
+            log.error(f"File '{fse.file_name}' scanning failed")
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        except FileInfectedException as fie:
+            log.error(f"File '{fie.file_name}' infected, viruses: {fie.viruses}")
+            return Response(status=status.HTTP_406_NOT_ACCEPTABLE)
 
     @extend_schema(
         responses=inline_serializer('ExternalDocuments', fields={'sections': ProjectExternalDocumentSectionSerializer(many=True)}),

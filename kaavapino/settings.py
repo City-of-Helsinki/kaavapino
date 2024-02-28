@@ -29,6 +29,7 @@ env = environ.Env(
     REDIS_PASSWORD=(str, None),
     CACHE_URL=(str, "locmemcache://"),
     EMAIL_URL=(str, "consolemail://"),
+    CLAMAV_URL=(str, ""),
     MEDIA_ROOT=(environ.Path, project_root("media")),
     STATIC_ROOT=(environ.Path, project_root("static")),
     MEDIA_URL=(str, "/media/"),
@@ -78,6 +79,8 @@ if env('SENTRY_DSN'):
         environment=env('SENTRY_ENVIRONMENT'),
         integrations=[DjangoIntegration(), RedisIntegration()]
     )
+
+CLAMAV_URL = env.str("CLAMAV_URL")
 
 SOCIAL_AUTH_TUNNISTAMO_SECRET = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_SECRET")
 SOCIAL_AUTH_TUNNISTAMO_KEY = os.environ.get("SOCIAL_AUTH_TUNNISTAMO_KEY")
@@ -318,6 +321,7 @@ Q_CLUSTER = {
     "retry": 3600,
     "timeout": 1800,
     "max_attempts": 1,
+    "django_redis": "default",
 }
 
 HELUSERS_PASSWORD_LOGIN_DISABLED = env.bool("HELUSERS_PASSWORD_LOGIN_DISABLED")
