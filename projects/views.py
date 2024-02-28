@@ -437,12 +437,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return filters
 
     def _get_query(self, filters, prefix=""):
+        log.info(self)
+        log.info(filters)
+        log.info(prefix)
         if prefix:
             prefix = f"{prefix}__"
 
         params = self.request.query_params
         query = Q()
-
+        log.info(params)
         for filter_obj, attrs in filters.items():
             try:
                 split_params = params.get(filter_obj.identifier).split(",")
@@ -455,7 +458,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 for attr in attrs:
                     # Only supports one-fieldset-deep queries for now
                     attr = attr.attribute
-
+                    log.info(attr)
+                    log.info('TYPE: %s' % (attr.value_type))
                     # Manipulate search parameter
                     if attr.value_type == Attribute.TYPE_BOOLEAN:
                         param_parsed = \
@@ -493,13 +497,18 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     elif attr.value_type == Attribute.TYPE_CHOICE:
                         choices = {}
                         for choice in attr.value_choices.all():
-                            choices[choice.identifier] = [choice.value, choice.identifier]
+                            log.info('val: %s' % (choice.value))
+                            log.info('ident: %s' % (choice.identifier))
+                            choices[choice.identifier] = [choice.value]
                         param_parsed = choices.get(param)
+                        log.info('Test: %s' % (param_parsed))
+                        log.info('Test: %s' % (param))
                     else:
                         param_parsed = param
 
                     # Handle search criteria special cases
                     if attr.value_type == Attribute.TYPE_USER:
+                        log.info('UUUUUSER: %s' % (attr.value_type))
                         postfix = "__ad_id"
                     else:
                         postfix = ""
@@ -508,6 +517,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                         param_parsed = [param_parsed]
 
                     for pp in param_parsed:
+                        log.info('safasfsa: %s' % (pp))
+                        log.info('attr.identifier: %s' % (attr.identifier))
+                        log.info('prefix: %s' % (prefix))
+                        log.info('postfix: %s' % (postfix))
                         # Add to query
                         if attr.fieldsets.first():
                             q |= Q(**{
@@ -519,8 +532,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                         else:
                             # TODO: __iexact is no longer needed if kaavaprosessin_kokoluokka
                             # ever gets refactored
+                            log.info('PERSONNEL: %s' % (attr.value_type))
                             q |= Q(**{f"{prefix}attribute_data__{attr.identifier}{postfix}__iexact": pp})
-
+                log.info('q: %s' % (q))
                 return q
 
             param_queries = Q()
@@ -529,8 +543,8 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             for param in split_params:
                 param_queries |= get_query_for_filter(param)
 
-            query &= param_queries
-
+            query |= param_queries
+        log.info('query: %s' % (query))
         return query
 
     @extend_schema(
@@ -583,9 +597,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         today = datetime.now().date()
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
+        projectsize = self.request.query_params.get("subtype_id",[1,2,3,4,5])
         valid_filters = self._get_valid_filters("filters_floor_area")
         deadline_query = self._get_query(valid_filters, "project")
         project_query = self._get_query(valid_filters)
+
+        if isinstance(projectsize, str):
+            projectsize_int = [int(x.strip()) for x in projectsize.split(',') if x]
+        else:
+            projectsize_int = projectsize
 
         start_date, end_date = self._parse_date_range(
             start_date,
@@ -608,7 +628,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             start_date + timedelta(days=i)
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
-
+        log.info('DATE RANGE: %s' % (date_range))
         # TODO hard-coded for now; consider a new field for Attribute
         floor_area_attrs = [
             "kerrosalan_lisays_yhteensa_asuminen",
@@ -622,26 +642,29 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "milloin_tarkistettu_ehdotus_lautakunnassa_3",
             "milloin_tarkistettu_ehdotus_lautakunnassa_4",
         ]
-
+        #
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
+                project__subtype_id__in=projectsize_int,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs + [
                     "milloin_kaavaehdotus_lautakunnassa",
                     "milloin_kaavaehdotus_lautakunnassa_2",
                     "milloin_kaavaehdotus_lautakunnassa_3",
                     "milloin_kaavaehdotus_lautakunnassa_4",
-                ]
+                ],
             ).prefetch_related("project", "project__user",
                                "project__subtype", "project__subtype__project_type",
                                "project__phase", "project__phase__common_project_phase").\
             order_by("project__pk").distinct("project__pk")
+        log.info('QQQQQ: %s' % project_deadlines.query)
         projects_by_date = {
             date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
             for date in date_range
         }
-
+        #log.info('projects_by_date: %s' % (projects_by_date))
+        #log.info('project_deadlines: %s' % (project_deadlines))
         project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
                 project__public=True,
@@ -658,14 +681,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             date: Project.objects.filter(
                 project_query, (
                     Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
-                    Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
                     Q(attribute_data__hyvaksymispaatos_pvm__lte=date)
-                ),
-                public=True,
-                pk__in=[p.pk for p in projects_in_range],
-            ).order_by("pk")
-            for date in date_range
-        }
+                    ),
+                    subtype_id__in=projectsize_int,
+                    public=True,
+                    pk__in=[p.pk for p in projects_in_range],
+                ).order_by("pk")
+                for date in date_range
+            }
 
         def get_floor_area(date, attr):
             if date < today:
