@@ -1,3 +1,6 @@
+import concurrent.futures
+import threading
+
 import datetime
 import io
 from html import escape
@@ -277,7 +280,7 @@ def render_template(project, document_template, preview):
                 target_section_name = None
                 if target_identifier:
                     try:
-                        target_phase_id = get_closest_phase(project, identifier).id
+                        target_phase_id = get_closest_phase(project, attribute.identifier).id
                         target_section_name = get_attribute_subtitle(target_identifier, target_phase_id)
                     except AttributeError:
                         pass
@@ -303,10 +306,11 @@ def render_template(project, document_template, preview):
                 edit_url += f"&section={target_section_name}" if target_section_name else ""
                 edit_url += f"&property={target_property}" if (target_property and not target_identifier) else ""
 
-                text_args = {
-                    "color": "#d0c873" if empty else "#79a6b5",
-                    "url_id": doc.build_url_id(edit_url) if doc_type == 'docx' else edit_url,
-                }
+                with build_url_id_lock:
+                    text_args = {
+                        "color": "#d0c873" if empty else "#79a6b5",
+                        "url_id": doc.build_url_id(edit_url) if doc_type == 'docx' else edit_url,
+                    }
             else:
                 text_args = {}
 
@@ -328,23 +332,26 @@ def render_template(project, document_template, preview):
     set_ad_data_in_attribute_data(attribute_data)
     set_automatic_attributes(attribute_data)
 
-    full_attribute_data = [
-        (attr, attribute_data.get(attr.identifier))
-        for attr in Attribute.objects.all()
-    ]
+    build_url_id_lock = threading.Lock()
 
-    for attribute, value in full_attribute_data:
-        identifier = attribute.identifier
-        display_value, raw_value, element_data = get_display_and_raw_value(
-            attribute,
-            value
-        )
+    def process_attribute(attr):
+        value = attribute_data.get(attr.identifier)
+        identifier = attr.identifier
+        display_value, raw_value, element_data = get_display_and_raw_value(attr, value)
+        return identifier, display_value, raw_value, element_data
 
-        attribute_data_display[identifier] = display_value
-        attribute_element_data[identifier] = element_data
+    full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in Attribute.objects.all()]
 
-        if attribute.value_type != Attribute.TYPE_FIELDSET:
-            attribute_data_display[identifier + "__raw"] = raw_value
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_attr = {executor.submit(process_attribute, attr): attr for attr, _ in full_attribute_data}
+        for future in concurrent.futures.as_completed(future_to_attr):
+            attr = future_to_attr[future]
+
+            identifier, display_value, raw_value, element_data = future.result()
+            attribute_data_display[identifier] = display_value
+            attribute_element_data[identifier] = element_data
+            if attr.value_type != Attribute.TYPE_FIELDSET:
+                attribute_data_display[identifier + "__raw"] = raw_value
 
     attribute_files = ProjectAttributeFile.objects \
         .filter(project=project, archived_at=None) \

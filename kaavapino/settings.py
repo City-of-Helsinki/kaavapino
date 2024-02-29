@@ -113,7 +113,7 @@ JWT_AUTH = {
 }
 DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
-DATABASES = {"default": env.db()}
+DATABASES = {"default": env.db(engine="dj_db_conn_pool.backends.postgresql")}
 
 SENTINELS = []
 
@@ -321,7 +321,6 @@ Q_CLUSTER = {
     "retry": 3600,
     "timeout": 1800,
     "max_attempts": 1,
-    "django_redis": "default",
 }
 
 HELUSERS_PASSWORD_LOGIN_DISABLED = env.bool("HELUSERS_PASSWORD_LOGIN_DISABLED")
