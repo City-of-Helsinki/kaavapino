@@ -491,7 +491,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     elif attr.value_type == Attribute.TYPE_CHOICE:
                         choices = {}
                         for choice in attr.value_choices.all():
-                            choices[choice.identifier] = [choice.value]
+                            choices[choice.identifier] = [choice.value,choice.identifier]
                         param_parsed = choices.get(param)
                     else:
                         param_parsed = param
@@ -526,7 +526,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             for param in split_params:
                 param_queries |= get_query_for_filter(param)
 
-            query |= param_queries
+            query &= param_queries
         return query
 
     @extend_schema(
@@ -629,7 +629,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "milloin_tarkistettu_ehdotus_lautakunnassa_3",
             "milloin_tarkistettu_ehdotus_lautakunnassa_4",
         ]
-        #
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
