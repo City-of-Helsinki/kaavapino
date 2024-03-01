@@ -590,7 +590,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             projectsize_int = [int(x.strip()) for x in projectsize.split(',') if x]
         else:
             projectsize_int = projectsize
-        
         if isinstance(unit, str):
             unit = [(x.strip()) for x in unit.split(',') if x]
             unitquery &= Q(project__attribute_data__vastuuyksikko__in=unit)
