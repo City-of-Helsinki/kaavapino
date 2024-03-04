@@ -442,7 +442,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         params = self.request.query_params
         query = Q()
-
         for filter_obj, attrs in filters.items():
             try:
                 split_params = params.get(filter_obj.identifier).split(",")
@@ -455,7 +454,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 for attr in attrs:
                     # Only supports one-fieldset-deep queries for now
                     attr = attr.attribute
-
                     # Manipulate search parameter
                     if attr.value_type == Attribute.TYPE_BOOLEAN:
                         param_parsed = \
@@ -493,7 +491,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     elif attr.value_type == Attribute.TYPE_CHOICE:
                         choices = {}
                         for choice in attr.value_choices.all():
-                            choices[choice.identifier] = [choice.value, choice.identifier]
+                            choices[choice.identifier] = [choice.value,choice.identifier]
                         param_parsed = choices.get(param)
                     else:
                         param_parsed = param
@@ -520,7 +518,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                             # TODO: __iexact is no longer needed if kaavaprosessin_kokoluokka
                             # ever gets refactored
                             q |= Q(**{f"{prefix}attribute_data__{attr.identifier}{postfix}__iexact": pp})
-
                 return q
 
             param_queries = Q()
@@ -530,7 +527,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 param_queries |= get_query_for_filter(param)
 
             query &= param_queries
-
         return query
 
     @extend_schema(
@@ -583,9 +579,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         today = datetime.now().date()
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
+        projectsize = self.request.query_params.get("subtype_id",[1,2,3,4,5])
+        unit = self.request.query_params.get("vastuuyksikko")
+        unitquery = Q()
         valid_filters = self._get_valid_filters("filters_floor_area")
         deadline_query = self._get_query(valid_filters, "project")
         project_query = self._get_query(valid_filters)
+
+        if isinstance(projectsize, str):
+            projectsize_int = [int(x.strip()) for x in projectsize.split(',') if x]
+        else:
+            projectsize_int = projectsize
+        if isinstance(unit, str):
+            unit = [(x.strip()) for x in unit.split(',') if x]
+            unitquery &= Q(project__attribute_data__vastuuyksikko__in=unit)
 
         start_date, end_date = self._parse_date_range(
             start_date,
@@ -608,7 +615,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             start_date + timedelta(days=i)
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
-
         # TODO hard-coded for now; consider a new field for Attribute
         floor_area_attrs = [
             "kerrosalan_lisays_yhteensa_asuminen",
@@ -622,17 +628,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             "milloin_tarkistettu_ehdotus_lautakunnassa_3",
             "milloin_tarkistettu_ehdotus_lautakunnassa_4",
         ]
-
         # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
         project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
+                unitquery,
+                project__subtype_id__in=projectsize_int,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs + [
                     "milloin_kaavaehdotus_lautakunnassa",
                     "milloin_kaavaehdotus_lautakunnassa_2",
                     "milloin_kaavaehdotus_lautakunnassa_3",
                     "milloin_kaavaehdotus_lautakunnassa_4",
-                ]
+                ],
+                date__gte=start_date,
+                date__lte=end_date,
             ).prefetch_related("project", "project__user",
                                "project__subtype", "project__subtype__project_type",
                                "project__phase", "project__phase__common_project_phase").\
@@ -644,9 +653,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
+                unitquery,
+                project__subtype_id__in=projectsize_int,
                 project__public=True,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
+                date__lte=end_date,
             ).prefetch_related("project").order_by("project__pk").distinct("project__pk")
         projects_in_range_by_date = {
             date: [dl.project for dl in filter(lambda dl: dl.date <= date, project_deadlines)]
@@ -658,14 +670,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             date: Project.objects.filter(
                 project_query, (
                     Q(attribute_data__tarkistettu_ehdotus_hyvaksytty_kylk__lte=date) |
-                    Q(attribute_data__toteutunut_kirje_kaupunginhallitukselle__lte=date) |
                     Q(attribute_data__hyvaksymispaatos_pvm__lte=date)
-                ),
-                public=True,
-                pk__in=[p.pk for p in projects_in_range],
-            ).order_by("pk")
-            for date in date_range
-        }
+                    ),
+                    public=True,
+                    pk__in=[p.pk for p in projects_in_range],
+                ).order_by("pk")
+                for date in date_range
+            }
 
         def get_floor_area(date, attr):
             if date < today:
@@ -768,7 +779,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # TODO hard-coded for now; consider a new field for Attribute
         date_range_attrs = [
-            "toteutunut_kirje_kaupunginhallitukselle",
+            "projektin_kaynnistys_pvm",
             "tarkistettu_ehdotus_hyvaksytty_kylk",
             "milloin_tarkistettu_ehdotus_lautakunnassa",
             "milloin_tarkistettu_ehdotus_lautakunnassa_2",
