@@ -230,17 +230,17 @@ KNOWN_SUBTYPES = ["XS", "S", "M", "L", "XL"]
 DATA_RETENTION_PLANS = {
     "tieto tallennetaan pysyvästi": {
         "label": "tieto tallennetaan pysyvästi",
-        "plan_type": "permanent",
+        "plan_type": DataRetentionPlan.TYPE_PERMANENT,
     },
     "prosessinaikainen": {
         "label": "prosessinaikainen",
-        "plan_type": "processing",
+        "plan_type": DataRetentionPlan.TYPE_PROCESSING,
     },
     "tieto poistuu 6 kk kuluttua, kun projekti on arkistoitu": {
         "label": "6 kk arkistoinnista",
-        "plan_type": "custom",
+        "plan_type": DataRetentionPlan.TYPE_CUSTOM,
         "custom_time": 6,
-        "custom_time_unit": "month",
+        "custom_time_unit": DataRetentionPlan.UNIT_MONTHS,
     },
 }
 DEFAULT_DATA_RETENTION_PLAN = DATA_RETENTION_PLANS["tieto tallennetaan pysyvästi"]
