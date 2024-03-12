@@ -832,12 +832,17 @@ class ProjectSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
         project_schedule_cache = cache.get("serialized_project_schedules", {})
-        deadlines = project.deadlines.filter(deadline__subtype=project.subtype)\
+        deadlines = ProjectDeadline.objects.filter(project=project, deadline__subtype=project.subtype)\
             .select_related("deadline", "project")\
             .prefetch_related("project__subtype", "project__deadlines", "project__deadlines__deadline",
                               "project__deadlines__project", "deadline__distances_to_previous",
                               "deadline__distances_to_next", "deadline__attribute", "deadline__phase",
                               "deadline__subtype", "deadline__date_type", "deadline__phase__project_subtype")
+        if not project.create_principles:
+            deadlines = deadlines.filter(~Q(deadline__phase__common_project_phase__name="Periaatteet"))
+        if not project.create_draft:
+            deadlines = deadlines.filter(~Q(deadline__phase__common_project_phase__name="Luonnos"))
+
         schedule = project_schedule_cache.get(project.pk)
         if self.context.get('should_update_deadlines') or not schedule:
             schedule = ProjectDeadlineSerializer(
