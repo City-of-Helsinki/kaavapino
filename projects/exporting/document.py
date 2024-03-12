@@ -35,7 +35,7 @@ from projects.models import ProjectDocumentDownloadLog
 log = logging.getLogger(__name__)
 
 MAX_WIDTH_MM = 170  # Max InlineImage width
-
+DEFAULT_IMG_DPI = (72,72) # For cases where dpi value is not available in metadata
 
 def _get_raw_value(value, attribute):
     if attribute.value_type == Attribute.TYPE_DATE and isinstance(value, str):
@@ -246,7 +246,10 @@ def render_template(project, document_template, preview):
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
                 try:
-                    width_mm = int(PImage.open(value).width * 0.2645833333)
+                    with PImage.open(value) as img:
+                        width_px = img.width
+                        dpi = img.info.get('dpi', DEFAULT_IMG_DPI)[0]
+                    width_mm = int((width_px/dpi) * 25.4)
                     display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else None)
                 except FileNotFoundError:
                     log.error(f'Image not found at {value}')
