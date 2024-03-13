@@ -1350,7 +1350,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                     {"phase": _("Archived projects cannot be edited")}
                 )
             elif archived is True:
-                print(f'set archived_at for project {self}')
                 attrs["archived_at"] = timezone.now()
 
         if attrs.get("subtype") and self.instance is not None:
