@@ -224,6 +224,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     field_roles = serializers.SerializerMethodField()
     field_subroles = serializers.SerializerMethodField()
     categorization = serializers.SerializerMethodField()
+    fieldset_total = serializers.CharField()
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
