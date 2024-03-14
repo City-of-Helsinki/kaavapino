@@ -521,6 +521,8 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
             ).data
             for section in phase.sections.all()
         ]
+        # Remove sections with no fields
+        sections = [section for section in sections if section["fields"] is not None and len(section["fields"]) > 0]
 
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl in project.deadlines.all()
