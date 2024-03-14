@@ -85,6 +85,7 @@ ATTRIBUTE_ASSISTIVE_TEXT = "kentän alla näkyvä lyhyt vinkki"
 ATTRIBUTE_ERROR_TEXT = "virheteksti"
 ATTRIBUTE_FIELD_ROLE = "rooli kenen kenttä"
 ATTRIBUTE_FIELD_SUBROLE = "alirooli kenen kenttä"
+ATTRIBUTE_FIELDSET_TOTAL = "fieldsettien lukumäärä"
 # TODO: ask for a dedicated column for uniqueness at some point
 ATTRIBUTE_ERROR_UNIQUE = [
     "Virhe. Nimi on jo käytössä",
@@ -887,6 +888,8 @@ class AttributeImporter:
             if field_subroles == "automaattinen tieto, jota ei voi muokata":
                 field_subroles = None
 
+            fieldset_total = row[self.column_index[ATTRIBUTE_FIELDSET_TOTAL]]
+
             data_source = row[self.column_index[EXT_DATA_SOURCE]]
             data_source_key = row[self.column_index[EXT_DATA_SOURCE_KEY]]
             key_attribute_path = row[self.column_index[EXT_DATA_PARENT_KEY_ATTRIBUTE]]
@@ -935,6 +938,7 @@ class AttributeImporter:
                     "ad_data_key": ad_data_key,
                     "field_roles": field_roles,
                     "field_subroles": field_subroles,
+                    "fieldset_total":fieldset_total
                 },
             )
             if created:
