@@ -248,9 +248,10 @@ def render_template(project, document_template, preview):
                 try:
                     with PImage.open(value) as img:
                         width_px = img.width
-                        dpi = img.info.get('dpi', DEFAULT_IMG_DPI)[0]
+                        dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
+                        dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
                     width_mm = int((width_px/dpi) * 25.4)
-                    display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else None)
+                    display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else Mm(width_mm))
                 except FileNotFoundError:
                     log.error(f'Image not found at {value}')
                     display_value = None
