@@ -619,15 +619,28 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             start_date + timedelta(days=i)
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
-        # TODO hard-coded for now; consider a new field for Attribute
+        #Dates that is shown in overview graph "Projektit ja kerrosalat lautakunnassa".
         suggested_date_attrs = [
             "milloin_kaavaehdotus_lautakunnassa",
             "milloin_kaavaehdotus_lautakunnassa_2",
             "milloin_kaavaehdotus_lautakunnassa_3",
             "milloin_kaavaehdotus_lautakunnassa_4",
+            "milloin_tarkistettu_ehdotus_lautakunnassa",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_2",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_3",
+            "milloin_tarkistettu_ehdotus_lautakunnassa_4",
+            "milloin_periaatteet_lautakunnassa",
+            "milloin_periaatteet_lautakunnassa_2",
+            "milloin_periaatteet_lautakunnassa_3",
+            "milloin_periaatteet_lautakunnassa_4",
+            "milloin_kaavaluonnos_lautakunnassa",
+            "milloin_kaavaluonnos_lautakunnassa_2",
+            "milloin_kaavaluonnos_lautakunnassa_3",
+            "milloin_kaavaluonnos_lautakunnassa_4",
         ]
 
-        # TODO add field to mark a Deadline as a "lautakunta" event and filter by that instead
+        #Select all suggested dates in project deadlines.
+        #Can have multiple hits for same project(one project can be shown 4 times in the graph at different dates).
         project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
                 unitquery,
@@ -639,7 +652,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             ).prefetch_related("project", "project__user",
                                "project__subtype", "project__subtype__project_type",
                                "project__phase", "project__phase__common_project_phase").\
-            order_by("project__pk").distinct("project__pk")
+            order_by("project__pk")
         projects_by_date = {
             date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
             for date in date_range
