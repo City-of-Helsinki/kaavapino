@@ -640,7 +640,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ]
 
         #Select all suggested dates in project deadlines.
-        #Can have multiple hits for same project(one project can be shown 4 times in the graph at different dates).
+        #Can have multiple hits for same project(one project can be shown multiple times in the graph at different dates).
         project_deadlines = ProjectDeadline.objects.filter(
                 deadline_query,
                 unitquery,
