@@ -51,6 +51,7 @@ from projects.models import (
     ProjectAttributeFileFieldsetPathLocation,
     OverviewFilter,
     DocumentTemplate,
+    FieldSetAttribute,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -1448,6 +1449,26 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
+                elif attribute.value_type == Attribute.TYPE_FIELDSET and value:
+                    for index, entry in enumerate(value):
+                        if entry.get("_deleted", False) is not True:
+                            continue
+                        old_value = self.instance.attribute_data.get(attribute_identifier, None)
+                        if not old_value or not old_value[index] or old_value[index]["_deleted"]:
+                            continue
+                        fieldset_attributes = FieldSetAttribute.objects.filter(
+                            attribute_source=attribute,
+                            attribute_target__value_type=Attribute.TYPE_IMAGE
+                        )
+                        for f_attr in fieldset_attributes:
+                            fieldset_path_str = f'{attribute_identifier}[{index}].{f_attr.attribute_target.identifier}'
+                            ProjectAttributeFile.objects.filter(
+                                project=self.instance,
+                                attribute=f_attr.attribute_target,
+                                fieldset_path_str=fieldset_path_str
+                            ).update(archived_at=timezone.now())
+
+
             except Attribute.DoesNotExist:
                 pass  # Attribute not found by attribute_identifier
         attribute_data.update(tmp_attribute_data)
