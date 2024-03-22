@@ -344,6 +344,12 @@ def render_template(project, document_template, preview):
         else:
             # Phase information does not exist in text_args
             # Add your code here
+            
+            #Testing http://localhost:3000/projects/x/documents Selostus
+
+            #Yritetään saada section ja vaihe tieto attributeista
+
+            #Ehdotus,taivoitteet,Muu ohjelmakytkentä editointi näkymässä
             if attribute.identifier == "ohjelma_kytkenta":
                 log.info("Phase NOT exists in text_args %s",attribute)
                 target_identifier = get_top_level_attribute(attribute).identifier
