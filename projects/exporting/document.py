@@ -104,6 +104,8 @@ def get_top_level_attribute(attribute):
 
 def get_attribute_subtitle(target_identifier, target_phase_id, project):
     try:
+        if target_identifier == "vastuuhenkilo_nimi":
+            target_identifier = "vastuuhenkilo_nimi_readonly"
         projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.filter(
             attribute__identifier=target_identifier,
             section__phase=target_phase_id
@@ -119,6 +121,9 @@ def get_attribute_subtitle(target_identifier, target_phase_id, project):
 
 
 def get_closest_phase(project, identifier, parent_identifier=None):
+    if parent_identifier == "vastuuhenkilo_nimi":
+        parent_identifier = "vastuuhenkilo_nimi_readonly"
+        
     phases = ProjectPhase.objects.filter(
         sections__attributes__identifier=identifier,
         project_subtype=project.subtype,
