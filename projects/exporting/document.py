@@ -102,23 +102,37 @@ def get_top_level_attribute(attribute):
         return get_top_level_attribute(attribute.fieldsets.first())
 
 
-def get_attribute_subtitle(target_identifier, target_phase_id):
+def get_attribute_subtitle(target_identifier, target_phase_id, project):
     try:
-        projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.get(
+        if target_identifier == "vastuuhenkilo_nimi":
+            target_identifier = "vastuuhenkilo_nimi_readonly"
+        projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.filter(
             attribute__identifier=target_identifier,
             section__phase=target_phase_id
         )
-        return projectphasesectionattribute.section.name
+        #Could have multiple sections but we need the closest one to the current phase
+        if len(projectphasesectionattribute) > 0:
+            section = projectphasesectionattribute.filter(index__gte=project.phase.index).first()
+            return section.section.name
+        else:
+            return projectphasesectionattribute.section.name
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
 
-def get_closest_phase(project, identifier):
+def get_closest_phase(project, identifier, parent_identifier=None):
+    if parent_identifier == "vastuuhenkilo_nimi":
+        parent_identifier = "vastuuhenkilo_nimi_readonly"
     phases = ProjectPhase.objects.filter(
         sections__attributes__identifier=identifier,
         project_subtype=project.subtype,
     ).order_by("index")
-
+    #If not found in the current identifier, check the parent
+    if not phases and parent_identifier is not None:
+        phases = ProjectPhase.objects.filter(
+            sections__attributes__identifier=parent_identifier,
+            project_subtype=project.subtype,
+        ).order_by("index")
     # Returning the closest open phase if found,
     # otherwise return the last phase when the attribute
     # was editable
@@ -284,8 +298,8 @@ def render_template(project, document_template, preview):
                 target_section_name = None
                 if target_identifier:
                     try:
-                        target_phase_id = get_closest_phase(project, attribute.identifier).id
-                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id)
+                        target_phase_id = get_closest_phase(project, attribute.identifier,target_identifier).id
+                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id, project)
                     except AttributeError:
                         pass
 
