@@ -364,9 +364,16 @@ def render_template(project, document_template, preview):
                     log.info("target_section_name %s",target_section_name)
                     if target_phase_id is not None and target_section_name is not None and text_args is not None:
                         log.info("ADDING TO %s",attribute.identifier)
-                        text_args["url_id"] += f"&phase={target_phase_id}"
-                        text_args["url_id"] += f"&section={target_section_name}"
-    
+                        edit_url += f"&phase={target_phase_id}" if target_phase_id else ""
+                        edit_url += f"&section={target_section_name}" if target_section_name else ""
+                        log.info("edit_url %s",edit_url)
+                        with build_url_id_lock:
+                            text_args = {
+                                "color": "#d0c873" if empty else "#79a6b5",
+                                "url_id": doc.build_url_id(edit_url) if doc_type == 'docx' else edit_url,
+                            }
+                        log.info("text_args %s",text_args)
+                        
         return (display_value, _get_raw_value(value, attribute), text_args)
 
     attribute_data = project.attribute_data
