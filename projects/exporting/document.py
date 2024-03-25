@@ -102,40 +102,37 @@ def get_top_level_attribute(attribute):
         return get_top_level_attribute(attribute.fieldsets.first())
 
 
-def get_attribute_subtitle(target_identifier, target_phase_id):
+def get_attribute_subtitle(target_identifier, target_phase_id, project):
     try:
-        projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.get(
+        projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.filter(
             attribute__identifier=target_identifier,
             section__phase=target_phase_id
         )
-        return projectphasesectionattribute.section.name
+        #Could have multiple sections but we need the closest one to the current phase
+        if len(projectphasesectionattribute) > 0:
+            section = projectphasesectionattribute.filter(index__gte=project.phase.index).first()
+            return section.section.name
+        else:
+            return projectphasesectionattribute.section.name
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
 
-def get_closest_phase(project, identifier,parent_identifier=None):
-    if parent_identifier is not None:
-        log.info("parent_identifier %s",parent_identifier)
-        log.info("project %s",project.subtype)
-        log.info("identifier %s",identifier)
+def get_closest_phase(project, identifier, parent_identifier=None):
+    phases = ProjectPhase.objects.filter(
+        sections__attributes__identifier=identifier,
+        project_subtype=project.subtype,
+    ).order_by("index")
+    #If not found in the current identifier, check the parent
+    if not phases and parent_identifier is not None:
         phases = ProjectPhase.objects.filter(
             sections__attributes__identifier=parent_identifier,
             project_subtype=project.subtype,
         ).order_by("index")
-    else:
-        phases = ProjectPhase.objects.filter(
-            sections__attributes__identifier=identifier,
-            project_subtype=project.subtype,
-        ).order_by("index")
-    if identifier == "ohjelma_kytkenta" and parent_identifier is not None:
-        log.info(phases.query)
-        log.info("phases %s",phases)
     # Returning the closest open phase if found,
     # otherwise return the last phase when the attribute
     # was editable
     phase = phases.filter(index__gte=project.phase.index).first()
-    if identifier == "ohjelma_kytkenta" and parent_identifier is not None:
-        log.info("phase %s",phase)
     return phase or phases.reverse().first()
 
 
@@ -297,8 +294,8 @@ def render_template(project, document_template, preview):
                 target_section_name = None
                 if target_identifier:
                     try:
-                        target_phase_id = get_closest_phase(project, attribute.identifier).id
-                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id)
+                        target_phase_id = get_closest_phase(project, attribute.identifier,target_identifier).id
+                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id, project)
                     except AttributeError:
                         pass
 
@@ -337,43 +334,6 @@ def render_template(project, document_template, preview):
                 else:
                     display_value = RichText(display_value, **text_args)
 
-        if text_args is not None and "&phase=" in text_args.get("url_id", ""):
-            # Phase information exists in text_args
-            # Add your code here
-            pass
-        else:
-            # Phase information does not exist in text_args
-            # Add your code here
-            
-            #Testing http://localhost:3000/projects/x/documents Selostus
-
-            #Yritetään saada section ja vaihe tieto attributeista
-
-            #Ehdotus,taivoitteet,Muu ohjelmakytkentä editointi näkymässä
-            if attribute.identifier == "ohjelma_kytkenta":
-                log.info("Phase NOT exists in text_args %s",attribute)
-                target_identifier = get_top_level_attribute(attribute).identifier
-                target_phase_id = None
-                target_section_name = None
-                if target_identifier:
-                    log.info("PROJECT %s",project)
-                    log.info("TARGETID %s",target_identifier)
-                    target_phase_id = get_closest_phase(project, attribute.identifier,target_identifier).id
-                    target_section_name = get_attribute_subtitle(target_identifier, target_phase_id)
-                    log.info("target_phase_id %s",target_phase_id)
-                    log.info("target_section_name %s",target_section_name)
-                    if target_phase_id is not None and target_section_name is not None and text_args is not None:
-                        log.info("ADDING TO %s",attribute.identifier)
-                        edit_url += f"&phase={target_phase_id}" if target_phase_id else ""
-                        edit_url += f"&section={target_section_name}" if target_section_name else ""
-                        log.info("edit_url %s",edit_url)
-                        with build_url_id_lock:
-                            text_args = {
-                                "color": "#d0c873" if empty else "#79a6b5",
-                                "url_id": doc.build_url_id(edit_url) if doc_type == 'docx' else edit_url,
-                            }
-                        log.info("text_args %s",text_args)
-                        
         return (display_value, _get_raw_value(value, attribute), text_args)
 
     attribute_data = project.attribute_data
