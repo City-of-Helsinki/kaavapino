@@ -123,7 +123,6 @@ def get_attribute_subtitle(target_identifier, target_phase_id, project):
 def get_closest_phase(project, identifier, parent_identifier=None):
     if parent_identifier == "vastuuhenkilo_nimi":
         parent_identifier = "vastuuhenkilo_nimi_readonly"
-        
     phases = ProjectPhase.objects.filter(
         sections__attributes__identifier=identifier,
         project_subtype=project.subtype,
