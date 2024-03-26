@@ -168,11 +168,12 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                               color=color
                               )
                 continue
-            _color = None if not preview else color if color else attributes.get("color", None)
+            
+            _color = get_color(preview,color,attributes)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
-            _sub = True if _script == "sub" else False
-            _super = True if _script == "super" else False
+            _sub = get_sub(_script)
+            _super = get_super(_script)
             _bold = attributes.get("bold", False)
             _italic = attributes.get("italic", False)
             _underline = attributes.get("underline", False)
@@ -197,7 +198,23 @@ def get_rich_text_display_value(value, preview=False, **text_args):
 
     return rich_text
 
-
+def get_color(preview,color,attributes):
+    if not preview:
+        return None
+    elif color:
+        return color
+    else:
+        return attributes.get("color", None)
+def get_sub(_script):
+    if _script == "sub":
+        return True
+    else:
+        return False
+def get_super(_script):
+    if _script == "super":
+        return True
+    else:
+        return False
 def render_template(project, document_template, preview):
     doc_type = get_file_type(document_template.file.path)
 
