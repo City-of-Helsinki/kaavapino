@@ -140,7 +140,7 @@ def get_closest_phase(project, identifier, parent_identifier=None):
     return phase or phases.reverse().first()
 
 
-def get_rich_text_display_value(value, **text_args):
+def get_rich_text_display_value(value, preview=False, **text_args):
     if not value:
         return RichText("Tieto puuttuu", **text_args)
 
@@ -168,8 +168,11 @@ def get_rich_text_display_value(value, **text_args):
                               color=color
                               )
                 continue
-
-            _color = color if color else attributes.get("color", None)
+            if preview:
+                _color = color if color else attributes.get("color", None)
+            else:
+                #Color is not used in the final document
+                _color = None
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
             _sub = True if _script == "sub" else False
@@ -334,7 +337,7 @@ def render_template(project, document_template, preview):
 
             if doc_type == 'docx':
                 if attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-                    display_value = get_rich_text_display_value(value, **text_args)
+                    display_value = get_rich_text_display_value(value, preview, **text_args)
                 else:
                     display_value = RichText(display_value, **text_args)
 
