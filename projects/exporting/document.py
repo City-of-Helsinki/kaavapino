@@ -140,7 +140,7 @@ def get_closest_phase(project, identifier, parent_identifier=None):
     return phase or phases.reverse().first()
 
 
-def get_rich_text_display_value(value, **text_args):
+def get_rich_text_display_value(value, preview=False, **text_args):
     if not value:
         return RichText("Tieto puuttuu", **text_args)
 
@@ -168,12 +168,11 @@ def get_rich_text_display_value(value, **text_args):
                               color=color
                               )
                 continue
-
-            _color = color if color else attributes.get("color", None)
+            _color = get_color(preview,color,attributes)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
-            _sub = True if _script == "sub" else False
-            _super = True if _script == "super" else False
+            _sub = get_sub(_script)
+            _super = get_super(_script)
             _bold = attributes.get("bold", False)
             _italic = attributes.get("italic", False)
             _underline = attributes.get("underline", False)
@@ -198,7 +197,23 @@ def get_rich_text_display_value(value, **text_args):
 
     return rich_text
 
-
+def get_color(preview,color,attributes):
+    if not preview:
+        return None
+    elif color:
+        return color
+    else:
+        return attributes.get("color", None)
+def get_sub(_script):
+    if _script == "sub":
+        return True
+    else:
+        return False
+def get_super(_script):
+    if _script == "super":
+        return True
+    else:
+        return False
 def render_template(project, document_template, preview):
     doc_type = get_file_type(document_template.file.path)
 
@@ -334,7 +349,7 @@ def render_template(project, document_template, preview):
 
             if doc_type == 'docx':
                 if attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-                    display_value = get_rich_text_display_value(value, **text_args)
+                    display_value = get_rich_text_display_value(value, preview, **text_args)
                 else:
                     display_value = RichText(display_value, **text_args)
 
