@@ -168,11 +168,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                               color=color
                               )
                 continue
-            if preview:
-                _color = color if color else attributes.get("color", None)
-            else:
-                #Color is not used in the final document
-                _color = None
+            _color = None if not preview else color if color else attributes.get("color", None)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
             _sub = True if _script == "sub" else False
