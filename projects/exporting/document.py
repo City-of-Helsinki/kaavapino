@@ -168,7 +168,6 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                               color=color
                               )
                 continue
-            
             _color = get_color(preview,color,attributes)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
