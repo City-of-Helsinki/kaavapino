@@ -131,7 +131,7 @@ def update_paikkatieto(attribute_data, use_cached=True):
             response = requests.get(
                 url,
                 headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                timeout=300
+                timeout=30
             )
             if response.status_code == 200:
                 cache.set(url, response, 86400)  # 24 hours
