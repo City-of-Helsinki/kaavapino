@@ -684,6 +684,8 @@ def set_ad_data_in_attribute_data(attribute_data):
         value = get_in_personnel_data(user_id, attr.ad_data_key, is_kaavapino_user)
 
         if value:
+            if attr.ad_data_key == "title":
+                value = value.lower()
             set_attribute_data(attribute_data, path, value)
 
 def _find_closest_path(target_path, path_behind, path_ahead):
