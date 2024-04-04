@@ -7,9 +7,10 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponse
+from django.utils import timezone
 
 from projects.exporting.report import render_report_to_response
-from projects.models import Project, Report
+from projects.models import Project, Report, DataRetentionPlan
 from projects.serializers.project import ProjectDeadlineSerializer
 from projects.helpers import set_kaavoitus_api_data_in_attribute_data
 
@@ -95,3 +96,28 @@ def cache_kaavoitus_api_data():
             logger.error(e)
 
     logger.info(f"Finished caching Kaavoitus-API data for {len(projects)} projects")
+
+
+def check_archived_projects():
+    archived_projects = Project.objects.filter(archived=True, archived_at__isnull=False)
+    logger.info(f"Checking {len(archived_projects)} archived projects")
+
+    custom_data_retention_plans = DataRetentionPlan.objects.filter(plan_type=DataRetentionPlan.TYPE_CUSTOM)
+    for project in archived_projects:
+        diff_days = (timezone.now() - project.archived_at).days
+        for data_retention_plan in custom_data_retention_plans:
+            diff = diff_days if data_retention_plan.custom_time_unit == DataRetentionPlan.UNIT_DAYS \
+                else diff_days / 30 if data_retention_plan.custom_time_unit == DataRetentionPlan.UNIT_MONTHS \
+                else diff_days / 365 if data_retention_plan.custom_time_unit == DataRetentionPlan.UNIT_YEARS \
+                else None
+
+            if diff is None:
+                logger.warning(f"Diff should not be none, data_retention_plan.custom_time_unit '{data_retention_plan.custom_time_unit}' might be invalid")
+                continue
+
+            if diff > data_retention_plan.custom_time:
+                project.clear_data_by_data_retention_plan(data_retention_plan)
+
+        if (diff_days / 365) > 5:  # Clear audit log data after 5 years has passed from archived_at
+            project.clear_audit_log_data()
+

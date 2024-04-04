@@ -51,6 +51,7 @@ from projects.models import (
     ProjectAttributeFileFieldsetPathLocation,
     OverviewFilter,
     DocumentTemplate,
+    FieldSetAttribute,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -832,12 +833,17 @@ class ProjectSerializer(serializers.ModelSerializer):
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
         project_schedule_cache = cache.get("serialized_project_schedules", {})
-        deadlines = project.deadlines.filter(deadline__subtype=project.subtype)\
+        deadlines = ProjectDeadline.objects.filter(project=project, deadline__subtype=project.subtype)\
             .select_related("deadline", "project")\
             .prefetch_related("project__subtype", "project__deadlines", "project__deadlines__deadline",
                               "project__deadlines__project", "deadline__distances_to_previous",
                               "deadline__distances_to_next", "deadline__attribute", "deadline__phase",
                               "deadline__subtype", "deadline__date_type", "deadline__phase__project_subtype")
+        if not project.create_principles:
+            deadlines = deadlines.filter(~Q(deadline__phase__common_project_phase__name="Periaatteet"))
+        if not project.create_draft:
+            deadlines = deadlines.filter(~Q(deadline__phase__common_project_phase__name="Luonnos"))
+
         schedule = project_schedule_cache.get(project.pk)
         if self.context.get('should_update_deadlines') or not schedule:
             schedule = ProjectDeadlineSerializer(
@@ -1339,10 +1345,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
 
-        if archived is not False and was_archived:
-            raise ValidationError(
-                {"phase": _("Archived projects cannot be edited")}
-            )
+        if archived is not False:
+            if was_archived:
+                raise ValidationError(
+                    {"phase": _("Archived projects cannot be edited")}
+                )
+            elif archived is True:
+                attrs["archived_at"] = timezone.now()
 
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
@@ -1440,6 +1449,26 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
+                elif attribute.value_type == Attribute.TYPE_FIELDSET and value:
+                    for index, entry in enumerate(value):
+                        if entry.get("_deleted", False) is not True:
+                            continue
+                        old_value = self.instance.attribute_data.get(attribute_identifier, None)
+                        if not old_value or not old_value[index] or old_value[index]["_deleted"]:
+                            continue
+                        fieldset_attributes = FieldSetAttribute.objects.filter(
+                            attribute_source=attribute,
+                            attribute_target__value_type=Attribute.TYPE_IMAGE
+                        )
+                        for f_attr in fieldset_attributes:
+                            fieldset_path_str = f'{attribute_identifier}[{index}].{f_attr.attribute_target.identifier}'
+                            ProjectAttributeFile.objects.filter(
+                                project=self.instance,
+                                attribute=f_attr.attribute_target,
+                                fieldset_path_str=fieldset_path_str
+                            ).update(archived_at=timezone.now())
+
+
             except Attribute.DoesNotExist:
                 pass  # Attribute not found by attribute_identifier
         attribute_data.update(tmp_attribute_data)

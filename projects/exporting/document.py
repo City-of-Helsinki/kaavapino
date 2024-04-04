@@ -102,23 +102,37 @@ def get_top_level_attribute(attribute):
         return get_top_level_attribute(attribute.fieldsets.first())
 
 
-def get_attribute_subtitle(target_identifier, target_phase_id):
+def get_attribute_subtitle(target_identifier, target_phase_id, project):
     try:
-        projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.get(
+        if target_identifier == "vastuuhenkilo_nimi":
+            target_identifier = "vastuuhenkilo_nimi_readonly"
+        projectphasesectionattribute = ProjectPhaseSectionAttribute.objects.filter(
             attribute__identifier=target_identifier,
             section__phase=target_phase_id
         )
-        return projectphasesectionattribute.section.name
+        #Could have multiple sections but we need the closest one to the current phase
+        if len(projectphasesectionattribute) > 0:
+            section = projectphasesectionattribute.filter(index__gte=project.phase.index).first()
+            return section.section.name
+        else:
+            return projectphasesectionattribute.section.name
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
 
-def get_closest_phase(project, identifier):
+def get_closest_phase(project, identifier, parent_identifier=None):
+    if parent_identifier == "vastuuhenkilo_nimi":
+        parent_identifier = "vastuuhenkilo_nimi_readonly"
     phases = ProjectPhase.objects.filter(
         sections__attributes__identifier=identifier,
         project_subtype=project.subtype,
     ).order_by("index")
-
+    #If not found in the current identifier, check the parent
+    if not phases and parent_identifier is not None:
+        phases = ProjectPhase.objects.filter(
+            sections__attributes__identifier=parent_identifier,
+            project_subtype=project.subtype,
+        ).order_by("index")
     # Returning the closest open phase if found,
     # otherwise return the last phase when the attribute
     # was editable
@@ -126,7 +140,7 @@ def get_closest_phase(project, identifier):
     return phase or phases.reverse().first()
 
 
-def get_rich_text_display_value(value, **text_args):
+def get_rich_text_display_value(value, preview=False, **text_args):
     if not value:
         return RichText("Tieto puuttuu", **text_args)
 
@@ -154,12 +168,11 @@ def get_rich_text_display_value(value, **text_args):
                               color=color
                               )
                 continue
-
-            _color = color if color else attributes.get("color", None)
+            _color = get_color(preview,color,attributes)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
-            _sub = True if _script == "sub" else False
-            _super = True if _script == "super" else False
+            _sub = get_sub(_script)
+            _super = get_super(_script)
             _bold = attributes.get("bold", False)
             _italic = attributes.get("italic", False)
             _underline = attributes.get("underline", False)
@@ -184,7 +197,23 @@ def get_rich_text_display_value(value, **text_args):
 
     return rich_text
 
-
+def get_color(preview,color,attributes):
+    if not preview:
+        return None
+    elif color:
+        return color
+    else:
+        return attributes.get("color", None)
+def get_sub(_script):
+    if _script == "sub":
+        return True
+    else:
+        return False
+def get_super(_script):
+    if _script == "super":
+        return True
+    else:
+        return False
 def render_template(project, document_template, preview):
     doc_type = get_file_type(document_template.file.path)
 
@@ -284,8 +313,8 @@ def render_template(project, document_template, preview):
                 target_section_name = None
                 if target_identifier:
                     try:
-                        target_phase_id = get_closest_phase(project, attribute.identifier).id
-                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id)
+                        target_phase_id = get_closest_phase(project, attribute.identifier,target_identifier).id
+                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id, project)
                     except AttributeError:
                         pass
 
@@ -320,7 +349,7 @@ def render_template(project, document_template, preview):
 
             if doc_type == 'docx':
                 if attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-                    display_value = get_rich_text_display_value(value, **text_args)
+                    display_value = get_rich_text_display_value(value, preview, **text_args)
                 else:
                     display_value = RichText(display_value, **text_args)
 

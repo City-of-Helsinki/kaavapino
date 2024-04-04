@@ -4,6 +4,7 @@ from django.apps import apps
 from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 
 from projects.models import (
@@ -258,6 +259,8 @@ class ProjectAdmin(OSMGeoAdmin):
         return actions
 
     def save_model(self, request, obj, form, change):
+        if 'archived' in form.changed_data:
+            obj.archived_at = timezone.now() if form.cleaned_data.get('archived') is True else None
         super(ProjectAdmin, self).save_model(request, obj, form, change)
         if 'phase' in form.changed_data:
             ProjectDocumentDownloadLog.objects.filter(project=obj).update(invalidated=True)

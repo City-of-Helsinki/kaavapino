@@ -3,7 +3,9 @@ import itertools
 import logging
 
 from actstream import action
+from actstream.models import Action as ActStreamAction
 from django.conf import settings
+from django.contrib.admin.models import LogEntry
 from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
@@ -212,6 +214,11 @@ class Project(models.Model):
     )
     public = models.BooleanField(default=True)
     archived = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(
+        verbose_name=_("archived at"),
+        null=True,
+        blank=True,
+    )
     onhold = models.BooleanField(default=False)
     owner_edit_override = models.BooleanField(default=False)
 
@@ -643,6 +650,22 @@ class Project(models.Model):
                 return False
 
         return True
+
+    def clear_data_by_data_retention_plan(self, data_retention_plan):
+        updated = False
+        for attribute in Attribute.objects.filter(data_retention_plan=data_retention_plan):
+            current_value = self.attribute_data.get(attribute.identifier, None)
+            if current_value:
+                self.attribute_data[attribute.identifier] = None
+                updated = True
+        if updated:
+            log.info(f"Clearing data by data_retention_plan '{data_retention_plan}' from project '{self}'")
+            self.save()
+
+    def clear_audit_log_data(self):
+        log.info(f"Clearing audit log data from project '{self}'")
+        LogEntry.objects.filter(object_id=str(self.pk)).delete()  # Clears django-admin logs from django_admin_log table
+        ActStreamAction.objects.filter(target_object_id=str(self.pk)).delete()  # Clear audit logs from actstream_action table
 
     def save(self, *args, **kwargs):
         fieldset_attributes = {f for f in FieldSetAttribute.objects.all().select_related("attribute_source", "attribute_target")}

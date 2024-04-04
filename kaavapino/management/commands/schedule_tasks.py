@@ -43,6 +43,13 @@ class Command(BaseCommand):
                     "schedule_type": Schedule.CRON,
                     "cron": "0 4 * * *",
                 }
+            },
+            {
+                "func": "projects.tasks.check_archived_projects",
+                "defaults": {
+                    "schedule_type": Schedule.CRON,
+                    "cron": "0 2 * * *"
+                }
             }
         ]
         for schedule in schedules:

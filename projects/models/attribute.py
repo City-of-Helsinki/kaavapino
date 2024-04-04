@@ -263,6 +263,11 @@ class Attribute(models.Model):
         blank=True,
         max_length=64,
     )
+    fieldset_total = models.TextField(
+        verbose_name=_("fieldset total"),
+        null=True,
+        blank=True,
+    )
     placeholder_text = models.TextField(
         verbose_name=_("placeholder text"),
         null=True,
