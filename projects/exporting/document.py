@@ -35,7 +35,8 @@ from projects.models import ProjectDocumentDownloadLog
 log = logging.getLogger(__name__)
 
 MAX_WIDTH_MM = 170  # Max InlineImage width
-DEFAULT_IMG_DPI = (72,72) # For cases where dpi value is not available in metadata
+DEFAULT_IMG_DPI = (72, 72)  # For cases where dpi value is not available in metadata
+
 
 def _get_raw_value(value, attribute):
     if attribute.value_type == Attribute.TYPE_DATE and isinstance(value, str):
@@ -43,56 +44,15 @@ def _get_raw_value(value, attribute):
     else:
         return value
 
-# TODO: Copied from serializers/utils.py, move under helpers at some point
-def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value):
-    parent_id = path[i]["parent"].identifier
-    index = path[i]["index"]
 
-    try:
-        next_obj = parent_obj[parent_id][index]
-    except KeyError:
-        parent_obj[parent_id] = [None] * (index + 1)
-        parent_obj[parent_id][index] = {}
-        next_obj = parent_obj[parent_id][index]
-    except IndexError:
-        parent_obj[parent_id] += [None] * (index + 1 - len(parent_obj[parent_id]))
-        next_obj = parent_obj[parent_id][index]
+def _set_fieldset_path(fieldset_path, attribute_data_display, identifier, value):
+    parent = fieldset_path[0]["parent"].identifier
+    index = fieldset_path[0]["index"]
 
-
-    # TODO multi-level fieldset image uploads not needed/supported for now
-    if False and i < len(path) - 1:
-        if next_obj is None:
-            if fieldset_content:
-                parent_obj[parent_id][index] = {**fieldset_content}
-            else:
-                parent_obj[parent_id][index] = {}
-
-            next_obj = parent_obj[parent_id][index]
-
-        # TODO Handle fieldset_content within multi-level fieldsets later
-        _set_fieldset_path(
-            None,
-            path,
-            next_obj,
-            i+1,
-            identifier,
-            value
-        )
-
-    else:
-        if next_obj is None:
-            if fieldset_content:
-                parent_obj[parent_id][index] = {
-                    **fieldset_content,
-                    identifier: value,
-                }
-            else:
-                parent_obj[parent_id][index] = {identifier: value}
-        else:
-            for k, v in fieldset_content.items():
-                next_obj[k] = v
-
-            next_obj[identifier] = value
+    for idx, fieldset_item in enumerate(attribute_data_display[parent]):
+        if fieldset_item["index"] == index:
+            fieldset_item[identifier] = value
+            attribute_data_display[parent][idx] = fieldset_item
 
 
 def get_top_level_attribute(attribute):
@@ -233,7 +193,7 @@ def render_template(project, document_template, preview):
 
         if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             result = []
-            for fieldset_item in value or []:
+            for index, fieldset_item in enumerate(value) if value else []:
                 fieldset_object = {}
                 for k, v in fieldset_item.items():
                     item_attr = attributes.get(k)
@@ -249,6 +209,7 @@ def render_template(project, document_template, preview):
                         fieldset_object[f"{k}__raw"] = raw_value
 
                 if fieldset_object:
+                    fieldset_object["index"] = index
                     result.append(fieldset_object)
 
             return (result, value, element_data)
@@ -436,18 +397,9 @@ def render_template(project, document_template, preview):
                 attribute_file.attribute.identifier
             ] = display_value
         else:
-            try:
-                fieldset_content = attribute_data_display.get(
-                    attribute_file.fieldset_path[0]["parent"].identifier, []
-                )[attribute_file.fieldset_path[0]["index"]]
-            except (KeyError, IndexError, TypeError):
-                fieldset_content = {}
-
             _set_fieldset_path(
-                fieldset_content,
                 attribute_file.fieldset_path,
                 attribute_data_display,
-                0,
                 attribute_file.attribute.identifier,
                 display_value,
             )
