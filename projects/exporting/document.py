@@ -116,7 +116,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
             insert = operation.get("insert", None)
 
             if index == len(operations):
-                insert = insert.strip() if insert else None
+                insert = insert.rstrip() if insert else None
 
             if not insert:
                 continue
