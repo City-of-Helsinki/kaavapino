@@ -19,7 +19,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
-from PIL import Image as PImage
+from PIL import Image as PImage, UnidentifiedImageError
 from ..models import Attribute, ProjectPhase, ProjectAttributeFile, ProjectPhaseSectionAttribute
 from ..models.utils import create_identifier
 from projects.helpers import (
@@ -242,8 +242,8 @@ def render_template(project, document_template, preview):
                         dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
                     width_mm = int((width_px/dpi) * 25.4)
                     display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else Mm(width_mm))
-                except FileNotFoundError:
-                    log.error(f'Image not found at {value}')
+                except (FileNotFoundError, UnidentifiedImageError):
+                    log.error(f'Image not found or is corrupted at {value}')
                     display_value = None
             else:
                 display_value = value
