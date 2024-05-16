@@ -231,7 +231,7 @@ class ProjectAdmin(OSMGeoAdmin):
         "priority",
         "public",
         "archived",
-        #"archived_at",  # TODO remove after testing
+        "archived_at",  # TODO remove after testing
         "onhold",
         "owner_edit_override",
         "attribute_data",
