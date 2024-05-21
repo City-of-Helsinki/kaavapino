@@ -46,7 +46,6 @@ DEADLINE_ERROR_DATE_TYPE_MISMATCH = "virheilmoitus, jos valittu päivä ei ole o
 DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 DEADLINE_GROUP = "ryhmä"
-DEADLINE_SUBGROUP = "alaryhmä"
 
 DEADLINE_V10 = "rivi koskee versiota 1.0"
 DEADLINE_V11 = "rivi koskee versiota 1.1"
