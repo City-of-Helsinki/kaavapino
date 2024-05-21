@@ -47,7 +47,6 @@ DEADLINE_ERROR_DATE_TYPE_MISMATCH = "virheilmoitus, jos valittu päivä ei ole o
 DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 DEADLINE_GROUP = "ryhmä"
-DEADLINE_SUBGROUP = "alaryhmä"
 
 DEADLINE_GROUP = "ryhmä"
 
