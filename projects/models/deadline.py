@@ -130,6 +130,11 @@ class Deadline(models.Model):
         verbose_name=_("Use created at as value if no attribute or calculations are specified"),
         default=False,
     )
+    deadlinegroup = models.TextField(
+        verbose_name=_("deadlinegroup"),
+        null=True,
+        blank=True,
+    )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
         default=0,

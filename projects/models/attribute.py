@@ -268,6 +268,16 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    attributegroup = models.TextField(
+        verbose_name=_("attributegroup"),
+        null=True,
+        blank=True,
+    )
+    attributesubgroup = models.TextField(
+        verbose_name=_("attributesubgroup"),
+        null=True,
+        blank=True,
+    )
     placeholder_text = models.TextField(
         verbose_name=_("placeholder text"),
         null=True,

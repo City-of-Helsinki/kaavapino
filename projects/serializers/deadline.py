@@ -21,6 +21,7 @@ class DeadlineSerializer(serializers.Serializer):
     error_date_type_mismatch = serializers.CharField()
     error_min_distance_previous = serializers.CharField()
     warning_min_distance_next = serializers.CharField()
+    deadlinegroup = serializers.CharField()
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_attribute(self, deadline):

@@ -86,6 +86,8 @@ ATTRIBUTE_ERROR_TEXT = "virheteksti"
 ATTRIBUTE_FIELD_ROLE = "rooli kenen kenttä"
 ATTRIBUTE_FIELD_SUBROLE = "alirooli kenen kenttä"
 ATTRIBUTE_FIELDSET_TOTAL = "fieldsettien lukumäärä"
+ATTRIBUTE_GROUP = "ryhmä"
+ATTRIBUTE_SUBGROUP = "alaryhmä"
 # TODO: ask for a dedicated column for uniqueness at some point
 ATTRIBUTE_ERROR_UNIQUE = [
     "Virhe. Nimi on jo käytössä",
@@ -907,6 +909,8 @@ class AttributeImporter:
             data_source_key = row[self.column_index[EXT_DATA_SOURCE_KEY]]
             key_attribute_path = row[self.column_index[EXT_DATA_PARENT_KEY_ATTRIBUTE]]
             ad_data_key = row[self.column_index[EXT_DATA_AD_KEY]]
+            attributegroup = row[self.column_index[ATTRIBUTE_GROUP]]
+            attributesubgroup = row[self.column_index[ATTRIBUTE_SUBGROUP]]
 
             attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
@@ -951,7 +955,9 @@ class AttributeImporter:
                     "ad_data_key": ad_data_key,
                     "field_roles": field_roles,
                     "field_subroles": field_subroles,
-                    "fieldset_total":fieldset_total
+                    "fieldset_total":fieldset_total,
+                    "attributegroup":attributegroup,
+                    "attributesubgroup":attributesubgroup
                 },
             )
             if created:

@@ -225,6 +225,8 @@ class AttributeSchemaSerializer(serializers.Serializer):
     field_subroles = serializers.SerializerMethodField()
     categorization = serializers.SerializerMethodField()
     fieldset_total = serializers.CharField()
+    attributegroup = serializers.CharField()
+    attributesubgroup = serializers.CharField()
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
@@ -657,10 +659,28 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
         ] if project else []
 
         for sect_i, section in enumerate(deadline_sections):
+            grouped_attributes = {}
+
             for attr_i, attr in enumerate(section["attributes"]):
                 if attr["name"] in confirmed_deadlines:
                     deadline_sections[sect_i]["attributes"][attr_i]["editable"] = False
 
+                # Group attributes by 'attributegroup'
+                group = attr.get("attributegroup", "default")
+                subgroup = attr.get("attributesubgroup", None)
+                if group not in grouped_attributes:
+                    grouped_attributes[group] = {}
+
+                if subgroup:
+                    if subgroup not in grouped_attributes[group]:
+                        grouped_attributes[group][subgroup] = []
+                    grouped_attributes[group][subgroup].append(attr)
+                else:
+                    if "default" not in grouped_attributes[group]:
+                        grouped_attributes[group]["default"] = []
+                    grouped_attributes[group]["default"].append(attr)
+
+            deadline_sections[sect_i]["attributes"] = grouped_attributes
         return deadline_sections
 
     def get_sections(self, phase):
