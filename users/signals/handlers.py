@@ -2,7 +2,7 @@ import requests
 
 from django.conf import settings
 from django.contrib.auth.models import Group
-from django.db.models.signals import post_save, m2m_changed
+from django.db.models.signals import post_save, pre_save, m2m_changed
 from django.dispatch import receiver
 
 from users.models import User, GroupPrivilege
@@ -74,6 +74,20 @@ def update_user_ad_data(sender, instance, *args, **kwargs):
     if changed:
         instance.save()
 
+@receiver(pre_save, sender=User)
+def update_pre_save(sender, instance, raw, using, update_fields, *args, **kwargs):
+    try:
+        old_user = User.objects.get(first_name=instance.first_name,
+                                last_name=instance.last_name,
+                                email=instance.email,
+                                )
+        if instance.id and old_user.id != instance.id:
+            new_groups = (old_user.groups.all() |  instance.groups.all())
+            instance.groups.set(new_groups)
+            instance.additional_groups.set(old_user.additional_groups.all() | instance.additional_groups.all())
+        instance.id = old_user.id
+    except User.DoesNotExist:
+            pass  # Old user not found
 
 @receiver(m2m_changed, sender=User.additional_groups.through)
 def handle_additional_groups(sender, instance, action, pk_set, **kwargs):
