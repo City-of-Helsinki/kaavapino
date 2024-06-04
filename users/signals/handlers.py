@@ -75,7 +75,7 @@ def update_user_ad_data(sender, instance, *args, **kwargs):
         instance.save()
 
 @receiver(pre_save, sender=User)
-def update_pre_save(sender, instance, raw, using, update_fields, *args, **kwargs):
+def update_existing_user(sender, instance, raw, using, update_fields, *args, **kwargs):
     try:
         old_user = User.objects.get(first_name=instance.first_name,
                                 last_name=instance.last_name,

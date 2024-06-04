@@ -35,7 +35,7 @@ readme = ["README", "LICENSE"]
 python = ">=3.9.0,<3.11"
 Django = "~3.2"
 djangorestframework = "3.13.1"
-django-helusers = "0.8.1"
+django-helusers = "0.9.0"
 django-environ = "0.10.0"
 drf-extensions = "0.7.1"
 drf-oidc-auth = "0.10.0"
