@@ -29,3 +29,15 @@ class DeadlineSerializer(serializers.Serializer):
             return deadline.attribute.identifier
         else:
             return None
+
+
+class DateTypeSerializer(serializers.Serializer):
+    identifier = serializers.CharField()
+    name = serializers.CharField()
+    dates = serializers.ListField(
+        child=serializers.DateField(), allow_null=False, allow_empty=False
+    )
+
+
+class DeadlineValidDateSerializer(serializers.Serializer):
+    date_types = serializers.ListField(child=DateTypeSerializer(), allow_null=False, allow_empty=False)

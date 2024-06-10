@@ -55,6 +55,7 @@ from projects.models import (
     OverviewFilter,
     OverviewFilterAttribute,
     ProjectPriority,
+    DateType,
 )
 from projects.models.attribute import AttributeLock
 from projects.models.utils import create_identifier
@@ -103,7 +104,7 @@ from projects.serializers.projecttype import (
     ProjectSubtypeSerializer,
 )
 from projects.serializers.report import ReportSerializer
-from projects.serializers.deadline import DeadlineSerializer
+from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
@@ -1567,3 +1568,36 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
             filters["phase__project_subtype__id"] = subtype
 
         return Deadline.objects.filter(**filters)
+
+    @extend_schema(
+        responses={
+            200: DeadlineValidDateSerializer,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[],
+        url_path="date_types",
+        url_name="date_types"
+    )
+    def date_types(self, request):
+        serialized_date_types = cache.get("serialized_date_types", [])
+        if not serialized_date_types:
+            current_year = datetime.now().year
+            for date_type in DateType.objects.all():
+                serialized_date_types.append(
+                    {
+                        "identifier": date_type.identifier,
+                        "name": date_type.name,
+                        "dates": date_type.get_dates_between(current_year, current_year + 10)
+                    }
+                )
+            cache.set("serialized_date_types", serialized_date_types, 60 * 60 * 24)
+
+        return Response(
+            DeadlineValidDateSerializer(
+                {"date_types": serialized_date_types}
+            ).data, status=status.HTTP_200_OK
+        )

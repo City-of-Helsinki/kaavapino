@@ -374,6 +374,12 @@ class DateType(models.Model):
             if cal.is_working_day(date)
         ]
 
+    def get_dates_between(self, from_year, to_year):
+        dates = []
+        for year in range(from_year, to_year):
+            dates += self.get_dates(year)
+        return dates
+
     def get_dates(self, year):
         listed_dates = self.dates or []
         base_dates = []
