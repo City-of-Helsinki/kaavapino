@@ -79,6 +79,7 @@ def update_existing_user(sender, instance, raw, using, update_fields, *args, **k
     old_users = User.objects.filter(first_name=instance.first_name,
                             last_name=instance.last_name,
                             email=instance.email,
+                            username__startswith="u-"
                             )
     if not old_users:
         return
