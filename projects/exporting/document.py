@@ -247,7 +247,7 @@ def render_template(project, document_template, preview):
                         log.error(f'Image not found or is corrupted at {value}')
                         display_value = None
                 else:
-                    display_value = InlineImage(doc, value, width=Mm(210), height=Mm(170))
+                    display_value = InlineImage(doc, value, width=Mm(212), height=Mm(172))
             else:
                 display_value = value
         else:
