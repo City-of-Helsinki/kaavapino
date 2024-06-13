@@ -40,4 +40,4 @@ class DateTypeSerializer(serializers.Serializer):
 
 
 class DeadlineValidDateSerializer(serializers.Serializer):
-    date_types = serializers.ListField(child=DateTypeSerializer(), allow_null=False, allow_empty=False)
+    date_types = serializers.DictField(child=DateTypeSerializer(), allow_null=False, allow_empty=False)

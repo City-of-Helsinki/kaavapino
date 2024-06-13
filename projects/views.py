@@ -1,6 +1,6 @@
 import pytz
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import time
 import logging
 
@@ -1583,19 +1583,33 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
         url_name="date_types"
     )
     def date_types(self, request):
-        serialized_date_types = cache.get("serialized_date_types", [])
+        serialized_date_types = cache.get("serialized_date_types", {})
         if not serialized_date_types:
             current_year = datetime.now().year
             for date_type in DateType.objects.all():
-                serialized_date_types.append(
+                serialized_date_types[date_type.identifier] = \
                     {
                         "identifier": date_type.identifier,
                         "name": date_type.name,
-                        "dates": date_type.get_dates_between(current_year, current_year + 10)
+                        "dates": date_type.get_dates_between(current_year - 1, current_year + 10)
                     }
-                )
-            cache.set("serialized_date_types", serialized_date_types, 60 * 60 * 24)
+            dates = []
+            current_date = date(date.today().year - 1, 1, 1)
+            end_date = date(date.today().year + 10, 12, 31)
 
+            while current_date < end_date:
+                dates.append(current_date)
+                current_date += timedelta(days=1)
+
+            workdays = serialized_date_types["työpäivät"]["dates"] + serialized_date_types["arkipäivät"]["dates"]
+            disabled_dates = [d for d in dates if d not in workdays]
+            serialized_date_types["disabled_dates"] = {
+                "identifier": "disabled_dates",
+                "name": "Disabled dates",
+                "dates": disabled_dates
+            }
+
+            cache.set("serialized_date_types", serialized_date_types, 60 * 60 * 24)
         return Response(
             DeadlineValidDateSerializer(
                 {"date_types": serialized_date_types}
