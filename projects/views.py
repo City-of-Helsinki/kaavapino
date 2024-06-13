@@ -1601,7 +1601,7 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                 dates.append(current_date)
                 current_date += timedelta(days=1)
 
-            workdays = serialized_date_types["arkipäivät"]["dates"]
+            workdays = serialized_date_types["työpäivät"]["dates"] + serialized_date_types["arkipäivät"]["dates"]
             disabled_dates = [d for d in dates if d not in workdays]
             serialized_date_types["disabled_dates"] = {
                 "identifier": "disabled_dates",
