@@ -41,3 +41,12 @@ class DateTypeSerializer(serializers.Serializer):
 
 class DeadlineValidDateSerializer(serializers.Serializer):
     date_types = serializers.DictField(child=DateTypeSerializer(), allow_null=False, allow_empty=False)
+
+
+class DeadlineValidationSerializer(serializers.Serializer):
+    identifier = serializers.CharField()
+    project = serializers.CharField()
+    date = serializers.CharField()
+    error_reason = serializers.CharField()
+    suggested_date = serializers.DateField()
+    conflicting_deadline = serializers.CharField()

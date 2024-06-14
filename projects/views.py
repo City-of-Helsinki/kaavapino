@@ -104,7 +104,7 @@ from projects.serializers.projecttype import (
     ProjectSubtypeSerializer,
 )
 from projects.serializers.report import ReportSerializer
-from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer
+from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer, DeadlineValidationSerializer
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
@@ -1615,3 +1615,103 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                 {"date_types": serialized_date_types}
             ).data, status=status.HTTP_200_OK
         )
+
+    @extend_schema(
+        responses={
+            200: DeadlineValidationSerializer,
+            400: OpenApiTypes.STR,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="validate",
+        url_name="validate"
+    )
+    def validate(self, request):
+        identifier = request.query_params.get("identifier", None)
+        project_name = request.query_params.get("project", None)
+        date_str = request.query_params.get("date", None)
+
+        if not identifier or not project_name or not date_str:
+            return HttpResponse("Error, missing parameters", status=status.HTTP_400_BAD_REQUEST)
+
+        def get_serializer_data(error_reason=None, suggested_date=None, conflicting_deadline=None):
+            return {
+                "identifier": identifier,
+                "project": project_name,
+                "date": date_str,
+                "error_reason": error_reason,
+                "suggested_date": suggested_date if error_reason else None,
+                "conflicting_deadline": conflicting_deadline.deadline.attribute.identifier if conflicting_deadline else None
+            }
+
+        try:
+            attribute = Attribute.objects.get(identifier=identifier)
+            project = Project.objects.get(name=project_name)
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+            def validate_date(date, initial_error_reason=None):
+                for attr_dl in attribute.deadline.filter(subtype=project.subtype):
+                    try:
+                        assert attr_dl.date_type.is_valid_date(date)
+                    except AttributeError:
+                        pass
+                    except AssertionError:
+                        valid_date = attr_dl.date_type.get_closest_valid_date(date)
+                        return validate_date(valid_date, initial_error_reason="invalid_date")
+
+                    for distance in attr_dl.distances_to_previous.all():
+                        try:
+                            prev_dl = project.deadlines.get(deadline=distance.previous_deadline)
+                            if distance.date_type:
+                                first_valid_day = distance.date_type.valid_days_from(
+                                    prev_dl.date,
+                                    distance.distance_from_previous
+                                )
+                                valid_date = attr_dl.date_type.get_closest_valid_date(first_valid_day) if attr_dl.date_type else first_valid_day
+                                if valid_date > date:
+                                    return Response(
+                                        DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_previous", valid_date, prev_dl)).data,
+                                        status=status.HTTP_200_OK
+                                    )
+                            elif prev_dl.date + timedelta(days=distance.distance_from_previous) > date:
+                                valid_date = prev_dl.date + timedelta(days=distance.distance_from_previous)
+                                return Response(
+                                    DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_previous", valid_date, prev_dl)).data,
+                                    status=status.HTTP_200_OK
+                                )
+                        except ProjectDeadline.DoesNotExist:
+                            pass
+
+                    for distance in attr_dl.distances_to_next.all():
+                        try:
+                            next_dl = project.deadlines.get(deadline=distance.deadline)
+                            if distance.date_type:
+                                first_valid_day = distance.date_type.valid_days_from(
+                                    next_dl.date,
+                                    -distance.distance_from_previous
+                                )
+                                valid_date = attr_dl.date_type.get_closest_valid_date(first_valid_day) if attr_dl.date_type else first_valid_day
+                                if valid_date < date:
+                                    return Response(
+                                        DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_next", valid_date, next_dl)).data,
+                                        status=status.HTTP_200_OK
+                                    )
+                            elif next_dl.date - timedelta(days=distance.distance_from_previous) < date:
+                                valid_date = next_dl.date - timedelta(days=distance.distance_from_previous)
+                                return Response(
+                                    DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_next", valid_date, next_dl)).data,
+                                    status=status.HTTP_200_OK
+                                )
+                        except ProjectDeadline.DoesNotExist:
+                            pass
+
+                return Response(DeadlineValidationSerializer(get_serializer_data(initial_error_reason, date)).data, status=status.HTTP_200_OK)
+
+            return validate_date(date)
+        except Exception as exc:
+            log.error("Error", exc)
+            return HttpResponse("Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
