@@ -1645,7 +1645,8 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                 "date": date_str,
                 "error_reason": error_reason,
                 "suggested_date": suggested_date if error_reason else None,
-                "conflicting_deadline": conflicting_deadline.deadline.attribute.identifier if conflicting_deadline else None
+                "conflicting_deadline": conflicting_deadline.deadline.attribute.identifier if conflicting_deadline and conflicting_deadline.deadline.attribute else None,
+                "conflicting_deadline_abbreviation": conflicting_deadline.deadline.abbreviation if conflicting_deadline else None
             }
 
         try:

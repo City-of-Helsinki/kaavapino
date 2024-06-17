@@ -50,3 +50,4 @@ class DeadlineValidationSerializer(serializers.Serializer):
     error_reason = serializers.CharField()
     suggested_date = serializers.DateField()
     conflicting_deadline = serializers.CharField()
+    conflicting_deadline_abbreviation = serializers.CharField()
