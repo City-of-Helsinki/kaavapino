@@ -434,6 +434,7 @@ VALUE_TYPES = {
     "Vuosiluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
     "Kokonaisluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
     "muotoilematon tekstikenttä": Attribute.TYPE_SHORT_STRING,
+    "Painike.": Attribute.TYPE_BOOLEAN,
 }
 
 DISPLAY_TYPES = {
