@@ -699,11 +699,15 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
                 if subgroup:
                     if subgroup not in grouped_attributes[group]:
                         grouped_attributes[group][subgroup] = []
-                    grouped_attributes[group][subgroup].append(attr)
+                    # Check if attr does not exist already before appending
+                    if attr not in grouped_attributes[group][subgroup]:
+                        grouped_attributes[group][subgroup].append(attr)
                 else:
                     if "default" not in grouped_attributes[group]:
                         grouped_attributes[group]["default"] = []
-                    grouped_attributes[group]["default"].append(attr)
+                    # Check if attr does not exist already before appending
+                    if attr not in grouped_attributes[group]["default"]:
+                        grouped_attributes[group]["default"].append(attr)
 
             deadline_sections[sect_i]["attributes"] = grouped_attributes
         return deadline_sections
