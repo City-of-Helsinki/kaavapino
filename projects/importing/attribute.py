@@ -96,7 +96,6 @@ ATTRIBUTE_ERROR_UNIQUE = [
 ATTRIBUTE_AUTO_VALUE_KEY_FIELD = "yhteystietojen automaattisen täytön lähdekenttä"
 ATTRIBUTE_AUTO_VALUE_MAPPING = "yhteystietojen automaattisen täytön avain-arvoparit"
 
-ATTRIBUTE_V10 = "rivi koskee versiota 1.0"
 ATTRIBUTE_V11 = "rivi koskee versiota 1.1"
 
 # Attribute object mappings for static Project fields
@@ -605,13 +604,9 @@ class AttributeImporter:
         name = row[self.column_index[ATTRIBUTE_NAME]]
         attr_type = row[self.column_index[ATTRIBUTE_TYPE]]
 
-        v10 = row[self.column_index[ATTRIBUTE_V10]]
         v11 = row[self.column_index[ATTRIBUTE_V11]]
 
-        if self.options.get("kv") == "1.0" and v10 == "ei":
-            return False
-
-        if self.options.get("kv") == "1.1" and v11 == "ei":
+        if self.options.get("kv") == "1.0" and v11 == "kyllä":
             return False
 
         if name and attr_type:
