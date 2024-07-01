@@ -609,6 +609,9 @@ class AttributeImporter:
         if self.options.get("kv") == "1.0" and v11 == "kyllä":
             return False
 
+        if self.options.get("kv") == "1.1" and v11 == "ei":
+            return False
+
         if name and attr_type:
             return True
 

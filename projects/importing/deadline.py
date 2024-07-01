@@ -140,6 +140,9 @@ class DeadlineImporter:
         if self.options.get("kv") == "1.0" and v11 == "kyllä":
             return False
 
+        if self.options.get("kv") == "1.1" and v11 == "ei":
+            return False
+
         """Check if the row has all required data."""
         try:
             assert(row[self.column_index[DEADLINE_ABBREVIATION]])
