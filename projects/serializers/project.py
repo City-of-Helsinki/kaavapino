@@ -1468,6 +1468,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                                 fieldset_path_str=fieldset_path_str
                             ).update(archived_at=timezone.now())
 
+                if value is None:
+                    try:
+                        deadline = Deadline.objects.get(attribute=attribute, subtype=self.instance.subtype)
+                        ProjectDeadline.objects.get(deadline=deadline, project=self.instance).delete()
+                    except Exception:
+                        pass
+
+
 
             except Attribute.DoesNotExist:
                 pass  # Attribute not found by attribute_identifier
