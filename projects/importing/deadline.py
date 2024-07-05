@@ -46,6 +46,7 @@ DEADLINE_ERROR_DATE_TYPE_MISMATCH = "virheilmoitus, jos valittu päivä ei ole o
 DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 
+DEADLINE_V11 = "rivi koskee versiota 1.1"
 
 # Date type row indices
 DATETYPE_NAME_INDEX = 0
@@ -133,6 +134,14 @@ class DeadlineImporter:
                 self.column_index[column.lower()] = index
 
     def _check_if_row_valid(self, row: Sequence) -> bool:
+        v11 = row[self.column_index[DEADLINE_V11]]
+
+        if self.options.get("kv") == "1.0" and v11 == "kyllä":
+            return False
+
+        if self.options.get("kv") == "1.1" and v11 == "ei":
+            return False
+
         """Check if the row has all required data."""
         try:
             assert(row[self.column_index[DEADLINE_ABBREVIATION]])

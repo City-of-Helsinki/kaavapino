@@ -11,6 +11,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("filename", type=str)
+        parser.add_argument("--kv", nargs="?", default="1.1", type=str)
 
     def handle(self, *args, **options):
         attribute_importer = DeadlineImporter(options)
