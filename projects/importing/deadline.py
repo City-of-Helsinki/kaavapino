@@ -175,6 +175,14 @@ class DeadlineImporter:
                 "business_days_only": True,
             },
         )
+        DateType.objects.update_or_create(
+            name="Lomapäivät",
+            identifier="lomapäivät",
+            defaults={
+                "exclude_selected": False,
+                "business_days_only": False,
+            }
+        )
 
     def _create_datetypes(self, datetype_rows):
         def create_automatic_date(date_string):
