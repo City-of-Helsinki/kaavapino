@@ -176,6 +176,7 @@ class DeadlineImporter:
                 "business_days_only": True,
             },
         )
+
         try:
             DateType.objects.update_or_create(
                 identifier="lomapäivät",
