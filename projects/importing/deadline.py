@@ -1,5 +1,6 @@
 import logging
 import re
+from django.db.utils import IntegrityError
 from typing import Iterable, Sequence, List
 
 from openpyxl import load_workbook
@@ -185,7 +186,6 @@ class DeadlineImporter:
                 }
             )
         except IntegrityError:
-            # Handle the error here
             with transaction.atomic():
                 date_type = DateType.objects.get(identifier="lomapäivät")
                 date_type.name = "Lomapäivät"
