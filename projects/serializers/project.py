@@ -1751,7 +1751,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def set_initial_data(self, attribute_data, validated_data):
         kokoluokka = validated_data["phase"].project_subtype.name
-
         if kokoluokka == "XL" and validated_data.get("create_draft", None) is True:
             attribute_data["kaavaluonnos_lautakuntaan_1"] = True
             attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
@@ -1846,6 +1845,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update_initial_data(self, validated_data):
         attribute_data = self.instance.attribute_data
+
         try:
             kokoluokka = validated_data["phase"].project_subtype.name
             create_draft = validated_data.get("create_draft", None)
@@ -1870,7 +1870,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
         except KeyError as exc:
             pass
-
 
     def log_updates_attribute_data(self, attribute_data, project=None, prefix=""):
         project = project or self.instance
