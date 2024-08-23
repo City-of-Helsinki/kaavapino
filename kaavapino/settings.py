@@ -249,6 +249,7 @@ OIDC_API_TOKEN_AUTH = {
     "API_SCOPE_PREFIX": env.str("TOKEN_AUTH_ACCEPTED_SCOPE_PREFIX"),
     "REQUIRE_API_SCOPE_FOR_AUTHENTICATION": env.bool("TOKEN_AUTH_REQUIRE_SCOPE_PREFIX"),
     "ISSUER": env.str("TOKEN_AUTH_AUTHSERVER_URL"),
+    "API_AUTHORIZATION_FIELD": "authorization.permissions.scopes"
 }
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
