@@ -46,6 +46,8 @@ DEADLINE_ERROR_DATE_TYPE_MISMATCH = "virheilmoitus, jos valittu päivä ei ole o
 DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 
+DEADLINE_V10 = "rivi koskee versiota 1.0"
+DEADLINE_V11 = "rivi koskee versiota 1.1"
 
 # Date type row indices
 DATETYPE_NAME_INDEX = 0
@@ -133,6 +135,15 @@ class DeadlineImporter:
                 self.column_index[column.lower()] = index
 
     def _check_if_row_valid(self, row: Sequence) -> bool:
+        v10 = row[self.column_index[DEADLINE_V10]]
+        v11 = row[self.column_index[DEADLINE_V11]]
+
+        if self.options.get("kv") == "1.0" and v10 == "ei":
+            return False
+
+        if self.options.get("kv") == "1.1" and v11 == "ei":
+            return False
+
         """Check if the row has all required data."""
         try:
             assert(row[self.column_index[DEADLINE_ABBREVIATION]])
@@ -453,6 +464,42 @@ class DeadlineImporter:
     def _create_deadline_relations(self, subtype, rows):
         logger.info(f"Updating deadline relations for {subtype}")
 
+        def get_attribute_conditions(cond):
+            condition_attributes = []
+            not_condition_attributes = []
+
+            if not cond:
+                return condition_attributes, not_condition_attributes
+
+            if " and " in cond:
+                for c in cond.split("and"):
+                    res = get_attribute_conditions(c)
+                    condition_attributes.extend(res[0])
+                    not_condition_attributes.extend(res[1])
+            else:
+                cond = cond.strip()
+                negate = False
+
+                if cond[0] == "!":
+                    negate = True
+                    cond = cond[1:]
+
+                try:
+                    attribute = Attribute.objects.get(identifier=cond)
+
+                    if negate:
+                        not_condition_attributes.append(attribute)
+                    else:
+                        condition_attributes.append(attribute)
+
+                except Attribute.DoesNotExist:
+                    logger.warning(
+                        f"Ignored an invalid attribute identifier {cond} for calculating deadline {abbreviation}."
+                    )
+
+            return condition_attributes, not_condition_attributes
+
+
         def parse_and_create_calculations(calc_string, calc_datetype):
             abbreviation_regex = r"([A-Z]+[0-9]+\.?[0-9]*)\s*[+|-]*\s*[0-9]*"
             constant_regex = r"[+|-]\s*([0-9]*)"
@@ -492,27 +539,7 @@ class DeadlineImporter:
 
                 # Other valid conditions are saved as Attribute relations later
                 for cond in attribute_conds:
-                    negate = False
-
-                    if cond == "":
-                        continue
-
-                    if cond[0] == "!":
-                        negate = True
-                        cond = cond[1:]
-
-                    try:
-                        attribute = Attribute.objects.get(identifier=cond)
-
-                        if negate:
-                           not_condition_attributes.append(attribute)
-                        else:
-                           condition_attributes.append(attribute)
-
-                    except Attribute.DoesNotExist:
-                        logger.warning(
-                            f"Ignored an invalid attribute identifier {cond} for calculating deadline {abbreviation}."
-                        )
+                    condition_attributes, not_condition_attributes = get_attribute_conditions(cond)
 
                 try:
                     constant = int(re.findall(constant_regex, calc)[0])
