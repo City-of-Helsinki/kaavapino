@@ -94,6 +94,9 @@ ATTRIBUTE_ERROR_UNIQUE = [
 ATTRIBUTE_AUTO_VALUE_KEY_FIELD = "yhteystietojen automaattisen täytön lähdekenttä"
 ATTRIBUTE_AUTO_VALUE_MAPPING = "yhteystietojen automaattisen täytön avain-arvoparit"
 
+ATTRIBUTE_V10 = "rivi koskee versiota 1.0"
+ATTRIBUTE_V11 = "rivi koskee versiota 1.1"
+
 # Attribute object mappings for static Project fields
 STATIC_ATTRIBUTES_MAPPING = {
      "vastuuhenkilo_nimi": "user",
@@ -434,6 +437,7 @@ VALUE_TYPES = {
     "Vuosiluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
     "Kokonaisluku ilman tuhaterotinta": Attribute.TYPE_INTEGER,
     "muotoilematon tekstikenttä": Attribute.TYPE_SHORT_STRING,
+    "Painike.": Attribute.TYPE_BOOLEAN,
 }
 
 DISPLAY_TYPES = {
@@ -598,6 +602,15 @@ class AttributeImporter:
         """
         name = row[self.column_index[ATTRIBUTE_NAME]]
         attr_type = row[self.column_index[ATTRIBUTE_TYPE]]
+
+        v10 = row[self.column_index[ATTRIBUTE_V10]]
+        v11 = row[self.column_index[ATTRIBUTE_V11]]
+
+        if self.options.get("kv") == "1.0" and v10 == "ei":
+            return False
+
+        if self.options.get("kv") == "1.1" and v11 == "ei":
+            return False
 
         if name and attr_type:
             return True
@@ -991,7 +1004,8 @@ class AttributeImporter:
             attr.ad_key_attribute = None
             attr.save()
 
-        AttributeAutoValue.objects.all().delete()
+        all_auto_attrs = [attr.id for attr in AttributeAutoValue.objects.all()]
+        all_auto_attr_mappings = [attr.id for attr in AttributeAutoValueMapping.objects.all()]
 
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
@@ -1031,10 +1045,13 @@ class AttributeImporter:
                 auto_value_key_attr = Attribute.objects.get(
                     identifier=auto_value_key_identifier,
                 )
-                auto_attr = AttributeAutoValue.objects.create(
+                auto_attr, created = AttributeAutoValue.objects.get_or_create(
                     value_attribute = attr,
                     key_attribute = auto_value_key_attr,
                 )
+                if auto_attr.id in all_auto_attrs:
+                    all_auto_attrs.remove(auto_attr.id)
+
                 for (key, value) in auto_value_mapping.items():
                     if auto_attr.key_attribute.value_choices.count():
                         try:
@@ -1043,15 +1060,20 @@ class AttributeImporter:
                         except AttributeValueChoice.DoesNotExist:
                             pass
 
-                    AttributeAutoValueMapping.objects.create(
+                    auto_attr_mapping, created = AttributeAutoValueMapping.objects.get_or_create(
                         auto_attr=auto_attr,
                         key_str=key,
-                        value_str=value,
+                        defaults={'value_str': value},
                     )
+                    if auto_attr_mapping.id in all_auto_attr_mappings:
+                        all_auto_attr_mappings.remove(auto_attr_mapping.id)
             except Attribute.DoesNotExist:
                 pass
 
             attr.save()
+
+        AttributeAutoValueMapping.objects.filter(id__in=all_auto_attr_mappings).delete()
+        AttributeAutoValue.objects.filter(id__in=all_auto_attrs).delete()
 
     def _get_generated_calculations(self, row):
         calculations_string = row[self.column_index[CALCULATIONS_COLUMN]]

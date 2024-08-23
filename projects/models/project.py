@@ -1186,7 +1186,7 @@ class ProjectAttributeFile(models.Model):
             image = Image.open(self.file.path)
             image = ImageOps.exif_transpose(image)
             exif = image.getexif()
-            image.thumbnail(paper_size_in_pixels, Image.ANTIALIAS)
+            image.thumbnail(paper_size_in_pixels, Image.Resampling.LANCZOS)
             if image.format == 'JPEG':
                 image.save(self.file.path, quality=100, optimize=True, exif=exif)
             else:

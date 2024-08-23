@@ -49,6 +49,9 @@ def _set_fieldset_path(fieldset_path, attribute_data_display, identifier, value)
     parent = fieldset_path[0]["parent"].identifier
     index = fieldset_path[0]["index"]
 
+    if index not in [item["index"] for item in attribute_data_display[parent]]:
+        attribute_data_display[parent].append({'index':index})
+
     for idx, fieldset_item in enumerate(attribute_data_display[parent]):
         if fieldset_item["index"] == index:
             fieldset_item[identifier] = value
