@@ -714,7 +714,7 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
         grouped_sections = [
             ProjectPhaseDeadlineSectionSerializer(
                 section,
-                context={"privilege": privilege, "owner": owner},
+                context={"privilege": privilege, "owner": owner, "project": project},
             ).data
             for section in phase.deadline_sections.all()
         ]
