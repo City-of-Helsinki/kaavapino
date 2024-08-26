@@ -76,20 +76,17 @@ def update_user_ad_data(sender, instance, *args, **kwargs):
 
 @receiver(pre_save, sender=User)
 def update_existing_user(sender, instance, raw, using, update_fields, *args, **kwargs):
+    old_users = []
     try:
         if not instance.username.startswith('u-'):
             old_users = User.objects.filter(username=instance.username)
     except AttributeError:
         pass
     if not old_users:
-        old_users = User.objects.filter(first_name=instance.first_name,
-                                last_name=instance.last_name,
-                                email=instance.email,
-                                username__startswith="u-"
-                                )
+        old_users = User.objects.filter(email=instance.email, username__startswith="u-")
     if not old_users:
         return
-    old_user = old_users[0]
+    old_user = next((user for user in old_users if user.id == instance.id), old_users[0])
     if old_user and instance.id and old_user.id != instance.id:
         instance.groups.set(old_user.groups.all() |  instance.groups.all())
         instance.additional_groups.set(old_user.additional_groups.all() | instance.additional_groups.all())
