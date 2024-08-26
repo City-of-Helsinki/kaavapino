@@ -1751,6 +1751,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def set_initial_data(self, attribute_data, validated_data):
         kokoluokka = validated_data["phase"].project_subtype.name
+
         if kokoluokka == "XL" and validated_data.get("create_draft", None) is True:
             attribute_data["kaavaluonnos_lautakuntaan_1"] = True
             attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True

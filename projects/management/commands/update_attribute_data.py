@@ -45,6 +45,21 @@ class Command(BaseCommand):
                     if project.attribute_data.get(JARJESTETAAN_LUONNOS_ESILLAOLO, None) is not None:
                         project.attribute_data.pop(JARJESTETAAN_LUONNOS_ESILLAOLO, None)
                         changed = True
+                
+                if project.subtype.name == "XL" and project.attribute_data.get("periaatteet_luotu", None):
+                    if project.attribute_data.get(PERIAATTEET_LAUTAKUNTAAN, None) is None:
+                        project.attribute_data[PERIAATTEET_LAUTAKUNTAAN] = True
+                        changed = True
+                    if project.attribute_data.get(JARJESTETAAN_PERIAATTEET_ESILLAOLO, None) is None:
+                        project.attribute_data[JARJESTETAAN_PERIAATTEET_ESILLAOLO] = True
+                        changed = True
+                elif project.subtype.name != "XL" or project.attribute_data.get("periaatteet_luotu", False) is False:
+                    if project.attribute_data.get(PERIAATTEET_LAUTAKUNTAAN, None) is not None:
+                        project.attribute_data.pop(PERIAATTEET_LAUTAKUNTAAN, None)
+                        changed = True
+                    if project.attribute_data.get(JARJESTETAAN_PERIAATTEET_ESILLAOLO, None) is not None:
+                        project.attribute_data.pop(JARJESTETAAN_PERIAATTEET_ESILLAOLO, None)
+                        changed = True
 
                 if project.subtype.name == "XL" and project.attribute_data.get("periaatteet_luotu", None):
                     if project.attribute_data.get(PERIAATTEET_LAUTAKUNTAAN, None) is None:
