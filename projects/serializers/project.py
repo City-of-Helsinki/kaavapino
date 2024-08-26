@@ -1751,9 +1751,13 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def set_initial_data(self, attribute_data, validated_data):
         kokoluokka = validated_data["phase"].project_subtype.name
+
         if kokoluokka == "XL" and validated_data.get("create_draft", None) is True:
             attribute_data["kaavaluonnos_lautakuntaan_1"] = True
             attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
+        if kokoluokka == "XL" and validated_data.get("create_principles", None) is True:
+            attribute_data["periaatteet_lautakuntaan_1"] = True
+            attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
         attribute_data["kaavaprosessin_kokoluokka_readonly"] = kokoluokka
         try:
             attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
@@ -1845,6 +1849,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         try:
             kokoluokka = validated_data["phase"].project_subtype.name
             create_draft = validated_data.get("create_draft", None)
+            create_principles = validated_data.get("create_principles", None)
+
             if kokoluokka == "XL" and create_draft:
                 if attribute_data.get("kaavaluonnos_lautakuntaan_1", None) is None:
                     attribute_data["kaavaluonnos_lautakuntaan_1"] = True
@@ -1853,6 +1859,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             else:
                 attribute_data.pop("kaavaluonnos_lautakuntaan_1", None)
                 attribute_data.pop("jarjestetaan_luonnos_esillaolo_1", None)
+
+            if kokoluokka == "XL" and create_principles:
+                if attribute_data.get("periaatteet_lautakuntaan_1", None) is None:
+                    attribute_data["periaatteet_lautakuntaan_1"] = True
+                if attribute_data.get("jarjestetaan_periaatteet_esillaolo_1", None) is None:
+                    attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
+            else:
+                attribute_data.pop("periaatteet_lautakuntaan_1", None)
+                attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
         except KeyError as exc:
             pass
 

@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 KAAVALUONNOS_LAUTAKUNTAAN = "kaavaluonnos_lautakuntaan_1"
 JARJESTETAAN_LUONNOS_ESILLAOLO = "jarjestetaan_luonnos_esillaolo_1"
+PERIAATTEET_LAUTAKUNTAAN = "periaatteet_lautakuntaan_1"
+JARJESTETAAN_PERIAATTEET_ESILLAOLO = "jarjestetaan_periaatteet_esillaolo_1"
 
 class Command(BaseCommand):
     help = "Update attribute data for V1.1"
@@ -42,6 +44,21 @@ class Command(BaseCommand):
                         changed = True
                     if project.attribute_data.get(JARJESTETAAN_LUONNOS_ESILLAOLO, None) is not None:
                         project.attribute_data.pop(JARJESTETAAN_LUONNOS_ESILLAOLO, None)
+                        changed = True
+                
+                if project.subtype.name == "XL" and project.attribute_data.get("periaatteet_luotu", None):
+                    if project.attribute_data.get(PERIAATTEET_LAUTAKUNTAAN, None) is None:
+                        project.attribute_data[PERIAATTEET_LAUTAKUNTAAN] = True
+                        changed = True
+                    if project.attribute_data.get(JARJESTETAAN_PERIAATTEET_ESILLAOLO, None) is None:
+                        project.attribute_data[JARJESTETAAN_PERIAATTEET_ESILLAOLO] = True
+                        changed = True
+                elif project.subtype.name != "XL" or project.attribute_data.get("periaatteet_luotu", False) is False:
+                    if project.attribute_data.get(PERIAATTEET_LAUTAKUNTAAN, None) is not None:
+                        project.attribute_data.pop(PERIAATTEET_LAUTAKUNTAAN, None)
+                        changed = True
+                    if project.attribute_data.get(JARJESTETAAN_PERIAATTEET_ESILLAOLO, None) is not None:
+                        project.attribute_data.pop(JARJESTETAAN_PERIAATTEET_ESILLAOLO, None)
                         changed = True
 
                 if changed:
