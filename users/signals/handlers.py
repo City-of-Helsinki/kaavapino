@@ -76,14 +76,15 @@ def update_user_ad_data(sender, instance, *args, **kwargs):
 
 @receiver(pre_save, sender=User)
 def update_existing_user(sender, instance, raw, using, update_fields, *args, **kwargs):
+    # For migrating users during tunnistamo-helsinkiprofiili (keycloak) transition
     old_users = []
     try:
         if not instance.username.startswith('u-'):
             old_users = User.objects.filter(username=instance.username)
     except AttributeError:
         pass
-    if not old_users:
-        old_users = User.objects.filter(email=instance.email, username__startswith="u-")
+    if not old_users and instance.email:
+        old_users = User.objects.filter(email__iexact=instance.email, username__startswith="u-")
     if not old_users:
         return
     old_user = next((user for user in old_users if user.id == instance.id), old_users[0])
