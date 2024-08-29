@@ -688,6 +688,9 @@ class Attribute(models.Model):
             if not isinstance(value, User):
                 try:
                     user = User.objects.get(uuid=value)
+                except User.DoesNotExist:
+                    log.warning(f"User with uuid: '{value}' not found for field: '{self.identifier}'")
+                    return value
                 except ValidationError:
                     return value
             else:
