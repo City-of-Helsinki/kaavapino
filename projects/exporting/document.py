@@ -238,16 +238,19 @@ def render_template(project, document_template, preview):
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
-                try:
-                    with PImage.open(value) as img:
-                        width_px = img.width
-                        dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
-                        dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
-                    width_mm = int((width_px/dpi) * 25.4)
-                    display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else Mm(width_mm))
-                except (FileNotFoundError, UnidentifiedImageError):
-                    log.error(f'Image not found or is corrupted at {value}')
-                    display_value = None
+                if not "kansikuva" in attribute.identifier:
+                    try:
+                        with PImage.open(value) as img:
+                            width_px = img.width
+                            dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
+                            dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
+                        width_mm = int((width_px/dpi) * 25.4)
+                        display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else Mm(width_mm))
+                    except (FileNotFoundError, UnidentifiedImageError):
+                        log.error(f'Image not found or is corrupted at {value}')
+                        display_value = None
+                else:
+                    display_value = InlineImage(doc, value, width=Mm(212), height=Mm(172))
             else:
                 display_value = value
         else:
