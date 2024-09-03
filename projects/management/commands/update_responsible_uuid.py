@@ -17,11 +17,13 @@ class Command(BaseCommand):
         for project in Project.objects.all():
             user = User.objects.get(id=project.user_id)
             if str(user.uuid) != project.attribute_data['vastuuhenkilo_nimi']:
+                print(f"Project {project.id} has mismatching uuid {project.attribute_data['vastuuhenkilo_nimi']}")
+                print(f"Should be {user.uuid}")
                 if options['commit']:
                     project.attribute_data['vastuuhenkilo_nimi']=user.uuid
                     if 'vastuuhenkilo_nimi_readonly' in project.attribute_data:
                         project.attribute_data['vastuuhenkilo_nimi_readonly']=user.uuid
                     project.save()
-                print("Affected project " + str(project.id))
+                    print(f"Updated project {project.id}")
                 affected_count += 1
         print(str(affected_count) + " projects affected")
