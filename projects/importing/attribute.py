@@ -987,7 +987,7 @@ class AttributeImporter:
 
             try:
                 attr.delete()
-            except Attribute.ProtectedError as exc:
+            except ProtectedError as exc:
                 logger.warning(f"Failed to delete Attribute {attr.identifier}", exc)
                 raise exc
 
