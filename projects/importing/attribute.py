@@ -989,7 +989,11 @@ class AttributeImporter:
                 dl.attribute = None
                 dl.save()
 
-            attr.delete()
+            try:
+                attr.delete()
+            except ProtectedError as exc:
+                logger.warning(f"Failed to delete Attribute {attr.identifier}", exc)
+                raise exc
 
         return {
             "created": created_attribute_count,

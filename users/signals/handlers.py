@@ -8,6 +8,7 @@ from django.dispatch import receiver
 from users.models import User, GroupPrivilege
 from users.helpers import get_graph_api_access_token
 
+from projects.models import Project
 
 @receiver(post_save, sender=User)
 def add_admin_group_post_user_creation(sender, instance, created, *args, **kwargs):
@@ -88,10 +89,18 @@ def update_existing_user(sender, instance, raw, using, update_fields, *args, **k
     if not old_users:
         return
     old_user = next((user for user in old_users if user.id == instance.id), old_users[0])
-    if old_user and instance.id and old_user.id != instance.id:
-        instance.groups.set(old_user.groups.all() |  instance.groups.all())
-        instance.additional_groups.set(old_user.additional_groups.all() | instance.additional_groups.all())
     instance.id = old_user.id
+
+
+@receiver(post_save, sender=User)
+def update_responsible_uuid(sender, instance, *args, **kwargs):
+    projects = Project.objects.filter(user_id=instance.id)
+    for project in projects:
+        if project.attribute_data['vastuuhenkilo_nimi'] != instance.uuid:
+            project.attribute_data['vastuuhenkilo_nimi'] = instance.uuid
+            if 'vastuuhenkilo_nimi_readonly' in project.attribute_data:
+                project.attribute_data['vastuuhenkilo_nimi_readonly']=instance.uuid
+            project.save()
 
 @receiver(m2m_changed, sender=User.additional_groups.through)
 def handle_additional_groups(sender, instance, action, pk_set, **kwargs):
