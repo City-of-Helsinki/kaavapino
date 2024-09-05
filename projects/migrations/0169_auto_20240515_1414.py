@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0167_attribute_fieldset_total'),
+        ('projects', '0168_alter_attribute_help_link'),
     ]
 
     operations = [
