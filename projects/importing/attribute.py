@@ -407,6 +407,7 @@ VALUE_TYPES = {
     "automaattinen (teksti), kun projekti luodaan": Attribute.TYPE_SHORT_STRING,
     "automaattinen (teksti), kun valitaan vastuuyksikkö": Attribute.TYPE_SHORT_STRING,
     "automaattinen (teksti), tieto tulee Factasta": Attribute.TYPE_SHORT_STRING,
+    "automaattinen (teksti), tieto tulee AD:n perusteella": Attribute.TYPE_SHORT_STRING,
     "automaattinen (valinta)": Attribute.TYPE_BOOLEAN,
     "automaattinen (valinta), kun projekti luodaan": Attribute.TYPE_LONG_STRING,
     "Desimaaliluvun syöttö": Attribute.TYPE_DECIMAL,
@@ -984,6 +985,9 @@ class AttributeImporter:
             for dl in deadlines:
                 dl.attribute = None
                 dl.save()
+
+            # Remove confirmation_attribute references in deadlines for deleted attributes
+            Deadline.objects.filter(confirmation_attribute=attr).update(confirmation_attribute=None)
 
             try:
                 attr.delete()
