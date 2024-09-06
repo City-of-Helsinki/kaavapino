@@ -176,7 +176,7 @@ class Deadline(models.Model):
         else:
             return False
 
-    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}):
+    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}, raw=False):
         # TODO hard-coded, maybe change later
         if self.phase.name == "Periaatteet" and not project.create_principles:
             return None
@@ -228,14 +228,20 @@ class Deadline(models.Model):
                         condition_result = True
 
             if condition_result:
+                if raw:
+                    date_calc = calculation.datecalculation
+                    return (date_calc.base_date_deadline.attribute.identifier if date_calc.base_date_deadline.attribute else None,
+                            date_calc.base_date_deadline.abbreviation,
+                            date_calc.constant
+                            )
                 return calculation.datecalculation.calculate(project, datetype, preview_attributes)
 
-        if self.default_to_created_at:
+        if self.default_to_created_at and not raw:
             return project.created_at.date()
 
         return None
 
-    def calculate_initial(self, project, preview_attributes={}):
+    def calculate_initial(self, project, preview_attributes={}, raw=False):
         if preview_attributes:
             valid_dls = project.get_applicable_deadlines(
                 preview_attributes=preview_attributes
@@ -249,6 +255,7 @@ class Deadline(models.Model):
             self.date_type,
             valid_dls,
             preview_attributes,
+            raw,
         )
 
     def calculate_updated(self, project, preview_attributes={}):

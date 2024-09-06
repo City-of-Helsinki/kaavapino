@@ -18,6 +18,7 @@ from projects.models import (
     ProjectSubtype,
     ProjectCardSectionAttribute,
     DeadlineDistance,
+    Deadline,
 )
 from projects.models.attribute import AttributeLock, AttributeCategorization
 from projects.models.project import (
@@ -360,6 +361,7 @@ class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
     distance_from_previous = serializers.SerializerMethodField()
     next_deadline = serializers.SerializerMethodField()
     distance_to_next = serializers.SerializerMethodField()
+    initial_distance = serializers.SerializerMethodField()
 
     def get_previous_deadline(self, attribute):
         try:
@@ -404,6 +406,21 @@ class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
         except DeadlineDistance.MultipleObjectsReturned:
             log.warning(f"get_distance_to_next - DeadlineDistance returned multiple objects for attribute {attribute.identifier}")
             return None
+
+    def get_initial_distance(self, attribute):
+        try:
+            project = self.context['project']
+            deadline = Deadline.objects.get(subtype=project.subtype, attribute=attribute)
+            base_deadline, base_deadline_abbreviation, distance = deadline.calculate_initial(project, raw=True) or (None, None, None)
+            return {
+                "base_deadline": base_deadline,
+                "base_deadline_abbreviation": base_deadline_abbreviation,
+                "distance": distance
+            }
+        except (KeyError, Deadline.DoesNotExist):
+            return None
+        except Exception as exc:
+            raise exc
 
 
 class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
