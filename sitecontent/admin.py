@@ -3,9 +3,6 @@ from django.contrib import admin
 from django.contrib.admin.models import LogEntry
 from django.db.models import Q
 
-from projects.importing import attribute, deadline
-from openpyxl import load_workbook
-
 from projects.importing import AttributeImporter, AttributeImporterException, DeadlineImporter, DeadlineImporterException
 from sitecontent.models import ExcelFile
 
@@ -17,6 +14,12 @@ from sitecontent.models import (
 )
 
 from django_q.tasks import async_task
+from django.core.cache import cache
+from projects.importing import attribute, deadline
+from openpyxl import load_workbook
+
+import json
+import traceback
 
 class FooterLinkInline(SortableInlineAdminMixin, admin.TabularInline):
     model = FooterLink
@@ -75,9 +78,6 @@ class LogEntryAdmin(admin.ModelAdmin):
     def has_view_permission(self, request, obj=None):
         return request.user.has_privilege('admin')
 
-import json
-import traceback
-from django.core.cache import cache
 
 def get_importer(obj):
     options = {
