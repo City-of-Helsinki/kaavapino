@@ -1,5 +1,5 @@
 from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.models import LogEntry
 from django.db.models import Q
 
@@ -117,10 +117,12 @@ def activate_excel(obj):
 def activate(modeladmin, request, queryset):
     if queryset.count() == 1:
         object = queryset.first()
-        if object.status is ExcelFile.STATUS_ACTIVE or object.type is ExcelFile.TYPE_UNKNOWN:
+        if object.status == ExcelFile.STATUS_ACTIVE or object.type == ExcelFile.TYPE_UNKNOWN:
+            messages.add_message(request, messages.WARNING, "Unable to activate file -- File already active or invalid")
             return
 
         if ExcelFile.objects.filter(status=ExcelFile.STATUS_UPDATING).count() > 0:
+            messages.add_message(request, messages.WARNING, "Unable to activate file -- Other file already updating")
             return
 
         task_id = async_task(
@@ -128,6 +130,7 @@ def activate(modeladmin, request, queryset):
             object
         )
         object.update(status=ExcelFile.STATUS_UPDATING, error=None, task_id=task_id)
+        messages.add_message(request, messages.INFO, f"Updating {object.file.path}")
 
 @admin.register(ExcelFile)
 class ExcelFileAdmin(admin.ModelAdmin):
