@@ -366,7 +366,7 @@ class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
     def get_previous_deadline(self, attribute):
         try:
             subtype = self.context['project'].subtype
-            deadline_distance = DeadlineDistance.objects.get(deadline__subtype=subtype, deadline__attribute=attribute)
+            deadline_distance = DeadlineDistance.objects.filter(deadline__subtype=subtype, deadline__attribute=attribute).first()
             return deadline_distance.previous_deadline.attribute.identifier if deadline_distance and deadline_distance.previous_deadline and deadline_distance.previous_deadline.attribute else None
         except (KeyError, DeadlineDistance.DoesNotExist):
             return None
@@ -377,7 +377,7 @@ class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
     def get_distance_from_previous(self, attribute):
         try:
             subtype = self.context['project'].subtype
-            deadline_distance = DeadlineDistance.objects.get(deadline__subtype=subtype, deadline__attribute=attribute)
+            deadline_distance = DeadlineDistance.objects.filter(deadline__subtype=subtype, deadline__attribute=attribute).first()
             return deadline_distance.distance_from_previous if deadline_distance and deadline_distance.previous_deadline else None
         except (KeyError, DeadlineDistance.DoesNotExist):
             return None
