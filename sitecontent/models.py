@@ -1,9 +1,12 @@
 from django.db import models
-from django.urls import reverse_lazy
-from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 
 from projects.models import Attribute
+
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class FooterLink(models.Model):
@@ -75,3 +78,68 @@ class TargetFloorArea(models.Model):
     class Meta:
         verbose_name = _("Asuinkerrosalan vuositavoite")
         verbose_name_plural = _("Asuinkerrosalan vuositavoitteet")
+
+
+class ExcelFile(models.Model):
+    TYPE_ATTRIBUTES = "attributes"
+    TYPE_DEADLINES = "deadlines"
+    TYPE_UNKNOWN = "unknown"
+
+    TYPE_CHOICES = (
+        (TYPE_ATTRIBUTES, TYPE_ATTRIBUTES),
+        (TYPE_DEADLINES, TYPE_DEADLINES),
+        (TYPE_UNKNOWN, TYPE_UNKNOWN)
+    )
+
+    STATUS_INACTIVE = "inactive"
+    STATUS_UPDATING = "updating"
+    STATUS_ACTIVE = "active"
+    STATUS_ERROR = "error"
+
+    STATUS_CHOICES = (
+        (STATUS_INACTIVE, STATUS_INACTIVE),
+        (STATUS_UPDATING, STATUS_UPDATING),
+        (STATUS_ACTIVE, STATUS_ACTIVE),
+        (STATUS_ERROR, STATUS_ERROR),
+    )
+
+    file = models.FileField(
+        upload_to="excel_files/", null=False, unique=True
+    )
+    uploaded = models.DateTimeField(
+        verbose_name=_("upload date"), auto_now_add=True
+    )
+    type = models.CharField(
+        max_length=32, choices=TYPE_CHOICES, default=TYPE_UNKNOWN
+    )
+    status = models.CharField(
+        max_length=32, choices=STATUS_CHOICES, default=STATUS_INACTIVE
+    )
+    updated = models.DateTimeField(
+        verbose_name=_("update date"), null=True
+    )
+    options = models.CharField(
+        max_length=32, null=True, default='{"kv":"1.0"}'
+    )
+    task_id = models.CharField(
+        max_length=64, null=True
+    )
+    error = models.CharField(
+        max_length=2048, null=True
+    )
+
+    def set_status(self, status):
+        self.status = status
+        self.updated = timezone.now()
+
+    def set_error(self, error):
+        if error and len(error) > 2048:
+            log.warning('Error length exceeded 2048 chars, splicing error')
+            error = error[:2048]
+        self.error = error
+
+    def update(self, status=None, error=None, task_id=None):
+        self.set_status(status)
+        self.set_error(error)
+        self.task_id = task_id
+        self.save()
