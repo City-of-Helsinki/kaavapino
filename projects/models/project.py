@@ -520,6 +520,7 @@ class Project(models.Model):
                 continue
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
+            value = value if value != 'null' else None
             dl.date = value
             dl.save()
 
