@@ -293,6 +293,18 @@ class Deadline(models.Model):
         verbose_name_plural = _("deadlines")
 
 
+class DeadlineDistanceConditionAttribute(models.Model):
+    attribute = models.ForeignKey(
+        Attribute,
+        null=False,
+        on_delete=models.CASCADE
+    )
+    negate = models.BooleanField(
+        default=False,
+        null=False,
+    )
+
+
 class DeadlineDistance(models.Model):
     deadline = models.ForeignKey(
         "Deadline",
@@ -317,11 +329,15 @@ class DeadlineDistance(models.Model):
         blank=True,
         null=True,
     )
-    # Only simple boolean conditions needed for now
-    conditions = models.ManyToManyField(
-        Attribute,
-        verbose_name=_("use rule if any attribute is set"),
+    condition_operator = models.CharField(
+        max_length=3,
+        null=True,
         blank=True,
+    )
+    condition_attributes = models.ManyToManyField(
+        DeadlineDistanceConditionAttribute,
+        related_name="deadline_distances",
+        blank=True
     )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
@@ -850,7 +866,7 @@ class DateCalculationAttribute(models.Model):
     )
 
     def __str__(self):
-        return f"{'-' if self.subtract else '-'} {self.attribute}"
+        return f"{'-' if self.subtract else '+'} {self.attribute}"
 
 
 class DeadlineDateCalculation(models.Model):

@@ -93,14 +93,26 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         ).data
 
     def _resolve_distance_conditions(self, distance, project):
-        if distance.conditions.count() == 0:
+        if not distance.condition_attributes:
             return True
 
-        for attribute in distance.conditions.all():
-            if project.attribute_data.get(attribute.identifier):
-                return True
+        condition_attributes = distance.condition_attributes.all()
+        operator = distance.condition_operator
 
-        return False
+        for distance_condition_attribute in condition_attributes:
+            attribute = distance_condition_attribute.attribute
+            negate = distance_condition_attribute.negate
+
+            res = project.attribute_data.get(attribute.identifier, None)
+            check_condition_result = True if res and not negate else True if not res and negate else False
+            if operator == 'and' and not check_condition_result:
+                return False
+            elif operator == 'or' and check_condition_result:
+                return True
+            else:
+                return check_condition_result
+
+        return True if operator == 'and' else False
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_under_min_distance_next(self, projectdeadline):
