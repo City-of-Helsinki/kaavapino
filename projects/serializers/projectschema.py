@@ -374,7 +374,6 @@ class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
 
     def get_date_type(self, attribute):
         deadline_distance = self._get_previous_deadline_distance(attribute)
-        print(f'date_type is : {deadline_distance.date_type.identifier if deadline_distance and deadline_distance.date_type else None}')
         return deadline_distance.date_type.identifier if deadline_distance and deadline_distance.date_type else None
 
     def get_previous_deadline(self, attribute):
