@@ -109,7 +109,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
                 return False
             elif operator == 'or' and check_condition_result:
                 return True
-            else:
+            elif len(condition_attributes) == 1:
                 return check_condition_result
 
         return True if operator == 'and' else False
