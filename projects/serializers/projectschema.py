@@ -357,55 +357,41 @@ class AttributeSchemaSerializer(serializers.Serializer):
 
 
 class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
+    date_type = serializers.SerializerMethodField()
     previous_deadline = serializers.SerializerMethodField()
     distance_from_previous = serializers.SerializerMethodField()
     next_deadline = serializers.SerializerMethodField()
     distance_to_next = serializers.SerializerMethodField()
     initial_distance = serializers.SerializerMethodField()
 
+    def _get_previous_deadline_distance(self, attribute):
+        subtype = self.context['project'].subtype
+        return DeadlineDistance.objects.filter(deadline__subtype=subtype, deadline__attribute=attribute).first()
+
+    def _get_next_deadline_distance(self, attribute):
+        subtype = self.context['project'].subtype
+        return DeadlineDistance.objects.filter(deadline__subtype=subtype, previous_deadline__attribute=attribute).first()
+
+    def get_date_type(self, attribute):
+        deadline_distance = self._get_previous_deadline_distance(attribute)
+        print(f'date_type is : {deadline_distance.date_type.identifier if deadline_distance and deadline_distance.date_type else None}')
+        return deadline_distance.date_type.identifier if deadline_distance and deadline_distance.date_type else None
+
     def get_previous_deadline(self, attribute):
-        try:
-            subtype = self.context['project'].subtype
-            deadline_distance = DeadlineDistance.objects.filter(deadline__subtype=subtype, deadline__attribute=attribute).first()
-            return deadline_distance.previous_deadline.attribute.identifier if deadline_distance and deadline_distance.previous_deadline and deadline_distance.previous_deadline.attribute else None
-        except (KeyError, DeadlineDistance.DoesNotExist):
-            return None
-        except DeadlineDistance.MultipleObjectsReturned:
-            log.warning(f"get_previous_deadline - DeadlineDistance returned multiple objects for attribute {attribute.identifier}")
-            return None
+        deadline_distance = self._get_previous_deadline_distance(attribute)
+        return deadline_distance.previous_deadline.attribute.identifier if deadline_distance and deadline_distance.previous_deadline and deadline_distance.previous_deadline.attribute else None
 
     def get_distance_from_previous(self, attribute):
-        try:
-            subtype = self.context['project'].subtype
-            deadline_distance = DeadlineDistance.objects.filter(deadline__subtype=subtype, deadline__attribute=attribute).first()
-            return deadline_distance.distance_from_previous if deadline_distance and deadline_distance.previous_deadline else None
-        except (KeyError, DeadlineDistance.DoesNotExist):
-            return None
-        except DeadlineDistance.MultipleObjectsReturned:
-            log.warning(f"get_distance_from_previous - DeadlineDistance returned multiple objects for attribute {attribute.identifier}")
-            return None
+        deadline_distance = self._get_previous_deadline_distance(attribute)
+        return deadline_distance.distance_from_previous if deadline_distance and deadline_distance.previous_deadline else None
 
     def get_next_deadline(self, attribute):
-        try:
-            subtype = self.context['project'].subtype
-            deadline_distance = DeadlineDistance.objects.get(deadline__subtype=subtype, previous_deadline__attribute=attribute)
-            return deadline_distance.deadline.attribute.identifier if deadline_distance and deadline_distance.deadline and deadline_distance.deadline.attribute else None
-        except (KeyError, DeadlineDistance.DoesNotExist):
-            return None
-        except DeadlineDistance.MultipleObjectsReturned:
-            log.warning(f"get_next_deadline - DeadlineDistance returned multiple objects for attribute {attribute.identifier}")
-            return None
+        deadline_distance = self._get_next_deadline_distance(attribute)
+        return deadline_distance.deadline.attribute.identifier if deadline_distance and deadline_distance.deadline and deadline_distance.deadline.attribute else None
 
     def get_distance_to_next(self, attribute):
-        try:
-            subtype = self.context['project'].subtype
-            deadline_distance = DeadlineDistance.objects.get(deadline__subtype=subtype, previous_deadline__attribute=attribute)
-            return deadline_distance.distance_from_previous if deadline_distance and deadline_distance.previous_deadline else None
-        except (KeyError, DeadlineDistance.DoesNotExist):
-            return None
-        except DeadlineDistance.MultipleObjectsReturned:
-            log.warning(f"get_distance_to_next - DeadlineDistance returned multiple objects for attribute {attribute.identifier}")
-            return None
+        deadline_distance = self._get_next_deadline_distance(attribute)
+        return deadline_distance.distance_from_previous if deadline_distance and deadline_distance.previous_deadline else None
 
     def get_initial_distance(self, attribute):
         try:
