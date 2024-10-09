@@ -24,8 +24,8 @@ class Command(BaseCommand):
         else:
             projects = Project.objects.all()
 
-        for project in projects:
-            log.info(f'Updating project "{project.name}" deadlines')
+        for idx, project in enumerate(projects):
+            log.info(f'Updating project "{project.name}" deadlines ({idx+1}/{len(projects)})')
             with transaction.atomic():
                 project.update_deadlines()
                 project.save()
