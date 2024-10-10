@@ -373,8 +373,12 @@ class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
         return DeadlineDistance.objects.filter(deadline__subtype=subtype, previous_deadline__attribute=attribute).first()
 
     def get_date_type(self, attribute):
-        deadline_distance = self._get_previous_deadline_distance(attribute)
-        return deadline_distance.date_type.identifier if deadline_distance and deadline_distance.date_type else None
+        subtype = self.context['project'].subtype
+        try:
+            deadline = Deadline.objects.get(subtype=subtype, attribute=attribute)
+            return deadline.date_type.identifier if deadline.date_type else None
+        except Deadline.DoesNotExist:
+            return None
 
     def get_previous_deadline(self, attribute):
         deadline_distance = self._get_previous_deadline_distance(attribute)
