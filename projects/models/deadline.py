@@ -130,6 +130,11 @@ class Deadline(models.Model):
         verbose_name=_("Use created at as value if no attribute or calculations are specified"),
         default=False,
     )
+    deadlinegroup = models.TextField(
+        verbose_name=_("deadlinegroup"),
+        null=True,
+        blank=True,
+    )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
         default=0,
@@ -171,7 +176,7 @@ class Deadline(models.Model):
         else:
             return False
 
-    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}):
+    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}, raw=False):
         # TODO hard-coded, maybe change later
         if self.phase.name == "Periaatteet" and not project.create_principles:
             return None
@@ -223,14 +228,20 @@ class Deadline(models.Model):
                         condition_result = True
 
             if condition_result:
+                if raw:
+                    date_calc = calculation.datecalculation
+                    return (date_calc.base_date_deadline.attribute.identifier if date_calc.base_date_deadline.attribute else None,
+                            date_calc.base_date_deadline.abbreviation,
+                            date_calc.constant
+                            )
                 return calculation.datecalculation.calculate(project, datetype, preview_attributes)
 
-        if self.default_to_created_at:
+        if self.default_to_created_at and not raw:
             return project.created_at.date()
 
         return None
 
-    def calculate_initial(self, project, preview_attributes={}):
+    def calculate_initial(self, project, preview_attributes={}, raw=False):
         if preview_attributes:
             valid_dls = project.get_applicable_deadlines(
                 preview_attributes=preview_attributes
@@ -244,6 +255,7 @@ class Deadline(models.Model):
             self.date_type,
             valid_dls,
             preview_attributes,
+            raw,
         )
 
     def calculate_updated(self, project, preview_attributes={}):
@@ -281,6 +293,18 @@ class Deadline(models.Model):
         verbose_name_plural = _("deadlines")
 
 
+class DeadlineDistanceConditionAttribute(models.Model):
+    attribute = models.ForeignKey(
+        Attribute,
+        null=False,
+        on_delete=models.CASCADE
+    )
+    negate = models.BooleanField(
+        default=False,
+        null=False,
+    )
+
+
 class DeadlineDistance(models.Model):
     deadline = models.ForeignKey(
         "Deadline",
@@ -305,11 +329,15 @@ class DeadlineDistance(models.Model):
         blank=True,
         null=True,
     )
-    # Only simple boolean conditions needed for now
-    conditions = models.ManyToManyField(
-        Attribute,
-        verbose_name=_("use rule if any attribute is set"),
+    condition_operator = models.CharField(
+        max_length=3,
+        null=True,
         blank=True,
+    )
+    condition_attributes = models.ManyToManyField(
+        DeadlineDistanceConditionAttribute,
+        related_name="deadline_distances",
+        blank=True
     )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
@@ -368,6 +396,12 @@ class DateType(models.Model):
             date for date in date_list
             if cal.is_working_day(date)
         ]
+
+    def get_dates_between(self, from_year, to_year):
+        dates = []
+        for year in range(from_year, to_year):
+            dates += self.get_dates(year)
+        return dates
 
     def get_dates(self, year):
         listed_dates = self.dates or []
@@ -832,7 +866,7 @@ class DateCalculationAttribute(models.Model):
     )
 
     def __str__(self):
-        return f"{'-' if self.subtract else '-'} {self.attribute}"
+        return f"{'-' if self.subtract else '+'} {self.attribute}"
 
 
 class DeadlineDateCalculation(models.Model):
