@@ -237,6 +237,11 @@ class ProjectAdmin(OSMGeoAdmin):
     )
     inlines = (ProjectPhaseLogInline, ProjectDeadlineInline)
 
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super(ProjectAdmin, self).get_form(request, obj, change, **kwargs)
+        disable_widget_options(form, ['phase', 'priority'])
+        return form
+
     def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
         if db_field.name == 'phase':
             project = Project.objects.get(id=request.resolver_match.kwargs.get('object_id'))
@@ -675,6 +680,13 @@ def get_app_list(self, request):
     return app_list
 
 admin.AdminSite.get_app_list = get_app_list
+
+
+def disable_widget_options(form, fields):
+    for field in fields:
+        form.base_fields[field].widget.can_add_related = False
+        form.base_fields[field].widget.can_delete_related = False
+        form.base_fields[field].widget.can_change_related = False
 
 
 # Unregister unnecessary models
