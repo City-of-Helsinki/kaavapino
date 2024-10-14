@@ -182,28 +182,26 @@ class Deadline(models.Model):
             return None
         elif self.phase.name == "Luonnos" and not project.create_draft:
             return None
+        if self.default_to_created_at and not raw:
+            return project.created_at.date()
 
-        attribute_data = {**project.attribute_data, **preview_attributes}
-
-        # Use first calculation whose condition is met
-        # and target has a value
-        for calculation in calculations:
+        def _calculate_condition_result(attribute_data, calculation):
             condition_result = False
             base_attr = calculation.datecalculation.base_date_attribute
             base_deadline = calculation.datecalculation.base_date_deadline
 
             # When calculating previews, do not use base deadlines that will be deleted
             if base_deadline and valid_dls and base_deadline not in valid_dls:
-                continue
+                return None
 
             if base_attr and base_attr.static_property:
                 base_attr = getattr(project, base_attr.static_property, None)
-            elif base_attr:
+            if base_attr:
                 base_date = attribute_data.get(base_attr.identifier)
             elif base_deadline and base_deadline.attribute:
                 try:
                     base_date = preview_attributes.get(base_deadline.attribute.identifier) or \
-                        project.deadlines.get(deadline=base_deadline).date
+                                project.deadlines.get(deadline=base_deadline).date
                 except ObjectDoesNotExist:
                     base_date = None
             elif base_deadline:
@@ -216,7 +214,7 @@ class Deadline(models.Model):
 
             if base_date:
                 if not calculation.conditions.count() + \
-                    calculation.not_conditions.count():
+                       calculation.not_conditions.count():
                     condition_result = True
 
                 for condition in calculation.conditions.all():
@@ -235,11 +233,22 @@ class Deadline(models.Model):
                             date_calc.constant
                             )
                 return calculation.datecalculation.calculate(project, datetype, preview_attributes)
+            return None
 
-        if self.default_to_created_at and not raw:
-            return project.created_at.date()
+        attribute_data = {**project.attribute_data, **preview_attributes}
 
-        return None
+        result = None
+        for calculation in calculations:
+            tmp = _calculate_condition_result(attribute_data, calculation)
+            if tmp is None:
+                continue
+            if self.attribute and self.attribute.identifier == "voimaantulovaihe_paattyy_pvm":  # Calculate latest date
+                result = tmp if (not result or tmp > result) else result
+            else:  # Return first calculation of whose condition is met
+                result = tmp
+                break
+
+        return result
 
     def calculate_initial(self, project, preview_attributes={}, raw=False):
         if preview_attributes:
