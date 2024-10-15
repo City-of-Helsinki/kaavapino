@@ -16,8 +16,6 @@ import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 
-import dj_db_conn_pool
-
 project_root = environ.Path(__file__) - 2
 
 env = environ.Env(
@@ -114,8 +112,7 @@ JWT_AUTH = {
 }
 DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
-dj_db_conn_pool.setup(pool_size=50, max_overflow=25)
-DATABASES = {"default": env.db(engine="dj_db_conn_pool.backends.postgresql")}
+DATABASES = {"default": env.db()}
 
 SENTINELS = []
 
