@@ -654,7 +654,12 @@ def set_geoserver_data_in_attribute_data(attribute_data):
                 cache.set(url, response, 3600)  # 1 hour
 
         if response.status_code == 200:
-            attribute_data.update(response.json())
+            new_attributes = response.json()
+            for geo_attr in list(new_attributes.keys()):
+                # Prioritize manually set values
+                if attribute_data.get(geo_attr, False):
+                    new_attributes.pop(geo_attr, None)
+            attribute_data.update(new_attributes)
 
     return None
 
