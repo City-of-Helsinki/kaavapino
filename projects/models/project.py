@@ -276,16 +276,8 @@ class Project(models.Model):
         if not data:
             return False
 
-        project_attributes = (
-            Attribute.objects.all()
-            .distinct()
-            .prefetch_related("value_choices")
-        )
-
-        attributes = {a.identifier: a for a in project_attributes}
-
         for identifier, value in data.items():
-            attribute = attributes.get(identifier)
+            attribute = Attribute.objects.get(identifier=identifier)
 
             if not attribute:
                 continue
