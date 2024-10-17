@@ -1298,7 +1298,7 @@ msgstr "Ensimmäinen mahdollinen päivä on {date}."
 #, python-brace-format
 msgid "Minimum distance to {distance.previous_deadline.abbreviation} not met"
 msgstr ""
-"Minimietäisyys määräaikaan {distance.previous_deadline.abbreviation} ei täyty"
+"Minimietäisyys määräaikaan {distance.previous_deadline.abbreviation} ei täyty."
 
 #: projects/templates/admin/kaavapino_app_list.html:8
 #, python-format
