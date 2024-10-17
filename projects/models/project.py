@@ -277,9 +277,10 @@ class Project(models.Model):
             return False
 
         for identifier, value in data.items():
-            attribute = Attribute.objects.get(identifier=identifier)
-
-            if not attribute:
+            try:
+                attribute = Attribute.objects.get(identifier=identifier)
+            except Attribute.DoesNotExist:
+                log.warning(f"Attribute {identifier} not found")
                 continue
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
@@ -348,7 +349,7 @@ class Project(models.Model):
 
         return False
 
-    def get_applicable_deadlines(self, subtype=None, preview_attributes={}):
+    def get_applicable_deadlines(self, subtype=None, preview_attributes={}, initial=False):
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -368,7 +369,7 @@ class Project(models.Model):
         return [
             deadline
             for deadline in deadlines
-            if self._check_condition(deadline, preview_attributes)
+            if initial or self._check_condition(deadline, preview_attributes)
         ]
 
     def _set_calculated_deadline(self, deadline, date, initial, user, preview, preview_attribute_data={}):
@@ -479,8 +480,8 @@ class Project(models.Model):
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, values=None, user=None):
-        deadlines = self.get_applicable_deadlines()
+    def update_deadlines(self, user=None, initial=False):
+        deadlines = self.get_applicable_deadlines(initial=initial)
 
         # Delete no longer relevant deadlines and create missing
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)

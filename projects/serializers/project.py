@@ -1753,7 +1753,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.save()
 
             user=self.context["request"].user
-            project.update_deadlines(user=user)
+            project.update_deadlines(user=user, initial=True)
             for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
@@ -1775,8 +1775,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
         except:
             pass
-        for idx in range(2,4):  # Set values by default to True
-            attribute_data[f"kaavaehdotus_uudelleen_nahtaville_{idx}"] = True
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
