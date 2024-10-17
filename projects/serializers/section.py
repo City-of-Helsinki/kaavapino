@@ -78,7 +78,7 @@ def get_rich_text_validator(attribute):
 
 def get_unique_validator(attribute, project_id):
     def validate(value):
-        column = f"attribute_data__{attribute.identifier}"
+        column = "attribute_data__{identifier}".format(identifier=attribute.identifier)
         error_msg = attribute.error_message or _("Value must be unique")
         if Project.objects.filter(**{column: value}).exclude(pk=project_id).count() > 0:
             raise ValidationError(
@@ -112,8 +112,8 @@ def get_deadline_validator(attribute, subtype, preview):
             except AssertionError:
                 valid_date = attr_dl.date_type.get_closest_valid_date(value)
                 raise ValidationError(
-                    (_(attr_dl.error_date_type_mismatch or \
-                    f"Invalid date selection for date type {attr_dl.date_type}"),
+                    (_(attr_dl.error_date_type_mismatch or
+                    _("Invalid date selection for date type {date_type}").format(date_type=attr_dl.date_type)),
                     _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
                 )
 
@@ -123,7 +123,7 @@ def get_deadline_validator(attribute, subtype, preview):
                 if not prev_dl:
                     continue
 
-                default_error = _(f"Minimum distance to {distance.previous_deadline.abbreviation} not met")
+                default_error = _("Minimum distance to {distance.previous_deadline.abbreviation} not met").format(distance=distance)
 
                 if type(prev_dl) == str:
                     prev_dl = datetime.datetime.strptime(prev_dl, "%Y-%m-%d").date()
