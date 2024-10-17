@@ -9,6 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils.translation import gettext_lazy as _
+from django.core.cache import cache
 
 from users.models import PRIVILEGE_LEVELS
 from . import Attribute
@@ -413,6 +414,12 @@ class DateType(models.Model):
         return dates
 
     def get_dates(self, year):
+        cache_key = f"datetype_{self.identifier}_dates_{year}"
+
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         listed_dates = self.dates or []
         base_dates = []
         has_base_datetypes = self.base_datetype.exists()
@@ -438,16 +445,19 @@ class DateType(models.Model):
                 else:
                     return False
 
-            return self._filter_date_list([
+            result = self._filter_date_list([
                 datetime.date(year, 1, 1) + datetime.timedelta(days=i)
                 for i in range((366 if isleap(+year) else 365))
                 if include(datetime.date(year, 1, 1)+datetime.timedelta(days=i))
             ], self.business_days_only)
         else:
-            return self._filter_date_list(
+            result = self._filter_date_list(
                 listed_dates + base_dates,
                 self.business_days_only,
             )
+
+        cache.set(cache_key, result, timeout=3600)  # 1 hour
+        return result
 
     def valid_days_to(self, date_a, date_b):
         days = (date_b - date_a).days

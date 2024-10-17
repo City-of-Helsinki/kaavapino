@@ -381,7 +381,7 @@ class Project(models.Model):
 
                 project_deadline = preview_attribute_data.get(identifier) or self.deadlines.get(deadline=deadline)
             else:
-                project_deadline = self.deadlines.get(deadline=deadline)
+                project_deadline = ProjectDeadline.objects.get(project=self, deadline=deadline)
         except ProjectDeadline.DoesNotExist:
             return
 
@@ -393,26 +393,25 @@ class Project(models.Model):
             project_deadline.save()
 
             if deadline.attribute:
-                with transaction.atomic():
-                    old_value = json.loads(json.dumps(
-                        self.attribute_data.get(deadline.attribute.identifier),
-                        default=str,
-                    ))
-                    new_value = json.loads(json.dumps(date, default=str))
+                old_value = json.loads(json.dumps(
+                    self.attribute_data.get(deadline.attribute.identifier),
+                    default=str,
+                ))
+                new_value = json.loads(json.dumps(date, default=str))
 
-                    self.update_attribute_data( \
-                        {deadline.attribute.identifier: date})
-                    self.save()
-                    if old_value != new_value:
-                        action.send(
-                            user or self.user,
-                            verb=verbs.UPDATED_ATTRIBUTE,
-                            action_object=deadline.attribute,
-                            target=self,
-                            attribute_identifier=deadline.attribute.identifier,
-                            old_value=old_value,
-                            new_value=new_value,
-                        )
+                self.update_attribute_data( \
+                    {deadline.attribute.identifier: date})
+
+                if old_value != new_value:
+                    action.send(
+                        user or self.user,
+                        verb=verbs.UPDATED_ATTRIBUTE,
+                        action_object=deadline.attribute,
+                        target=self,
+                        attribute_identifier=deadline.attribute.identifier,
+                        old_value=old_value,
+                        new_value=new_value,
+                    )
 
             return date
 
@@ -450,7 +449,6 @@ class Project(models.Model):
             result = self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
-                initial,
                 user,
                 preview,
                 preview_attribute_data,
@@ -471,11 +469,12 @@ class Project(models.Model):
             self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
-                initial,
                 user,
                 preview,
                 preview_attribute_data,
             )
+
+        self.save()
 
         return results
 
@@ -530,19 +529,10 @@ class Project(models.Model):
         # Update automatic deadlines
         self._set_calculated_deadlines(
             [
-                dl.deadline for dl in self.deadlines
-                .select_related(
-                    "project", "deadline", "deadline__attribute", "deadline__confirmation_attribute",
-                )
-                .prefetch_related(
-                    "deadline__condition_attributes",
-                    "deadline__initial_calculations",
-                    "deadline__update_calculations",
-                )
-                .all()
+                dl.deadline for dl in self.deadlines.all()
                 if dl.deadline.update_calculations.count()
-                    or dl.deadline.default_to_created_at
-                    or dl.deadline.attribute
+                   or dl.deadline.default_to_created_at
+                   or dl.deadline.attribute
             ],
             user,
             initial=False,
