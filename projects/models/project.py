@@ -372,7 +372,7 @@ class Project(models.Model):
             if initial or self._check_condition(deadline, preview_attributes)
         ]
 
-    def _set_calculated_deadline(self, deadline, date, initial, user, preview, preview_attribute_data={}):
+    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}):
         try:
             if preview:
                 try:
