@@ -18,6 +18,7 @@ from .deadline import (  # noqa
     DateCalculation,
     DeadlineDistance,
     DeadlineDateCalculation,
+    DeadlineDistanceConditionAttribute,
 )
 from .document import (  #noqa
     DocumentTemplate,
