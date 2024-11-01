@@ -261,7 +261,7 @@ class Deadline(models.Model):
 
         return self._calculate(
             project,
-            self.initial_calculations.all().select_related("datecalculation"),
+            self.initial_calculations.all().order_by('-index').select_related("datecalculation"),
             self.date_type,
             valid_dls,
             preview_attributes,
@@ -279,9 +279,7 @@ class Deadline(models.Model):
 
             return self._calculate(
                 project,
-                self.update_calculations.all().select_related("datecalculation", "datecalculation__base_date_attribute",
-                                                              "datecalculation__base_date_deadline",
-                                                              "datecalculation__base_date_deadline__attribute"),
+                self.update_calculations.order_by('-index').all().select_related("datecalculation"),
                 self.date_type,
                 valid_dls,
                 preview_attributes,
