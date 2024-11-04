@@ -96,7 +96,7 @@ def update_existing_user(sender, instance, raw, using, update_fields, *args, **k
 def update_responsible_uuid(sender, instance, *args, **kwargs):
     projects = Project.objects.filter(user_id=instance.id)
     for project in projects:
-        if project.attribute_data['vastuuhenkilo_nimi'] != instance.uuid:
+        if instance.uuid and (str(instance.uuid) != project.attribute_data['vastuuhenkilo_nimi']):
             project.attribute_data['vastuuhenkilo_nimi'] = instance.uuid
             if 'vastuuhenkilo_nimi_readonly' in project.attribute_data:
                 project.attribute_data['vastuuhenkilo_nimi_readonly']=instance.uuid

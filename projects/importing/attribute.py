@@ -1016,8 +1016,11 @@ class AttributeImporter:
             attr.ad_key_attribute = None
             attr.save()
 
-        all_auto_attrs = [attr.id for attr in AttributeAutoValue.objects.all()]
-        all_auto_attr_mappings = [attr.id for attr in AttributeAutoValueMapping.objects.all()]
+        # Ignore 'vastuu_paallikon_nimi' (customer manages it manually in django-admin)
+        all_auto_attrs = [attr.id for attr in AttributeAutoValue.objects.all()
+                          .exclude(value_attribute__identifier='vastuu_paallikon_nimi')]
+        all_auto_attr_mappings = [attr.id for attr in AttributeAutoValueMapping.objects.all()
+                                  .exclude(auto_attr__value_attribute__identifier='vastuu_paallikon_nimi')]
 
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
@@ -1064,21 +1067,22 @@ class AttributeImporter:
                 if auto_attr.id in all_auto_attrs:
                     all_auto_attrs.remove(auto_attr.id)
 
-                for (key, value) in auto_value_mapping.items():
-                    if auto_attr.key_attribute.value_choices.count():
-                        try:
-                            key = auto_attr.key_attribute.value_choices \
-                                .get(value=key).identifier
-                        except AttributeValueChoice.DoesNotExist:
-                            pass
+                if created or identifier != 'vastuu_paallikon_nimi':
+                    for (key, value) in auto_value_mapping.items():
+                        if auto_attr.key_attribute.value_choices.count():
+                            try:
+                                key = auto_attr.key_attribute.value_choices \
+                                    .get(value=key).identifier
+                            except AttributeValueChoice.DoesNotExist:
+                                pass
 
-                    auto_attr_mapping, created = AttributeAutoValueMapping.objects.get_or_create(
-                        auto_attr=auto_attr,
-                        key_str=key,
-                        defaults={'value_str': value},
-                    )
-                    if auto_attr_mapping.id in all_auto_attr_mappings:
-                        all_auto_attr_mappings.remove(auto_attr_mapping.id)
+                        auto_attr_mapping, created = AttributeAutoValueMapping.objects.get_or_create(
+                            auto_attr=auto_attr,
+                            key_str=key,
+                            defaults={'value_str': value},
+                        )
+                        if auto_attr_mapping.id in all_auto_attr_mappings:
+                            all_auto_attr_mappings.remove(auto_attr_mapping.id)
             except Attribute.DoesNotExist:
                 pass
 

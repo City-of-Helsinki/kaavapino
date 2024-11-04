@@ -33,7 +33,7 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
-from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE, get_attribute_lock_data, set_ad_data_in_attribute_data
+from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE, get_attribute_lock_data
 from projects.importing import AttributeImporter, AttributeUpdater
 from projects.models import (
     FieldComment,
@@ -890,13 +890,14 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         try:
             project_name = request.query_params.get("project_name")
             project = Project.objects.get(name=project_name)
+            serializer = self.get_serializer_class()(project, context=self.get_serializer_context())
+            attribute_data = serializer.get_attribute_data(project=project)
 
             if attribute_identifier is not None:
-                data = {attribute_identifier: project.attribute_data[attribute_identifier]}
-                set_ad_data_in_attribute_data(data)
+                data = {attribute_identifier: attribute_data[attribute_identifier]}
                 return Response(data)
 
-            return Response({"attribute_data": project.attribute_data})
+            return Response({"attribute_data": attribute_data})
         except Project.DoesNotExist as exc:
             log.error("Project not found")
             return Response("Project not found", status=status.HTTP_400_BAD_REQUEST)

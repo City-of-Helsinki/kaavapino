@@ -113,6 +113,10 @@ def get_rich_text_display_value(value, preview=False, **text_args):
         url_id = text_args.get("url_id", None)
         color = text_args.get("color", None)
 
+        if isinstance(value, str):
+            log.warning(f"Plain string found when processing richtext value: {value} (converted to dict)")
+            value = {"ops": [{"insert": f"{value}"}] }
+        
         operations = value["ops"]
 
         for index, operation in enumerate(operations, start=1):
