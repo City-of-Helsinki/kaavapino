@@ -907,6 +907,18 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             log.error("Error in projects/attribute_data %s", exc)
             return Response("Error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def update(self, request, *args, **kwargs):
+        fake = request.query_params.get('fake', False)
+        if not fake:
+            return super().update(request, *args, **kwargs)
+
+        # Run update in 'ghost' mode where no changes are applied to database but result is returned
+        with transaction.atomic():
+            result = super().update(request, *args, **kwargs)
+            transaction.set_rollback(True)
+            return result
+
+
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase",
                                                            "project_subtype",
