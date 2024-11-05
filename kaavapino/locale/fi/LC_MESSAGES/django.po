@@ -635,6 +635,10 @@ msgstr "automaattiset päivämäärät"
 msgid "exclude selected dates"
 msgstr "poista valitut päivämäärät hyväksytyistä"
 
+#: projects/models/deadline.py:393
+msgid "forced dates"
+msgstr "pakotetut päivämäärät (YYYY-MM-DD,...)"
+
 #: projects/models/deadline.py:486
 msgid "date types"
 msgstr "päivämäärän tyyppi"

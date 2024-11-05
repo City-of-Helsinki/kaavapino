@@ -392,6 +392,12 @@ class DateType(models.Model):
     exclude_selected = models.BooleanField(
         default=False, verbose_name=_("exclude selected dates")
     )
+    forced_dates = ArrayField(
+        models.DateField(),
+        verbose_name=_("forced dates"),
+        null=True,
+        blank=True,
+    )
 
     @staticmethod
     def _filter_date_list(date_list, business_days_only):
@@ -419,6 +425,7 @@ class DateType(models.Model):
             return cached_result
 
         listed_dates = self.dates or []
+        forced_dates = self.forced_dates or []
         base_dates = []
         has_base_datetypes = self.base_datetype.exists()
 
@@ -433,7 +440,9 @@ class DateType(models.Model):
 
         if self.exclude_selected:
             def include(date):
-                if date not in listed_dates \
+                if date in forced_dates:
+                    return True
+                elif date not in listed_dates \
                     and has_base_datetypes \
                     and date in base_dates:
                     return True
@@ -453,6 +462,7 @@ class DateType(models.Model):
                 listed_dates + base_dates,
                 self.business_days_only,
             )
+            result += forced_dates
 
         cache.set(cache_key, result, timeout=3600)  # 1 hour
         return result
