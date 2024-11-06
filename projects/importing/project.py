@@ -75,7 +75,6 @@ class ProjectImporter:
                     row_indexes = create_row_indexes(row)
                     continue
 
-                attribute_data = create_attribute_data(row_indexes, row)
                 hankenumero = attribute_data["hankenumero"]
 
                 project = projects.get(hankenumero, None)
@@ -83,9 +82,12 @@ class ProjectImporter:
                     logger.error(f"Project with hankenumero {hankenumero} not found")
                     continue
 
+                import_attribute_data = create_attribute_data(row_indexes, row)
+                attribute_data = {**import_attribute_data, **project.attribute_data}
+
                 try:
                     logger.info(f"Importing data for project: {project.name} ({hankenumero})")
-                    project.attribute_data.update(attribute_data)
+                    project.attribute_data = attribute_data
                     project.update_deadlines()
                     project.save()
                 except Exception as exc:
