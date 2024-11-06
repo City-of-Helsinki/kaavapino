@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 IGNORED_ATTRIBUTES = ["projektin_nimi"]
 
-IMPORT_DATE_FORMAT = "%d.%m.%Y"
+IMPORT_DATE_FORMAT = "%d.%m%.Y"
 EXPORT_DATE_FORMAT = "%Y-%m-%d"
 
 class ProjectImporterException(Exception):
@@ -75,14 +75,14 @@ class ProjectImporter:
                     row_indexes = create_row_indexes(row)
                     continue
 
-                hankenumero = attribute_data["hankenumero"]
+                import_attribute_data = create_attribute_data(row_indexes, row)
+                hankenumero = import_attribute_data["hankenumero"]
 
                 project = projects.get(hankenumero, None)
                 if not project:
                     logger.error(f"Project with hankenumero {hankenumero} not found")
                     continue
 
-                import_attribute_data = create_attribute_data(row_indexes, row)
                 attribute_data = {**import_attribute_data, **project.attribute_data}
 
                 try:
