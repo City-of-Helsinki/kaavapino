@@ -3,13 +3,13 @@ import logging
 
 from datetime import datetime
 from django.db import transaction
-from projects.models import Attribute, Project
+from projects.models import Attribute, Project, ProjectDeadline, Deadline
 
 logger = logging.getLogger(__name__)
 
 IGNORED_ATTRIBUTES = ["projektin_nimi"]
 
-IMPORT_DATE_FORMAT = "%d.%m%.Y"
+IMPORT_DATE_FORMAT = "%d.%m.%Y"
 EXPORT_DATE_FORMAT = "%Y-%m-%d"
 
 class ProjectImporterException(Exception):
@@ -36,7 +36,7 @@ class ProjectImporter:
             return row_indexes
 
         def create_attribute_data(row_indexes, row):
-            return {row_indexes[index]: sanitize(row_indexes[index], row[index]) for index, value in enumerate(row) if row_indexes[index] not in IGNORED_ATTRIBUTES}
+            return {row_indexes[index]: sanitize(row_indexes[index], row[index]) for index, value in enumerate(row) if row[index] and row_indexes[index] not in IGNORED_ATTRIBUTES}
 
         def sanitize(identifier, value):
             if not value:
@@ -78,15 +78,47 @@ class ProjectImporter:
                 import_attribute_data = create_attribute_data(row_indexes, row)
                 hankenumero = import_attribute_data["hankenumero"]
 
+                if not hankenumero:
+                    logger.error("Import attribute data missing hankenumero")
+                    continue
+
                 project = projects.get(hankenumero, None)
                 if not project:
                     logger.error(f"Project with hankenumero {hankenumero} not found")
                     continue
 
-                attribute_data = {**import_attribute_data, **project.attribute_data}
+                project_attribute_data = project.attribute_data
+
+                logger.info(f"Importing data for project: {project.name} (size: {project.subtype.name}) (hankenumero: {hankenumero})")
+                for key, value in import_attribute_data.items():
+                    attribute = attributes.get(key)
+                    if not attribute:
+                        logger.warning(f"Attribute {key} not found")
+
+                    if attribute.value_type == Attribute.TYPE_DATE:
+                        # Update ProjectDeadline
+                        try:
+                            deadline = Deadline.objects.get(attribute=attribute, subtype=project.subtype)
+                            project_deadline = project.deadlines.get(deadline=deadline)
+                            if not project_deadline.generated:
+                                continue  # Don't update value if it has been manually modified
+
+                            project_deadline.date = value
+                            project_deadline.generated = False
+                            project_deadline.save()
+                            project_attribute_data[key] = value
+                            logger.info(f"Updated ProjectDeadline {project_deadline} with {value}")
+                        except Deadline.DoesNotExist:
+                            logger.warning(f"Deadline not found for attribute {key}", )
+                        except ProjectDeadline.DoesNotExist:
+                            logger.warning(f"ProjectDeadline not found for deadline {deadline}")
+                        except Exception as exc:
+                            logger.error("Error", exc)
+
+
+                attribute_data = {**import_attribute_data, **project_attribute_data}
 
                 try:
-                    logger.info(f"Importing data for project: {project.name} ({hankenumero})")
                     project.attribute_data = attribute_data
                     project.update_deadlines()
                     project.save()
