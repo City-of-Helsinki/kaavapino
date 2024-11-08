@@ -245,6 +245,21 @@ class Deadline(models.Model):
                 continue
             if self.attribute and self.attribute.identifier == "voimaantulovaihe_paattyy_pvm":  # Calculate latest date
                 result = tmp if (not result or tmp > result) else result
+            elif self.attribute and self.attribute.identifier == "ehdotusvaihe_paattyy_pvm":
+                base_identifier = calculation.datecalculation.base_date_deadline.attribute.identifier
+                if attribute_data.get("kaavaehdotus_uudelleen_nahtaville_4", None) and \
+                    base_identifier != "viimeistaan_lausunnot_ehdotuksesta_4":
+                    continue
+                elif attribute_data.get("kaavaehdotus_uudelleen_nahtaville_3", None) and \
+                    base_identifier != "viimeistaan_lausunnot_ehdotuksesta_3":
+                        continue
+                elif attribute_data.get("kaavaehdotus_uudelleen_nahtaville_2", None) and \
+                    base_identifier != "viimeistaan_lausunnot_ehdotuksesta_2":
+                        continue
+                elif base_identifier != "viimeistaan_lausunnot_ehdotuksesta":
+                    continue
+                result = tmp
+                break
             else:  # Return first calculation of whose condition is met
                 result = tmp
                 break
