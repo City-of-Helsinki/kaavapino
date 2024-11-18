@@ -1184,13 +1184,13 @@ class ProjectAttributeFile(models.Model):
         try:
             # resize to 200dpi print size
             image = Image.open(self.file.path)
+            image_format = image.format # deleted from image data during transpose
             image = ImageOps.exif_transpose(image)
-            exif = image.getexif()
             image.thumbnail(paper_size_in_pixels, Image.Resampling.LANCZOS)
-            if image.format == 'JPEG':
-                image.save(self.file.path, quality=100, optimize=True, exif=exif)
+            if image_format == 'JPEG':
+                image.save(self.file.path, quality=100, optimize=True)
             else:
-                image.save(self.file.path, optimize=True, exif=exif)
+                image.save(self.file.path, optimize=True)
         except IOError:
             # not an image
             pass
