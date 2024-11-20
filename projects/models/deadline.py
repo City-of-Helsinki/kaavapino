@@ -214,17 +214,15 @@ class Deadline(models.Model):
                 base_date = None
 
             if base_date:
-                if not calculation.conditions.count() + \
-                       calculation.not_conditions.count():
-                    condition_result = True
+                condition_result = True
 
                 for condition in calculation.conditions.all():
-                    if self._check_condition(project, condition, preview_attributes):
-                        condition_result = True
+                    if not self._check_condition(project, condition, preview_attributes):
+                        condition_result = False
 
                 for condition in calculation.not_conditions.all():
-                    if not self._check_condition(project, condition, preview_attributes):
-                        condition_result = True
+                    if self._check_condition(project, condition, preview_attributes):
+                        condition_result = False
 
             if condition_result:
                 if raw:
