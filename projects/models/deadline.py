@@ -243,7 +243,7 @@ class Deadline(models.Model):
             tmp = _calculate_condition_result(attribute_data, calculation)
             if tmp is None:
                 continue
-            if self.attribute and (self.attribute.identifier == "voimaantulovaihe_paattyy_pvm" or self.attribute.identifier == "ehdotusvaihe_paattyy_pvm"):  # Calculate latest date
+            if self.attribute and ("vaihe_alkaa_pvm" in self.attribute.identifier or "vaihe_paattyy_pvm" in self.attribute.identifier):  # Calculate latest date
                 result = tmp if (not result or tmp > result) else result
             else:  # Return first calculation of whose condition is met
                 result = tmp
