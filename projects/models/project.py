@@ -480,8 +480,8 @@ class Project(models.Model):
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, user=None, initial=False):
-        deadlines = self.get_applicable_deadlines(initial=initial)
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}):
+        deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
@@ -525,6 +525,7 @@ class Project(models.Model):
             ],
             user,
             initial=True,
+            preview_attribute_data=preview_attributes
         )
 
         # Update automatic deadlines
@@ -537,6 +538,7 @@ class Project(models.Model):
             ],
             user,
             initial=False,
+            preview_attribute_data=preview_attributes
         )
 
     # Calculate a preview schedule without saving anything

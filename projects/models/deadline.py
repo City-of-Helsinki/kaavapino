@@ -243,23 +243,8 @@ class Deadline(models.Model):
             tmp = _calculate_condition_result(attribute_data, calculation)
             if tmp is None:
                 continue
-            if self.attribute and self.attribute.identifier == "voimaantulovaihe_paattyy_pvm":  # Calculate latest date
+            if self.attribute and (self.attribute.identifier == "voimaantulovaihe_paattyy_pvm" or self.attribute.identifier == "ehdotusvaihe_paattyy_pvm"):  # Calculate latest date
                 result = tmp if (not result or tmp > result) else result
-            elif self.attribute and self.attribute.identifier == "ehdotusvaihe_paattyy_pvm":
-                base_identifier = calculation.datecalculation.base_date_deadline.attribute.identifier
-                if attribute_data.get("kaavaehdotus_uudelleen_nahtaville_4", None) and \
-                    base_identifier != "viimeistaan_lausunnot_ehdotuksesta_4":
-                    continue
-                elif attribute_data.get("kaavaehdotus_uudelleen_nahtaville_3", None) and \
-                    base_identifier != "viimeistaan_lausunnot_ehdotuksesta_3":
-                        continue
-                elif attribute_data.get("kaavaehdotus_uudelleen_nahtaville_2", None) and \
-                    base_identifier != "viimeistaan_lausunnot_ehdotuksesta_2":
-                        continue
-                elif base_identifier != "viimeistaan_lausunnot_ehdotuksesta":
-                    continue
-                result = tmp
-                break
             else:  # Return first calculation of whose condition is met
                 result = tmp
                 break
@@ -294,7 +279,7 @@ class Deadline(models.Model):
 
             return self._calculate(
                 project,
-                self.update_calculations.order_by('-index').all().select_related("datecalculation"),
+                self.update_calculations.all().order_by('-index').select_related("datecalculation"),
                 self.date_type,
                 valid_dls,
                 preview_attributes,

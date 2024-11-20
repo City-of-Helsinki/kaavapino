@@ -1416,6 +1416,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
 
             if not should_update_deadlines:
+                should_update_deadlines = bool(Deadline.objects.filter(
+                    subtype=instance.subtype,
+                    attribute__identifier__in=attr_identifiers
+                ).count())
+
+            if not should_update_deadlines:
                 should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
                     deadline__project_deadlines__project=instance
                 ).filter(
@@ -1832,9 +1838,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=user)
+                project.update_deadlines(user=user, preview_attributes=attribute_data)
             elif should_update_deadlines:
-                project.update_deadlines(user=user)
+                project.update_deadlines(user=user, preview_attributes=attribute_data)
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
 
