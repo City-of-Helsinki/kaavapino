@@ -1759,7 +1759,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.save()
 
             user=self.context["request"].user
-            project.update_deadlines(user=user, initial=True)
+            project.update_deadlines(user=user, initial=True, preview_attributes=project.attribute_data)
             for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
