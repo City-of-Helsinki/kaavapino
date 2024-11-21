@@ -397,6 +397,7 @@ def render_template(project, document_template, preview):
                 attribute_file.attribute,
                 attribute_file.file.path,
             )
+            attribute_data_display[attribute_file.attribute.identifier + "__raw"] = attribute_file.file.name
         elif preview:
             display_value = "Kuvan tiedostotyyppiä ei tueta"
         else:
