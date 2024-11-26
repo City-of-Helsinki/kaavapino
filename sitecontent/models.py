@@ -11,7 +11,7 @@ log = logging.getLogger(__name__)
 
 class FooterLink(models.Model):
     link_text = models.CharField(max_length=255, verbose_name=_("link text"))
-    url = models.CharField(max_length=255, verbose_name=_("url"))
+    url = models.CharField(max_length=511, verbose_name=_("url"))
     index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
     section = models.ForeignKey(
         "FooterSection",
