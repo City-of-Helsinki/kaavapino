@@ -1788,6 +1788,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
         phase_changed = phase is not None and phase != instance.phase
+        draft_principles_changed = 'create_draft' in validated_data or 'create_principles' in validated_data
         should_generate_deadlines = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
@@ -1800,11 +1801,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                 user=user,
             )
 
-        if subtype_changed:
+        if subtype_changed or draft_principles_changed:
             #  Clear project from cache
             for owner in ['True', 'False']:
                 for privilege, role in PRIVILEGE_LEVELS:
-                    cache.delete(f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}')
+                    if subtype_changed:
+                        cache.delete(f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}')
+                    if draft_principles_changed:
+                        cache.delete(f'deadline_sections:{privilege}:{owner}:{instance.pk if instance else None}')
 
         should_update_deadlines = self._get_should_update_deadlines(
             subtype_changed, instance, attribute_data,
