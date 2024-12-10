@@ -601,6 +601,11 @@ class Project(models.Model):
             preview_attribute_data=updated_attributes,
         )}
 
+        # Add visibility booleans
+        for identifier, value in updated_attribute_data.items():
+            if type(value) == bool:
+                project_dls[identifier] = value
+
         return project_dls
 
     @property

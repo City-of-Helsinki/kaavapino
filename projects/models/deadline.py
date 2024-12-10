@@ -353,6 +353,28 @@ class DeadlineDistance(models.Model):
     def __str__(self):
         return f"{self.previous_deadline.abbreviation} -> {self.deadline.abbreviation} ({self.distance_from_previous}{' ' + str(self.date_type) if self.date_type else ''})"
 
+    def check_conditions(self, attribute_data):
+        if not self.condition_attributes or self.condition_attributes.count() == 0:
+            return True
+
+        condition_attributes = self.condition_attributes.all()
+        operator = self.condition_operator
+
+        for distance_condition_attribute in condition_attributes:
+            attribute = distance_condition_attribute.attribute
+            negate = distance_condition_attribute.negate
+
+            res = attribute_data.get(attribute.identifier, None)
+            check_condition_result = True if res and not negate else True if not res and negate else False
+            if operator == 'and' and not check_condition_result:
+                return False
+            elif operator == 'or' and check_condition_result:
+                return True
+            elif len(condition_attributes) == 1:
+                return check_condition_result
+
+        return True if operator == 'and' else False
+
     class Meta:
         ordering = ("index",)
 

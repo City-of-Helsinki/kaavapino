@@ -123,6 +123,9 @@ def get_deadline_validator(attribute, subtype, preview):
                 if not prev_dl:
                     continue
 
+                if not distance.check_conditions(preview):
+                    continue
+
                 default_error = _("Minimum distance to {distance.previous_deadline.abbreviation} not met").format(distance=distance)
 
                 if type(prev_dl) == str:
