@@ -57,7 +57,7 @@ from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
-from projects.serializers.utils import _set_fieldset_path
+from projects.serializers.utils import _set_fieldset_path, get_dl_vis_bool_name
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
@@ -120,6 +120,11 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
             # Ignore if next date is not set
             if not next_date:
+                continue
+
+            # Ignore if next date is not supposed to be visible
+            vis_bool = get_dl_vis_bool_name(next_distance.deadline.deadlinegroup)
+            if vis_bool and not projectdeadline.project.attribute_data.get(vis_bool):
                 continue
 
             if next_distance.date_type:
