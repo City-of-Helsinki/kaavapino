@@ -57,7 +57,7 @@ from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
-from projects.serializers.utils import _set_fieldset_path
+from projects.serializers.utils import _set_fieldset_path, get_dl_vis_bool_name
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
@@ -93,14 +93,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         ).data
 
     def _resolve_distance_conditions(self, distance, project):
-        if distance.conditions.count() == 0:
-            return True
-
-        for attribute in distance.conditions.all():
-            if project.attribute_data.get(attribute.identifier):
-                return True
-
-        return False
+        return distance.check_conditions(project.attribute_data)
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_under_min_distance_next(self, projectdeadline):
@@ -127,6 +120,11 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
             # Ignore if next date is not set
             if not next_date:
+                continue
+
+            # Ignore if next date is not supposed to be visible
+            vis_bool = get_dl_vis_bool_name(next_distance.deadline.deadlinegroup)
+            if vis_bool and not projectdeadline.project.attribute_data.get(vis_bool):
                 continue
 
             if next_distance.date_type:
@@ -1404,6 +1402,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
 
             if not should_update_deadlines:
+                should_update_deadlines = bool(Deadline.objects.filter(
+                    subtype=instance.subtype,
+                    attribute__identifier__in=attr_identifiers
+                ).count())
+
+            if not should_update_deadlines:
                 should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
                     deadline__project_deadlines__project=instance
                 ).filter(
@@ -1467,6 +1471,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                                 attribute=f_attr.attribute_target,
                                 fieldset_path_str=fieldset_path_str
                             ).update(archived_at=timezone.now())
+
+                if value is None:
+                    try:
+                        deadline = Deadline.objects.get(attribute=attribute, subtype=self.instance.subtype)
+                        ProjectDeadline.objects.get(deadline=deadline, project=self.instance).delete()
+                    except Exception:
+                        pass
+
 
 
             except Attribute.DoesNotExist:
@@ -1712,11 +1724,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             self.context['should_update_deadlines'] = True
             attribute_data = validated_data.pop("attribute_data", {})
-            attribute_data["kaavaprosessin_kokoluokka_readonly"] = validated_data["phase"].project_subtype.name
-            try:
-                attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
-            except:
-                pass
+            self.set_initial_data(attribute_data, validated_data)
 
             project: Project = super().create(validated_data)
             user = self.context["request"].user
@@ -1737,7 +1745,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.save()
 
             user=self.context["request"].user
-            project.update_deadlines(user=user)
+            project.update_deadlines(user=user, initial=True, preview_attributes=project.attribute_data)
             for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
@@ -1745,12 +1753,28 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         return project
 
+    def set_initial_data(self, attribute_data, validated_data):
+        kokoluokka = validated_data["phase"].project_subtype.name
+
+        if kokoluokka == "XL" and validated_data.get("create_draft", None) is True:
+            attribute_data["kaavaluonnos_lautakuntaan_1"] = True
+            attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
+        if kokoluokka == "XL" and validated_data.get("create_principles", None) is True:
+            attribute_data["periaatteet_lautakuntaan_1"] = True
+            attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
+        attribute_data["kaavaprosessin_kokoluokka_readonly"] = kokoluokka
+        try:
+            attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
+        except:
+            pass
+
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
         phase_changed = phase is not None and phase != instance.phase
+        draft_principles_changed = 'create_draft' in validated_data or 'create_principles' in validated_data
         should_generate_deadlines = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
@@ -1763,11 +1787,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                 user=user,
             )
 
-        if subtype_changed:
+        if subtype_changed or draft_principles_changed:
             #  Clear project from cache
             for owner in ['True', 'False']:
                 for privilege, role in PRIVILEGE_LEVELS:
-                    cache.delete(f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}')
+                    if subtype_changed:
+                        cache.delete(f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}')
+                    if draft_principles_changed:
+                        cache.delete(f'deadline_sections:{privilege}:{owner}:{instance.pk if instance else None}')
 
         should_update_deadlines = self._get_should_update_deadlines(
             subtype_changed, instance, attribute_data,
@@ -1781,6 +1808,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                 attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
             except:
                 pass
+
+            self.update_initial_data(validated_data)
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
@@ -1799,9 +1828,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=user)
+                project.update_deadlines(user=user, preview_attributes=attribute_data)
             elif should_update_deadlines:
-                project.update_deadlines(user=user)
+                project.update_deadlines(user=user, preview_attributes=attribute_data)
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
 
@@ -1822,6 +1851,34 @@ class ProjectSerializer(serializers.ModelSerializer):
                     )
 
             return project
+
+    def update_initial_data(self, validated_data):
+        attribute_data = self.instance.attribute_data
+
+        try:
+            kokoluokka = validated_data["phase"].project_subtype.name
+            create_draft = validated_data.get("create_draft", None)
+            create_principles = validated_data.get("create_principles", None)
+
+            if kokoluokka == "XL" and create_draft:
+                if attribute_data.get("kaavaluonnos_lautakuntaan_1", None) is None:
+                    attribute_data["kaavaluonnos_lautakuntaan_1"] = True
+                if attribute_data.get("jarjestetaan_luonnos_esillaolo_1", None) is None:
+                    attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
+            else:
+                attribute_data.pop("kaavaluonnos_lautakuntaan_1", None)
+                attribute_data.pop("jarjestetaan_luonnos_esillaolo_1", None)
+
+            if kokoluokka == "XL" and create_principles:
+                if attribute_data.get("periaatteet_lautakuntaan_1", None) is None:
+                    attribute_data["periaatteet_lautakuntaan_1"] = True
+                if attribute_data.get("jarjestetaan_periaatteet_esillaolo_1", None) is None:
+                    attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
+            else:
+                attribute_data.pop("periaatteet_lautakuntaan_1", None)
+                attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
+        except KeyError as exc:
+            pass
 
     def log_updates_attribute_data(self, attribute_data, project=None, prefix=""):
         project = project or self.instance
