@@ -665,7 +665,6 @@ def get_app_list(self, request):
     for app in app_list:
         for model in app["models"]:
             try:
-                print(app)
                 model_obj = apps.get_model(app["app_label"], model["object_name"])
             except Exception as e:
                 continue
