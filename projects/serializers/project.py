@@ -1791,8 +1791,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             #  Clear project from cache
             for owner in ['True', 'False']:
                 for privilege, role in PRIVILEGE_LEVELS:
-                    if subtype_changed:
-                        cache.delete(f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}')
+                    cache.delete(f'phase_schema:{privilege}:{owner}:{instance.pk if instance else None}')
                     if draft_principles_changed:
                         cache.delete(f'deadline_sections:{privilege}:{owner}:{instance.pk if instance else None}')
 
