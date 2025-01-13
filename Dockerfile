@@ -64,7 +64,7 @@ RUN dnf install -y \
 RUN pip install -U pip
 
 # Install Poetry
-RUN pip install poetry
+RUN pip install poetry==1.8.5
 
 RUN groupadd -g 1003 kaavapinogroup && useradd -u 1002 -g kaavapinogroup kaavapinouser
 
