@@ -833,7 +833,7 @@ class AttributeImporter:
             error_text = row[self.column_index[ATTRIBUTE_ERROR_TEXT]]
             error_message = row[self.column_index[ATTRIBUTE_ERROR]]
             static_property = STATIC_ATTRIBUTES_MAPPING.get(
-                row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
 
             try:
@@ -1282,7 +1282,7 @@ class AttributeImporter:
                 },
             )
             fieldset = Attribute.objects.get(
-                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
             try:
                 [name, custom_name, link] = [
@@ -1316,7 +1316,7 @@ class AttributeImporter:
             show_on_mobile = row[self.column_index[CARD_SHOW_ON_MOBILE]] == "kyllä"
             date_format = row[self.column_index[CARD_SECTION_DATE_FORMAT]]
             attribute = Attribute.objects.get(
-                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
 
             if not location:
@@ -1377,7 +1377,7 @@ class AttributeImporter:
                 },
             )
             attribute = Attribute.objects.get(
-                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
             OverviewFilterAttribute.objects.create(
                 attribute=attribute,
@@ -1623,7 +1623,7 @@ class AttributeImporter:
         for row in rows:
             try:
                 attribute = Attribute.objects.get(
-                    identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]],
+                    identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip(),
                 )
             except Attribute.DoesNotExist:
                 continue
