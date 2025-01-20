@@ -1859,23 +1859,25 @@ class ProjectSerializer(serializers.ModelSerializer):
             create_draft = validated_data.get("create_draft", None)
             create_principles = validated_data.get("create_principles", None)
 
-            if kokoluokka == "XL" and create_draft:
-                if attribute_data.get("kaavaluonnos_lautakuntaan_1", None) is None:
-                    attribute_data["kaavaluonnos_lautakuntaan_1"] = True
-                if attribute_data.get("jarjestetaan_luonnos_esillaolo_1", None) is None:
-                    attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
-            else:
-                attribute_data.pop("kaavaluonnos_lautakuntaan_1", None)
-                attribute_data.pop("jarjestetaan_luonnos_esillaolo_1", None)
+            if create_draft is not None:
+                if kokoluokka == "XL" and create_draft == True:
+                    if attribute_data.get("kaavaluonnos_lautakuntaan_1", None) is None:
+                        attribute_data["kaavaluonnos_lautakuntaan_1"] = True
+                    if attribute_data.get("jarjestetaan_luonnos_esillaolo_1", None) is None:
+                        attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
+                else:
+                    attribute_data.pop("kaavaluonnos_lautakuntaan_1", None)
+                    attribute_data.pop("jarjestetaan_luonnos_esillaolo_1", None)
 
-            if kokoluokka == "XL" and create_principles:
-                if attribute_data.get("periaatteet_lautakuntaan_1", None) is None:
-                    attribute_data["periaatteet_lautakuntaan_1"] = True
-                if attribute_data.get("jarjestetaan_periaatteet_esillaolo_1", None) is None:
-                    attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
-            else:
-                attribute_data.pop("periaatteet_lautakuntaan_1", None)
-                attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
+            if create_principles is not None:
+                if kokoluokka == "XL" and create_principles == True:
+                    if attribute_data.get("periaatteet_lautakuntaan_1", None) is None:
+                        attribute_data["periaatteet_lautakuntaan_1"] = True
+                    if attribute_data.get("jarjestetaan_periaatteet_esillaolo_1", None) is None:
+                        attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
+                else:
+                    attribute_data.pop("periaatteet_lautakuntaan_1", None)
+                    attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
         except KeyError as exc:
             pass
 
