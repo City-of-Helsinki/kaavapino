@@ -22,24 +22,48 @@ class Command(BaseCommand):
             return
         
         project = Project.objects.get(pk=project_id)
-        deadline_test = ProjectDeadline.objects.filter(project=project)
+        project_deadlines = ProjectDeadline.objects.filter(project=project)
+        to_be_removed = []
+        dont_delete = [] # Identifiers that should not be deleted from attribute_data, but possibly from ProjectDeadlines
+        for project_dl in project_deadlines:
+            if project_dl.deadline.subtype != project.subtype:
+                to_be_removed.append(project_dl)
+                continue
+            if not project.create_draft and project_dl.deadline.phase.name == "Luonnos":
+                to_be_removed.append(project_dl)
+                continue
+            if not project.create_principles and project_dl.deadline.phase.name == "Periaatteet":
+                to_be_removed.append(project_dl)
+                continue
+            dont_delete.append(project_dl)
+        dont_delete = [p_dl.deadline.attribute.identifier for p_dl in dont_delete if p_dl.deadline.attribute]
+
         try:
             with transaction.atomic():
-                # Remove irrelevant deadlines from project data
-                project.update_deadlines()
-                # Remove projectDeadline associated with this project from the bad ones
-                for dl in deadline_test:
-                    if dl.deadline.subtype != project.subtype:
-                        dl.delete()
-                        logger.info("Deleting " + str(dl.deadline))
-                        continue
+                for dl in to_be_removed:
+                    logger.info("Deleting " + str(dl.deadline))
+                    if dl.deadline.attribute:
+                        attr_value = project.attribute_data.get(dl.deadline.attribute.identifier)
+                        if attr_value and not dl.deadline.attribute.identifier in dont_delete:
+                            # Fix attribute_data
+                            correct_value = project.deadlines.filter(deadline__attribute__identifier=dl.deadline.attribute.identifier,
+                                                                     deadline__subtype=project.subtype).first()
+                            if correct_value:
+                                print("Found correct value for " + str(dl.deadline)," Setting to " + str(correct_value))
+                                project.attribute_data[dl.deadline.attribute.identifier] = correct_value
+                            else:
+                                print("Removing incorrect value from attribute_data " + str(dl.deadline))
+                                project.attribute_data.pop(dl.deadline.attribute.identifier)
+                    # Remove incorrect ProjectDeadline(s)
+                    dl.delete()
                 confirmation = input("OK to clear the above deadlines? (y/n)")
                 if confirmation != 'y':
                     raise Exception
                 project.save()
                 logger.info("Bad deadlines cleared.")
                 clear_cache()
-        except:
+        except Exception as e:
+            logger.info(e)
             logger.info("Removal canceled.")
 
     
