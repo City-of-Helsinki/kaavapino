@@ -1606,10 +1606,10 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                     {
                         "identifier": date_type.identifier,
                         "name": date_type.name,
-                        "dates": date_type.get_dates_between(current_year - 1, current_year + 20)
+                        "dates": date_type.get_dates_between(current_year - 20, current_year + 20)
                     }
             dates = []
-            current_date = date(date.today().year - 1, 1, 1)
+            current_date = date(date.today().year - 20, 1, 1)
             end_date = date(date.today().year + 20, 12, 31)
 
             while current_date < end_date:
