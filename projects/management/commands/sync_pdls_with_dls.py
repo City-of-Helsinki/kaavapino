@@ -28,7 +28,7 @@ class Command(BaseCommand):
                 current_dls = project.deadlines.filter()
                 for p_dl in project_deadlines:
                     if p_dl not in current_dls:
-                        logger.info("Synchronizing missing deadline", str(p_dl))
+                        logger.info("Synchronizing missing deadline " + str(p_dl.deadline))
                         if p_dl.deadline.attribute:
                             attr_value = project.attribute_data.get(p_dl.deadline.attribute.identifier)
                             if attr_value:
