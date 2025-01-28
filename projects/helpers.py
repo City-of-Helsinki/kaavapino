@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
-from requests import ReadTimeout
+from requests import Timeout
 from rest_framework import status
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -119,34 +119,31 @@ def get_flat_attribute_data(data, flat, first_run=True, flat_key=None, value_typ
 
 
 def update_paikkatieto(attribute_data, use_cached=True):
-    if not attribute_data.get("hankenumero"):
+    identifier = attribute_data.get("hankenumero", None)
+    if not identifier:
         return
 
-    hankenumero = attribute_data["hankenumero"]
+    url = f"{settings.KAAVOITUS_API_BASE_URL}/hel/v1/paikkatieto/{identifier}"
 
-    url = f"{settings.KAAVOITUS_API_BASE_URL}/hel/v1/paikkatieto/{hankenumero}"
-    response = cache.get(url) if use_cached else None
-    if response is None:
+    paikkatieto_data = cache.get(url) if use_cached else None
+    if not paikkatieto_data:
         try:
             response = requests.get(
                 url,
                 headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                timeout=56
+                timeout=30
             )
             if response.status_code == 200:
-                cache.set(url, response, 86400)  # 24 hours
+                paikkatieto_data = response.json()
+                cache.set(url, paikkatieto_data, 86400)  # 24 hours
             else:
-                cache.set(url, response, 900)  # 15 minutes
-        except ReadTimeout:
+                cache.set(url, "error", 900)  # 15 minutes
+        except Timeout:
             log.error("Request timed out for url: {}".format(url))
-            response = Response(
-                data="Kaavoitus-api did not return a response in time.",
-                status=status.HTTP_408_REQUEST_TIMEOUT
-            )
-            cache.set(url, response, 3600)  # 1 hour
+            cache.set(url, "error", 3600)  # 1 hour
 
-    if response and response.status_code == 200:
-        return attribute_data.update(response.json())
+    if paikkatieto_data and paikkatieto_data != "error":
+        attribute_data.update(paikkatieto_data)
 
 
 def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
@@ -202,31 +199,32 @@ def set_kaavoitus_api_data_in_attribute_data(attribute_data, use_cached=True):
     }
 
     for attr, urls in fetched_data.items():
-        for key, value in urls.items():
-            url = value
-            if use_cached and cache.get(url) is not None:
-                response = cache.get(url)
-            else:
+        for key, url in urls.items():
+            data = cache.get(url) if use_cached else None
+            if not data:
                 try:
                     response = requests.get(
                         url,
                         headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
                         timeout=180
                     )
-                except ReadTimeout:
+                except Timeout:
                     log.error("Request timed out for url: {}".format(url))
                     response = Response(
                         data="Kaavoitus-api did not return a response in time.",
                         status=status.HTTP_408_REQUEST_TIMEOUT
                     )
 
-                if response.status_code in [200, 400, 404, 408]:
-                    cache.set(url, response, 86400)  # 24 hours
+                if response.status_code == 200:
+                    data = response.json()
+                    cache.set(url, data, 86400)  # 24 hours
+                elif response.status_code in [400, 404, 408]:
+                    cache.set(url, "error", 86400)  # 24 hours
                 else:
-                    cache.set(url, response, 900)  # 15 minutes
+                    cache.set(url, "error", 900)  # 15 minutes
 
-            if response.status_code == 200:
-                fetched_data[attr][key] = response.json()
+            if data and data != "error":
+                fetched_data[attr][key] = data
             else:
                 fetched_data[attr][key] = None
 
@@ -566,14 +564,11 @@ def get_ad_user(id):
     url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}" \
           "?$select=companyName,givenName,id,jobTitle,mail,mobilePhone,businessPhones,officeLocation,surname"
     try:
-        response = cache.get(url)
+        ad_user_data = cache.get(url)
     except TypeError:
         return None
 
-    if not response:
-        if response is not None:
-            return None
-
+    if not ad_user_data:
         token = get_graph_api_access_token()
         if not token:
             return Response(
@@ -583,13 +578,11 @@ def get_ad_user(id):
         response = requests.get(
             url, headers={"Authorization": f"Bearer {token}"}
         )
+        if response:
+            ad_user_data = response.json()
+            cache.set(url, ad_user_data, 3600)
 
-        cache.set(url, response, 3600)
-
-        if not response:
-            return None
-
-    return response.json()
+    return ad_user_data
 
 def _add_paths(paths, solved_path, remaining_path, parent_data):
     from projects.models import Attribute
@@ -626,42 +619,35 @@ def get_in_personnel_data(id, key, is_kaavapino_user):
 
 
 def set_geoserver_data_in_attribute_data(attribute_data):
-    if not attribute_data.get("hankenumero"):
+    identifier = attribute_data.get("hankenumero", None)
+    if not identifier:
         return
 
-    identifier = attribute_data["hankenumero"]
+    url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
 
-    if identifier and re.compile("^\d{4}_\d{1,3}$").match(identifier):
-        url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
-
-        if cache.get(url) is not None:
-            response = cache.get(url)
-        else:
+    geoserver_data = cache.get(url)
+    if not geoserver_data:
+        try:
             response = requests.get(
                 url,
                 headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                timeout=15
             )
             if response.status_code == 200:
-                cache.set(url, response, 86400)  # 1 day
-            elif response.status_code == 404:
-                cache.set(url, response, 28800)  # 8 hours
-            elif response.status_code >= 500:
-                log.error("Kaavoitus-api connection error: {} {}".format(
-                    response.status_code,
-                    response.text
-                ))
+                geoserver_data = response.json()
+                cache.set(url, geoserver_data, 86400)  # 1 day
             else:
-                cache.set(url, response, 3600)  # 1 hour
+                cache.set(url, "error", 3600)  # 1 hour
+        except Timeout:
+            log.error("Request timed out for url: {}".format(url))
+            cache.set(url, "error", 3600)  # 1 hour
 
-        if response.status_code == 200:
-            new_attributes = response.json()
-            for geo_attr in list(new_attributes.keys()):
-                # Prioritize manually set values
-                if attribute_data.get(geo_attr, False):
-                    new_attributes.pop(geo_attr, None)
-            attribute_data.update(new_attributes)
-
-    return None
+    if geoserver_data and geoserver_data != "error":
+        for geo_attr in list(geoserver_data.keys()):
+            # Prioritize manually set values
+            if attribute_data.get(geo_attr, False):
+                geoserver_data.pop(geo_attr, None)
+        attribute_data.update(geoserver_data)
 
 
 def set_ad_data_in_attribute_data(attribute_data):
