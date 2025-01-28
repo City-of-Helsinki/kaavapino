@@ -20,7 +20,7 @@ class Command(BaseCommand):
                 "func": "projects.tasks.refresh_on_map_overview_cache",
                 "defaults": {
                     "schedule_type": Schedule.CRON,
-                    "cron": "0 0 * * *",
+                    "cron": "0 6/6 * * *",
                 }
             },
             {
