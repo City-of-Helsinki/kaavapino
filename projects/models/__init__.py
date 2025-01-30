@@ -14,6 +14,7 @@ from .attribute import (  # noqa
 from .deadline import (  # noqa
     Deadline,
     DateType,
+    ForcedDate,
     AutomaticDate,
     DateCalculation,
     DeadlineDistance,

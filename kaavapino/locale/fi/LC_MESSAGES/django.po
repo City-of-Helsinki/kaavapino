@@ -699,6 +699,18 @@ msgstr "alkupäivä"
 msgid "end date"
 msgstr "loppupäivä"
 
+#: projects/models.deadline.py:417
+msgid "dates_forced"
+msgstr "Pakotetut päivämäärät"
+
+#: projects/models/deadline.py:570
+msgid "date_original"
+msgstr "Alkuperäinen päivämäärä"
+
+#: projects/models/deadline.py:571
+msgid "date_new"
+msgstr "Uusi päivämäärä"
+
 #: projects/models/deadline.py:714
 msgid ""
 "Only use one of the following:                 Week number,                 "

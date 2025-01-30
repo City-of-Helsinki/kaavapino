@@ -561,7 +561,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         if start_date > end_date:
             [start_date, end_date] = [start_date, end_date]
 
-        return (start_date, end_date)
+        return (start_date, end_date, end_date.year)
 
     @extend_schema(
         parameters=[
@@ -599,7 +599,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             #Find values have some vastuuyksikko or are null. Show all projects in date range.
             unitquery &= Q(project__attribute_data__vastuuyksikko__in=unit) | Q(project__attribute_data__vastuuyksikko__isnull=True)
 
-        start_date, end_date = self._parse_date_range(
+        start_date, end_date, year = self._parse_date_range(
             start_date,
             end_date,
             today=today,
@@ -620,6 +620,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             start_date + timedelta(days=i)
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
+
+        forced_dates = DateType.objects.get(identifier="lautakunnan_kokouspäivät").forced_dates.all()
+        forced_dates_remove = [d.original_date for d in forced_dates if d.original_date and d.original_date.year == year]
+        forced_dates_add = [d.new_date for d in forced_dates if d.new_date.year == year]
+        date_range = [d for d in date_range if d not in forced_dates_remove]
+        date_range.extend(forced_dates_add)
+
         #Dates that is shown in overview graph "Projektit ja kerrosalat lautakunnassa".
         suggested_date_attrs = [
             "milloin_kaavaehdotus_lautakunnassa",
