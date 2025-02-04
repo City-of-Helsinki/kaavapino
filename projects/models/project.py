@@ -498,7 +498,7 @@ class Project(models.Model):
             self.deadlines.remove(dl)
 
         generated_deadlines = []
-        project_deadlines = list(self.deadlines.all())
+        project_deadlines = []
 
         for deadline in deadlines:
             project_deadline, created = ProjectDeadline.objects.get_or_create(
@@ -510,7 +510,7 @@ class Project(models.Model):
             )
             if created:
                 generated_deadlines.append(project_deadline)
-                project_deadlines.append(project_deadline)
+            project_deadlines.append(project_deadline)
 
         self.deadlines.set(project_deadlines)
 
