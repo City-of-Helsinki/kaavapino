@@ -105,7 +105,7 @@ from projects.serializers.projecttype import (
 )
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer, DeadlineValidationSerializer
-from projects.serializers.utils import get_dl_vis_bool_name
+from projects.serializers.utils import get_dl_vis_bool_name, should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
@@ -955,19 +955,8 @@ class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                 dls = Deadline.objects.filter(attribute=item.attribute)
                 if not dls:
                     continue
-                vis_bool = get_dl_vis_bool_name(dls.first().deadlinegroup)
-                if not any(dl.subtype == project.subtype for dl in dls):
+                if not any(should_display_deadline(project, dl) for dl in dls):
                     filtered.append(item.pk)
-                    #print("Excluding " + str(item.attribute.identifier) + " because it is in the wrong subtype")
-                elif dls.first().phase.name == "Periaatteet" and not project.create_principles:
-                    filtered.append(item.pk)
-                    #print("Excluding " + str(item.attribute.identifier) + " because principles are not created")
-                elif dls.first().phase.name == "Luonnos" and not project.create_draft:
-                    filtered.append(item.pk)
-                    #print("Excluding " + str(item.attribute.identifier) + " because draft is not created")
-                elif vis_bool and not project.attribute_data.get(vis_bool):
-                    filtered.append(item.pk)
-                    #print("Excluding " + str(item.attribute.identifier) + " because visiblity bool is false or missing")
             return self.queryset.exclude(pk__in=filtered)
             
 
