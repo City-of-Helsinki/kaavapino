@@ -663,7 +663,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                                "project__phase", "project__phase__common_project_phase").\
             order_by("project__pk")
         projects_by_date = {
-            date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
+            date: [
+                dl.project for dl in filter(
+                    lambda dl:
+                        dl.date == date and should_display_deadline(dl.project, dl.deadline), project_deadlines
+                )
+            ]
             for date in date_range
         }
 
