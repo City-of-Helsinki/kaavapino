@@ -677,6 +677,9 @@ class Attribute(models.Model):
             return '{:,}'.format(int(float(value))).replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DATE:
             try:
+                if isinstance(value, bool):
+                    log.warning(self.identifier + " had a boolean value despite being a date")
+                    return value
                 date_value = datetime.datetime.strptime(value, "%Y-%m-%d")
                 return '{d.day}.{d.month}.{d.year}'.format(d=date_value)
             except ValueError:

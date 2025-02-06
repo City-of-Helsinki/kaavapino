@@ -66,6 +66,7 @@ def get_dl_vis_bool_name(group_name):
         'periaatteet_lautakuntakerta_1': 'periaatteet_lautakuntaan_1',
         'periaatteet_lautakuntakerta_2': 'periaatteet_lautakuntaan_2',
         'periaatteet_lautakuntakerta_3': 'periaatteet_lautakuntaan_3',
+        'periaatteet_lautakuntakerta_4': 'periaatteet_lautakuntaan_4',
         'oas_esillaolokerta_1': 'jarjestetaan_oas_esillaolo_1',
         'oas_esillaolokerta_2': 'jarjestetaan_oas_esillaolo_2',
         'oas_esillaolokerta_3': 'jarjestetaan_oas_esillaolo_3',
@@ -92,3 +93,18 @@ def get_dl_vis_bool_name(group_name):
         'voimaantulo_1': None
     }
     return vis_bool_map[group_name] if group_name in vis_bool_map else None
+
+def should_display_deadline(project, deadline):
+    if not project or not deadline:
+        # No reason to exclude
+        return True
+    vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
+    if deadline.subtype != project.subtype:
+        return False
+    elif deadline.phase.name == "Periaatteet" and not project.create_principles:
+        return False
+    elif deadline.phase.name == "Luonnos" and not project.create_draft:
+        return False
+    elif vis_bool and not project.attribute_data.get(vis_bool):
+        return False
+    return True
