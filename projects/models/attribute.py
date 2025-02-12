@@ -359,6 +359,14 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    viewing_privilege = models.CharField(
+        verbose_name=_("privilege for viewing timetable items"),
+        max_length=6,
+        choices=PRIVILEGE_LEVELS,
+        default=None,
+        null=True,
+        blank=True,
+    )
     # attributes which are linked to static Project fields
     static_property = models.CharField(max_length=255, blank=True, null=True)
 

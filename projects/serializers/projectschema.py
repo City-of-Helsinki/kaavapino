@@ -229,6 +229,22 @@ class AttributeSchemaSerializer(serializers.Serializer):
     fieldset_total = serializers.CharField()
     attributegroup = serializers.CharField()
     attributesubgroup = serializers.CharField()
+    viewing_privilege = serializers.CharField()
+    timetable_editable = serializers.SerializerMethodField("get_timetable_editable")
+
+    def get_timetable_editable(self, attribute):
+        privilege = privilege_as_int(self.context["privilege"])
+        owner = self.context["owner"]
+        # owner can edit owner-editable fields regardless of their role
+        #Needs to be atleast vastuuhenkilö and owner of project to edit
+        if owner and privilege >= 3:
+            return True
+        # check privilege for others
+        elif attribute.edit_privilege and \
+            privilege >= privilege_as_int(attribute.edit_privilege):
+            return True
+        else:
+            return False
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
@@ -693,6 +709,31 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
 
         return self._get_serialized_attributes(sect_attrs, owner, privilege, project)
 
+class ProjectPhaseDeadlineSectionSerializerGroup(serializers.Serializer):
+    name = serializers.CharField()
+    attributes = serializers.SerializerMethodField("_get_attributes")
+
+    @staticmethod
+    def _get_serialized_attributes(sect_attrs, owner, privilege, project):
+        serialized = []
+
+        for sect_attr in sect_attrs:
+            serialized.append(DeadlineAttributeSchemaSerializer(
+                sect_attr.attribute,
+                context={"owner": owner, "privilege": privilege, "project": project}
+            ).data)
+
+        return serialized
+
+    def _get_attributes(self, deadline_section):
+        owner = self.context.get("owner", False)
+        privilege = self.context.get("privilege", False)
+        project = self.context.get("project", None)
+
+        sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
+            .filter(admin_field=True).select_related("attribute")
+
+        return self._get_serialized_attributes(sect_attrs, owner, privilege, project)
 
 class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -748,7 +789,7 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
     @staticmethod
     def _get_grouped_sections(privilege, owner, phase, project=None):
         grouped_sections = [
-            ProjectPhaseDeadlineSectionSerializer(
+            ProjectPhaseDeadlineSectionSerializerGroup(
                 section,
                 context={"privilege": privilege, "owner": owner, "project": project},
             ).data
@@ -808,71 +849,6 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
             phase,
             project,
         )
-
-    @staticmethod
-    def _get_grouped_sections(privilege, owner, phase, project=None):
-        grouped_sections = [
-            ProjectPhaseDeadlineSectionSerializer(
-                section,
-                context={"privilege": privilege, "owner": owner, "project": project},
-            ).data
-            for section in phase.deadline_sections.all()
-        ]
-
-        confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl in project.deadlines.all()
-            .select_related("deadline", "project", "deadline__attribute", "deadline__confirmation_attribute")
-            if dl.confirmed and dl.deadline.attribute
-        ] if project else []
-
-        for sect_i, section in enumerate(grouped_sections):
-            grouped_attributes = {}
-
-            for attr_i, attr in enumerate(section["attributes"]):
-                if attr["name"] in confirmed_deadlines:
-                    grouped_sections[sect_i]["attributes"][attr_i]["editable"] = False
-
-                # Group attributes by 'attributegroup'
-                group = attr.get("attributegroup", "default")
-                subgroup = attr.get("attributesubgroup", None)
-                if group not in grouped_attributes:
-                    grouped_attributes[group] = {}
-
-                if subgroup:
-                    if subgroup not in grouped_attributes[group]:
-                        grouped_attributes[group][subgroup] = []
-                    # Check if attr does not exist already before appending
-                    if attr not in grouped_attributes[group][subgroup]:
-                        grouped_attributes[group][subgroup].append(attr)
-                else:
-                    if "default" not in grouped_attributes[group]:
-                        grouped_attributes[group]["default"] = []
-                    # Check if attr does not exist already before appending
-                    if attr not in grouped_attributes[group]["default"]:
-                        grouped_attributes[group]["default"].append(attr)
-
-            grouped_sections[sect_i]["attributes"] = grouped_attributes
-        return grouped_sections
-
-    def get_grouped_sections(self, phase):
-        try:
-            context = self.context
-        except AttributeError:
-            context = {}
-
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
-        except (ValueError, TypeError, Project.DoesNotExist):
-            project = None
-
-        return self._get_grouped_sections(
-            context.get("privilege"),
-            context.get("owner"),
-            phase,
-            project,
-        )
-
 
 class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
     def to_representation(self, data):

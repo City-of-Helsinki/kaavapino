@@ -79,6 +79,7 @@ ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
 ATTRIBUTE_VALIDATION_REGEX = "regex sääntö"
 ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 ATTRIBUTE_EDIT_PRIVILEGE = "kenellä on oikeus muokata tietoa"
+ATTRIBUTE_VIEW_PRIVILEGE = "kenellä on oikeus nähdä tieto"
 ATTRIBUTE_ERROR = "virhetilanne"
 ATTRIBUTE_PLACEHOLDER = "syöttökentässä näkyvä ohjeistusteksti"
 ATTRIBUTE_ASSISTIVE_TEXT = "kentän alla näkyvä lyhyt vinkki"
@@ -894,6 +895,15 @@ class AttributeImporter:
                     if match_text in privilege_list:
                         edit_privilege = privilege
                         break
+            
+            viewing_privilege = row[self.column_index[ATTRIBUTE_VIEW_PRIVILEGE]]
+
+            if viewing_privilege:
+                viewing_privilege_list = re.split(r",\s*", viewing_privilege.lower())
+                for match_text, privilege in USER_PRIVILEGES.items():
+                    if match_text in viewing_privilege_list:
+                        viewing_privilege = privilege
+                        break
 
             field_roles = row[self.column_index[ATTRIBUTE_FIELD_ROLE]]
             if field_roles == "automaattinen tieto, jota ei voi muokata":
@@ -946,6 +956,7 @@ class AttributeImporter:
                     "static_property": static_property,
                     "owner_editable": owner_editable,
                     "edit_privilege": edit_privilege,
+                    "viewing_privilege": viewing_privilege,
                     "owner_viewable": True,
                     "view_privilege": "browse",
                     "data_source": data_source,
