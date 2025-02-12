@@ -105,6 +105,7 @@ from projects.serializers.projecttype import (
 )
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer, DeadlineValidationSerializer
+from projects.serializers.utils import get_dl_vis_bool_name, should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
@@ -662,7 +663,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                                "project__phase", "project__phase__common_project_phase").\
             order_by("project__pk")
         projects_by_date = {
-            date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
+            date: [
+                dl.project for dl in filter(
+                    lambda dl:
+                        dl.date == date and should_display_deadline(dl.project, dl.deadline), project_deadlines
+                )
+            ]
             for date in date_range
         }
 
@@ -940,6 +946,24 @@ class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
         .order_by("section__index", "index")
     serializer_class = ProjectCardSchemaSerializer
 
+    def get_queryset(self):
+        project_id = self.request.query_params.get('project', None)
+        if not project_id:
+            return self.queryset
+        else:
+            try:
+                project = Project.objects.get(pk=int(project_id))
+            except Project.DoesNotExist:
+                raise Http404
+            filtered = []
+            for item in self.queryset:
+                dls = Deadline.objects.filter(attribute=item.attribute)
+                if not dls:
+                    continue
+                if not any(should_display_deadline(project, dl) for dl in dls):
+                    filtered.append(item.pk)
+            return self.queryset.exclude(pk__in=filtered)
+            
 
 class AttributePagination(pagination.PageNumberPagination):
     page_size = 2000
