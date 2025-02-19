@@ -4,6 +4,7 @@ import re
 import logging
 import numpy as np
 import requests
+from requests.exceptions import Timeout
 from typing import List, NamedTuple, Type
 
 from actstream import action
@@ -384,32 +385,14 @@ class ProjectOnMapOverviewSerializer(serializers.ModelSerializer):
     subtype = serializers.SerializerMethodField()
     phase = serializers.SerializerMethodField()
 
-    def get_geoserver_data(self, project):
+    def get_geoserver_data(self, project):  # Data is cached in projects.tasks.refresh_on_map_overview_cache periodically
         identifier = project.attribute_data.get("hankenumero")
-        if identifier and re.compile("^\d{4}_\d{1,3}$").match(identifier):
-            url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
+        if not identifier:
+            return None
 
-            if cache.get(url) is not None:
-                response = cache.get(url)
-            else:
-                response = requests.get(
-                    url,
-                    headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-                )
-                if response.status_code == 200:
-                    cache.set(url, response, 86400)  # 1 day
-                elif response.status_code == 404:
-                    cache.set(url, response, 28800)  # 8 hours
-                elif response.status_code >= 500:
-                    log.error("Kaavoitus-api connection error: {} {}".format(
-                        response.status_code,
-                        response.text
-                    ))
-                else:
-                    cache.set(url, response, 3600)  # 1 hour
-
-            if response.status_code == 200:
-                return response.json()
+        geoserver_data  = cache.get(f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}")
+        if geoserver_data and geoserver_data != "error":
+            return geoserver_data
 
         return None
 
@@ -672,32 +655,30 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["type", "created_at", "modified_at", "project_card_document"]
 
-    def get_geoserver_data(self, project):
+    def get_geoserver_data(self, project):  # Data is cached in projects.tasks.refresh_on_map_overview_cache periodically
         identifier = project.attribute_data.get("hankenumero")
-        if identifier and re.compile("^\d{4}_\d{1,3}$").match(identifier):
-            url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
+        if not identifier:
+            return None
 
-            if cache.get(url) is not None:
-                response = cache.get(url)
-            else:
+        url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
+        geoserver_data  = cache.get(url)
+
+        if not geoserver_data:
+            try:
                 response = requests.get(
                     url,
                     headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
                 )
                 if response.status_code == 200:
-                    cache.set(url, response, 86400)  # 1 day
-                elif response.status_code == 404:
-                    cache.set(url, response, 28800)  # 8 hours
-                elif response.status_code >= 500:
-                    log.error("Kaavoitus-api connection error: {} {}".format(
-                        response.status_code,
-                        response.text
-                    ))
+                    geoserver_data = response.json()
+                    cache.set(url, geoserver_data, 86400)
                 else:
-                    cache.set(url, response, 3600)  # 1 hour
+                    cache.set(url, "error", 3600)
+            except Timeout:
+                pass
 
-            if response.status_code == 200:
-                return response.json()
+        if geoserver_data and geoserver_data != "error":
+            return geoserver_data
 
         return None
 
@@ -1073,8 +1054,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         for id in set(ids):
             url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/{id}"
-            response = cache.get(url)
-            if not response:
+            personnel_data = cache.get(url)
+            if not personnel_data:
                 token = get_graph_api_access_token()
                 if not token:
                     return Response(
@@ -1088,9 +1069,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if not response:
                     continue
 
-                cache.set(url, response, 28800)
+                personnel_data = response.json()
+                cache.set(url, personnel_data, 28800)
 
-            data = PersonnelSerializer(response.json()).data
+            data = PersonnelSerializer(personnel_data).data
             return_values.append({"id": id, "name": data["name"]})
 
         return return_values

@@ -3,6 +3,7 @@ import logging
 import re
 
 import requests
+from requests.exceptions import Timeout
 
 from django.conf import settings
 from django.core.cache import cache
@@ -16,28 +17,34 @@ from projects.helpers import set_kaavoitus_api_data_in_attribute_data
 
 logger = logging.getLogger(__name__)
 
+VALID_IDENTIFIER_PATTERN = re.compile("^\d{4}_\d{1,3}$")
+
 
 def refresh_on_map_overview_cache():
-    logger.info("Requesting new Geoserver data for all projects")
-
-    for project in Project.objects.all():
+    projects = Project.objects.all()
+    logger.info(f"Caching Geoserver data for {len(projects)} projects")
+    for project in projects:
         identifier = project.attribute_data.get("hankenumero")
-
-        if not identifier or not re.compile("^\d{4}_\d{1,3}$").match(identifier):
+        if not identifier or not VALID_IDENTIFIER_PATTERN.match(identifier):
+            logger.info(f"Project {project.name} has invalid hankenumero: {identifier}")
             continue
 
         url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
-
-        response = requests.get(
-            url,
-            headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
-        )
-        if response.status_code == 200:
-            cache.set(url, response, 86400)  # 1 day
-        elif response.status_code == 404:
-            cache.set(url, response, 28800)  # 8 hours
-        else:
-            cache.set(url, response, 3600)  # 1 hour
+        try:
+            response = requests.get(
+                url,
+                headers={"Authorization": f"Token {settings.KAAVOITUS_API_AUTH_TOKEN}"},
+                timeout=10,
+            )
+            if response.status_code == 200:
+                cache.set(url, response.json(), 86400)
+            else:
+                logger.info(f"Invalid request response {response.status_code} for {identifier}")
+        except Timeout:
+            logger.warning(f"Timeout while caching Geoserver data for hankenumero {identifier}")
+            pass
+        except Exception as exc:
+            logger.warning(f"Exception while caching Geoserver data for hankenumero {identifier}", exc)
 
 def refresh_project_schedule_cache():
     project_schedule_cache = cache.get("serialized_project_schedules", {})
