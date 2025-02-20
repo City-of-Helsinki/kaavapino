@@ -29,6 +29,8 @@ from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
 from .projectcomment import FieldComment
 
+import time
+
 log = logging.getLogger(__name__)
 
 
@@ -139,6 +141,9 @@ class ProjectPriority(models.Model):
 
 class Project(models.Model):
     """Represents a single project in the system."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.total_save_time = 0
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -416,11 +421,18 @@ class Project(models.Model):
 
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False, preview_attribute_data={}):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False):
+        print(f"_set_calculated_deadlines called with {len(deadlines)} deadlines" )
+        if ignore is None:
+            ignore = [] # Important! Otherwise skips a lot of validation!
         results = {}
         fillers = []
 
+        total_deps_time = 0
+        total_dep_calc_time = 0
+        total_normal_calc_time = 0
         for deadline in deadlines:
+            fetch_deps = time.time()
             if initial:
                 calculate_deadline = deadline.calculate_initial
                 dependencies = [
@@ -433,8 +445,9 @@ class Project(models.Model):
                     dl for dl in deadline.update_depends_on
                     if dl not in ignore
                 ]
-
+            total_deps_time += (time.time() - fetch_deps)
             if dependencies:
+                dep_calc_time = time.time()
                 ignore += dependencies
                 results = { **results,
                     **self._set_calculated_deadlines(
@@ -444,9 +457,12 @@ class Project(models.Model):
                         initial=initial,
                         preview=preview,
                         preview_attribute_data=preview_attribute_data,
+                        is_recursing=True
                     )
                 }
+                total_dep_calc_time += time.time() - dep_calc_time
 
+            normal_calc_time = time.time()
             result = self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
@@ -454,12 +470,13 @@ class Project(models.Model):
                 preview,
                 preview_attribute_data,
             )
+            total_normal_calc_time += time.time() - normal_calc_time
 
             if not result:
                 fillers += [deadline]
 
             results[deadline] = result
-
+        #print(f"Fetching deps {total_deps_time} Calculating deps {total_dep_calc_time} Calculating without deps {total_normal_calc_time}")
         for deadline in fillers:
             # Another pass for few deadlines that depend on other deadlines
             if initial:
@@ -475,12 +492,18 @@ class Project(models.Model):
                 preview_attribute_data,
             )
 
-        self.save()
+        if not is_recursing:
+            save_start = time.time()
+            self.save()
+            self.total_save_time += time.time() - save_start
+        #print("Cumulative save time:  " + str(self.total_save_time))
 
         return results
 
     # Generate or update schedule for project
     def update_deadlines(self, user=None, initial=False, preview_attributes={}):
+        print("Update deadlines called")
+        update_start = time.time()
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
@@ -540,9 +563,12 @@ class Project(models.Model):
             initial=False,
             preview_attribute_data=preview_attributes
         )
+        print("Update_deadlines took " + str(time.time() - update_start))
 
     # Calculate a preview schedule without saving anything
     def get_preview_deadlines(self, updated_attributes, subtype):
+        print(f"get_preview_deadlines called with {len(updated_attributes)} attributes and subtype {subtype}")
+        preview_start = time.time()
         # Filter out deadlines that would be deleted
         project_dls = {
             dl.deadline: dl.date
@@ -551,6 +577,7 @@ class Project(models.Model):
             .prefetch_related("deadline__initial_calculations", "deadline__update_calculations")
             if dl.deadline.subtype == subtype
         }
+        print(f"Initial project dls: {len(project_dls)}")
 
         # List deadlines that would be created
         new_dls = {
@@ -561,6 +588,7 @@ class Project(models.Model):
             )
             if dl not in project_dls
         }
+        print(f"New project dls: {len(new_dls)}")
 
         project_dls = {**new_dls, **project_dls}
 
@@ -575,7 +603,7 @@ class Project(models.Model):
             if value:
                 project_dls[dl] = value
 
-
+        initial_start = time.time()
         # Generate newly added deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
@@ -586,7 +614,9 @@ class Project(models.Model):
             initial=True,
             preview=True,
         )}
+        print(f"Initial generation duration {time.time() - initial_start} s, new len {len(project_dls)}" )
 
+        update_start = time.time()
         # Update all deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
@@ -600,12 +630,13 @@ class Project(models.Model):
             preview=True,
             preview_attribute_data=updated_attributes,
         )}
+        print(f"Update duration {time.time() - update_start} s, new len {len(project_dls)}" )
 
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
             if type(value) == bool:
                 project_dls[identifier] = value
-
+        print("get_preview_deadlines duration: " + str(time.time() - preview_start))
         return project_dls
 
     @property
@@ -659,6 +690,7 @@ class Project(models.Model):
         ActStreamAction.objects.filter(target_object_id=str(self.pk)).delete()  # Clear audit logs from actstream_action table
 
     def save(self, *args, **kwargs):
+        print("Saving project")
         fieldset_attributes = {f for f in FieldSetAttribute.objects.all().select_related("attribute_source", "attribute_target")}
 
         def add_fieldset_field_for_attribute(search_fields, attr, fieldset, raw=False):

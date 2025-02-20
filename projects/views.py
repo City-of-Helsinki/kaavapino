@@ -109,6 +109,8 @@ from projects.serializers.utils import get_dl_vis_bool_name, should_display_dead
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
+import time
+
 log = logging.getLogger(__name__)
 
 
@@ -207,6 +209,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return ProjectSerializer
 
     def get_queryset(self):
+        start = time.time()
         user = self.request.user
         queryset = self.queryset
         if self.request.method in ['PUT', 'PATCH']:
@@ -244,7 +247,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 queryset = queryset.filter(onhold=True)
             elif status == "archived":
                 queryset = queryset.filter(archived=True)
-
+        print("getting queryset part took (s): " + str(time.time() - start))
         return queryset
 
     def _string_filter_to_list(self, filter_string):
@@ -928,8 +931,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # Run update in 'ghost' mode where no changes are applied to database but result is returned
         with transaction.atomic():
+            start = time.time()
             result = super().update(request, *args, **kwargs)
+            result_end = time.time()
             transaction.set_rollback(True)
+            rollback_end = time.time()
+            print("Time elapsed during calculating:" + str(result_end - start))
+            print("Time elapsed during rollback: "+ str(rollback_end - result_end))
             return result
 
 

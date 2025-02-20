@@ -70,6 +70,7 @@ from users.helpers import get_graph_api_access_token
 
 log = logging.getLogger(__name__)
 
+import time
 
 class SectionData(NamedTuple):
     section: ProjectPhaseSection
@@ -1322,6 +1323,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def validate(self, attrs):
+        start = time.time()
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
 
@@ -1354,14 +1356,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("create_draft") == False:
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
-
+        start_adata = time.time()
         attrs["attribute_data"] = self._validate_attribute_data(
             attrs.get("attribute_data", None),
             attrs,
             self.instance.user if self.instance else None,
             self.instance.owner_edit_override if self.instance else None,
         )
-
+        #print("Projectserializer.validate() took (s): " + str(time.time()-start))
+        #print("Of this, validating attribute data took (s) " + str(time.time()-start_adata))
         return attrs
 
     def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
@@ -1402,6 +1405,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return should_update_deadlines
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
+        #print("Validating attribute data")
         static_property_attributes = {}
         if self.instance:
             static_properties = [
@@ -1489,12 +1493,15 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
         preview = None
         if self.instance and should_update_deadlines:
+            start_preview = time.time()
             preview = self.instance.get_preview_deadlines(
                 attribute_data,
                 subtype,
             )
+            #print("Getting preview deadlines took: " + str(time.time() - start_preview))
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
+        start_phase_loop = time.time()
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
             .exclude(index__range=[2, min_phase_index-1]):
             sections_data += self.generate_sections_data(
@@ -1514,7 +1521,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             preview=preview,
         ) or []
 
-
+        #print("Phase loop took: " + str(time.time()-start_phase_loop))
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
@@ -1527,13 +1534,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         #     valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
         errors = {}
+        start_section_update = time.time()
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
             if not serializer.is_valid(raise_exception=False):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
-
+        print("Section update took " + str(time.time()-start_section_update))
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
             raise ValidationError(errors)
@@ -1568,7 +1576,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
                 files_to_archive.append((identifier, attribute_file))
 
-            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist):
+            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist) as e:
                 invalid_identifiers.append(identifier)
 
 
@@ -1751,6 +1759,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             pass
 
     def update(self, instance: Project, validated_data: dict) -> Project:
+        start = time.time()
         attribute_data = validated_data.pop("attribute_data", {})
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
@@ -1830,7 +1839,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     self.create_deadline_updates_log(
                         dl.deadline, project, user, old_date, new_date
                     )
-
+            #print("Time elapsed in projectSerializer.update(): " + str(time.time() - start))
             return project
 
     def update_initial_data(self, validated_data):
