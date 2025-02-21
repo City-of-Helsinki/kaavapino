@@ -444,8 +444,8 @@ class DateType(models.Model):
             return cached_result
 
         listed_dates = self.dates or []
-        forced_dates_remove = [date.original_date for date in self.forced_dates.all()]
-        forced_dates_add = [date.new_date for date in self.forced_dates.all()]
+        forced_dates_remove = [date.original_date for date in self.forced_dates.all() if date.original_date]
+        forced_dates_add = [date.new_date for date in self.forced_dates.all() if date.new_date]
         base_dates = []
         has_base_datetypes = self.base_datetype.exists()
 
@@ -574,13 +574,13 @@ class DateType(models.Model):
 
 
 class ForcedDate(models.Model):
-    original_date = models.DateField(blank=True, null=True, verbose_name=_("date_original"))
-    new_date = models.DateField(blank=False, null=False, verbose_name=_("date_new"))
+    original_date = models.DateField(blank=True, null=True, unique=True, verbose_name=_("date_original"))
+    new_date = models.DateField(blank=True, null=True, unique=True, verbose_name=_("date_new"))
 
     def __str__(self):
         original_date_str = self.original_date.strftime("%d.%m.%Y") if self.original_date else None
         new_date_str = self.new_date.strftime("%d.%m.%Y") if self.new_date else None
-        return f"{original_date_str} -> {new_date_str}" if original_date_str else new_date_str
+        return f"{original_date_str} -> {new_date_str}"
 
 
 class AutomaticDate(models.Model):

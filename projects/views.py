@@ -624,7 +624,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         forced_dates = DateType.objects.get(identifier="lautakunnan_kokouspäivät").forced_dates.all()
         forced_dates_remove = [d.original_date for d in forced_dates if d.original_date and d.original_date.year == year]
-        forced_dates_add = [d.new_date for d in forced_dates if d.new_date.year == year]
+        forced_dates_add = [d.new_date for d in forced_dates if d.new_date and d.new_date.year == year]
         date_range = [d for d in date_range if d not in forced_dates_remove]
         date_range.extend(forced_dates_add)
 
