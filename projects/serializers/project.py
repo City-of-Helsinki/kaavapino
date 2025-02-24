@@ -1354,14 +1354,12 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("create_draft") == False:
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
-
         attrs["attribute_data"] = self._validate_attribute_data(
             attrs.get("attribute_data", None),
             attrs,
             self.instance.user if self.instance else None,
             self.instance.owner_edit_override if self.instance else None,
         )
-
         return attrs
 
     def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
@@ -1514,7 +1512,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             preview=preview,
         ) or []
 
-
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
@@ -1533,7 +1530,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             if not serializer.is_valid(raise_exception=False):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
-
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
             raise ValidationError(errors)
@@ -1568,7 +1564,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
                 files_to_archive.append((identifier, attribute_file))
 
-            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist):
+            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist) as e:
                 invalid_identifiers.append(identifier)
 
 
@@ -1830,7 +1826,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                     self.create_deadline_updates_log(
                         dl.deadline, project, user, old_date, new_date
                     )
-
             return project
 
     def update_initial_data(self, validated_data):

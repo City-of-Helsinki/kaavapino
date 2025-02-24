@@ -29,6 +29,7 @@ from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
 from .projectcomment import FieldComment
 
+
 log = logging.getLogger(__name__)
 
 
@@ -416,7 +417,9 @@ class Project(models.Model):
 
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False, preview_attribute_data={}):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False):
+        if ignore is None:
+            ignore = []
         results = {}
         fillers = []
 
@@ -433,7 +436,6 @@ class Project(models.Model):
                     dl for dl in deadline.update_depends_on
                     if dl not in ignore
                 ]
-
             if dependencies:
                 ignore += dependencies
                 results = { **results,
@@ -444,6 +446,7 @@ class Project(models.Model):
                         initial=initial,
                         preview=preview,
                         preview_attribute_data=preview_attribute_data,
+                        is_recursing=True
                     )
                 }
 
@@ -454,7 +457,6 @@ class Project(models.Model):
                 preview,
                 preview_attribute_data,
             )
-
             if not result:
                 fillers += [deadline]
 
@@ -475,7 +477,8 @@ class Project(models.Model):
                 preview_attribute_data,
             )
 
-        self.save()
+        if not is_recursing:
+            self.save()
 
         return results
 
@@ -515,7 +518,6 @@ class Project(models.Model):
             value = value if value != 'null' else None
             dl.date = value
             dl.save()
-
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
             [
@@ -575,7 +577,6 @@ class Project(models.Model):
             if value:
                 project_dls[dl] = value
 
-
         # Generate newly added deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
@@ -605,7 +606,6 @@ class Project(models.Model):
         for identifier, value in updated_attribute_data.items():
             if type(value) == bool:
                 project_dls[identifier] = value
-
         return project_dls
 
     @property

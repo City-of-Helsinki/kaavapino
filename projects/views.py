@@ -1,7 +1,6 @@
 import pytz
 import csv
 from datetime import datetime, timedelta, date
-import time
 import logging
 
 from django.contrib.postgres.search import SearchVector
@@ -108,6 +107,7 @@ from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateS
 from projects.serializers.utils import get_dl_vis_bool_name, should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
+
 
 log = logging.getLogger(__name__)
 
@@ -244,7 +244,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 queryset = queryset.filter(onhold=True)
             elif status == "archived":
                 queryset = queryset.filter(archived=True)
-
         return queryset
 
     def _string_filter_to_list(self, filter_string):
