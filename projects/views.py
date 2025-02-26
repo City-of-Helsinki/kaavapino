@@ -242,8 +242,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 queryset = queryset.filter(onhold=True)
             elif status == "archived":
                 queryset = queryset.filter(archived=True)
-
-        return queryset
+        return queryset.distinct()
 
     def _string_filter_to_list(self, filter_string):
         return [_filter.strip().lower() for _filter in filter_string.split(",")]
