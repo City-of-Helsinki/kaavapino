@@ -244,7 +244,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 queryset = queryset.filter(onhold=True)
             elif status == "archived":
                 queryset = queryset.filter(archived=True)
-        return queryset
+        return queryset.distinct()
 
     def _string_filter_to_list(self, filter_string):
         return [_filter.strip().lower() for _filter in filter_string.split(",")]
@@ -581,7 +581,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         start_date = self.request.query_params.get("start_date")
         end_date = self.request.query_params.get("end_date")
         projectsize = self.request.query_params.get("subtype_id",[1,2,3,4,5])
-        unit = self.request.query_params.get("vastuuyksikko",["lantinen_alueyksikko","ita_alueyksikko","pohjoinen_alueyksikko","etela_alueyksikko","kaarela_vihdintie_tiimi","lantinen_taydennysrakentaminen_tiimi","koivusaari_lauttasaari_tiimi","malmi_tiimi","pasila_tiimi","pohjoinen_taydennysrakentaminen_tiimi","herttoniemi_ja_itaiset_saaret_tiimi","vuosaari_ostersundom_tiimi","mellunkyla_vartiokyla_tiimi","lansisatama_kalasatama_tiimi","kantakaupunki_tiimi","asemakaavakoordinointiyksikko","keskusta_tiimi","kaupunkiuudistus_tiimi","asemakaavaprosessi_tiimi"])
+        unit = self.request.query_params.get("vastuuyksikko", None)
         unitquery = Q()
         valid_filters = self._get_valid_filters("filters_floor_area")
         deadline_query = self._get_query(valid_filters, "project")
@@ -591,13 +591,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             projectsize_int = [int(x.strip()) for x in projectsize.split(',') if x]
         else:
             projectsize_int = projectsize
-        if isinstance(unit, str):
+        if unit:
             unit = [(x.strip()) for x in unit.split(',') if x]
-            #Filter values that have specific vastuuyksikko and are not null
             unitquery &= Q(project__attribute_data__vastuuyksikko__in=unit)
-        elif isinstance(unit, list):
-            #Find values have some vastuuyksikko or are null. Show all projects in date range.
-            unitquery &= Q(project__attribute_data__vastuuyksikko__in=unit) | Q(project__attribute_data__vastuuyksikko__isnull=True)
 
         start_date, end_date, year = self._parse_date_range(
             start_date,

@@ -1430,7 +1430,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         for attribute_identifier, value in attribute_data.items():
             try:
                 attribute = Attribute.objects.get(identifier=attribute_identifier)
-                if attribute.value_type == Attribute.TYPE_CHOICE:
+                if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
                 elif attribute.value_type == Attribute.TYPE_FIELDSET and value:

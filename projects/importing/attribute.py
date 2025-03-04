@@ -834,7 +834,7 @@ class AttributeImporter:
             error_text = row[self.column_index[ATTRIBUTE_ERROR_TEXT]]
             error_message = row[self.column_index[ATTRIBUTE_ERROR]]
             static_property = STATIC_ATTRIBUTES_MAPPING.get(
-                row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
 
             try:
@@ -1027,11 +1027,8 @@ class AttributeImporter:
             attr.ad_key_attribute = None
             attr.save()
 
-        # Ignore 'vastuu_paallikon_nimi' (customer manages it manually in django-admin)
-        all_auto_attrs = [attr.id for attr in AttributeAutoValue.objects.all()
-                          .exclude(value_attribute__identifier='vastuu_paallikon_nimi')]
-        all_auto_attr_mappings = [attr.id for attr in AttributeAutoValueMapping.objects.all()
-                                  .exclude(auto_attr__value_attribute__identifier='vastuu_paallikon_nimi')]
+        all_auto_attrs = [attr.id for attr in AttributeAutoValue.objects.all()]
+        all_auto_attr_mappings = [attr.id for attr in AttributeAutoValueMapping.objects.all()]
 
         for row in rows:
             identifier = self._get_attribute_row_identifier(row)
@@ -1043,7 +1040,7 @@ class AttributeImporter:
             auto_value_mapping = {}
             if row[self.column_index[ATTRIBUTE_AUTO_VALUE_MAPPING]]:
                 for item in re.split(
-                    r',\s*',
+                    r';\s*',
                     row[self.column_index[ATTRIBUTE_AUTO_VALUE_MAPPING]],
                 ):
                     try:
@@ -1078,22 +1075,24 @@ class AttributeImporter:
                 if auto_attr.id in all_auto_attrs:
                     all_auto_attrs.remove(auto_attr.id)
 
-                if created or identifier != 'vastuu_paallikon_nimi':
-                    for (key, value) in auto_value_mapping.items():
-                        if auto_attr.key_attribute.value_choices.count():
-                            try:
-                                key = auto_attr.key_attribute.value_choices \
-                                    .get(value=key).identifier
-                            except AttributeValueChoice.DoesNotExist:
-                                pass
+                for (key, value) in auto_value_mapping.items():
+                    if auto_attr.key_attribute.value_choices.count():
+                        try:
+                            key = auto_attr.key_attribute.value_choices \
+                                .get(value=key).identifier
+                        except AttributeValueChoice.DoesNotExist:
+                            pass
 
-                        auto_attr_mapping, created = AttributeAutoValueMapping.objects.get_or_create(
-                            auto_attr=auto_attr,
-                            key_str=key,
-                            defaults={'value_str': value},
-                        )
-                        if auto_attr_mapping.id in all_auto_attr_mappings:
-                            all_auto_attr_mappings.remove(auto_attr_mapping.id)
+                    auto_attr_mapping, created = AttributeAutoValueMapping.objects.get_or_create(
+                        auto_attr=auto_attr,
+                        key_str=key,
+                        defaults={'value_str': value},
+                    )
+                    if not created:
+                        auto_attr_mapping.value_str = value
+                        auto_attr_mapping.save()
+                    if auto_attr_mapping.id in all_auto_attr_mappings:
+                        all_auto_attr_mappings.remove(auto_attr_mapping.id)
             except Attribute.DoesNotExist:
                 pass
 
@@ -1297,7 +1296,7 @@ class AttributeImporter:
                 },
             )
             fieldset = Attribute.objects.get(
-                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
             try:
                 [name, custom_name, link] = [
@@ -1331,7 +1330,7 @@ class AttributeImporter:
             show_on_mobile = row[self.column_index[CARD_SHOW_ON_MOBILE]] == "kyllä"
             date_format = row[self.column_index[CARD_SECTION_DATE_FORMAT]]
             attribute = Attribute.objects.get(
-                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
 
             if not location:
@@ -1392,7 +1391,7 @@ class AttributeImporter:
                 },
             )
             attribute = Attribute.objects.get(
-                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]]
+                identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip()
             )
             OverviewFilterAttribute.objects.create(
                 attribute=attribute,
@@ -1638,7 +1637,7 @@ class AttributeImporter:
         for row in rows:
             try:
                 attribute = Attribute.objects.get(
-                    identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]],
+                    identifier=row[self.column_index[ATTRIBUTE_IDENTIFIER]].strip(),
                 )
             except Attribute.DoesNotExist:
                 continue
