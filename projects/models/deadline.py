@@ -177,7 +177,7 @@ class Deadline(models.Model):
         else:
             return False
 
-    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}, raw=False):
+    def _calculate(self, project, calculations, datetype, preview_attributes={}, raw=False):
         # TODO hard-coded, maybe change later
         if self.phase.name == "Periaatteet" and not project.create_principles:
             return None
@@ -192,7 +192,8 @@ class Deadline(models.Model):
             base_deadline = calculation.datecalculation.base_date_deadline
 
             # When calculating previews, do not use base deadlines that will be deleted
-            if base_deadline and valid_dls and base_deadline not in valid_dls:
+            if base_deadline and not project.is_deadline_applicable(base_deadline, preview_attributes):
+                print("Skipped")
                 return None
 
             if base_attr and base_attr.static_property:
@@ -250,36 +251,33 @@ class Deadline(models.Model):
         return result
 
     def calculate_initial(self, project, preview_attributes={}, raw=False):
-        if preview_attributes:
-            valid_dls = project.get_applicable_deadlines(
-                preview_attributes=preview_attributes
-            )
-        else:
-            valid_dls = []
-
         return self._calculate(
             project,
-            self.initial_calculations.all().order_by('-index').select_related("datecalculation"),
+            self.initial_calculations.all().order_by('-index').select_related("datecalculation",
+                                    "datecalculation__base_date_attribute",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__attribute",
+                                    "datecalculation__base_date_deadline__subtype",
+                                    "datecalculation__base_date_deadline__phase")
+                    .prefetch_related("conditions", "not_conditions"),
             self.date_type,
-            valid_dls,
             preview_attributes,
             raw,
         )
 
     def calculate_updated(self, project, preview_attributes={}):
         if self.update_calculations.count():
-            if preview_attributes:
-                valid_dls = project.get_applicable_deadlines(
-                    preview_attributes=preview_attributes
-                )
-            else:
-                valid_dls = []
-
             return self._calculate(
                 project,
-                self.update_calculations.all().order_by('-index').select_related("datecalculation"),
+                self.update_calculations.all().order_by('-index')
+                    .select_related("datecalculation",
+                                    "datecalculation__base_date_attribute",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__attribute",
+                                    "datecalculation__base_date_deadline__subtype",
+                                    "datecalculation__base_date_deadline__phase")
+                    .prefetch_related("conditions", "not_conditions"),
                 self.date_type,
-                valid_dls,
                 preview_attributes,
             )
         elif self.attribute:

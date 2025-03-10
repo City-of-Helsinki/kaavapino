@@ -4,6 +4,7 @@ import re
 import logging
 import numpy as np
 import requests
+import time
 from requests.exceptions import Timeout
 from typing import List, NamedTuple, Type
 
@@ -67,6 +68,8 @@ from sitecontent.models import ListViewAttributeColumn
 from users.models import User, PRIVILEGE_LEVELS
 from users.serializers import PersonnelSerializer, UserSerializer
 from users.helpers import get_graph_api_access_token
+
+from projects.models.report import ReportFilterAttributeChoice
 
 log = logging.getLogger(__name__)
 
@@ -1486,11 +1489,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             False, self.instance, attribute_data,
         )
         preview = None
+        preview_start = time.time()
         if self.instance and should_update_deadlines:
             preview = self.instance.get_preview_deadlines(
                 attribute_data,
                 subtype,
             )
+        print(f"Getting preview deadlines took: {time.time() - preview_start}s")
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \

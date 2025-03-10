@@ -1,6 +1,7 @@
 import datetime
 import itertools
 import logging
+import time
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
@@ -373,6 +374,15 @@ class Project(models.Model):
             if initial or self._check_condition(deadline, preview_attributes)
         ]
 
+    def is_deadline_applicable(self, deadline, preview_attributes={}):
+        if deadline.subtype != self.subtype:
+            return False
+        elif deadline.phase.name == "Periaatteet" and not self.create_principles:
+            return False
+        elif deadline.phase.name == "Luonnos" and not self.create_draft:
+            return False
+        return self._check_condition(deadline, preview_attributes)
+
     def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}):
         try:
             if preview:
@@ -484,6 +494,7 @@ class Project(models.Model):
 
     # Generate or update schedule for project
     def update_deadlines(self, user=None, initial=False, preview_attributes={}):
+        update_deadlines_start = time.time()
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
@@ -542,6 +553,7 @@ class Project(models.Model):
             initial=False,
             preview_attribute_data=preview_attributes
         )
+        print(f"update_deadlines took {time.time() - update_deadlines_start}s")
 
     # Calculate a preview schedule without saving anything
     def get_preview_deadlines(self, updated_attributes, subtype):
