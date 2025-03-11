@@ -1269,6 +1269,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         preview,
         validation: bool = True,
     ) -> List[SectionData]:
+        section_start = time.time()
         sections = []
         sections_to_serialize = phase.sections \
             .filter(attributes__identifier__in=self._get_keys()) \
@@ -1283,7 +1284,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-
+        print(f"Section data generation: {time.time() - section_start}s")
         return sections
 
     def generate_floor_area_sections_data(
@@ -1307,6 +1308,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def generate_schedule_sections_data(self, phase, preview, validation=True):
+        schedule_section_start = time.time()
         sections = []
         deadline_sections = phase.deadline_sections.filter(
             attributes__identifier__in=self._get_keys()
@@ -1321,7 +1323,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-
+        print(f"Schedule section data generation: {time.time() - schedule_section_start}s")
         return sections
 
     def validate(self, attrs):
@@ -1430,9 +1432,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             return static_property_attributes
 
         tmp_attribute_data = {}
+        attribute_objects = { attribute.identifier: attribute for attribute in Attribute.objects.filter(
+            identifier__in=attribute_data.keys())}
         for attribute_identifier, value in attribute_data.items():
             try:
-                attribute = Attribute.objects.get(identifier=attribute_identifier)
+                attribute = attribute_objects.get(attribute_identifier)
                 if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
@@ -1498,6 +1502,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         print(f"Getting preview deadlines took: {time.time() - preview_start}s")
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
+        phase_loop_start = time.time()
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
             .exclude(index__range=[2, min_phase_index-1]):
             sections_data += self.generate_sections_data(
@@ -1510,13 +1515,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                 validation=should_validate,
                 preview=preview,
             ) or []
-
+        print(f"Phase loop took {time.time() - phase_loop_start}s")
+        floorsect_start = time.time()
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
             validation=should_validate,
             preview=preview,
         ) or []
-
+        print(f"Floor section generation took {time.time() - floorsect_start}")
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
@@ -1529,6 +1535,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         #     valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
         errors = {}
+        section_validation_start = time.time()
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
@@ -1537,8 +1544,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             valid_attributes.update(serializer.validated_data)
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
+            print(f"Section validation raised error at {time.time()-section_validation_start}")
             raise ValidationError(errors)
+        print(f"Section validation finished in {time.time()-section_validation_start}s")
 
+        confirm_deadlines_start = time.time()
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl
@@ -1551,13 +1561,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                 k: v for k, v in valid_attributes.items()
                 if k not in confirmed_deadlines
             }
-
+        print(f"Confirm deadlines took {time.time()-confirm_deadlines_start}")
         # mostly invalid identifiers, but could be fieldset file fields
         unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
             list(valid_attributes.keys()),
         ))
 
+        invalid_time = time.time()
         invalid_identifiers = []
         files_to_archive = []
         for identifier in unusual_identifiers:
@@ -1575,8 +1586,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if len(invalid_identifiers):
             invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
-            log.warn(", ".join(invalids))
+            #log.warn(", ".join(invalids))
 
+        print(f"Invalid identifiers took {time.time()-invalid_time}")
+
+        print(f"Files to archive count: {len(files_to_archive)}")
         for identifier, attribute_file in files_to_archive:
             entry = action.send(
                 user,
@@ -1592,6 +1606,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_file.archived_at = timestamp
             attribute_file.save()
 
+        dl_saving_start = time.time()
         if self.instance:
             for dl in ProjectDeadline.objects.filter(
                 project=self.instance,
@@ -1600,6 +1615,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 dl.generated = False
                 dl.save()
 
+        print(f"Deadline saving took {dl_saving_start-time.time()}")
         return {**static_property_attributes, **valid_attributes}
 
     def _validate_public(self, attrs):
