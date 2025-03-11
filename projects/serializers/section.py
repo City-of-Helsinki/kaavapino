@@ -103,7 +103,8 @@ def get_deadline_validator(attribute, subtype, preview):
         if not preview:
             return
 
-        for attr_dl in attribute.deadline.filter(subtype=subtype):
+        for attr_dl in attribute.deadline.filter(subtype=subtype) \
+            .select_related("date_type"):
             # validate datetype
             try:
                 assert attr_dl.date_type.is_valid_date(value)
@@ -118,7 +119,7 @@ def get_deadline_validator(attribute, subtype, preview):
                 )
 
             # validate minimum distance to previous deadline(s)
-            for distance in attr_dl.distances_to_previous.all():
+            for distance in attr_dl.distances_to_previous.all().select_related("previous_deadline", "date_type"):
                 prev_dl = preview.get(distance.previous_deadline)
                 if not prev_dl:
                     continue

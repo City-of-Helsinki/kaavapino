@@ -402,8 +402,9 @@ class Project(models.Model):
             if preview:
                 return date
 
-            project_deadline.date = date
-            project_deadline.save()
+            if not project_deadline.date == date:
+                project_deadline.date = date
+                project_deadline.save()
 
             if deadline.attribute:
                 old_value = json.loads(json.dumps(
@@ -528,8 +529,9 @@ class Project(models.Model):
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
             value = value if value != 'null' else None
-            dl.date = value
-            dl.save()
+            if dl.date != value:
+                dl.date = value
+                dl.save()
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
             [
@@ -565,7 +567,7 @@ class Project(models.Model):
             for dl in self.deadlines.all()
             .select_related(
                 "deadline", "deadline__phase", "deadline__phase__common_project_phase",
-                "deadline__subtype", "deadline__attribute")
+                "deadline__subtype", "deadline__attribute", "deadline__date_type")
             .prefetch_related("deadline__initial_calculations","deadline__update_calculations")
             if dl.deadline.subtype == subtype
         }

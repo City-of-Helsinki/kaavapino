@@ -193,7 +193,6 @@ class Deadline(models.Model):
 
             # When calculating previews, do not use base deadlines that will be deleted
             if base_deadline and not project.is_deadline_applicable(base_deadline, preview_attributes):
-                print("Skipped")
                 return None
 
             if base_attr and base_attr.static_property:
@@ -258,7 +257,8 @@ class Deadline(models.Model):
                                     "datecalculation__base_date_deadline",
                                     "datecalculation__base_date_deadline__attribute",
                                     "datecalculation__base_date_deadline__subtype",
-                                    "datecalculation__base_date_deadline__phase")
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase")
                     .prefetch_related("conditions", "not_conditions"),
             self.date_type,
             preview_attributes,
@@ -275,7 +275,9 @@ class Deadline(models.Model):
                                     "datecalculation__base_date_deadline",
                                     "datecalculation__base_date_deadline__attribute",
                                     "datecalculation__base_date_deadline__subtype",
-                                    "datecalculation__base_date_deadline__phase")
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__date_type")
                     .prefetch_related("conditions", "not_conditions"),
                 self.date_type,
                 preview_attributes,
