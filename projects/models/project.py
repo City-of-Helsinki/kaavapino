@@ -341,7 +341,7 @@ class Project(models.Model):
             attribute_data[attribute.identifier] = calculated_value
 
     def _check_condition(self, deadline, preview_attributes={}):
-        if not deadline.condition_attributes.count():
+        if not deadline.condition_attributes.exists():
             return True
 
         attribute_data = {**self.attribute_data, **preview_attributes}
@@ -364,7 +364,7 @@ class Project(models.Model):
         deadlines = Deadline.objects \
                 .filter(subtype=subtype or self.subtype) \
                 .exclude(phase__common_project_phase__name__in=excluded_phases) \
-                .select_related('phase', 'subtype') \
+                .select_related('phase', 'subtype', 'attribute', 'phase__project_subtype', 'phase__common_project_phase', ) \
                 .prefetch_related('condition_attributes') \
                 .prefetch_related('initial_calculations') \
                 .prefetch_related('update_calculations') \
@@ -506,23 +506,25 @@ class Project(models.Model):
             self.deadlines.remove(dl)
 
         generated_deadlines = []
-        project_deadlines = []
+        project_deadlines = list(ProjectDeadline.objects.filter(project=self, deadline__in=deadlines)
+                                 .select_related("deadline"))
+        existing_dls = [p_dl.deadline for p_dl in project_deadlines]
 
+        get_or_create_start = time.time()
         for deadline in deadlines:
-            project_deadline, created = ProjectDeadline.objects.get_or_create(
-                project=self,
-                deadline=deadline,
-                defaults={
-                    "generated": True,
-                }
-            )
-            if created:
-                generated_deadlines.append(project_deadline)
-            project_deadlines.append(project_deadline)
-
+            if not deadline in existing_dls:
+                new_project_deadline = ProjectDeadline.objects.create(
+                    project=self,
+                    deadline=deadline,
+                    generated=True
+                )
+                generated_deadlines.append(new_project_deadline)
+                project_deadlines.append(new_project_deadline)
+        print(f"Update_deadlines: get_or_create took {time.time() - get_or_create_start}")
         self.deadlines.set(project_deadlines)
 
         # Update attribute-based deadlines
+        dls_to_update = []
         for dl in self.deadlines.all().select_related("deadline__attribute"):
             if not dl.deadline.attribute:
                 continue
@@ -531,31 +533,45 @@ class Project(models.Model):
             value = value if value != 'null' else None
             if dl.date != value:
                 dl.date = value
-                dl.save()
+                dls_to_update.append(dl)
+        self.deadlines.bulk_update(dls_to_update, ['date'])
         # Calculate automatic values for newly added deadlines
+        initial_start = time.time()
         self._set_calculated_deadlines(
             [
                 dl.deadline for dl in generated_deadlines
-                if dl.deadline.initial_calculations.count() \
+                if dl.deadline.initial_calculations.exists() \
                     or dl.deadline.default_to_created_at
             ],
             user,
             initial=True,
             preview_attribute_data=preview_attributes
         )
+        print(f"Update_deadlines: _set_calculated_deadlines (initial) {time.time() - initial_start}")
 
         # Update automatic deadlines
+        update_start = time.time()
         self._set_calculated_deadlines(
             [
                 dl.deadline for dl in self.deadlines.all()
-                if dl.deadline.update_calculations.count()
-                   or dl.deadline.default_to_created_at
-                   or dl.deadline.attribute
+                    .select_related(
+                        "deadline", "deadline__attribute", "deadline__phase", 
+                        "deadline__phase__common_project_phase","deadline__phase__project_subtype", "deadline__subtype",
+                        "deadline__attribute", "deadline__date_type")
+                    .prefetch_related(
+                        "deadline__update_calculations"
+                    )
+                if any([
+                    dl.deadline.update_calculations.exists(),
+                    dl.deadline.default_to_created_at,
+                    dl.deadline.attribute
+                ])
             ],
             user,
             initial=False,
             preview_attribute_data=preview_attributes
         )
+        print(f"Update_deadlines: _set_calculated_deadlines (update) {time.time() - update_start}")
         print(f"update_deadlines took {time.time() - update_deadlines_start}s")
 
     # Calculate a preview schedule without saving anything
@@ -564,12 +580,11 @@ class Project(models.Model):
         get_dls_start = time.time()
         project_dls = {
             dl.deadline: dl.date
-            for dl in self.deadlines.all()
+            for dl in self.deadlines.filter(deadline__subtype=subtype)
             .select_related(
-                "deadline", "deadline__phase", "deadline__phase__common_project_phase",
+                "deadline", "deadline__phase", "deadline__phase__common_project_phase", "deadline__phase__project_subtype",
                 "deadline__subtype", "deadline__attribute", "deadline__date_type")
             .prefetch_related("deadline__initial_calculations","deadline__update_calculations")
-            if dl.deadline.subtype == subtype
         }
 
         # List deadlines that would be created
@@ -601,7 +616,7 @@ class Project(models.Model):
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in new_dls.keys()
-                if dl.initial_calculations.count() or dl.default_to_created_at
+                if dl.initial_calculations.exists() or dl.default_to_created_at
             ],
             None,
             initial=True,
@@ -613,7 +628,7 @@ class Project(models.Model):
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in project_dls
-                if dl.update_calculations.count() \
+                if dl.update_calculations.exists() \
                     or dl.default_to_created_at \
                     or dl.attribute
             ],

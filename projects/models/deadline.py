@@ -258,7 +258,8 @@ class Deadline(models.Model):
                                     "datecalculation__base_date_deadline__attribute",
                                     "datecalculation__base_date_deadline__subtype",
                                     "datecalculation__base_date_deadline__phase",
-                                    "datecalculation__base_date_deadline__phase__common_project_phase")
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__phase__project_subtype")
                     .prefetch_related("conditions", "not_conditions"),
             self.date_type,
             preview_attributes,
@@ -266,7 +267,7 @@ class Deadline(models.Model):
         )
 
     def calculate_updated(self, project, preview_attributes={}):
-        if self.update_calculations.count():
+        if self.update_calculations.exists():
             return self._calculate(
                 project,
                 self.update_calculations.all().order_by('-index')
@@ -354,7 +355,7 @@ class DeadlineDistance(models.Model):
         return f"{self.previous_deadline.abbreviation} -> {self.deadline.abbreviation} ({self.distance_from_previous}{' ' + str(self.date_type) if self.date_type else ''})"
 
     def check_conditions(self, attribute_data):
-        if not self.condition_attributes or self.condition_attributes.count() == 0:
+        if not self.condition_attributes.exists():
             return True
 
         condition_attributes = self.condition_attributes.all()

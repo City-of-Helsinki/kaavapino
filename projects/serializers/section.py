@@ -119,7 +119,9 @@ def get_deadline_validator(attribute, subtype, preview):
                 )
 
             # validate minimum distance to previous deadline(s)
-            for distance in attr_dl.distances_to_previous.all().select_related("previous_deadline", "date_type"):
+            for distance in attr_dl.distances_to_previous.all() \
+            .select_related("previous_deadline", "date_type") \
+            .prefetch_related("condition_attributes", "condition_attributes__attribute"):
                 prev_dl = preview.get(distance.previous_deadline)
                 if not prev_dl:
                     continue
@@ -184,7 +186,7 @@ def create_attribute_field_data(attribute, validation, project, preview):
     if attribute.validation_regex:
         field_arguments["validators"] += [get_regex_validator(attribute)]
 
-    if attribute.deadline.count():
+    if attribute.deadline.exists():
         field_arguments["validators"] += [get_deadline_validator(
             attribute,
             project.phase.project_subtype,

@@ -1269,7 +1269,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         preview,
         validation: bool = True,
     ) -> List[SectionData]:
-        section_start = time.time()
         sections = []
         sections_to_serialize = phase.sections \
             .filter(attributes__identifier__in=self._get_keys()) \
@@ -1284,7 +1283,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-        print(f"Section data generation: {time.time() - section_start}s")
         return sections
 
     def generate_floor_area_sections_data(
@@ -1308,7 +1306,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def generate_schedule_sections_data(self, phase, preview, validation=True):
-        schedule_section_start = time.time()
         sections = []
         deadline_sections = phase.deadline_sections.filter(
             attributes__identifier__in=self._get_keys()
@@ -1323,7 +1320,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-        print(f"Schedule section data generation: {time.time() - schedule_section_start}s")
         return sections
 
     def validate(self, attrs):
@@ -1375,7 +1371,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             should_update_deadlines = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
                     deadline__attribute__identifier__in=attr_identifiers
-                ).count()
+                ).exists()
             )
 
             if not should_update_deadlines:
@@ -1383,14 +1379,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                     Deadline.objects.filter(
                         subtype=instance.subtype,
                         condition_attributes__identifier__in=attr_identifiers,
-                    ).count()
+                    ).exists()
                 )
 
             if not should_update_deadlines:
                 should_update_deadlines = bool(Deadline.objects.filter(
                     subtype=instance.subtype,
                     attribute__identifier__in=attr_identifiers
-                ).count())
+                ).exists())
 
             if not should_update_deadlines:
                 should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
@@ -1400,7 +1396,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     Q(not_conditions__identifier__in=attr_identifiers) | \
                     Q(datecalculation__base_date_attribute__identifier__in=attr_identifiers) | \
                     Q(datecalculation__attributes__attribute__identifier__in=attr_identifiers)
-                ).count())
+                ).exists())
 
         return should_update_deadlines
 
@@ -1606,16 +1602,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_file.archived_at = timestamp
             attribute_file.save()
 
-        dl_saving_start = time.time()
         if self.instance:
-            for dl in ProjectDeadline.objects.filter(
+            updated_dls = ProjectDeadline.objects.filter(
                 project=self.instance,
                 deadline__attribute__identifier__in=valid_attributes.keys()
-            ):
+            )
+            for dl in updated_dls:
                 dl.generated = False
-                dl.save()
+            ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
 
-        print(f"Deadline saving took {dl_saving_start-time.time()}")
         return {**static_property_attributes, **valid_attributes}
 
     def _validate_public(self, attrs):
@@ -1768,6 +1763,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             pass
 
     def update(self, instance: Project, validated_data: dict) -> Project:
+        project_update_start = time.time()
+        print("Update started")
         attribute_data = validated_data.pop("attribute_data", {})
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
@@ -1847,6 +1844,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     self.create_deadline_updates_log(
                         dl.deadline, project, user, old_date, new_date
                     )
+            print(f"Project.update() took {time.time() - project_update_start}s")
             return project
 
     def update_initial_data(self, validated_data):
