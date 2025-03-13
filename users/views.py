@@ -39,25 +39,48 @@ class PersonnelList(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        search = request.query_params.get("search")
+        search = request.query_params.get("search", "").strip()
         company_name = request.query_params.get("company_name", None)
+        #Initialize base URL
+        base_url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/"
+        query_params = []
 
-        url = \
-            f"{settings.GRAPH_API_BASE_URL}/v1.0/users/" + \
-            f"?$search=\"displayName:{search}\"" + \
-            "&$filter=endsWith(mail, \'@hel.fi\')" + \
-            (f" and companyName eq \'{company_name}\'" if company_name
-             else " and companyName in('KYMP', 'KUVA', 'KASKO', 'KEHA', 'KANSLIA')") + \
-            "&$select=id,givenName,surname,mobilePhone,businessPhones,companyName,mail,jobTitle,officeLocation"
+        #Only apply `$search` if a valid search term is provided
+        if search and search != "*":
+            query_params.append(f'$search="displayName:{search}"')
+
+        #Correctly format `$filter` conditions
+        filter_conditions = ["endsWith(mail, '@hel.fi')"]
+
+        if company_name:
+            filter_conditions.append(f"companyName eq '{company_name}'")
+        else:
+            company_filter = " or ".join(
+                [f"companyName eq '{c}'" for c in ['KYMP', 'KUVA', 'KASKO', 'KEHA', 'KANSLIA']]
+            )
+            filter_conditions.append(f"({company_filter})")
+
+        if filter_conditions:
+            query_params.append(f"$filter=({' and '.join(filter_conditions)})")
+
+        #Add `$count=true` to enable `endsWith()`
+        query_params.append("$count=true")
+        #Select required fields
+        query_params.append(
+            "$select=id,givenName,surname,mobilePhone,businessPhones,companyName,mail,jobTitle,officeLocation"
+        )
+        #Ensure URL is properly constructed
+        url = base_url + ("?" + "&".join(query_params) if query_params else "")
 
         response = requests.get(
             url,
             headers={
                 "Authorization": f"Bearer {token}",
-                "consistencyLevel": "eventual",
+                "consistencyLevel": "eventual",  # ✅ Required for `endsWith`
             },
         )
-        if response:
+
+        if response.status_code == 200:
             return Response(PersonnelSerializer(
                 response.json().get("value", []),
                 many=True,
@@ -68,7 +91,7 @@ class PersonnelList(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         else:
-            return Response("Bad request", status=status.HTTP_400_BAD_REQUEST)
+            return Response(f"Bad request: {response.text}", status=status.HTTP_400_BAD_REQUEST)
 
 
 class PersonnelDetail(APIView):
