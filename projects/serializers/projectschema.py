@@ -17,6 +17,8 @@ from projects.models import (
     Project,
     ProjectSubtype,
     ProjectCardSectionAttribute,
+    DeadlineDistance,
+    Deadline,
 )
 from projects.models.attribute import AttributeLock, AttributeCategorization
 from projects.models.project import (
@@ -225,6 +227,24 @@ class AttributeSchemaSerializer(serializers.Serializer):
     field_subroles = serializers.SerializerMethodField()
     categorization = serializers.SerializerMethodField()
     fieldset_total = serializers.CharField()
+    attributegroup = serializers.CharField()
+    attributesubgroup = serializers.CharField()
+    viewing_privilege = serializers.CharField()
+    timetable_editable = serializers.SerializerMethodField("get_timetable_editable")
+
+    def get_timetable_editable(self, attribute):
+        privilege = privilege_as_int(self.context["privilege"])
+        owner = self.context["owner"]
+        # owner can edit owner-editable fields regardless of their role
+        #Needs to be atleast vastuuhenkilö and owner of project to edit
+        if owner and attribute.owner_editable and privilege >= 3:
+            return True
+        # check privilege for others
+        elif attribute.edit_privilege and \
+            privilege >= privilege_as_int(attribute.edit_privilege):
+            return True
+        else:
+            return False
 
     def get_editable(self, attribute):
         privilege = privilege_as_int(self.context["privilege"])
@@ -257,12 +277,13 @@ class AttributeSchemaSerializer(serializers.Serializer):
 
     def get_categorization(self, attribute):
         try:
-            project = self.context["project"]
-            return attribute.categorizations.get(
-                common_project_phase=project.phase.common_project_phase,
-                includes_principles=project.create_principles,
-                includes_draft=project.create_draft
-            ).value
+            project = self.context.get("project", None)
+            if project:
+                return attribute.categorizations.get(
+                    common_project_phase=project.phase.common_project_phase,
+                    includes_principles=project.create_principles,
+                    includes_draft=project.create_draft
+                ).value
         except (KeyError, AttributeCategorization.DoesNotExist):
             pass
         return ""
@@ -349,6 +370,62 @@ class AttributeSchemaSerializer(serializers.Serializer):
         for choice in choice_instances:
             choices.append({"label": choice.value, "value": choice.identifier})
         return choices
+
+
+class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
+    date_type = serializers.SerializerMethodField()
+    previous_deadline = serializers.SerializerMethodField()
+    distance_from_previous = serializers.SerializerMethodField()
+    next_deadline = serializers.SerializerMethodField()
+    distance_to_next = serializers.SerializerMethodField()
+    initial_distance = serializers.SerializerMethodField()
+
+    def _get_previous_deadline_distance(self, attribute):
+        subtype = self.context['project'].subtype
+        return DeadlineDistance.objects.filter(deadline__subtype=subtype, deadline__attribute=attribute).first()
+
+    def _get_next_deadline_distance(self, attribute):
+        subtype = self.context['project'].subtype
+        return DeadlineDistance.objects.filter(deadline__subtype=subtype, previous_deadline__attribute=attribute).first()
+
+    def get_date_type(self, attribute):
+        subtype = self.context['project'].subtype
+        try:
+            deadline = Deadline.objects.get(subtype=subtype, attribute=attribute)
+            return deadline.date_type.identifier if deadline.date_type else None
+        except Deadline.DoesNotExist:
+            return None
+
+    def get_previous_deadline(self, attribute):
+        deadline_distance = self._get_previous_deadline_distance(attribute)
+        return deadline_distance.previous_deadline.attribute.identifier if deadline_distance and deadline_distance.previous_deadline and deadline_distance.previous_deadline.attribute else None
+
+    def get_distance_from_previous(self, attribute):
+        deadline_distance = self._get_previous_deadline_distance(attribute)
+        return deadline_distance.distance_from_previous if deadline_distance and deadline_distance.previous_deadline else None
+
+    def get_next_deadline(self, attribute):
+        deadline_distance = self._get_next_deadline_distance(attribute)
+        return deadline_distance.deadline.attribute.identifier if deadline_distance and deadline_distance.deadline and deadline_distance.deadline.attribute else None
+
+    def get_distance_to_next(self, attribute):
+        deadline_distance = self._get_next_deadline_distance(attribute)
+        return deadline_distance.distance_from_previous if deadline_distance and deadline_distance.previous_deadline else None
+
+    def get_initial_distance(self, attribute):
+        try:
+            project = self.context['project']
+            deadline = Deadline.objects.get(subtype=project.subtype, attribute=attribute)
+            base_deadline, base_deadline_abbreviation, distance = deadline.calculate_initial(project, raw=True) or (None, None, None)
+            return {
+                "base_deadline": base_deadline,
+                "base_deadline_abbreviation": base_deadline_abbreviation,
+                "distance": distance
+            }
+        except (KeyError, Deadline.DoesNotExist):
+            return None
+        except Exception as exc:
+            raise exc
 
 
 class ProjectSectionAttributeSchemaSerializer(serializers.Serializer):
@@ -605,13 +682,13 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
     attributes = serializers.SerializerMethodField("_get_attributes")
 
     @staticmethod
-    def _get_serialized_attributes(sect_attrs, owner, privilege):
+    def _get_serialized_attributes(sect_attrs, owner, privilege, project):
         serialized = []
 
         for sect_attr in sect_attrs:
-            serialized.append(AttributeSchemaSerializer(
+            serialized.append(DeadlineAttributeSchemaSerializer(
                 sect_attr.attribute,
-                context={"owner": owner, "privilege": privilege}
+                context={"owner": owner, "privilege": privilege, "project": project}
             ).data)
 
         return serialized
@@ -619,6 +696,7 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
     def _get_attributes(self, deadline_section):
         owner = self.context.get("owner", False)
         privilege = self.context.get("privilege", False)
+        project = self.context.get("project", None)
 
         if privilege == "admin":
             sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
@@ -629,8 +707,33 @@ class ProjectPhaseDeadlineSectionSerializer(serializers.Serializer):
             sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
                 .filter(owner_field=True).select_related("attribute")
 
-        return self._get_serialized_attributes(sect_attrs, owner, privilege)
+        return self._get_serialized_attributes(sect_attrs, owner, privilege, project)
 
+class ProjectPhaseDeadlineSectionSerializerGroup(serializers.Serializer):
+    name = serializers.CharField()
+    attributes = serializers.SerializerMethodField("_get_attributes")
+
+    @staticmethod
+    def _get_serialized_attributes(sect_attrs, owner, privilege, project):
+        serialized = []
+
+        for sect_attr in sect_attrs:
+            serialized.append(DeadlineAttributeSchemaSerializer(
+                sect_attr.attribute,
+                context={"owner": owner, "privilege": privilege, "project": project}
+            ).data)
+
+        return serialized
+
+    def _get_attributes(self, deadline_section):
+        owner = self.context.get("owner", False)
+        privilege = self.context.get("privilege", False)
+        project = self.context.get("project", None)
+
+        sect_attrs = deadline_section.projectphasedeadlinesectionattribute_set \
+            .filter(admin_field=True).select_related("attribute")
+
+        return self._get_serialized_attributes(sect_attrs, owner, privilege, project)
 
 class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
     id = serializers.IntegerField()
@@ -639,13 +742,14 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
     color_code = serializers.CharField()
     list_prefix = serializers.CharField()
     sections = serializers.SerializerMethodField()
+    grouped_sections = serializers.SerializerMethodField()
 
     @staticmethod
     def _get_sections(privilege, owner, phase, project=None):
         deadline_sections = [
             ProjectPhaseDeadlineSectionSerializer(
                 section,
-                context={"privilege": privilege, "owner": owner},
+                context={"privilege": privilege, "owner": owner, "project": project},
             ).data
             for section in phase.deadline_sections.all()
         ]
@@ -682,6 +786,69 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
             project,
         )
 
+    @staticmethod
+    def _get_grouped_sections(privilege, owner, phase, project=None):
+        grouped_sections = [
+            ProjectPhaseDeadlineSectionSerializerGroup(
+                section,
+                context={"privilege": privilege, "owner": owner, "project": project},
+            ).data
+            for section in phase.deadline_sections.all()
+        ]
+
+        confirmed_deadlines = [
+            dl.deadline.attribute.identifier for dl in project.deadlines.all()
+            .select_related("deadline", "project", "deadline__attribute", "deadline__confirmation_attribute")
+            if dl.confirmed and dl.deadline.attribute
+        ] if project else []
+
+        for sect_i, section in enumerate(grouped_sections):
+            grouped_attributes = {}
+
+            for attr_i, attr in enumerate(section["attributes"]):
+                if attr["name"] in confirmed_deadlines:
+                    grouped_sections[sect_i]["attributes"][attr_i]["editable"] = False
+
+                # Group attributes by 'attributegroup'
+                group = attr.get("attributegroup", "default")
+                subgroup = attr.get("attributesubgroup", None)
+                if group not in grouped_attributes:
+                    grouped_attributes[group] = {}
+
+                if subgroup:
+                    if subgroup not in grouped_attributes[group]:
+                        grouped_attributes[group][subgroup] = []
+                    # Check if attr does not exist already before appending
+                    if attr not in grouped_attributes[group][subgroup]:
+                        grouped_attributes[group][subgroup].append(attr)
+                else:
+                    if "default" not in grouped_attributes[group]:
+                        grouped_attributes[group]["default"] = []
+                    # Check if attr does not exist already before appending
+                    if attr not in grouped_attributes[group]["default"]:
+                        grouped_attributes[group]["default"].append(attr)
+
+            grouped_sections[sect_i]["attributes"] = grouped_attributes
+        return grouped_sections
+
+    def get_grouped_sections(self, phase):
+        try:
+            context = self.context
+        except AttributeError:
+            context = {}
+
+        query_params = getattr(self.context["request"], "GET", {})
+        try:
+            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
+        except (ValueError, TypeError, Project.DoesNotExist):
+            project = None
+
+        return self._get_grouped_sections(
+            context.get("privilege"),
+            context.get("owner"),
+            phase,
+            project,
+        )
 
 class ProjectSubtypeListFilterSerializer(serializers.ListSerializer):
     def to_representation(self, data):
