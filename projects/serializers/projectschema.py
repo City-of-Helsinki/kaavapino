@@ -237,7 +237,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
         owner = self.context["owner"]
         # owner can edit owner-editable fields regardless of their role
         #Needs to be atleast vastuuhenkilö and owner of project to edit
-        if owner and privilege >= 3:
+        if owner and attribute.owner_editable and privilege >= 3:
             return True
         # check privilege for others
         elif attribute.edit_privilege and \
