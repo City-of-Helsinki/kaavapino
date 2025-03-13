@@ -145,21 +145,47 @@ class Deadline(models.Model):
 
     @property
     def initial_depends_on(self):
-        return list(set([
-            calc.datecalculation.base_date_deadline
-            for calc in self.initial_calculations.all().select_related("datecalculation",
-                                                                       "datecalculation__base_date_deadline")
-            if calc.datecalculation.base_date_deadline
-        ]))
+        cache_key = f"deadline_initial_dependencies_{self.pk}"
+        cached_value = cache.get(cache_key)
+        if cached_value is None:
+            cached_value = list(set([
+                calc.datecalculation.base_date_deadline
+                for calc in self.initial_calculations.all()\
+                    .select_related("datecalculation",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__date_type",
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__phase__project_subtype",
+                                    "datecalculation__base_date_deadline__subtype", 
+                                    "datecalculation__base_date_deadline__attribute")\
+                    .prefetch_related("datecalculation__base_date_deadline__initial_calculations")
+                if calc.datecalculation.base_date_deadline
+            ]))
+            cache.set(cache_key, cached_value, timeout=60*60*6)
+        return cached_value
 
     @property
     def update_depends_on(self):
-        return list(set([
-            calc.datecalculation.base_date_deadline
-            for calc in self.update_calculations.all().select_related("datecalculation",
-                                                                      "datecalculation__base_date_deadline")
-            if calc.datecalculation.base_date_deadline
-        ]))
+        cache_key = f"deadline_update_dependencies_{self.pk}"
+        cached_value = cache.get(cache_key)
+        if cached_value is None:
+            cached_value = list(set([
+                calc.datecalculation.base_date_deadline
+                for calc in self.update_calculations.all()\
+                    .select_related("datecalculation",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__date_type",
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__phase__project_subtype",
+                                    "datecalculation__base_date_deadline__subtype", 
+                                    "datecalculation__base_date_deadline__attribute") \
+                    .prefetch_related("datecalculation__base_date_deadline__update_calculations")
+                if calc.datecalculation.base_date_deadline
+            ]))
+            cache.set(cache_key, cached_value, timeout=60*60*6)
+        return cached_value
 
     @property
     def editable(self):
