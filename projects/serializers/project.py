@@ -105,7 +105,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             return False
 
         next_deadlines = projectdeadline.deadline.distances_to_next.all()\
-            .select_related("deadline", "deadline__date_type")
+            .select_related("deadline", "deadline__date_type", "date_type")
         for next_distance in next_deadlines:
             # Ignore if distance conditions are not met
             if not self._resolve_distance_conditions(
@@ -148,7 +148,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             return False
 
         prev_deadlines = projectdeadline.deadline.distances_to_previous.all()\
-            .select_related("previous_deadline", "previous_deadline__date_type")\
+            .select_related("previous_deadline", "previous_deadline__date_type", "date_type")\
             .prefetch_related("previous_deadline__date_type__automatic_dates")
         for prev_distance in prev_deadlines:
             # Ignore if distance conditions are not met

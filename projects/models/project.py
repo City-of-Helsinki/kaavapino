@@ -385,6 +385,8 @@ class Project(models.Model):
         return self._check_condition(deadline, preview_attributes)
 
     def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}):
+        if not date:
+            return None
         try:
             if preview:
                 try:
@@ -392,13 +394,13 @@ class Project(models.Model):
                 except AttributeError:
                     identifier = None
 
-                project_deadline = preview_attribute_data.get(identifier) or self.deadlines.get(deadline=deadline)
+                project_deadline = preview_attribute_data.get(identifier) or self.deadlines.filter(deadline=deadline).exists()
             else:
                 project_deadline = ProjectDeadline.objects.get(project=self, deadline=deadline)
         except ProjectDeadline.DoesNotExist:
             return
 
-        if project_deadline and date:
+        if project_deadline:
             if preview:
                 return date
 
