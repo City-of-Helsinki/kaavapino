@@ -1,4 +1,3 @@
-import copy
 import datetime
 import re
 import logging
@@ -14,7 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field, inline_serializer
@@ -23,7 +22,6 @@ from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
-from rest_framework_gis.fields import GeometryField
 
 from projects.actions import verbs
 from projects.helpers import (
@@ -102,7 +100,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             return False
 
         next_deadlines = projectdeadline.deadline.distances_to_next.all()\
-            .select_related("deadline", "deadline__date_type")
+            .select_related("deadline", "deadline__date_type", "date_type")
         for next_distance in next_deadlines:
             # Ignore if distance conditions are not met
             if not self._resolve_distance_conditions(
@@ -145,7 +143,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             return False
 
         prev_deadlines = projectdeadline.deadline.distances_to_previous.all()\
-            .select_related("previous_deadline", "previous_deadline__date_type")\
+            .select_related("previous_deadline", "previous_deadline__date_type", "date_type")\
             .prefetch_related("previous_deadline__date_type__automatic_dates")
         for prev_distance in prev_deadlines:
             # Ignore if distance conditions are not met
@@ -1280,7 +1278,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-
         return sections
 
     def generate_floor_area_sections_data(
@@ -1318,7 +1315,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-
         return sections
 
     def validate(self, attrs):
@@ -1370,7 +1366,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             should_update_deadlines = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
                     deadline__attribute__identifier__in=attr_identifiers
-                ).count()
+                ).exists()
             )
 
             if not should_update_deadlines:
@@ -1378,14 +1374,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                     Deadline.objects.filter(
                         subtype=instance.subtype,
                         condition_attributes__identifier__in=attr_identifiers,
-                    ).count()
+                    ).exists()
                 )
 
             if not should_update_deadlines:
                 should_update_deadlines = bool(Deadline.objects.filter(
                     subtype=instance.subtype,
                     attribute__identifier__in=attr_identifiers
-                ).count())
+                ).exists())
 
             if not should_update_deadlines:
                 should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
@@ -1395,7 +1391,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     Q(not_conditions__identifier__in=attr_identifiers) | \
                     Q(datecalculation__base_date_attribute__identifier__in=attr_identifiers) | \
                     Q(datecalculation__attributes__attribute__identifier__in=attr_identifiers)
-                ).count())
+                ).exists())
 
         return should_update_deadlines
 
@@ -1427,9 +1423,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             return static_property_attributes
 
         tmp_attribute_data = {}
+        attribute_objects = { attribute.identifier: attribute for attribute in Attribute.objects.filter(
+            identifier__in=attribute_data.keys())}
         for attribute_identifier, value in attribute_data.items():
             try:
-                attribute = Attribute.objects.get(identifier=attribute_identifier)
+                attribute = attribute_objects.get(attribute_identifier)
                 if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
@@ -1505,13 +1503,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                 validation=should_validate,
                 preview=preview,
             ) or []
-
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
             validation=should_validate,
             preview=preview,
         ) or []
-
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
@@ -1546,7 +1542,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 k: v for k, v in valid_attributes.items()
                 if k not in confirmed_deadlines
             }
-
         # mostly invalid identifiers, but could be fieldset file fields
         unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
@@ -1570,7 +1565,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if len(invalid_identifiers):
             invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
-            log.warn(", ".join(invalids))
+            log.warning(", ".join(invalids))
+
 
         for identifier, attribute_file in files_to_archive:
             entry = action.send(
@@ -1588,12 +1584,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_file.save()
 
         if self.instance:
-            for dl in ProjectDeadline.objects.filter(
+            updated_dls = ProjectDeadline.objects.filter(
                 project=self.instance,
                 deadline__attribute__identifier__in=valid_attributes.keys()
-            ):
+            )
+            for dl in updated_dls:
                 dl.generated = False
-                dl.save()
+            ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
 
         return {**static_property_attributes, **valid_attributes}
 
