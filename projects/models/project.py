@@ -1,7 +1,5 @@
-import datetime
 import itertools
 import logging
-import time
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
@@ -13,18 +11,15 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db import transaction
-from django.db.models import Q
 from django.db.models.expressions import Value
 from django.urls import reverse_lazy
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 from private_storage.fields import PrivateFileField
 from PIL import Image, ImageOps
 
 from projects.actions import verbs
-from projects.helpers import get_in_personnel_data, set_ad_data_in_attribute_data
+from projects.helpers import get_in_personnel_data
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
 from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
@@ -498,7 +493,6 @@ class Project(models.Model):
 
     # Generate or update schedule for project
     def update_deadlines(self, user=None, initial=False, preview_attributes={}):
-        update_deadlines_start = time.time()
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
@@ -512,7 +506,6 @@ class Project(models.Model):
                                  .select_related("deadline"))
         existing_dls = [p_dl.deadline for p_dl in project_deadlines]
 
-        get_or_create_start = time.time()
         for deadline in deadlines:
             if not deadline in existing_dls:
                 new_project_deadline = ProjectDeadline.objects.create(
@@ -522,7 +515,6 @@ class Project(models.Model):
                 )
                 generated_deadlines.append(new_project_deadline)
                 project_deadlines.append(new_project_deadline)
-        print(f"Update_deadlines: get_or_create took {time.time() - get_or_create_start}")
         self.deadlines.set(project_deadlines)
 
         # Update attribute-based deadlines
@@ -538,7 +530,6 @@ class Project(models.Model):
                 dls_to_update.append(dl)
         self.deadlines.bulk_update(dls_to_update, ['date'])
         # Calculate automatic values for newly added deadlines
-        initial_start = time.time()
         self._set_calculated_deadlines(
             [
                 dl.deadline for dl in generated_deadlines
@@ -549,10 +540,8 @@ class Project(models.Model):
             initial=True,
             preview_attribute_data=preview_attributes
         )
-        print(f"Update_deadlines: _set_calculated_deadlines (initial) {time.time() - initial_start}")
 
         # Update automatic deadlines
-        update_start = time.time()
         self._set_calculated_deadlines(
             [
                 dl.deadline for dl in self.deadlines.all()
@@ -573,13 +562,10 @@ class Project(models.Model):
             initial=False,
             preview_attribute_data=preview_attributes
         )
-        print(f"Update_deadlines: _set_calculated_deadlines (update) {time.time() - update_start}")
-        print(f"update_deadlines took {time.time() - update_deadlines_start}s")
 
     # Calculate a preview schedule without saving anything
     def get_preview_deadlines(self, updated_attributes, subtype):
         # Filter out deadlines that would be deleted
-        get_dls_start = time.time()
         project_dls = {
             dl.deadline: dl.date
             for dl in self.deadlines.filter(deadline__subtype=subtype)
@@ -612,9 +598,7 @@ class Project(models.Model):
             if value:
                 project_dls[dl] = value
 
-        print(f"get_dls took {time.time() - get_dls_start}")
         # Generate newly added deadlines
-        newly_added_start = time.time()
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in new_dls.keys()
@@ -624,9 +608,7 @@ class Project(models.Model):
             initial=True,
             preview=True,
         )}
-        print(f"Setting calculated deadlines for new dls took {time.time() - newly_added_start}")
         # Update all deadlines
-        old_update_start = time.time()
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in project_dls
@@ -639,7 +621,6 @@ class Project(models.Model):
             preview=True,
             preview_attribute_data=updated_attributes,
         )}
-        print(f"Setting calculated deadlines for old dls took {time.time() - old_update_start}")
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
             if type(value) == bool:

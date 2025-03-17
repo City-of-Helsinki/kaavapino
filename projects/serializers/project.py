@@ -1,10 +1,8 @@
-import copy
 import datetime
 import re
 import logging
 import numpy as np
 import requests
-import time
 from requests.exceptions import Timeout
 from typing import List, NamedTuple, Type
 
@@ -15,7 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field, inline_serializer
@@ -24,7 +22,6 @@ from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
-from rest_framework_gis.fields import GeometryField
 
 from projects.actions import verbs
 from projects.helpers import (
@@ -68,8 +65,6 @@ from sitecontent.models import ListViewAttributeColumn
 from users.models import User, PRIVILEGE_LEVELS
 from users.serializers import PersonnelSerializer, UserSerializer
 from users.helpers import get_graph_api_access_token
-
-from projects.models.report import ReportFilterAttributeChoice
 
 log = logging.getLogger(__name__)
 
@@ -1489,16 +1484,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             False, self.instance, attribute_data,
         )
         preview = None
-        preview_start = time.time()
         if self.instance and should_update_deadlines:
             preview = self.instance.get_preview_deadlines(
                 attribute_data,
                 subtype,
             )
-        print(f"Getting preview deadlines took: {time.time() - preview_start}s")
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
-        phase_loop_start = time.time()
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
             .exclude(index__range=[2, min_phase_index-1]):
             sections_data += self.generate_sections_data(
@@ -1511,14 +1503,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                 validation=should_validate,
                 preview=preview,
             ) or []
-        print(f"Phase loop took {time.time() - phase_loop_start}s")
-        floorsect_start = time.time()
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
             validation=should_validate,
             preview=preview,
         ) or []
-        print(f"Floor section generation took {time.time() - floorsect_start}")
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
@@ -1531,7 +1520,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         #     valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
         errors = {}
-        section_validation_start = time.time()
         for section_data in sections_data:
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
@@ -1540,11 +1528,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             valid_attributes.update(serializer.validated_data)
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
-            print(f"Section validation raised error at {time.time()-section_validation_start}")
             raise ValidationError(errors)
-        print(f"Section validation finished in {time.time()-section_validation_start}s")
 
-        confirm_deadlines_start = time.time()
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl
@@ -1557,14 +1542,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 k: v for k, v in valid_attributes.items()
                 if k not in confirmed_deadlines
             }
-        print(f"Confirm deadlines took {time.time()-confirm_deadlines_start}")
         # mostly invalid identifiers, but could be fieldset file fields
         unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
             list(valid_attributes.keys()),
         ))
 
-        invalid_time = time.time()
         invalid_identifiers = []
         files_to_archive = []
         for identifier in unusual_identifiers:
@@ -1582,11 +1565,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         if len(invalid_identifiers):
             invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
-            #log.warn(", ".join(invalids))
+            log.warning(", ".join(invalids))
 
-        print(f"Invalid identifiers took {time.time()-invalid_time}")
 
-        print(f"Files to archive count: {len(files_to_archive)}")
         for identifier, attribute_file in files_to_archive:
             entry = action.send(
                 user,
@@ -1763,8 +1744,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             pass
 
     def update(self, instance: Project, validated_data: dict) -> Project:
-        project_update_start = time.time()
-        print("Update started")
         attribute_data = validated_data.pop("attribute_data", {})
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
@@ -1844,7 +1823,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                     self.create_deadline_updates_log(
                         dl.deadline, project, user, old_date, new_date
                     )
-            print(f"Project.update() took {time.time() - project_update_start}s")
             return project
 
     def update_initial_data(self, validated_data):
