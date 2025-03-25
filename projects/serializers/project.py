@@ -1532,13 +1532,10 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
         def is_confirmed(dl):
-            if not dl.deadline.confirmation_attribute and not dl.deadline.attribute:
-                return False
-
             try:
                 identifier = dl.deadline.confirmation_attribute.identifier
             except AttributeError:
-                identifier = dl.deadline.attribute.identifier
+                return None
 
             if identifier in valid_attributes:
                 return bool(valid_attributes.get(identifier, False))
@@ -1546,13 +1543,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             if identifier in dl.project.attribute_data:
                 return bool(dl.project.attribute_data.get(identifier, False))
 
-            return False
+            return None
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl
             in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
-            if is_confirmed(dl)
+            if is_confirmed(dl) and dl.deadline.attribute
         ] if self.instance else []
 
         if confirmed_deadlines:
