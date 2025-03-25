@@ -105,6 +105,10 @@ def should_display_deadline(project, deadline):
         return False
     elif deadline.phase.name == "Luonnos" and not project.create_draft:
         return False
-    elif vis_bool and not project.attribute_data.get(vis_bool):
-        return False
+    elif vis_bool:
+        vis_bool_val = project.attribute_data.get(vis_bool)
+        if vis_bool_val == None and deadline.deadlinegroup.endswith('1'):
+            # Special case: Vis bool is missing from attribute_data for default deadlines
+            return True
+        return bool(vis_bool_val)
     return True

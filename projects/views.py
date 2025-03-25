@@ -104,7 +104,7 @@ from projects.serializers.projecttype import (
 )
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer, DeadlineValidationSerializer
-from projects.serializers.utils import get_dl_vis_bool_name, should_display_deadline
+from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
