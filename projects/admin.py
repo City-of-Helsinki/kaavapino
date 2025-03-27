@@ -151,6 +151,7 @@ class DateTypeAdmin(admin.ModelAdmin):
         if 'forced_dates' in form.changed_data:  # Delete cached lautakunnan_kokouspäivät dates
             cache_keys = cache.keys("*")
             keys_to_delete = list(filter(lambda k: k.startswith(f"datetype_{obj.identifier}_dates_"), cache_keys))
+            keys_to_delete.append("serialized_date_types")
             cache.delete_many(keys_to_delete)
 
 
