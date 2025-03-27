@@ -16,6 +16,7 @@ from projects.models import (
     Project,
     ProjectSubtype,
     AttributeValueChoice,
+    FieldSetAttribute,
 )
 
 
@@ -352,6 +353,50 @@ class ReportFilter(models.Model):
             return Q(**{f"{key}__isnull": False})
         elif self.type == ReportFilter.TYPE_NOT_SET:
             return Q(**{f"{key}__isnull": True})
+
+
+    def _contains(self, filter_value, attribute, value):
+        if value is None:
+            return False
+
+        if attribute.value_type in [Attribute.TYPE_SHORT_STRING, Attribute.TYPE_LONG_STRING]:
+            if filter_value.lower() in value.lower():
+                return True
+        elif attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+            if "ops" in value:
+                for item in value["ops"]:
+                    if "insert" in item:
+                        insert = item["insert"]
+                        if filter_value.lower() in insert.lower():
+                            return True
+        return False
+
+    def filter_data_request(self, filter_value, queryset):
+        projects = set()
+        for project in queryset:
+            if project in projects:
+                continue
+
+            for attr in self.attributes.all():
+                try:
+                    parent_attribute = FieldSetAttribute.objects.get(attribute_target=attr).attribute_source
+                    fieldset_value = project.attribute_data.get(parent_attribute.identifier, None)
+                    if not fieldset_value:
+                        continue
+
+                    for element in fieldset_value:
+                        for key, value in element.items():
+                            if key != attr.identifier:
+                                continue
+                            if self._contains(filter_value, attr, value):
+                                projects.add(project)
+                                break
+                except FieldSetAttribute.DoesNotExist:
+                    if self._contains(filter_value, attr, project.attribute_data.get(attr.identifier, None)):
+                        projects.add(project)
+                        break
+
+        return projects
 
     def filter_projects(self, value, queryset=Project.objects.all()):
         type_field_mapping = {

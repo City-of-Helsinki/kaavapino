@@ -96,6 +96,8 @@ def clear_cache():
                      "projects.helpers.get_fieldset_path",
                      "projects.helpers.get_flat_attribute_data",
                      "phase_schema",
+                     "deadline_update_dependencies",
+                     "deadline_initial_dependencies"
                      ]
     cache_keys = cache.keys("*")
     keys_to_delete = []
