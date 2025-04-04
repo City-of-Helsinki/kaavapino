@@ -197,6 +197,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
     name = serializers.CharField(source="identifier")
     help_text = serializers.CharField()
     help_link = serializers.CharField(read_only=True)
+    help_img_link = serializers.CharField(read_only=True)
     multiple_choice = serializers.BooleanField()
     character_limit = serializers.IntegerField()
     validation_regex = serializers.CharField()
