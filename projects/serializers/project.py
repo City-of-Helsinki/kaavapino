@@ -1,4 +1,3 @@
-import copy
 import datetime
 import re
 import logging
@@ -14,7 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field, inline_serializer
@@ -23,7 +22,6 @@ from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError, NotFound, ParseError
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
-from rest_framework_gis.fields import GeometryField
 
 from projects.actions import verbs
 from projects.helpers import (
@@ -58,7 +56,7 @@ from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
-from projects.serializers.utils import _set_fieldset_path
+from projects.serializers.utils import _set_fieldset_path, get_dl_vis_bool_name
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
@@ -94,14 +92,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
         ).data
 
     def _resolve_distance_conditions(self, distance, project):
-        if distance.conditions.count() == 0:
-            return True
-
-        for attribute in distance.conditions.all():
-            if project.attribute_data.get(attribute.identifier):
-                return True
-
-        return False
+        return distance.check_conditions(project.attribute_data)
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_under_min_distance_next(self, projectdeadline):
@@ -109,7 +100,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             return False
 
         next_deadlines = projectdeadline.deadline.distances_to_next.all()\
-            .select_related("deadline", "deadline__date_type")
+            .select_related("deadline", "deadline__date_type", "date_type")
         for next_distance in next_deadlines:
             # Ignore if distance conditions are not met
             if not self._resolve_distance_conditions(
@@ -130,6 +121,11 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             if not next_date:
                 continue
 
+            # Ignore if next date is not supposed to be visible
+            vis_bool = get_dl_vis_bool_name(next_distance.deadline.deadlinegroup)
+            if vis_bool and not projectdeadline.project.attribute_data.get(vis_bool):
+                continue
+
             if next_distance.date_type:
                 distance_to_next = next_distance.date_type.valid_days_to(
                     projectdeadline.date, next_date
@@ -147,7 +143,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
             return False
 
         prev_deadlines = projectdeadline.deadline.distances_to_previous.all()\
-            .select_related("previous_deadline", "previous_deadline__date_type")\
+            .select_related("previous_deadline", "previous_deadline__date_type", "date_type")\
             .prefetch_related("previous_deadline__date_type__automatic_dates")
         for prev_distance in prev_deadlines:
             # Ignore if distance conditions are not met
@@ -1282,7 +1278,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-
         return sections
 
     def generate_floor_area_sections_data(
@@ -1320,7 +1315,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
             section_data = SectionData(section, serializer_class)
             sections.append(section_data)
-
         return sections
 
     def validate(self, attrs):
@@ -1356,14 +1350,12 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("create_draft") == False:
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
-
         attrs["attribute_data"] = self._validate_attribute_data(
             attrs.get("attribute_data", None),
             attrs,
             self.instance.user if self.instance else None,
             self.instance.owner_edit_override if self.instance else None,
         )
-
         return attrs
 
     def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
@@ -1374,7 +1366,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             should_update_deadlines = bool(
                 instance.deadlines.prefetch_related("deadline").filter(
                     deadline__attribute__identifier__in=attr_identifiers
-                ).count()
+                ).exists()
             )
 
             if not should_update_deadlines:
@@ -1382,8 +1374,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                     Deadline.objects.filter(
                         subtype=instance.subtype,
                         condition_attributes__identifier__in=attr_identifiers,
-                    ).count()
+                    ).exists()
                 )
+
+            if not should_update_deadlines:
+                should_update_deadlines = bool(Deadline.objects.filter(
+                    subtype=instance.subtype,
+                    attribute__identifier__in=attr_identifiers
+                ).exists())
 
             if not should_update_deadlines:
                 should_update_deadlines= bool(DeadlineDateCalculation.objects.filter(
@@ -1393,7 +1391,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     Q(not_conditions__identifier__in=attr_identifiers) | \
                     Q(datecalculation__base_date_attribute__identifier__in=attr_identifiers) | \
                     Q(datecalculation__attributes__attribute__identifier__in=attr_identifiers)
-                ).count())
+                ).exists())
 
         return should_update_deadlines
 
@@ -1425,9 +1423,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             return static_property_attributes
 
         tmp_attribute_data = {}
+        attribute_objects = { attribute.identifier: attribute for attribute in Attribute.objects.filter(
+            identifier__in=attribute_data.keys())}
         for attribute_identifier, value in attribute_data.items():
             try:
-                attribute = Attribute.objects.get(identifier=attribute_identifier)
+                attribute = attribute_objects.get(attribute_identifier)
                 if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
@@ -1449,6 +1449,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                                 attribute=f_attr.attribute_target,
                                 fieldset_path_str=fieldset_path_str
                             ).update(archived_at=timezone.now())
+
+                if value is None:
+                    try:
+                        deadline = Deadline.objects.get(attribute=attribute, subtype=self.instance.subtype)
+                        ProjectDeadline.objects.get(deadline=deadline, project=self.instance).delete()
+                    except Exception:
+                        pass
+
 
 
             except Attribute.DoesNotExist:
@@ -1495,14 +1503,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                 validation=should_validate,
                 preview=preview,
             ) or []
-
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
             validation=should_validate,
             preview=preview,
         ) or []
-
-
         # To be able to validate the entire structure, we set the initial attributes
         # to the same as the already saved instance attributes.
         valid_attributes = {}
@@ -1521,16 +1526,30 @@ class ProjectSerializer(serializers.ModelSerializer):
             if not serializer.is_valid(raise_exception=False):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
-
         # If we should validate attribute data, then raise errors if they exist
         if self.should_validate_attributes() and errors:
             raise ValidationError(errors)
+
+
+        def is_confirmed(dl):
+            try:
+                identifier = dl.deadline.confirmation_attribute.identifier
+            except AttributeError:
+                return None
+
+            if identifier in valid_attributes:
+                return bool(valid_attributes.get(identifier, False))
+
+            if identifier in dl.project.attribute_data:
+                return bool(dl.project.attribute_data.get(identifier, False))
+
+            return None
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl
             in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
-            if dl.confirmed and dl.deadline.attribute
+            if is_confirmed(dl) and dl.deadline.attribute
         ] if self.instance else []
 
         if confirmed_deadlines:
@@ -1538,7 +1557,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 k: v for k, v in valid_attributes.items()
                 if k not in confirmed_deadlines
             }
-
         # mostly invalid identifiers, but could be fieldset file fields
         unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
@@ -1556,13 +1574,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
                 files_to_archive.append((identifier, attribute_file))
 
-            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist):
+            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist) as e:
                 invalid_identifiers.append(identifier)
 
 
         if len(invalid_identifiers):
             invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
-            log.warn(", ".join(invalids))
+            log.warning(", ".join(invalids))
+
 
         for identifier, attribute_file in files_to_archive:
             entry = action.send(
@@ -1580,12 +1599,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_file.save()
 
         if self.instance:
-            for dl in ProjectDeadline.objects.filter(
+            updated_dls = ProjectDeadline.objects.filter(
                 project=self.instance,
                 deadline__attribute__identifier__in=valid_attributes.keys()
-            ):
+            )
+            for dl in updated_dls:
                 dl.generated = False
-                dl.save()
+            ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
 
         return {**static_property_attributes, **valid_attributes}
 
@@ -1694,11 +1714,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             self.context['should_update_deadlines'] = True
             attribute_data = validated_data.pop("attribute_data", {})
-            attribute_data["kaavaprosessin_kokoluokka_readonly"] = validated_data["phase"].project_subtype.name
-            try:
-                attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
-            except:
-                pass
+            self.set_initial_data(attribute_data, validated_data)
 
             project: Project = super().create(validated_data)
             user = self.context["request"].user
@@ -1719,13 +1735,28 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.save()
 
             user=self.context["request"].user
-            project.update_deadlines(user=user)
+            project.update_deadlines(user=user, initial=True, preview_attributes=project.attribute_data)
             for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
                 )
 
         return project
+
+    def set_initial_data(self, attribute_data, validated_data):
+        kokoluokka = validated_data["phase"].project_subtype.name
+
+        if kokoluokka == "XL" and validated_data.get("create_draft", None) is True:
+            attribute_data["kaavaluonnos_lautakuntaan_1"] = True
+            attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
+        if kokoluokka == "XL" and validated_data.get("create_principles", None) is True:
+            attribute_data["periaatteet_lautakuntaan_1"] = True
+            attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
+        attribute_data["kaavaprosessin_kokoluokka_readonly"] = kokoluokka
+        try:
+            attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
+        except:
+            pass
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
@@ -1745,7 +1776,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                 phase=phase,
                 user=user,
             )
-
 
         if subtype_changed or draft_principles_changed:
             #  Clear project from cache
@@ -1767,6 +1797,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                 attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
             except:
                 pass
+
+            self.update_initial_data(validated_data)
             if attribute_data:
                 instance.update_attribute_data(attribute_data)
 
@@ -1785,9 +1817,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=user)
+                project.update_deadlines(user=user, preview_attributes=attribute_data)
             elif should_update_deadlines:
-                project.update_deadlines(user=user)
+                project.update_deadlines(user=user, preview_attributes=attribute_data)
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
 
@@ -1806,8 +1838,37 @@ class ProjectSerializer(serializers.ModelSerializer):
                     self.create_deadline_updates_log(
                         dl.deadline, project, user, old_date, new_date
                     )
-
             return project
+
+    def update_initial_data(self, validated_data):
+        attribute_data = self.instance.attribute_data
+
+        try:
+            kokoluokka = validated_data["phase"].project_subtype.name
+            create_draft = validated_data.get("create_draft", None)
+            create_principles = validated_data.get("create_principles", None)
+
+            if create_draft is not None:
+                if kokoluokka == "XL" and create_draft == True:
+                    if attribute_data.get("kaavaluonnos_lautakuntaan_1", None) is None:
+                        attribute_data["kaavaluonnos_lautakuntaan_1"] = True
+                    if attribute_data.get("jarjestetaan_luonnos_esillaolo_1", None) is None:
+                        attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
+                else:
+                    attribute_data.pop("kaavaluonnos_lautakuntaan_1", None)
+                    attribute_data.pop("jarjestetaan_luonnos_esillaolo_1", None)
+
+            if create_principles is not None:
+                if kokoluokka == "XL" and create_principles == True:
+                    if attribute_data.get("periaatteet_lautakuntaan_1", None) is None:
+                        attribute_data["periaatteet_lautakuntaan_1"] = True
+                    if attribute_data.get("jarjestetaan_periaatteet_esillaolo_1", None) is None:
+                        attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
+                else:
+                    attribute_data.pop("periaatteet_lautakuntaan_1", None)
+                    attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
+        except KeyError as exc:
+            pass
 
     def log_updates_attribute_data(self, attribute_data, project=None, prefix=""):
         project = project or self.instance

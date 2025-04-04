@@ -9,6 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils.translation import gettext_lazy as _
+from django.core.cache import cache
 
 from users.models import PRIVILEGE_LEVELS
 from . import Attribute
@@ -130,6 +131,11 @@ class Deadline(models.Model):
         verbose_name=_("Use created at as value if no attribute or calculations are specified"),
         default=False,
     )
+    deadlinegroup = models.TextField(
+        verbose_name=_("deadlinegroup"),
+        null=True,
+        blank=True,
+    )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
         default=0,
@@ -139,21 +145,47 @@ class Deadline(models.Model):
 
     @property
     def initial_depends_on(self):
-        return list(set([
-            calc.datecalculation.base_date_deadline
-            for calc in self.initial_calculations.all().select_related("datecalculation",
-                                                                       "datecalculation__base_date_deadline")
-            if calc.datecalculation.base_date_deadline
-        ]))
+        cache_key = f"deadline_initial_dependencies_{self.pk}"
+        cached_value = cache.get(cache_key)
+        if cached_value is None:
+            cached_value = list(set([
+                calc.datecalculation.base_date_deadline
+                for calc in self.initial_calculations.all()\
+                    .select_related("datecalculation",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__date_type",
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__phase__project_subtype",
+                                    "datecalculation__base_date_deadline__subtype", 
+                                    "datecalculation__base_date_deadline__attribute")\
+                    .prefetch_related("datecalculation__base_date_deadline__initial_calculations")
+                if calc.datecalculation.base_date_deadline
+            ]))
+            cache.set(cache_key, cached_value, timeout=60*60*6)
+        return cached_value
 
     @property
     def update_depends_on(self):
-        return list(set([
-            calc.datecalculation.base_date_deadline
-            for calc in self.update_calculations.all().select_related("datecalculation",
-                                                                      "datecalculation__base_date_deadline")
-            if calc.datecalculation.base_date_deadline
-        ]))
+        cache_key = f"deadline_update_dependencies_{self.pk}"
+        cached_value = cache.get(cache_key)
+        if cached_value is None:
+            cached_value = list(set([
+                calc.datecalculation.base_date_deadline
+                for calc in self.update_calculations.all()\
+                    .select_related("datecalculation",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__date_type",
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__phase__project_subtype",
+                                    "datecalculation__base_date_deadline__subtype", 
+                                    "datecalculation__base_date_deadline__attribute") \
+                    .prefetch_related("datecalculation__base_date_deadline__update_calculations")
+                if calc.datecalculation.base_date_deadline
+            ]))
+            cache.set(cache_key, cached_value, timeout=60*60*6)
+        return cached_value
 
     @property
     def editable(self):
@@ -171,34 +203,32 @@ class Deadline(models.Model):
         else:
             return False
 
-    def _calculate(self, project, calculations, datetype, valid_dls=[], preview_attributes={}):
+    def _calculate(self, project, calculations, datetype, preview_attributes={}, raw=False):
         # TODO hard-coded, maybe change later
         if self.phase.name == "Periaatteet" and not project.create_principles:
             return None
         elif self.phase.name == "Luonnos" and not project.create_draft:
             return None
+        if self.default_to_created_at and not raw:
+            return project.created_at.date()
 
-        attribute_data = {**project.attribute_data, **preview_attributes}
-
-        # Use first calculation whose condition is met
-        # and target has a value
-        for calculation in calculations:
+        def _calculate_condition_result(attribute_data, calculation):
             condition_result = False
             base_attr = calculation.datecalculation.base_date_attribute
             base_deadline = calculation.datecalculation.base_date_deadline
 
             # When calculating previews, do not use base deadlines that will be deleted
-            if base_deadline and valid_dls and base_deadline not in valid_dls:
-                continue
+            if base_deadline and not project.is_deadline_applicable(base_deadline, preview_attributes):
+                return None
 
             if base_attr and base_attr.static_property:
                 base_attr = getattr(project, base_attr.static_property, None)
-            elif base_attr:
+            if base_attr:
                 base_date = attribute_data.get(base_attr.identifier)
             elif base_deadline and base_deadline.attribute:
                 try:
                     base_date = preview_attributes.get(base_deadline.attribute.identifier) or \
-                        project.deadlines.get(deadline=base_deadline).date
+                                project.deadlines.get(deadline=base_deadline).date
                 except ObjectDoesNotExist:
                     base_date = None
             elif base_deadline:
@@ -210,58 +240,73 @@ class Deadline(models.Model):
                 base_date = None
 
             if base_date:
-                if not calculation.conditions.count() + \
-                    calculation.not_conditions.count():
-                    condition_result = True
+                condition_result = True
 
                 for condition in calculation.conditions.all():
-                    if self._check_condition(project, condition, preview_attributes):
-                        condition_result = True
+                    if not self._check_condition(project, condition, preview_attributes):
+                        condition_result = False
 
                 for condition in calculation.not_conditions.all():
-                    if not self._check_condition(project, condition, preview_attributes):
-                        condition_result = True
+                    if self._check_condition(project, condition, preview_attributes):
+                        condition_result = False
 
             if condition_result:
+                if raw:
+                    date_calc = calculation.datecalculation
+                    return (date_calc.base_date_deadline.attribute.identifier if date_calc.base_date_deadline.attribute else None,
+                            date_calc.base_date_deadline.abbreviation,
+                            date_calc.constant
+                            )
                 return calculation.datecalculation.calculate(project, datetype, preview_attributes)
+            return None
 
-        if self.default_to_created_at:
-            return project.created_at.date()
+        attribute_data = {**project.attribute_data, **preview_attributes}
 
-        return None
+        result = None
+        for calculation in calculations:
+            tmp = _calculate_condition_result(attribute_data, calculation)
+            if tmp is None:
+                continue
+            if self.attribute and ("vaihe_alkaa_pvm" in self.attribute.identifier or "vaihe_paattyy_pvm" in self.attribute.identifier):  # Calculate latest date
+                result = tmp if (not result or tmp > result) else result
+            else:  # Return first calculation of whose condition is met
+                result = tmp
+                break
 
-    def calculate_initial(self, project, preview_attributes={}):
-        if preview_attributes:
-            valid_dls = project.get_applicable_deadlines(
-                preview_attributes=preview_attributes
-            )
-        else:
-            valid_dls = []
+        return result
 
+    def calculate_initial(self, project, preview_attributes={}, raw=False):
         return self._calculate(
             project,
-            self.initial_calculations.all().select_related("datecalculation"),
+            self.initial_calculations.all().order_by('-index').select_related("datecalculation",
+                                    "datecalculation__base_date_attribute",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__attribute",
+                                    "datecalculation__base_date_deadline__subtype",
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__phase__project_subtype")
+                    .prefetch_related("conditions", "not_conditions"),
             self.date_type,
-            valid_dls,
             preview_attributes,
+            raw,
         )
 
     def calculate_updated(self, project, preview_attributes={}):
-        if self.update_calculations.count():
-            if preview_attributes:
-                valid_dls = project.get_applicable_deadlines(
-                    preview_attributes=preview_attributes
-                )
-            else:
-                valid_dls = []
-
+        if self.update_calculations.exists():
             return self._calculate(
                 project,
-                self.update_calculations.all().select_related("datecalculation", "datecalculation__base_date_attribute",
-                                                              "datecalculation__base_date_deadline",
-                                                              "datecalculation__base_date_deadline__attribute"),
+                self.update_calculations.all().order_by('-index')
+                    .select_related("datecalculation",
+                                    "datecalculation__base_date_attribute",
+                                    "datecalculation__base_date_deadline",
+                                    "datecalculation__base_date_deadline__attribute",
+                                    "datecalculation__base_date_deadline__subtype",
+                                    "datecalculation__base_date_deadline__phase",
+                                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                                    "datecalculation__base_date_deadline__date_type")
+                    .prefetch_related("conditions", "not_conditions"),
                 self.date_type,
-                valid_dls,
                 preview_attributes,
             )
         elif self.attribute:
@@ -279,6 +324,18 @@ class Deadline(models.Model):
         ordering = ("index",)
         verbose_name = _("deadline")
         verbose_name_plural = _("deadlines")
+
+
+class DeadlineDistanceConditionAttribute(models.Model):
+    attribute = models.ForeignKey(
+        Attribute,
+        null=False,
+        on_delete=models.CASCADE
+    )
+    negate = models.BooleanField(
+        default=False,
+        null=False,
+    )
 
 
 class DeadlineDistance(models.Model):
@@ -305,11 +362,15 @@ class DeadlineDistance(models.Model):
         blank=True,
         null=True,
     )
-    # Only simple boolean conditions needed for now
-    conditions = models.ManyToManyField(
-        Attribute,
-        verbose_name=_("use rule if any attribute is set"),
+    condition_operator = models.CharField(
+        max_length=3,
+        null=True,
         blank=True,
+    )
+    condition_attributes = models.ManyToManyField(
+        DeadlineDistanceConditionAttribute,
+        related_name="deadline_distances",
+        blank=True
     )
     index = models.PositiveIntegerField(
         verbose_name=_("index"),
@@ -318,6 +379,28 @@ class DeadlineDistance(models.Model):
 
     def __str__(self):
         return f"{self.previous_deadline.abbreviation} -> {self.deadline.abbreviation} ({self.distance_from_previous}{' ' + str(self.date_type) if self.date_type else ''})"
+
+    def check_conditions(self, attribute_data):
+        if not self.condition_attributes.exists():
+            return True
+
+        condition_attributes = self.condition_attributes.all()
+        operator = self.condition_operator
+
+        for distance_condition_attribute in condition_attributes:
+            attribute = distance_condition_attribute.attribute
+            negate = distance_condition_attribute.negate
+
+            res = attribute_data.get(attribute.identifier, None)
+            check_condition_result = True if res and not negate else True if not res and negate else False
+            if operator == 'and' and not check_condition_result:
+                return False
+            elif operator == 'or' and check_condition_result:
+                return True
+            elif len(condition_attributes) == 1:
+                return check_condition_result
+
+        return True if operator == 'and' else False
 
     class Meta:
         ordering = ("index",)
@@ -356,6 +439,11 @@ class DateType(models.Model):
     exclude_selected = models.BooleanField(
         default=False, verbose_name=_("exclude selected dates")
     )
+    forced_dates = models.ManyToManyField(
+        "ForcedDate",
+        verbose_name=_("dates_forced"),
+        blank=True,
+    )
 
     @staticmethod
     def _filter_date_list(date_list, business_days_only):
@@ -369,8 +457,22 @@ class DateType(models.Model):
             if cal.is_working_day(date)
         ]
 
+    def get_dates_between(self, from_year, to_year):
+        dates = []
+        for year in range(from_year, to_year):
+            dates += self.get_dates(year)
+        return dates
+
     def get_dates(self, year):
+        cache_key = f"datetype_{self.identifier}_dates_{year}"
+
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return cached_result
+
         listed_dates = self.dates or []
+        forced_dates_remove = [date.original_date for date in self.forced_dates.all() if date.original_date]
+        forced_dates_add = [date.new_date for date in self.forced_dates.all() if date.new_date]
         base_dates = []
         has_base_datetypes = self.base_datetype.exists()
 
@@ -385,7 +487,11 @@ class DateType(models.Model):
 
         if self.exclude_selected:
             def include(date):
-                if date not in listed_dates \
+                if date in forced_dates_add:
+                    return True
+                elif date in forced_dates_remove:
+                    return False
+                elif date not in listed_dates \
                     and has_base_datetypes \
                     and date in base_dates:
                     return True
@@ -395,16 +501,20 @@ class DateType(models.Model):
                 else:
                     return False
 
-            return self._filter_date_list([
+            result = self._filter_date_list([
                 datetime.date(year, 1, 1) + datetime.timedelta(days=i)
                 for i in range((366 if isleap(+year) else 365))
                 if include(datetime.date(year, 1, 1)+datetime.timedelta(days=i))
             ], self.business_days_only)
         else:
-            return self._filter_date_list(
+            result = self._filter_date_list(
                 listed_dates + base_dates,
                 self.business_days_only,
             )
+
+
+        cache.set(cache_key, result, timeout=3600)  # 1 hour
+        return result
 
     def valid_days_to(self, date_a, date_b):
         days = (date_b - date_a).days
@@ -488,6 +598,16 @@ class DateType(models.Model):
     class Meta:
         verbose_name = _("date type")
         verbose_name_plural = _("date types")
+
+
+class ForcedDate(models.Model):
+    original_date = models.DateField(blank=True, null=True, unique=True, verbose_name=_("date_original"))
+    new_date = models.DateField(blank=True, null=True, unique=True, verbose_name=_("date_new"))
+
+    def __str__(self):
+        original_date_str = self.original_date.strftime("%d.%m.%Y") if self.original_date else None
+        new_date_str = self.new_date.strftime("%d.%m.%Y") if self.new_date else None
+        return f"{original_date_str} -> {new_date_str}"
 
 
 class AutomaticDate(models.Model):
@@ -832,7 +952,7 @@ class DateCalculationAttribute(models.Model):
     )
 
     def __str__(self):
-        return f"{'-' if self.subtract else '-'} {self.attribute}"
+        return f"{'-' if self.subtract else '+'} {self.attribute}"
 
 
 class DeadlineDateCalculation(models.Model):
