@@ -983,7 +983,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             log.error("Error in projects/attribute_data %s", exc)
             return Response("Error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-def update(self, request, *args, **kwargs):
+    def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
