@@ -983,16 +983,44 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             log.error("Error in projects/attribute_data %s", exc)
             return Response("Error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def update(self, request, *args, **kwargs):
-        fake = request.query_params.get('fake', False)
-        if not fake:
-            return super().update(request, *args, **kwargs)
+def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
 
-        # Run update in 'ghost' mode where no changes are applied to database but result is returned
-        with transaction.atomic():
-            result = super().update(request, *args, **kwargs)
-            transaction.set_rollback(True)
-            return result
+        serializer.is_valid(raise_exception=True)
+
+        # Save validated data (if not fake)
+        fake = request.query_params.get("fake", "false").lower() == "true"
+        project = serializer.save()
+
+        # Collect related deadlines to update
+        deadlines = list(project.deadlines.all())
+
+        # Calculate deadlines with preview flag
+        deadline_results = project._set_calculated_deadlines(
+            deadlines=deadlines,
+            user=request.user,
+            initial=False,
+            preview=fake,
+            preview_attribute_data=request.data,
+        )
+
+        if fake:
+            # Don't save in preview mode
+            unresolved = [dl.abbreviation for dl, result in deadline_results.items() if not result]
+
+            return Response({
+                "status": "ok",
+                "preview": True,
+                "unresolved": unresolved,
+                "calculated": {
+                    dl.abbreviation: result for dl, result in deadline_results.items()
+                }
+            }, status=status.HTTP_200_OK)
+
+        # If not preview, continue normally
+        return Response(self.get_serializer(project).data)
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
