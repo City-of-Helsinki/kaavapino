@@ -428,8 +428,11 @@ class Project(models.Model):
             return date
 
     def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False):
+        log.info(f"[set_calculated_deadlines] Called with {len(deadlines)} deadlines, initial={initial}, preview={preview}, is_recursing={is_recursing}")
+        
         if ignore is None:
             ignore = []
+
         results = {}
         fillers = []
 
@@ -446,10 +449,19 @@ class Project(models.Model):
                     dl for dl in deadline.update_depends_on
                     if dl not in ignore
                 ]
+                log.info(
+                    f"[set_calculated_deadlines] Deadline {getattr(deadline.attribute, 'identifier', str(deadline))} depends on "
+                    f"{[getattr(d.attribute, 'identifier', str(d)) for d in dependencies]}"
+                )
+
             if dependencies:
-                ignore += dependencies
-                results = { **results,
-                    **self._set_calculated_deadlines(
+                log.debug(
+                    f"[set_calculated_deadlines] Recurse into: "
+                    f"{[getattr(d.attribute, 'identifier', str(d)) for d in dependencies]}"
+                )
+                ignore = list(ignore) + dependencies
+                results.update(
+                    self._set_calculated_deadlines(
                         dependencies,
                         user,
                         ignore=ignore,
@@ -458,7 +470,7 @@ class Project(models.Model):
                         preview_attribute_data=preview_attribute_data,
                         is_recursing=True
                     )
-                }
+                )
 
             result = self._set_calculated_deadline(
                 deadline,
@@ -467,13 +479,17 @@ class Project(models.Model):
                 preview,
                 preview_attribute_data,
             )
+            log.debug(
+                f"[set_calculated_deadlines] Calculated deadline {getattr(deadline.attribute, 'identifier', str(deadline))} = {result}"
+            )
+
             if not result:
-                fillers += [deadline]
+                fillers.append(deadline)
 
             results[deadline] = result
 
         for deadline in fillers:
-            # Another pass for few deadlines that depend on other deadlines
+            log.info(f"[set_calculated_deadlines] Second pass: {getattr(deadline.attribute, 'identifier', str(deadline))}")
             if initial:
                 calculate_deadline = deadline.calculate_initial
             else:
@@ -488,81 +504,98 @@ class Project(models.Model):
             )
 
         if not is_recursing:
+            log.info(f"[set_calculated_deadlines] Saving project after all calculations")
             self.save()
 
+        log.info(
+            f"[set_calculated_deadlines] Finished with {len(results)} results: "
+            f"{[getattr(d.attribute, 'identifier', str(d)) for d in results]}"
+        )
         return results
 
     # Generate or update schedule for project
     def update_deadlines(self, user=None, initial=False, preview_attributes={}):
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
+        log.info(f"[update_deadlines] Start. initial={initial}, preview keys={list(preview_attributes.keys())}")
 
-        # Delete no longer relevant deadlines and create missing
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
-
         for dl in to_be_deleted:
+            log.info(f"[update_deadlines] Deleting deadline: {getattr(dl.deadline.attribute, 'identifier', str(dl.deadline))}")
             self.deadlines.remove(dl)
 
         generated_deadlines = []
         project_deadlines = list(ProjectDeadline.objects.filter(project=self, deadline__in=deadlines)
-                                 .select_related("deadline"))
+                                .select_related("deadline"))
         existing_dls = [p_dl.deadline for p_dl in project_deadlines]
 
         for deadline in deadlines:
-            if not deadline in existing_dls:
+            if deadline not in existing_dls:
                 new_project_deadline = ProjectDeadline.objects.create(
                     project=self,
                     deadline=deadline,
                     generated=True
                 )
+                log.info(f"[update_deadlines] Created new deadline: {getattr(deadline.attribute, 'identifier', str(deadline))}")
+
                 if deadline.deadlinegroup:
                     vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
-                    if vis_bool and not vis_bool in self.attribute_data:
+                    if vis_bool and vis_bool not in self.attribute_data:
                         self.attribute_data[vis_bool] = True if deadline.deadlinegroup.endswith('1') else False
+
                 generated_deadlines.append(new_project_deadline)
                 project_deadlines.append(new_project_deadline)
+
         self.deadlines.set(project_deadlines)
 
-        # Update attribute-based deadlines
         dls_to_update = []
         for dl in self.deadlines.all().select_related("deadline__attribute"):
             if not dl.deadline.attribute:
                 continue
 
-            value = self.attribute_data.get(dl.deadline.attribute.identifier)
+            attr_id = dl.deadline.attribute.identifier
+            value = self.attribute_data.get(attr_id)
             value = value if value != 'null' else None
             if dl.date != value:
+                log.info(f"[update_deadlines] Updating attribute-based deadline {attr_id}: {dl.date} -> {value}")
                 dl.date = value
                 dls_to_update.append(dl)
+
         self.deadlines.bulk_update(dls_to_update, ['date'])
-        # Calculate automatic values for newly added deadlines
+
+        initial_calc_deadlines = [
+            dl.deadline for dl in generated_deadlines
+            if dl.deadline.initial_calculations.exists() or dl.deadline.default_to_created_at
+        ]
+        log.info(
+            f"[update_deadlines] Setting initial calculated deadlines: "
+            f"{[getattr(d.attribute, 'identifier', str(d)) for d in initial_calc_deadlines]}"
+        )
         self._set_calculated_deadlines(
-            [
-                dl.deadline for dl in generated_deadlines
-                if dl.deadline.initial_calculations.exists() \
-                    or dl.deadline.default_to_created_at
-            ],
+            initial_calc_deadlines,
             user,
             initial=True,
             preview_attribute_data=preview_attributes
         )
 
-        # Update automatic deadlines
+        update_calc_deadlines = [
+            dl.deadline for dl in self.deadlines.all()
+                .select_related(
+                    "deadline", "deadline__attribute", "deadline__phase", 
+                    "deadline__phase__common_project_phase", "deadline__phase__project_subtype", "deadline__subtype",
+                    "deadline__attribute", "deadline__date_type")
+                .prefetch_related("deadline__update_calculations")
+            if any([
+                dl.deadline.update_calculations.exists(),
+                dl.deadline.default_to_created_at,
+                dl.deadline.attribute
+            ])
+        ]
+        log.info(
+            f"[update_deadlines] Updating calculated deadlines: "
+            f"{[getattr(d.attribute, 'identifier', str(d)) for d in update_calc_deadlines]}"
+        )
         self._set_calculated_deadlines(
-            [
-                dl.deadline for dl in self.deadlines.all()
-                    .select_related(
-                        "deadline", "deadline__attribute", "deadline__phase", 
-                        "deadline__phase__common_project_phase","deadline__phase__project_subtype", "deadline__subtype",
-                        "deadline__attribute", "deadline__date_type")
-                    .prefetch_related(
-                        "deadline__update_calculations"
-                    )
-                if any([
-                    dl.deadline.update_calculations.exists(),
-                    dl.deadline.default_to_created_at,
-                    dl.deadline.attribute
-                ])
-            ],
+            update_calc_deadlines,
             user,
             initial=False,
             preview_attribute_data=preview_attributes

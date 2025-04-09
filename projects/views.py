@@ -985,6 +985,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
+        log.info(f"[update] Called with fake={fake}")
         if not fake:
             return super().update(request, *args, **kwargs)
 
