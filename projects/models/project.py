@@ -380,56 +380,57 @@ class Project(models.Model):
             return False
         return self._check_condition(deadline, preview_attributes)
 
-    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}):
-        if not date:
+    def _set_calculated_deadline(self, deadline, calculated_value, user, preview, preview_attribute_data):
+        if not deadline.attribute:
+            log.debug(f"[set_calculated_deadline] No attribute for deadline: {str(deadline)}")
             return None
-        try:
-            if preview:
-                try:
-                    identifier = deadline.attribute.identifier
-                except AttributeError:
-                    identifier = None
 
-                project_deadline = preview_attribute_data.get(identifier) or self.deadlines.filter(deadline=deadline).exists()
-            else:
-                project_deadline = ProjectDeadline.objects.get(project=self, deadline=deadline)
-        except ProjectDeadline.DoesNotExist:
-            return
+        attr_id = deadline.attribute.identifier
+        if not attr_id:
+            log.debug(f"[set_calculated_deadline] No identifier for deadline attribute: {str(deadline)}")
+            return None
 
-        if project_deadline:
-            if preview:
-                return date
+        # Respect confirmed fields (from preview or live attribute_data)
+        confirmed = preview_attribute_data.get("confirmed_fields") if preview else self.attribute_data.get("confirmed_fields")
+        confirmed = confirmed or []
 
-            if not project_deadline.date == date:
-                project_deadline.date = date
-                project_deadline.save()
+        if attr_id in confirmed:
+            log.info(f"[set_calculated_deadline] Skipping confirmed field: {attr_id}")
+            return self.attribute_data.get(attr_id)
 
-            if deadline.attribute:
-                old_value = json.loads(json.dumps(
-                    self.attribute_data.get(deadline.attribute.identifier),
-                    default=str,
-                ))
-                new_value = json.loads(json.dumps(date, default=str))
+        project_deadline = self.deadlines.filter(deadline=deadline).first()
+        if not project_deadline:
+            log.debug(f"[set_calculated_deadline] No ProjectDeadline found for deadline: {attr_id}")
+            return None
 
-                self.update_attribute_data( \
-                    {deadline.attribute.identifier: date})
+        current_value = project_deadline.date
 
-                if old_value != new_value:
-                    action.send(
-                        user or self.user,
-                        verb=verbs.UPDATED_ATTRIBUTE,
-                        action_object=deadline.attribute,
-                        target=self,
-                        attribute_identifier=deadline.attribute.identifier,
-                        old_value=old_value,
-                        new_value=new_value,
-                    )
+        # In preview mode, simulate value assignment
+        if preview:
+            self.attribute_data[attr_id] = calculated_value
+            return calculated_value
 
-            return date
+        # In real mode, update the stored deadline
+        if current_value != calculated_value:
+            log.info(f"[set_calculated_deadline] Updating {attr_id}: {current_value} -> {calculated_value}")
+            project_deadline.date = calculated_value
+            project_deadline.save(update_fields=["date"])
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False):
+        return calculated_value
+
+
+    def _set_calculated_deadlines(
+        self,
+        deadlines,
+        user,
+        ignore=None,
+        initial=False,
+        preview=False,
+        preview_attribute_data={},
+        is_recursing=False
+    ):
         log.info(f"[set_calculated_deadlines] Called with {len(deadlines)} deadlines, initial={initial}, preview={preview}, is_recursing={is_recursing}")
-        
+
         if ignore is None:
             ignore = []
 
@@ -440,14 +441,12 @@ class Project(models.Model):
             if initial:
                 calculate_deadline = deadline.calculate_initial
                 dependencies = [
-                    dl for dl in deadline.initial_depends_on
-                    if dl not in ignore
+                    dl for dl in deadline.initial_depends_on if dl not in ignore
                 ]
             else:
                 calculate_deadline = deadline.calculate_updated
                 dependencies = [
-                    dl for dl in deadline.update_depends_on
-                    if dl not in ignore
+                    dl for dl in deadline.update_depends_on if dl not in ignore
                 ]
                 log.info(
                     f"[set_calculated_deadlines] Deadline {getattr(deadline.attribute, 'identifier', str(deadline))} depends on "
@@ -518,6 +517,7 @@ class Project(models.Model):
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
         log.info(f"[update_deadlines] Start. initial={initial}, preview keys={list(preview_attributes.keys())}")
 
+        # Delete no longer relevant deadlines
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
         for dl in to_be_deleted:
             log.info(f"[update_deadlines] Deleting deadline: {getattr(dl.deadline.attribute, 'identifier', str(dl.deadline))}")
@@ -536,7 +536,6 @@ class Project(models.Model):
                     generated=True
                 )
                 log.info(f"[update_deadlines] Created new deadline: {getattr(deadline.attribute, 'identifier', str(deadline))}")
-
                 if deadline.deadlinegroup:
                     vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
                     if vis_bool and vis_bool not in self.attribute_data:
@@ -547,6 +546,7 @@ class Project(models.Model):
 
         self.deadlines.set(project_deadlines)
 
+        # Update attribute-based deadlines (dates directly from attribute_data)
         dls_to_update = []
         for dl in self.deadlines.all().select_related("deadline__attribute"):
             if not dl.deadline.attribute:
@@ -562,6 +562,7 @@ class Project(models.Model):
 
         self.deadlines.bulk_update(dls_to_update, ['date'])
 
+        # Calculate automatic values for newly added deadlines (initial calculations)
         initial_calc_deadlines = [
             dl.deadline for dl in generated_deadlines
             if dl.deadline.initial_calculations.exists() or dl.deadline.default_to_created_at
@@ -574,9 +575,11 @@ class Project(models.Model):
             initial_calc_deadlines,
             user,
             initial=True,
+            preview=bool(preview_attributes),
             preview_attribute_data=preview_attributes
         )
 
+        # Calculate automatic values for all deadlines (updated calculations)
         update_calc_deadlines = [
             dl.deadline for dl in self.deadlines.all()
                 .select_related(
@@ -598,6 +601,7 @@ class Project(models.Model):
             update_calc_deadlines,
             user,
             initial=False,
+            preview=bool(preview_attributes),
             preview_attribute_data=preview_attributes
         )
 
