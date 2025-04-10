@@ -1360,7 +1360,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
         if subtype_changed:
-            should_update_deadlines = False
+            return True
         elif instance:
             attr_identifiers = list(attribute_data.keys())
             should_update_deadlines = bool(
@@ -1786,7 +1786,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         cache.delete(f'deadline_sections:{privilege}:{owner}:{instance.pk if instance else None}')
 
         should_update_deadlines = self._get_should_update_deadlines(
-            subtype_changed, instance, attribute_data,
+            subtype_changed or draft_principles_changed, instance, attribute_data,
         )
         self.context['should_update_deadlines'] = \
             should_update_deadlines or should_generate_deadlines

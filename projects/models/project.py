@@ -501,6 +501,7 @@ class Project(models.Model):
 
         for dl in to_be_deleted:
             self.deadlines.remove(dl)
+            dl.delete()
 
         generated_deadlines = []
         project_deadlines = list(ProjectDeadline.objects.filter(project=self, deadline__in=deadlines)
