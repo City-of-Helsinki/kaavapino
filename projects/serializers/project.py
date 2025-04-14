@@ -65,6 +65,7 @@ from sitecontent.models import ListViewAttributeColumn
 from users.models import User, PRIVILEGE_LEVELS
 from users.serializers import PersonnelSerializer, UserSerializer
 from users.helpers import get_graph_api_access_token
+from projects.models.utils import normalize_identifier_list
 
 log = logging.getLogger(__name__)
 
@@ -1486,8 +1487,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         preview = None
         if self.instance and should_update_deadlines:
             preview = self.instance.get_preview_deadlines(
-                attribute_data,
-                subtype,
+                updated_attributes=attribute_data,  # Use attribute_data instead of preview_attribute_data
+                subtype=self.instance.subtype
             )
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable

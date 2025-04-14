@@ -6,6 +6,29 @@ from django.utils.encoding import force_bytes, force_text
 from django.utils.text import slugify
 from private_storage.storage.files import PrivateFileSystemStorage
 from projects.models.deadline import Deadline
+from projects.models.attribute import Attribute
+
+def clean_attribute_data_for_preview(attribute_data: dict) -> dict:
+    """Ensures all values are JSON-serializable. Avoids double-serializing already-clean values."""
+    cleaned = {}
+
+    attributes = Attribute.objects.filter(identifier__in=attribute_data.keys()).prefetch_related("value_choices")
+
+    for attr in attributes:
+        raw_value = attribute_data.get(attr.identifier)
+
+        # Skip serialize_value if the value is already JSON-safe (e.g., string or list of strings)
+        if isinstance(raw_value, (str, int, bool, float, type(None))):
+            cleaned[attr.identifier] = raw_value
+        elif isinstance(raw_value, list) and all(isinstance(v, (str, int, bool, float)) for v in raw_value):
+            cleaned[attr.identifier] = raw_value
+        else:
+            cleaned[attr.identifier] = attr.serialize_value(raw_value)
+
+    return cleaned
+
+def normalize_identifier_list(lst):
+    return [str(x).strip() for x in (lst or [])]
 
 def get_applicable_deadlines_for_project(project):
     # Ensure we can access subtype through phase

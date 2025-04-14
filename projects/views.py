@@ -115,7 +115,8 @@ from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateS
 from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
-
+from projects.models.utils import clean_attribute_data_for_preview
+from projects.models.utils import normalize_identifier_list
 
 log = logging.getLogger(__name__)
 
@@ -1003,23 +1004,39 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         if is_fake:
             attribute_data = serializer.validated_data.get("attribute_data", {}) or {}
-            confirmed_fields = serializer.validated_data.get("confirmed_fields", []) or []
+            confirmed_fields = normalize_identifier_list(request.data.get("confirmed_fields", []))
+
 
             preview_attribute_data = {
                 k: v for k, v in attribute_data.items() if k not in confirmed_fields
             }
-
-            preview_deadlines = instance.generate_preview_deadlines(
-                user=request.user,
-                preview_attribute_data=preview_attribute_data,
+            attribute_data = request.data.get("attribute_data", {})
+            confirmed_fields = request.data.get("confirmed_fields", [])
+            phase = getattr(instance, "phase", None)
+            subtype = getattr(phase, "project_subtype", None)       
+            log.warning("[FAKE] confirmed_fields sent by frontend: %s", confirmed_fields)
+            # ✅ THIS IS WHAT YOU SHOULD USE:
+            preview_deadlines = instance.get_preview_deadlines(
+                updated_attributes=attribute_data,
+                subtype=subtype,
+                confirmed_fields=confirmed_fields,
             )
-            log.info("[FAKE PREVIEW] Returning preview deadlines for project '%s' with %d deadlines", instance.name, len(preview_deadlines))
-            return Response({
-                "id": instance.id,
-                "attribute_data": instance.attribute_data,
-                "deadlines": preview_deadlines,
-            })
+            
 
+            # Merge simulated attribute_data but preserve confirmed values
+            final_attribute_data = dict(instance.attribute_data)
+            for k, v in preview_attribute_data.items():
+                if k not in confirmed_fields:
+                    final_attribute_data[k] = v
+            instance.attribute_data = clean_attribute_data_for_preview(final_attribute_data)
+
+            # Return the full serializer output as-is (KAAV-1473 style)
+            response_data = ProjectSerializer(instance, context={"request": request}).data
+
+            log.info("[FAKE PREVIEW] Returning preview with %d deadlines for project '%s'", len(preview_deadlines), instance.name)
+            return Response(response_data)
+
+        # Real PATCH save
         serializer.save()
         return Response(serializer.data)
 
