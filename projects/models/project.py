@@ -29,6 +29,7 @@ from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
 from .projectcomment import FieldComment
 
+
 log = logging.getLogger(__name__)
 
 
@@ -276,18 +277,11 @@ class Project(models.Model):
         if not data:
             return False
 
-        project_attributes = (
-            Attribute.objects.all()
-            .distinct()
-            .prefetch_related("value_choices")
-        )
-
-        attributes = {a.identifier: a for a in project_attributes}
-
         for identifier, value in data.items():
-            attribute = attributes.get(identifier)
-
-            if not attribute:
+            try:
+                attribute = Attribute.objects.get(identifier=identifier)
+            except Attribute.DoesNotExist:
+                log.warning(f"Attribute {identifier} not found")
                 continue
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
@@ -356,7 +350,7 @@ class Project(models.Model):
 
         return False
 
-    def get_applicable_deadlines(self, subtype=None, preview_attributes={}):
+    def get_applicable_deadlines(self, subtype=None, preview_attributes={}, initial=False):
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -376,10 +370,10 @@ class Project(models.Model):
         return [
             deadline
             for deadline in deadlines
-            if self._check_condition(deadline, preview_attributes)
+            if initial or self._check_condition(deadline, preview_attributes)
         ]
 
-    def _set_calculated_deadline(self, deadline, date, initial, user, preview, preview_attribute_data={}):
+    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}):
         try:
             if preview:
                 try:
@@ -389,7 +383,7 @@ class Project(models.Model):
 
                 project_deadline = preview_attribute_data.get(identifier) or self.deadlines.get(deadline=deadline)
             else:
-                project_deadline = self.deadlines.get(deadline=deadline)
+                project_deadline = ProjectDeadline.objects.get(project=self, deadline=deadline)
         except ProjectDeadline.DoesNotExist:
             return
 
@@ -401,30 +395,31 @@ class Project(models.Model):
             project_deadline.save()
 
             if deadline.attribute:
-                with transaction.atomic():
-                    old_value = json.loads(json.dumps(
-                        self.attribute_data.get(deadline.attribute.identifier),
-                        default=str,
-                    ))
-                    new_value = json.loads(json.dumps(date, default=str))
+                old_value = json.loads(json.dumps(
+                    self.attribute_data.get(deadline.attribute.identifier),
+                    default=str,
+                ))
+                new_value = json.loads(json.dumps(date, default=str))
 
-                    self.update_attribute_data( \
-                        {deadline.attribute.identifier: date})
-                    self.save()
-                    if old_value != new_value:
-                        action.send(
-                            user or self.user,
-                            verb=verbs.UPDATED_ATTRIBUTE,
-                            action_object=deadline.attribute,
-                            target=self,
-                            attribute_identifier=deadline.attribute.identifier,
-                            old_value=old_value,
-                            new_value=new_value,
-                        )
+                self.update_attribute_data( \
+                    {deadline.attribute.identifier: date})
+
+                if old_value != new_value:
+                    action.send(
+                        user or self.user,
+                        verb=verbs.UPDATED_ATTRIBUTE,
+                        action_object=deadline.attribute,
+                        target=self,
+                        attribute_identifier=deadline.attribute.identifier,
+                        old_value=old_value,
+                        new_value=new_value,
+                    )
 
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False, preview_attribute_data={}):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False):
+        if ignore is None:
+            ignore = []
         results = {}
         fillers = []
 
@@ -441,7 +436,6 @@ class Project(models.Model):
                     dl for dl in deadline.update_depends_on
                     if dl not in ignore
                 ]
-
             if dependencies:
                 ignore += dependencies
                 results = { **results,
@@ -452,18 +446,17 @@ class Project(models.Model):
                         initial=initial,
                         preview=preview,
                         preview_attribute_data=preview_attribute_data,
+                        is_recursing=True
                     )
                 }
 
             result = self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
-                initial,
                 user,
                 preview,
                 preview_attribute_data,
             )
-
             if not result:
                 fillers += [deadline]
 
@@ -479,17 +472,19 @@ class Project(models.Model):
             self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
-                initial,
                 user,
                 preview,
                 preview_attribute_data,
             )
 
+        if not is_recursing:
+            self.save()
+
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, values=None, user=None):
-        deadlines = self.get_applicable_deadlines()
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}):
+        deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
@@ -520,9 +515,9 @@ class Project(models.Model):
                 continue
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
+            value = value if value != 'null' else None
             dl.date = value
             dl.save()
-
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
             [
@@ -532,27 +527,20 @@ class Project(models.Model):
             ],
             user,
             initial=True,
+            preview_attribute_data=preview_attributes
         )
 
         # Update automatic deadlines
         self._set_calculated_deadlines(
             [
-                dl.deadline for dl in self.deadlines
-                .select_related(
-                    "project", "deadline", "deadline__attribute", "deadline__confirmation_attribute",
-                )
-                .prefetch_related(
-                    "deadline__condition_attributes",
-                    "deadline__initial_calculations",
-                    "deadline__update_calculations",
-                )
-                .all()
+                dl.deadline for dl in self.deadlines.all()
                 if dl.deadline.update_calculations.count()
-                    or dl.deadline.default_to_created_at
-                    or dl.deadline.attribute
+                   or dl.deadline.default_to_created_at
+                   or dl.deadline.attribute
             ],
             user,
             initial=False,
+            preview_attribute_data=preview_attributes
         )
 
     # Calculate a preview schedule without saving anything
@@ -589,7 +577,6 @@ class Project(models.Model):
             if value:
                 project_dls[dl] = value
 
-
         # Generate newly added deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
@@ -615,6 +602,10 @@ class Project(models.Model):
             preview_attribute_data=updated_attributes,
         )}
 
+        # Add visibility booleans
+        for identifier, value in updated_attribute_data.items():
+            if type(value) == bool:
+                project_dls[identifier] = value
         return project_dls
 
     @property

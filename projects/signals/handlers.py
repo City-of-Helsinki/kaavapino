@@ -11,6 +11,7 @@ from django.db.models.signals import (
 from django.dispatch import receiver
 from django_q.tasks import async_task
 from django_q.models import OrmQ
+from datetime import datetime
 
 from projects.helpers import get_fieldset_path
 from projects.models import (
@@ -35,6 +36,7 @@ from projects.models import (
     ProjectPhaseDeadlineSectionAttribute,
     Deadline,
     Project,
+    DateType,
 )
 from projects.tasks import refresh_project_schedule_cache \
     as refresh_project_schedule_cache_task
@@ -103,3 +105,12 @@ def refresh_project_schedule_cache(sender, instance, *args, **kwargs):
         refresh_project_schedule_cache_task,
         task_name="refresh_project_schedule_cache",
     )
+
+@receiver([post_save], sender=DateType)
+def delete_cached_date_types(sender, instance, *args, **kwargs):
+    identifier = instance.identifier
+    current_year = datetime.now().year
+    for year in range(current_year - 1, current_year + 20):
+        cache_key = f"datetype_{identifier}_dates_{year}"
+        cache.delete(cache_key)
+    cache.delete("serialized_date_types")

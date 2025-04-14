@@ -635,6 +635,10 @@ msgstr "automaattiset päivämäärät"
 msgid "exclude selected dates"
 msgstr "poista valitut päivämäärät hyväksytyistä"
 
+#: projects/models/deadline.py:393
+msgid "forced dates"
+msgstr "pakotetut päivämäärät (YYYY-MM-DD,...)"
+
 #: projects/models/deadline.py:486
 msgid "date types"
 msgstr "päivämäärän tyyppi"
@@ -694,6 +698,18 @@ msgstr "alkupäivä"
 #: projects/models/deadline.py:561
 msgid "end date"
 msgstr "loppupäivä"
+
+#: projects/models.deadline.py:417
+msgid "dates_forced"
+msgstr "Pakotetut päivämäärät"
+
+#: projects/models/deadline.py:570
+msgid "date_original"
+msgstr "Alkuperäinen päivämäärä"
+
+#: projects/models/deadline.py:571
+msgid "date_new"
+msgstr "Uusi päivämäärä"
 
 #: projects/models/deadline.py:714
 msgid ""
@@ -1298,7 +1314,7 @@ msgstr "Ensimmäinen mahdollinen päivä on {date}."
 #, python-brace-format
 msgid "Minimum distance to {distance.previous_deadline.abbreviation} not met"
 msgstr ""
-"Minimietäisyys määräaikaan {distance.previous_deadline.abbreviation} ei täyty"
+"Minimietäisyys määräaikaan {distance.previous_deadline.abbreviation} ei täyty."
 
 #: projects/templates/admin/kaavapino_app_list.html:8
 #, python-format
