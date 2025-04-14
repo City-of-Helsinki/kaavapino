@@ -5,6 +5,17 @@ import hashlib
 from django.utils.encoding import force_bytes, force_text
 from django.utils.text import slugify
 from private_storage.storage.files import PrivateFileSystemStorage
+from projects.models.deadline import Deadline
+
+def get_applicable_deadlines_for_project(project):
+    # Ensure we can access subtype through phase
+    if not project.phase or not project.phase.project_subtype:
+        return Deadline.objects.none()
+
+    return Deadline.objects.filter(
+        subtype=project.phase.project_subtype,
+        phase=project.phase,
+    ).select_related("attribute")
 
 
 def create_identifier(text):

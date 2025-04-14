@@ -993,6 +993,36 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             result = super().update(request, *args, **kwargs)
             transaction.set_rollback(True)
             return result
+        
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        is_fake = request.query_params.get("fake") == "true"
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        if is_fake:
+            attribute_data = serializer.validated_data.get("attribute_data", {}) or {}
+            confirmed_fields = serializer.validated_data.get("confirmed_fields", []) or []
+
+            preview_attribute_data = {
+                k: v for k, v in attribute_data.items() if k not in confirmed_fields
+            }
+
+            preview_deadlines = instance.generate_preview_deadlines(
+                user=request.user,
+                preview_attribute_data=preview_attribute_data,
+            )
+            log.info("[FAKE PREVIEW] Returning preview deadlines for project '%s' with %d deadlines", instance.name, len(preview_deadlines))
+            return Response({
+                "id": instance.id,
+                "attribute_data": instance.attribute_data,
+                "deadlines": preview_deadlines,
+            })
+
+        serializer.save()
+        return Response(serializer.data)
+
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1174,10 +1204,9 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
         url_name="unlock_all"
     )
     def unlock_all(self, request):
-        project_name = request.data["project_name"]
-
+        project_name = request.data.get("project_name")
         if not project_name:
-            return HttpResponse(status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Missing 'project_name'"}, status=400)
 
         try:
             AttributeLock.objects.filter(
