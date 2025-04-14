@@ -413,8 +413,10 @@ class Project(models.Model):
         # In real mode, update the stored deadline
         if current_value != calculated_value:
             log.info(f"[set_calculated_deadline] Updating {attr_id}: {current_value} -> {calculated_value}")
-            project_deadline.date = calculated_value
-            project_deadline.save(update_fields=["date"])
+            if not preview_attributes:
+                project_deadline.date = calculated_value
+                project_deadline.save(update_fields=["date"])
+                self.update_attribute_data({attr_id: calculated_value})
 
         return calculated_value
 
