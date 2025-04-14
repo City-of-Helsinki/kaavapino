@@ -588,6 +588,7 @@ class ProjectExternalDocumentSectionSerializer(serializers.Serializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    confirmed_fields = serializers.DictField(required=False)
     user = serializers.SlugRelatedField(
         read_only=False, slug_field="uuid", queryset=get_user_model().objects.all()
     )
@@ -1318,6 +1319,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def validate(self, attrs):
+        confirmed_fields = attrs.pop("confirmed_fields", None)
+
+        # ✅ Only assign if updating
+        if confirmed_fields and self.instance:
+            self.instance._confirmed_fields = confirmed_fields
+
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
 
