@@ -266,18 +266,24 @@ class Project(models.Model):
             ret[attribute.identifier] = deserialized_value
         return ret
 
-    def set_attribute_data(self, data):
-        self.attribute_data = {}
-        self.update_attribute_data(data)
+    def set_attribute_data(self, data, confirmed_fields=None):
+        confirmed_fields = confirmed_fields or []
+        self.update_attribute_data(data, confirmed_fields=confirmed_fields)
 
-    def update_attribute_data(self, data):
+    def update_attribute_data(self, data, confirmed_fields=None):
+        confirmed_fields = set(normalize_identifier_list(confirmed_fields))
+        log.warning("[CHECK] update_attribute_data: confirmed_fields=%s | data.keys()=%s", confirmed_fields, list(data.keys()))
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
 
         if not data:
             return False
 
+        for key, value in data.items():
+            log.warning("[UPDATE] Overwriting attr_id=%s with value=%s", key, value)
+
         for identifier, value in data.items():
+            log.warning("[CHECK] attempting to write attr_id=%s | confirmed=%s", identifier, identifier in confirmed_fields)
             try:
                 attribute = Attribute.objects.get(identifier=identifier)
             except Attribute.DoesNotExist:
@@ -390,9 +396,11 @@ class Project(models.Model):
         preview_attribute_data = preview_attribute_data or {}
         confirmed_fields = normalize_identifier_list(confirmed_fields)
         attr_id = str(deadline.attribute.identifier).strip() if deadline.attribute else None
-        log.warning("[CHECK] attr_id=%s | confirmed=%s | skip=%s", attr_id, attr_id in confirmed_fields, confirmed_fields)
-        log.warning("[CHECK] attr_id=%s | confirmed=%s | skip=%s", attr_id, attr_id in confirmed_fields, confirmed_fields)
-
+        confirmed = str(attr_id) in confirmed_fields if attr_id else False
+        log.warning("[CHECK] attr_id=%s | confirmed=%s | skip=%s", attr_id, confirmed, confirmed_fields)
+        if confirmed:
+            log.info("[SKIP _set_calculated_deadline] attr_id=%s is confirmed", attr_id)
+            return self.attribute_data.get(attr_id) 
         if attr_id in confirmed_fields:
             return self.attribute_data.get(attr_id)  # ✅ return existing value
 
@@ -413,7 +421,7 @@ class Project(models.Model):
                 old_value = json.loads(json.dumps(self.attribute_data.get(attr_id), default=str))
                 new_value = json.loads(json.dumps(date, default=str))
 
-                self.update_attribute_data({attr_id: date})
+                self.update_attribute_data({attr_id: date}, confirmed_fields=confirmed_fields)
 
                 if old_value != new_value:
                     action.send(
@@ -446,8 +454,8 @@ class Project(models.Model):
 
         for deadline in deadlines:
             attr_id = str(deadline.attribute.identifier).strip() if deadline.attribute else None
-
-            if preview and attr_id in confirmed_fields:
+            confirmed = str(attr_id) in confirmed_fields if attr_id else False
+            if preview and confirmed:
                 log.warning("[SKIP _set_calculated_deadline] attr_id=%s is confirmed", attr_id)
                 results[attr_id] = self.attribute_data.get(attr_id)
                 continue  # ✅ skip recalculating or modifying
@@ -466,11 +474,12 @@ class Project(models.Model):
 
             if deadline.attribute:
                 results[deadline.attribute.identifier] = result
+                
 
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, user=None, initial=False, preview_attributes={}):
+    def update_deadlines(self, user=None, initial=False, preview_attributes={},confirmed_fields=None):
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
@@ -520,7 +529,8 @@ class Project(models.Model):
             ],
             user,
             initial=True,
-            preview_attribute_data=preview_attributes
+            preview_attribute_data=preview_attributes,
+            confirmed_fields=confirmed_fields,
         )
 
         # Update automatic deadlines
@@ -542,7 +552,8 @@ class Project(models.Model):
             ],
             user,
             initial=False,
-            preview_attribute_data=preview_attributes
+            preview_attribute_data=preview_attributes,
+            confirmed_fields=confirmed_fields,
         )
 
     # Calculate a preview schedule without saving anything
@@ -684,8 +695,9 @@ class Project(models.Model):
         log.warning("[GEN DEADLINES] confirmed_fields received = %s", confirmed_fields)
         for deadline in applicable_deadlines:
             attr_id = str(deadline.attribute.identifier).strip() if deadline.attribute else None
-            log.warning("[GD] attr=%s | confirmed=%s", attr_id, attr_id in confirmed_fields)
-            log.warning("[CHECK] attr_id=%s | confirmed=%s | skip=%s", attr_id, attr_id in confirmed_fields, confirmed_fields)
+            confirmed = str(attr_id) in confirmed_fields if attr_id else False
+            log.warning("[GD] attr=%s | confirmed=%s", attr_id, confirmed)
+            log.warning("[CHECK] attr_id=%s | confirmed=%s | skip=%s", attr_id, confirmed, confirmed_fields)
 
             if preview and attr_id in confirmed_fields:
                 log.warning("[SKIP generate_deadlines] attr_id=%s is confirmed, skipping calculation", attr_id)
