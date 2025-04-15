@@ -267,7 +267,16 @@ class Project(models.Model):
         self.attribute_data = {}
         self.update_attribute_data(data)
 
-    def update_attribute_data(self, data):
+    def update_attribute_data(self, data, confirmed_fields=None, fake=False):
+        confirmed_fields = confirmed_fields or []
+
+        for attr_id, value in data.items():
+            if attr_id in confirmed_fields:
+                if fake:
+                    continue  # Skip silently in preview mode
+
+            self.attribute_data[attr_id] = value
+
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
 
