@@ -405,6 +405,11 @@ class Project(models.Model):
             return
 
         if project_deadline:
+            if deadline.attribute and deadline.attribute.identifier:
+                # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
+                identifier = deadline.attribute.identifier
+                date = preview_attribute_data[identifier] if identifier in confirmed_fields and identifier in preview_attribute_data else date
+
             if preview:
                 return date
 
@@ -413,11 +418,6 @@ class Project(models.Model):
                 project_deadline.save()
 
             if deadline.attribute:
-                # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
-                identifier = deadline.attribute.identifier
-                if identifier in confirmed_fields and identifier in preview_attribute_data:
-                    return preview_attribute_data[identifier]
-                
                 old_value = json.loads(json.dumps(
                     self.attribute_data.get(deadline.attribute.identifier),
                     default=str,
