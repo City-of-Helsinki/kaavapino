@@ -592,7 +592,9 @@ class Project(models.Model):
         )
 
     # Calculate a preview schedule without saving anything
-    def get_preview_deadlines(self, updated_attributes, subtype):
+    def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None):
+        confirmed_fields = confirmed_fields or []
+
         # Filter out deadlines that would be deleted
         project_dls = {
             dl.deadline: dl.date
@@ -635,6 +637,7 @@ class Project(models.Model):
             None,
             initial=True,
             preview=True,
+            confirmed_fields=confirmed_fields,
         )}
         # Update all deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
@@ -648,6 +651,7 @@ class Project(models.Model):
             initial=False,
             preview=True,
             preview_attribute_data=updated_attributes,
+            confirmed_fields=confirmed_fields,
         )}
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():

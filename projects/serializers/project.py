@@ -1488,6 +1488,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             preview = self.instance.get_preview_deadlines(
                 attribute_data,
                 subtype,
+                self.context["confirmed_fields"],
             )
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
