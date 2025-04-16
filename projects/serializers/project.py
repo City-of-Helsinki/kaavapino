@@ -1760,6 +1760,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
+        confirmed_fields = validated_data.pop("confirmed_fields", {})
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
@@ -1800,7 +1801,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             self.update_initial_data(validated_data)
             if attribute_data:
-                instance.update_attribute_data(attribute_data)
+                instance.update_attribute_data(attribute_data, confirmed_fields=confirmed_fields)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
 
@@ -1817,9 +1818,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=user, preview_attributes=attribute_data)
+                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
             elif should_update_deadlines:
-                project.update_deadlines(user=user, preview_attributes=attribute_data)
+                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
 
