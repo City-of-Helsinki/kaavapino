@@ -1760,7 +1760,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
-        confirmed_fields = validated_data.pop("confirmed_fields", {})
+        confirmed_fields = self.context["confirmed_fields"]
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")

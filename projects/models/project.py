@@ -408,7 +408,11 @@ class Project(models.Model):
             if deadline.attribute and deadline.attribute.identifier:
                 # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
                 identifier = deadline.attribute.identifier
-                date = preview_attribute_data[identifier] if identifier in confirmed_fields and identifier in preview_attribute_data else date
+                if identifier in confirmed_fields:
+                    return date # Don't allow editing confirmed fields
+
+                # Prioritize value from preview_attribute_data over calculated value
+                date = preview_attribute_data[identifier] if identifier in preview_attribute_data else date
 
             if preview:
                 return date
