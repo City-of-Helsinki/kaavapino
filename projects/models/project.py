@@ -272,8 +272,7 @@ class Project(models.Model):
 
         for attr_id, value in data.items():
             if attr_id in confirmed_fields:
-                if fake:
-                    continue  # Skip silently in preview mode
+                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
 
             self.attribute_data[attr_id] = value
 
