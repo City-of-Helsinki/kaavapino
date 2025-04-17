@@ -1537,14 +1537,17 @@ class ProjectSerializer(serializers.ModelSerializer):
                 identifier = dl.deadline.confirmation_attribute.identifier
             except AttributeError:
                 return None
+            
+            new_confirm_val = attribute_data.get(identifier, None)
+            old_confirm_val = self.instance.attribute_data.get(identifier, None)
 
-            if identifier in valid_attributes:
-                return bool(valid_attributes.get(identifier, False))
-
-            if identifier in dl.project.attribute_data:
-                return bool(dl.project.attribute_data.get(identifier, False))
-
-            return None
+            # Newly confirmed values can be edited (not counted as confirmed)
+            if not old_confirm_val:
+                return False
+            # Previously confirmed values cannot be edited, unless they are newly set to false.
+            if new_confirm_val == None:
+                return True
+            return new_confirm_val == old_confirm_val
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
