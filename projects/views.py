@@ -995,12 +995,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # Actual update logic that saves to db
             result = super().update(request, *args, **kwargs)
             
-            # Before returning, check if we need to restore original values for confirmed fields
-            if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
-                # Restore original values for confirmed fields
-                for field in confirmed_fields:
-                    if field in original_attribute_data and field in result.data['attribute_data']:
-                        result.data['attribute_data'][field] = original_attribute_data[field]
             return result
         
         # When using fake mode, we need to pass the fake=True parameter to the serializer
