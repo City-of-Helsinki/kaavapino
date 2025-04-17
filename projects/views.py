@@ -345,6 +345,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["action"] = self.action
+        context["confirmed_fields"] = self.request.data.get('confirmed_fields', [])
 
         if self.action == "list":
             context["project_schedule_cache"] = \
@@ -985,12 +986,32 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
+        # Store the original confirmed_fields before calling update
+        # should prevent confirmed fields from moving when updating or validating 
+        confirmed_fields = request.data.get('confirmed_fields', [])
+        original_attribute_data = request.data.get('attribute_data', {})
+        
         if not fake:
-            return super().update(request, *args, **kwargs)
-
+        # Actual update logic that saves to db
+            result = super().update(request, *args, **kwargs)
+            
+            return result
+        
+        # When using fake mode, we need to pass the fake=True parameter to the serializer
+        # This will ensure Project.update_attribute_data respects confirmed_fields
+        request._fake = True  # Add a private attribute to indicate this is a fake call
+        # Validation logic ?fake
         # Run update in 'ghost' mode where no changes are applied to database but result is returned
         with transaction.atomic():
             result = super().update(request, *args, **kwargs)
+            
+            # Before returning, check if we need to restore original values for confirmed fields
+            if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
+                # Restore original values for confirmed fields
+                for field in confirmed_fields:
+                    if field in original_attribute_data and field in result.data['attribute_data']:
+                        result.data['attribute_data'][field] = original_attribute_data[field]
+            #Prevents saving anything to database but returns values that have been changed by validation to frontend
             transaction.set_rollback(True)
             return result
 

@@ -267,7 +267,15 @@ class Project(models.Model):
         self.attribute_data = {}
         self.update_attribute_data(data)
 
-    def update_attribute_data(self, data):
+    def update_attribute_data(self, data, confirmed_fields=None, fake=False):
+        confirmed_fields = confirmed_fields or []
+
+        for attr_id, value in data.items():
+            if attr_id in confirmed_fields:
+                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
+
+            self.attribute_data[attr_id] = value
+
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
 
@@ -380,7 +388,7 @@ class Project(models.Model):
             return False
         return self._check_condition(deadline, preview_attributes)
 
-    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}):
+    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}, confirmed_fields={}):
         if not date:
             return None
         try:
@@ -397,6 +405,15 @@ class Project(models.Model):
             return
 
         if project_deadline:
+            if deadline.attribute and deadline.attribute.identifier:
+                # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
+                identifier = deadline.attribute.identifier
+                if identifier in confirmed_fields:
+                    return date # Don't allow editing confirmed fields
+
+                # Prioritize value from preview_attribute_data over calculated value
+                date = preview_attribute_data[identifier] if identifier in preview_attribute_data else date
+
             if preview:
                 return date
 
@@ -427,7 +444,7 @@ class Project(models.Model):
 
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False, confirmed_fields={}):
         if ignore is None:
             ignore = []
         results = {}
@@ -456,7 +473,8 @@ class Project(models.Model):
                         initial=initial,
                         preview=preview,
                         preview_attribute_data=preview_attribute_data,
-                        is_recursing=True
+                        is_recursing=True,
+                        confirmed_fields=confirmed_fields
                     )
                 }
 
@@ -466,6 +484,7 @@ class Project(models.Model):
                 user,
                 preview,
                 preview_attribute_data,
+                confirmed_fields=confirmed_fields
             )
             if not result:
                 fillers += [deadline]
@@ -485,6 +504,7 @@ class Project(models.Model):
                 user,
                 preview,
                 preview_attribute_data,
+                confirmed_fields=confirmed_fields
             )
 
         if not is_recursing:
@@ -493,7 +513,7 @@ class Project(models.Model):
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, user=None, initial=False, preview_attributes={}):
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}):
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
@@ -544,7 +564,8 @@ class Project(models.Model):
             ],
             user,
             initial=True,
-            preview_attribute_data=preview_attributes
+            preview_attribute_data=preview_attributes,
+            confirmed_fields=confirmed_fields
         )
 
         # Update automatic deadlines
@@ -566,11 +587,14 @@ class Project(models.Model):
             ],
             user,
             initial=False,
-            preview_attribute_data=preview_attributes
+            preview_attribute_data=preview_attributes,
+            confirmed_fields=confirmed_fields
         )
 
     # Calculate a preview schedule without saving anything
-    def get_preview_deadlines(self, updated_attributes, subtype):
+    def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None):
+        confirmed_fields = confirmed_fields or []
+
         # Filter out deadlines that would be deleted
         project_dls = {
             dl.deadline: dl.date
@@ -613,6 +637,7 @@ class Project(models.Model):
             None,
             initial=True,
             preview=True,
+            confirmed_fields=confirmed_fields,
         )}
         # Update all deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
@@ -626,6 +651,7 @@ class Project(models.Model):
             initial=False,
             preview=True,
             preview_attribute_data=updated_attributes,
+            confirmed_fields=confirmed_fields,
         )}
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
