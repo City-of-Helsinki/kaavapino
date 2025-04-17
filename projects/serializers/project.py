@@ -1547,7 +1547,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             # Previously confirmed values cannot be edited, unless they are newly set to false.
             if new_confirm_val == None:
                 return True
-            return new_confirm_val == old_confirm_val
+            return new_confirm_val
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
