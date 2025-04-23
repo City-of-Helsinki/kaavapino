@@ -1306,6 +1306,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             attributes__identifier__in=self._get_keys()
         )
         for section in deadline_sections:
+            if section.phase.name == "Luonnos" and not self.instance.create_draft or (
+            section.phase.name == "Periaatteet" and not self.instance.create_principles):
+                continue
             serializer_class = create_section_serializer(
                 section,
                 context=self.context,
