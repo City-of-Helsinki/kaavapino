@@ -522,6 +522,10 @@ class Project(models.Model):
         for dl in to_be_deleted:
             self.deadlines.remove(dl)
             dl.delete()
+            # Remove from attribute data if the dl is not applicable to the new subtype
+            if dl.deadline.attribute and dl.deadline.attribute.identifier in self.attribute_data:
+                if not dl.deadline.attribute.identifier in [deadline.attribute.identifier for deadline in deadlines if deadline.attribute]:
+                    self.attribute_data.pop(dl.deadline.attribute.identifier)
 
         generated_deadlines = []
         project_deadlines = list(ProjectDeadline.objects.filter(project=self, deadline__in=deadlines)
