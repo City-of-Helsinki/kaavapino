@@ -268,6 +268,16 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    attributegroup = models.TextField(
+        verbose_name=_("attributegroup"),
+        null=True,
+        blank=True,
+    )
+    attributesubgroup = models.TextField(
+        verbose_name=_("attributesubgroup"),
+        null=True,
+        blank=True,
+    )
     placeholder_text = models.TextField(
         verbose_name=_("placeholder text"),
         null=True,
@@ -308,6 +318,7 @@ class Attribute(models.Model):
     )
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
     help_link = models.URLField(verbose_name=_("Help link"), max_length=2048, blank=True, null=True)
+    help_img_link = models.URLField(verbose_name=_("Help image link"), max_length=2048, blank=True, null=True)
     broadcast_changes = models.BooleanField(default=False)
     autofill_readonly = models.BooleanField(verbose_name=_("read-only autofill field"), null=True)
     autofill_rule = models.JSONField(
@@ -343,6 +354,14 @@ class Attribute(models.Model):
     )
     edit_privilege = models.CharField(
         verbose_name=_("privilege for editing"),
+        max_length=6,
+        choices=PRIVILEGE_LEVELS,
+        default=None,
+        null=True,
+        blank=True,
+    )
+    viewing_privilege = models.CharField(
+        verbose_name=_("privilege for viewing timetable items"),
         max_length=6,
         choices=PRIVILEGE_LEVELS,
         default=None,
@@ -404,6 +423,10 @@ class Attribute(models.Model):
         max_length=256,
         null=True,
         blank=True,
+    )
+    api_visibility = models.BooleanField(
+        verbose_name=_("Visible to Kaavoitus-API"),
+        default=False,
     )
     objects = AttributeQuerySet.as_manager()
 
@@ -667,6 +690,9 @@ class Attribute(models.Model):
             return '{:,}'.format(int(float(value))).replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DATE:
             try:
+                if isinstance(value, bool):
+                    log.warning(self.identifier + " had a boolean value despite being a date")
+                    return value
                 date_value = datetime.datetime.strptime(value, "%Y-%m-%d")
                 return '{d.day}.{d.month}.{d.year}'.format(d=date_value)
             except ValueError:
