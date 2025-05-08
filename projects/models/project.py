@@ -414,7 +414,7 @@ class Project(models.Model):
                 # Prioritize value from preview_attribute_data over calculated value
                 date = preview_attribute_data[identifier] if identifier in preview_attribute_data else date
 
-            if preview:
+            if preview or not project_deadline.editable:
                 return date
 
             if not project_deadline.date == date:
@@ -1317,6 +1317,10 @@ class ProjectDeadline(models.Model):
         editable=False,
         null=True,
         blank=True,
+    )
+    editable = models.BooleanField(
+        verbose_name=_("editable"),
+        default=True,
     )
 
     @property

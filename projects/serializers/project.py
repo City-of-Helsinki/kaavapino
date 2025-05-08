@@ -84,6 +84,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     deadline = serializers.SerializerMethodField()
     generated = serializers.BooleanField()
     edited = serializers.DateTimeField()
+    editable = serializers.BooleanField()
 
     @extend_schema_field(DeadlineSerializer)
     def get_deadline(self, projectdeadline):
@@ -1556,7 +1557,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl
             in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
-            if is_confirmed(dl) and dl.deadline.attribute
+            if not dl.editable or (is_confirmed(dl) and dl.deadline.attribute)
         ] if self.instance else []
 
         if confirmed_deadlines:
