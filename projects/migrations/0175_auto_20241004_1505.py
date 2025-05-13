@@ -12,13 +12,7 @@ class Migration(migrations.Migration):
         ('projects', '0174_remove_deadline_deadlinesubgroup'),
     ]
 
-    def clear_deadlinedistance_conditions(self, schema_editor):
-        for deadline_distance in DeadlineDistance.objects.all():
-            deadline_distance.conditions.clear()
-            deadline_distance.save()
-
     operations = [
-        migrations.RunPython(clear_deadlinedistance_conditions, migrations.RunPython.noop),
         migrations.RemoveField(
             model_name='deadlinedistance',
             name='conditions',
