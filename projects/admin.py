@@ -6,6 +6,7 @@ from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
+from django.core.cache import cache
 
 from projects.models import (
     ProjectComment,
@@ -16,6 +17,7 @@ from projects.models import (
     ReportFilterAttributeChoice,
     Deadline,
     AutomaticDate,
+    ForcedDate,
     DateType,
     DateCalculation,
     DeadlineDateCalculation,
@@ -122,9 +124,35 @@ class AutomaticDateInline(admin.ModelAdmin):
         return {}
 
 
+@admin.register(ForcedDate)
+class ForcedDateInline(admin.ModelAdmin):
+    pass
+
+
 @admin.register(DateType)
 class DateTypeAdmin(admin.ModelAdmin):
-    pass
+    fields = (
+        "identifier",
+        "name",
+        "base_datetype",
+        "business_days_only",
+        "dates",
+        "automatic_dates",
+        "exclude_selected",
+    )
+
+    def get_fields(self, request, obj=None):
+        fields = list(super().get_fields(request, obj))
+        if obj and obj.identifier == "lautakunnan_kokouspäivät":
+            fields.append("forced_dates")
+        return fields
+
+    def save_model(self, request, obj, form, change):
+        if 'forced_dates' in form.changed_data:  # Delete cached lautakunnan_kokouspäivät dates
+            cache_keys = cache.keys("*")
+            keys_to_delete = list(filter(lambda k: k.startswith(f"datetype_{obj.identifier}_dates_"), cache_keys))
+            keys_to_delete.append("serialized_date_types")
+            cache.delete_many(keys_to_delete)
 
 
 class ProjectPhaseDeadlineSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
@@ -139,8 +167,8 @@ class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin):
 
 class ProjectDeadlineInline(admin.TabularInline):
     model = ProjectDeadline
-    fields = ("deadline", "date")
-    readonly_fields = ("deadline", "date")
+    fields = ("deadline", "editable", "date")
+    readonly_fields = ("deadline",)
     extra = 0
     can_delete = False
 
@@ -237,6 +265,11 @@ class ProjectAdmin(OSMGeoAdmin):
     )
     inlines = (ProjectPhaseLogInline, ProjectDeadlineInline)
 
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        form = super(ProjectAdmin, self).get_form(request, obj, change, **kwargs)
+        disable_widget_options(form, ['phase', 'priority'])
+        return form
+
     def formfield_for_foreignkey(self, db_field, request=None, **kwargs):
         if db_field.name == 'phase':
             project = Project.objects.get(id=request.resolver_match.kwargs.get('object_id'))
@@ -264,6 +297,15 @@ class ProjectAdmin(OSMGeoAdmin):
         super(ProjectAdmin, self).save_model(request, obj, form, change)
         if 'phase' in form.changed_data:
             ProjectDocumentDownloadLog.objects.filter(project=obj).update(invalidated=True)
+
+    def save_formset(self, request, obj, formset, change):
+        super(ProjectAdmin, self).save_formset(request, obj, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, ProjectDeadline) and instance.deadline.attribute:
+                project = instance.project
+                project.attribute_data[instance.deadline.attribute.identifier] = instance.date
+                project.save()
 
 class ProjectCardSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectCardSectionAttribute
@@ -674,6 +716,13 @@ def get_app_list(self, request):
     return app_list
 
 admin.AdminSite.get_app_list = get_app_list
+
+
+def disable_widget_options(form, fields):
+    for field in fields:
+        form.base_fields[field].widget.can_add_related = False
+        form.base_fields[field].widget.can_delete_related = False
+        form.base_fields[field].widget.can_change_related = False
 
 
 # Unregister unnecessary models

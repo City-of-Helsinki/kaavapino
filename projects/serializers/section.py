@@ -78,7 +78,7 @@ def get_rich_text_validator(attribute):
 
 def get_unique_validator(attribute, project_id):
     def validate(value):
-        column = f"attribute_data__{attribute.identifier}"
+        column = "attribute_data__{identifier}".format(identifier=attribute.identifier)
         error_msg = attribute.error_message or _("Value must be unique")
         if Project.objects.filter(**{column: value}).exclude(pk=project_id).count() > 0:
             raise ValidationError(
@@ -103,7 +103,8 @@ def get_deadline_validator(attribute, subtype, preview):
         if not preview:
             return
 
-        for attr_dl in attribute.deadline.filter(subtype=subtype):
+        for attr_dl in attribute.deadline.filter(subtype=subtype) \
+            .select_related("date_type"):
             # validate datetype
             try:
                 assert attr_dl.date_type.is_valid_date(value)
@@ -112,18 +113,23 @@ def get_deadline_validator(attribute, subtype, preview):
             except AssertionError:
                 valid_date = attr_dl.date_type.get_closest_valid_date(value)
                 raise ValidationError(
-                    (_(attr_dl.error_date_type_mismatch or \
-                    f"Invalid date selection for date type {attr_dl.date_type}"),
+                    (_(attr_dl.error_date_type_mismatch or
+                    _("Invalid date selection for date type {date_type}").format(date_type=attr_dl.date_type)),
                     _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
                 )
 
             # validate minimum distance to previous deadline(s)
-            for distance in attr_dl.distances_to_previous.all():
+            for distance in attr_dl.distances_to_previous.all() \
+            .select_related("previous_deadline", "date_type") \
+            .prefetch_related("condition_attributes", "condition_attributes__attribute"):
                 prev_dl = preview.get(distance.previous_deadline)
                 if not prev_dl:
                     continue
 
-                default_error = _(f"Minimum distance to {distance.previous_deadline.abbreviation} not met")
+                if not distance.check_conditions(preview):
+                    continue
+
+                default_error = _("Minimum distance to {distance.previous_deadline.abbreviation} not met").format(distance=distance)
 
                 if type(prev_dl) == str:
                     prev_dl = datetime.datetime.strptime(prev_dl, "%Y-%m-%d").date()
@@ -180,7 +186,7 @@ def create_attribute_field_data(attribute, validation, project, preview):
     if attribute.validation_regex:
         field_arguments["validators"] += [get_regex_validator(attribute)]
 
-    if attribute.deadline.count():
+    if attribute.deadline.exists():
         field_arguments["validators"] += [get_deadline_validator(
             attribute,
             project.phase.project_subtype,

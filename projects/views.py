@@ -1,7 +1,6 @@
 import pytz
 import csv
-from datetime import datetime, timedelta
-import time
+from datetime import datetime, timedelta, date
 import logging
 
 from django.contrib.postgres.search import SearchVector
@@ -33,7 +32,15 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
-from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE, get_attribute_lock_data
+from projects.helpers import (
+    DOCUMENT_CONTENT_TYPES,
+    get_file_type,
+    TRUE,
+    get_attribute_lock_data,
+    set_ad_data_in_attribute_data,
+    get_in_personnel_data,
+    set_geoserver_data_in_attribute_data,
+)
 from projects.importing import AttributeImporter, AttributeUpdater
 from projects.models import (
     FieldComment,
@@ -55,6 +62,7 @@ from projects.models import (
     OverviewFilter,
     OverviewFilterAttribute,
     ProjectPriority,
+    DateType,
 )
 from projects.models.attribute import AttributeLock
 from projects.models.utils import create_identifier
@@ -103,9 +111,11 @@ from projects.serializers.projecttype import (
     ProjectSubtypeSerializer,
 )
 from projects.serializers.report import ReportSerializer
-from projects.serializers.deadline import DeadlineSerializer
+from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer, DeadlineValidationSerializer
+from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
+
 
 log = logging.getLogger(__name__)
 
@@ -335,6 +345,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["action"] = self.action
+        context["confirmed_fields"] = self.request.data.get('confirmed_fields', [])
 
         if self.action == "list":
             context["project_schedule_cache"] = \
@@ -357,6 +368,65 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     )
     def simple(self, request, pk):
         return Response(SimpleProjectSerializer(self.get_object()).data)
+
+    @extend_schema(
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR
+        }
+    )
+    @action(
+        methods=["get"],
+        detail=True,
+        permission_classes=[IsAuthenticated, ProjectPermissions],
+    )
+    def simple_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
+        project = ProjectSerializer(self.get_object(), context={"request": request}).data
+        attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+        response = {
+            "project_name": project.get("name"),
+        }
+        attribute_data = project.get("attribute_data", None)
+        if not attribute_data:
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        set_ad_data_in_attribute_data(attribute_data)
+        set_geoserver_data_in_attribute_data(attribute_data)
+
+        for key, value in attribute_data.items():
+            attribute = attributes.get(key)
+            if not attribute or not attribute.api_visibility:
+                continue
+
+            if not value:
+                continue
+
+            if attribute.value_type == Attribute.TYPE_FIELDSET:
+                fieldset = []
+                for entry in value:  # fieldset
+                    fieldset_obj = {}
+                    for k, v in entry.items():
+                        fieldset_attr = attributes.get(k, None)
+                        if not fieldset_attr or not fieldset_attr.api_visibility:
+                            continue
+                        if fieldset_attr.value_type == Attribute.TYPE_PERSONNEL:
+                            v = get_in_personnel_data(v, "name", False)
+                        elif fieldset_attr.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+                            v = "".join([item["insert"] for item in v["ops"]]).strip()
+                        fieldset_obj[k] = v
+                    if fieldset_obj:
+                        fieldset.append(fieldset_obj)
+                if fieldset:
+                    response[key] = fieldset
+            elif attribute.value_type == Attribute.TYPE_USER:
+                response[key] = get_in_personnel_data(value, "name", True)
+            elif attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+                response[key] = "".join([item["insert"] for item in value["ops"]]).strip()
+            else:
+                response[key] = value
+
+        return Response(response)
 
     @extend_schema(
         request=ProjectFileSerializer,
@@ -559,7 +629,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         if start_date > end_date:
             [start_date, end_date] = [start_date, end_date]
 
-        return (start_date, end_date)
+        return (start_date, end_date, end_date.year)
 
     @extend_schema(
         parameters=[
@@ -593,7 +663,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             unit = [(x.strip()) for x in unit.split(',') if x]
             unitquery &= Q(project__attribute_data__vastuuyksikko__in=unit)
 
-        start_date, end_date = self._parse_date_range(
+        start_date, end_date, year = self._parse_date_range(
             start_date,
             end_date,
             today=today,
@@ -614,6 +684,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             start_date + timedelta(days=i)
             for i in range(0, (end_date-start_date+timedelta(days=1)).days, 7)
         ]
+
+        forced_dates = DateType.objects.get(identifier="lautakunnan_kokouspäivät").forced_dates.all()
+        forced_dates_remove = [d.original_date for d in forced_dates if d.original_date and d.original_date.year == year]
+        forced_dates_add = [d.new_date for d in forced_dates if d.new_date and d.new_date.year == year]
+        date_range = [d for d in date_range if d not in forced_dates_remove]
+        date_range.extend(forced_dates_add)
+
         #Dates that is shown in overview graph "Projektit ja kerrosalat lautakunnassa".
         suggested_date_attrs = [
             "milloin_kaavaehdotus_lautakunnassa",
@@ -649,7 +726,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                                "project__phase", "project__phase__common_project_phase").\
             order_by("project__pk")
         projects_by_date = {
-            date: [dl.project for dl in filter(lambda dl: dl.date == date, project_deadlines)]
+            date: [
+                dl.project for dl in filter(
+                    lambda dl:
+                        dl.date == date and should_display_deadline(dl.project, dl.deadline), project_deadlines
+                )
+            ]
             for date in date_range
         }
 
@@ -902,6 +984,38 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             log.error("Error in projects/attribute_data %s", exc)
             return Response("Error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def update(self, request, *args, **kwargs):
+        fake = request.query_params.get('fake', False)
+        # Store the original confirmed_fields before calling update
+        # should prevent confirmed fields from moving when updating or validating 
+        confirmed_fields = request.data.get('confirmed_fields', [])
+        original_attribute_data = request.data.get('attribute_data', {})
+        
+        if not fake:
+        # Actual update logic that saves to db
+            result = super().update(request, *args, **kwargs)
+            
+            return result
+        
+        # When using fake mode, we need to pass the fake=True parameter to the serializer
+        # This will ensure Project.update_attribute_data respects confirmed_fields
+        request._fake = True  # Add a private attribute to indicate this is a fake call
+        # Validation logic ?fake
+        # Run update in 'ghost' mode where no changes are applied to database but result is returned
+        with transaction.atomic():
+            result = super().update(request, *args, **kwargs)
+            
+            # Before returning, check if we need to restore original values for confirmed fields
+            if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
+                # Restore original values for confirmed fields
+                for field in confirmed_fields:
+                    if field in original_attribute_data and field in result.data['attribute_data']:
+                        result.data['attribute_data'][field] = original_attribute_data[field]
+            #Prevents saving anything to database but returns values that have been changed by validation to frontend
+            transaction.set_rollback(True)
+            return result
+
+
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPhase.objects.all().prefetch_related("common_project_phase",
                                                            "project_subtype",
@@ -915,6 +1029,24 @@ class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
         .order_by("section__index", "index")
     serializer_class = ProjectCardSchemaSerializer
 
+    def get_queryset(self):
+        project_id = self.request.query_params.get('project', None)
+        if not project_id:
+            return self.queryset
+        else:
+            try:
+                project = Project.objects.get(pk=int(project_id))
+            except Project.DoesNotExist:
+                raise Http404
+            filtered = []
+            for item in self.queryset:
+                dls = Deadline.objects.filter(attribute=item.attribute)
+                if not dls:
+                    continue
+                if not any(should_display_deadline(project, dl) for dl in dls):
+                    filtered.append(item.pk)
+            return self.queryset.exclude(pk__in=filtered)
+            
 
 class AttributePagination(pagination.PageNumberPagination):
     page_size = 2000
@@ -1464,12 +1596,20 @@ class ReportViewSet(ReadOnlyModelViewSet):
         filters = report.filters.filter(
             identifier__in=params.keys()
         )
-        projects = Project.objects.filter(onhold=False, public=True)
-        for report_filter in filters:
-            projects = report_filter.filter_projects(
-                params.get(report_filter.identifier),
-                queryset=projects,
-            )
+        if report.name == "Tietopyyntö":
+            projects = set()
+            for report_filter in filters:
+                projects.update(report_filter.filter_data_request(
+                    params.get(report_filter.identifier),
+                    queryset=projects or Project.objects.all(),
+                ))
+        else:
+            projects = Project.objects.filter(onhold=False, public=True)
+            for report_filter in filters:
+                projects = report_filter.filter_projects(
+                    params.get(report_filter.identifier),
+                    queryset=projects,
+                )
         return projects
 
     def _remove_from_queue(self, *args, **kwargs):
@@ -1565,3 +1705,152 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
             filters["phase__project_subtype__id"] = subtype
 
         return Deadline.objects.filter(**filters)
+
+    @extend_schema(
+        responses={
+            200: DeadlineValidDateSerializer,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[],
+        url_path="date_types",
+        url_name="date_types"
+    )
+    def date_types(self, request):
+        serialized_date_types = cache.get("serialized_date_types", {})
+        if not serialized_date_types:
+            current_year = datetime.now().year
+            for date_type in DateType.objects.all():
+                serialized_date_types[date_type.identifier] = \
+                    {
+                        "identifier": date_type.identifier,
+                        "name": date_type.name,
+                        "dates": date_type.get_dates_between(current_year - 20, current_year + 20)
+                    }
+            dates = []
+            current_date = date(date.today().year - 20, 1, 1)
+            end_date = date(date.today().year + 20, 12, 31)
+
+            while current_date < end_date:
+                dates.append(current_date)
+                current_date += timedelta(days=1)
+
+            workdays = serialized_date_types["arkipäivät"]["dates"]
+            disabled_dates = [d for d in dates if d not in workdays]
+            serialized_date_types["disabled_dates"] = {
+                "identifier": "disabled_dates",
+                "name": "Disabled dates",
+                "dates": disabled_dates
+            }
+
+            cache.set("serialized_date_types", serialized_date_types, 60 * 60 * 24)
+        return Response(
+            DeadlineValidDateSerializer(
+                {"date_types": serialized_date_types}
+            ).data, status=status.HTTP_200_OK
+        )
+
+    @extend_schema(
+        responses={
+            200: DeadlineValidationSerializer,
+            400: OpenApiTypes.STR,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="validate",
+        url_name="validate"
+    )
+    def validate(self, request):
+        identifier = request.query_params.get("identifier", None)
+        project_name = request.query_params.get("project", None)
+        date_str = request.query_params.get("date", None)
+
+        if not identifier or not project_name or not date_str:
+            return HttpResponse("Error, missing parameters", status=status.HTTP_400_BAD_REQUEST)
+
+        def get_serializer_data(error_reason=None, suggested_date=None, conflicting_deadline=None):
+            return {
+                "identifier": identifier,
+                "project": project_name,
+                "date": date_str,
+                "error_reason": error_reason,
+                "suggested_date": suggested_date if error_reason else None,
+                "conflicting_deadline": conflicting_deadline.deadline.attribute.identifier if conflicting_deadline and conflicting_deadline.deadline.attribute else None,
+                "conflicting_deadline_abbreviation": conflicting_deadline.deadline.abbreviation if conflicting_deadline else None
+            }
+
+        try:
+            attribute = Attribute.objects.get(identifier=identifier)
+            project = Project.objects.get(name=project_name)
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+            def validate_date(date, initial_error_reason=None):
+                for attr_dl in attribute.deadline.filter(subtype=project.subtype):
+                    try:
+                        assert attr_dl.date_type.is_valid_date(date)
+                    except AttributeError:
+                        pass
+                    except AssertionError:
+                        valid_date = attr_dl.date_type.get_closest_valid_date(date)
+                        return validate_date(valid_date, initial_error_reason="invalid_date")
+
+                    for distance in attr_dl.distances_to_previous.all():
+                        try:
+                            prev_dl = project.deadlines.get(deadline=distance.previous_deadline)
+                            if distance.date_type:
+                                first_valid_day = distance.date_type.valid_days_from(
+                                    prev_dl.date,
+                                    distance.distance_from_previous
+                                )
+                                valid_date = attr_dl.date_type.get_closest_valid_date(first_valid_day) if attr_dl.date_type else first_valid_day
+                                if valid_date > date:
+                                    return Response(
+                                        DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_previous", valid_date, prev_dl)).data,
+                                        status=status.HTTP_200_OK
+                                    )
+                            elif prev_dl.date + timedelta(days=distance.distance_from_previous) > date:
+                                valid_date = prev_dl.date + timedelta(days=distance.distance_from_previous)
+                                return Response(
+                                    DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_previous", valid_date, prev_dl)).data,
+                                    status=status.HTTP_200_OK
+                                )
+                        except ProjectDeadline.DoesNotExist:
+                            pass
+
+                    for distance in attr_dl.distances_to_next.all():
+                        try:
+                            next_dl = project.deadlines.get(deadline=distance.deadline)
+                            if distance.date_type:
+                                first_valid_day = distance.date_type.valid_days_from(
+                                    next_dl.date,
+                                    -distance.distance_from_previous
+                                )
+                                valid_date = attr_dl.date_type.get_closest_valid_date(first_valid_day) if attr_dl.date_type else first_valid_day
+                                if valid_date < date:
+                                    return Response(
+                                        DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_next", valid_date, next_dl)).data,
+                                        status=status.HTTP_200_OK
+                                    )
+                            elif next_dl.date - timedelta(days=distance.distance_from_previous) < date:
+                                valid_date = next_dl.date - timedelta(days=distance.distance_from_previous)
+                                return Response(
+                                    DeadlineValidationSerializer(get_serializer_data("invalid_distance_to_next", valid_date, next_dl)).data,
+                                    status=status.HTTP_200_OK
+                                )
+                        except ProjectDeadline.DoesNotExist:
+                            pass
+
+                return Response(DeadlineValidationSerializer(get_serializer_data(initial_error_reason, date)).data, status=status.HTTP_200_OK)
+
+            return validate_date(date)
+        except Exception as exc:
+            log.error("Error", exc)
+            return HttpResponse("Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

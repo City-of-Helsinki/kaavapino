@@ -1,4 +1,3 @@
-import datetime
 import itertools
 import logging
 
@@ -12,22 +11,21 @@ from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db import transaction
-from django.db.models import Q
 from django.db.models.expressions import Value
 from django.urls import reverse_lazy
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 from private_storage.fields import PrivateFileField
 from PIL import Image, ImageOps
 
 from projects.actions import verbs
-from projects.helpers import get_in_personnel_data, set_ad_data_in_attribute_data
+from projects.helpers import get_in_personnel_data
 from projects.models.utils import KaavapinoPrivateStorage, arithmetic_eval
+from projects.serializers.utils import get_dl_vis_bool_name
 from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
 from .projectcomment import FieldComment
+
 
 log = logging.getLogger(__name__)
 
@@ -269,25 +267,26 @@ class Project(models.Model):
         self.attribute_data = {}
         self.update_attribute_data(data)
 
-    def update_attribute_data(self, data):
+    def update_attribute_data(self, data, confirmed_fields=None, fake=False):
+        confirmed_fields = confirmed_fields or []
+
+        for attr_id, value in data.items():
+            if attr_id in confirmed_fields:
+                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
+
+            self.attribute_data[attr_id] = value
+
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
 
         if not data:
             return False
 
-        project_attributes = (
-            Attribute.objects.all()
-            .distinct()
-            .prefetch_related("value_choices")
-        )
-
-        attributes = {a.identifier: a for a in project_attributes}
-
         for identifier, value in data.items():
-            attribute = attributes.get(identifier)
-
-            if not attribute:
+            try:
+                attribute = Attribute.objects.get(identifier=identifier)
+            except Attribute.DoesNotExist:
+                log.warning(f"Attribute {identifier} not found")
                 continue
 
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
@@ -346,7 +345,7 @@ class Project(models.Model):
             attribute_data[attribute.identifier] = calculated_value
 
     def _check_condition(self, deadline, preview_attributes={}):
-        if not deadline.condition_attributes.count():
+        if not deadline.condition_attributes.exists():
             return True
 
         attribute_data = {**self.attribute_data, **preview_attributes}
@@ -356,7 +355,7 @@ class Project(models.Model):
 
         return False
 
-    def get_applicable_deadlines(self, subtype=None, preview_attributes={}):
+    def get_applicable_deadlines(self, subtype=None, preview_attributes={}, initial=False):
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -369,17 +368,29 @@ class Project(models.Model):
         deadlines = Deadline.objects \
                 .filter(subtype=subtype or self.subtype) \
                 .exclude(phase__common_project_phase__name__in=excluded_phases) \
+                .select_related('phase', 'subtype', 'attribute', 'phase__project_subtype', 'phase__common_project_phase', ) \
                 .prefetch_related('condition_attributes') \
                 .prefetch_related('initial_calculations') \
-                .prefetch_related('update_calculations')
+                .prefetch_related('update_calculations') \
 
         return [
             deadline
             for deadline in deadlines
-            if self._check_condition(deadline, preview_attributes)
+            if initial or self._check_condition(deadline, preview_attributes)
         ]
 
-    def _set_calculated_deadline(self, deadline, date, initial, user, preview, preview_attribute_data={}):
+    def is_deadline_applicable(self, deadline, preview_attributes={}):
+        if deadline.subtype != self.subtype:
+            return False
+        elif deadline.phase.name == "Periaatteet" and not self.create_principles:
+            return False
+        elif deadline.phase.name == "Luonnos" and not self.create_draft:
+            return False
+        return self._check_condition(deadline, preview_attributes)
+
+    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}, confirmed_fields={}):
+        if not date:
+            return None
         try:
             if preview:
                 try:
@@ -387,44 +398,55 @@ class Project(models.Model):
                 except AttributeError:
                     identifier = None
 
-                project_deadline = preview_attribute_data.get(identifier) or self.deadlines.get(deadline=deadline)
+                project_deadline = preview_attribute_data.get(identifier) or self.deadlines.filter(deadline=deadline).exists()
             else:
-                project_deadline = self.deadlines.get(deadline=deadline)
+                project_deadline = ProjectDeadline.objects.get(project=self, deadline=deadline)
         except ProjectDeadline.DoesNotExist:
             return
 
-        if project_deadline and date:
-            if preview:
+        if project_deadline:
+            if deadline.attribute and deadline.attribute.identifier:
+                # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
+                identifier = deadline.attribute.identifier
+                if identifier in confirmed_fields:
+                    return date # Don't allow editing confirmed fields
+
+                # Prioritize value from preview_attribute_data over calculated value
+                date = preview_attribute_data[identifier] if identifier in preview_attribute_data else date
+
+            if preview or not project_deadline.editable:
                 return date
 
-            project_deadline.date = date
-            project_deadline.save()
+            if not project_deadline.date == date:
+                project_deadline.date = date
+                project_deadline.save()
 
             if deadline.attribute:
-                with transaction.atomic():
-                    old_value = json.loads(json.dumps(
-                        self.attribute_data.get(deadline.attribute.identifier),
-                        default=str,
-                    ))
-                    new_value = json.loads(json.dumps(date, default=str))
+                old_value = json.loads(json.dumps(
+                    self.attribute_data.get(deadline.attribute.identifier),
+                    default=str,
+                ))
+                new_value = json.loads(json.dumps(date, default=str))
 
-                    self.update_attribute_data( \
-                        {deadline.attribute.identifier: date})
-                    self.save()
-                    if old_value != new_value:
-                        action.send(
-                            user or self.user,
-                            verb=verbs.UPDATED_ATTRIBUTE,
-                            action_object=deadline.attribute,
-                            target=self,
-                            attribute_identifier=deadline.attribute.identifier,
-                            old_value=old_value,
-                            new_value=new_value,
-                        )
+                self.update_attribute_data( \
+                    {deadline.attribute.identifier: date})
+
+                if old_value != new_value:
+                    action.send(
+                        user or self.user,
+                        verb=verbs.UPDATED_ATTRIBUTE,
+                        action_object=deadline.attribute,
+                        target=self,
+                        attribute_identifier=deadline.attribute.identifier,
+                        old_value=old_value,
+                        new_value=new_value,
+                    )
 
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=[], initial=False, preview=False, preview_attribute_data={}):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False, confirmed_fields={}):
+        if ignore is None:
+            ignore = []
         results = {}
         fillers = []
 
@@ -441,7 +463,6 @@ class Project(models.Model):
                     dl for dl in deadline.update_depends_on
                     if dl not in ignore
                 ]
-
             if dependencies:
                 ignore += dependencies
                 results = { **results,
@@ -452,18 +473,19 @@ class Project(models.Model):
                         initial=initial,
                         preview=preview,
                         preview_attribute_data=preview_attribute_data,
+                        is_recursing=True,
+                        confirmed_fields=confirmed_fields
                     )
                 }
 
             result = self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
-                initial,
                 user,
                 preview,
                 preview_attribute_data,
+                confirmed_fields=confirmed_fields
             )
-
             if not result:
                 fillers += [deadline]
 
@@ -479,91 +501,112 @@ class Project(models.Model):
             self._set_calculated_deadline(
                 deadline,
                 calculate_deadline(self, preview_attributes=preview_attribute_data),
-                initial,
                 user,
                 preview,
                 preview_attribute_data,
+                confirmed_fields=confirmed_fields
             )
+
+        if not is_recursing:
+            self.save()
 
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, values=None, user=None):
-        deadlines = self.get_applicable_deadlines()
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}):
+        deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
 
         for dl in to_be_deleted:
             self.deadlines.remove(dl)
+            dl.delete()
+            # Remove from attribute data if the dl is not applicable to the new subtype
+            if dl.deadline.attribute and dl.deadline.attribute.identifier in self.attribute_data:
+                if not dl.deadline.attribute.identifier in [deadline.attribute.identifier for deadline in deadlines if deadline.attribute]:
+                    self.attribute_data.pop(dl.deadline.attribute.identifier)
 
         generated_deadlines = []
-        project_deadlines = []
+        project_deadlines = list(ProjectDeadline.objects.filter(project=self, deadline__in=deadlines)
+                                 .select_related("deadline"))
+        existing_dls = [p_dl.deadline for p_dl in project_deadlines]
 
         for deadline in deadlines:
-            project_deadline, created = ProjectDeadline.objects.get_or_create(
-                project=self,
-                deadline=deadline,
-                defaults={
-                    "generated": True,
-                }
-            )
-            if created:
-                generated_deadlines.append(project_deadline)
-            project_deadlines.append(project_deadline)
-
+            if not deadline in existing_dls:
+                new_project_deadline = ProjectDeadline.objects.create(
+                    project=self,
+                    deadline=deadline,
+                    generated=True
+                )
+                if deadline.deadlinegroup:
+                    vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
+                    if vis_bool and not vis_bool in self.attribute_data:
+                        self.attribute_data[vis_bool] = True if deadline.deadlinegroup.endswith('1') else False
+                generated_deadlines.append(new_project_deadline)
+                project_deadlines.append(new_project_deadline)
         self.deadlines.set(project_deadlines)
 
         # Update attribute-based deadlines
+        dls_to_update = []
         for dl in self.deadlines.all().select_related("deadline__attribute"):
             if not dl.deadline.attribute:
                 continue
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
-            dl.date = value
-            dl.save()
-
+            value = value if value != 'null' else None
+            if dl.date != value:
+                dl.date = value
+                dls_to_update.append(dl)
+        self.deadlines.bulk_update(dls_to_update, ['date'])
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
             [
                 dl.deadline for dl in generated_deadlines
-                if dl.deadline.initial_calculations.count() \
+                if dl.deadline.initial_calculations.exists() \
                     or dl.deadline.default_to_created_at
             ],
             user,
             initial=True,
+            preview_attribute_data=preview_attributes,
+            confirmed_fields=confirmed_fields
         )
 
         # Update automatic deadlines
         self._set_calculated_deadlines(
             [
-                dl.deadline for dl in self.deadlines
-                .select_related(
-                    "project", "deadline", "deadline__attribute", "deadline__confirmation_attribute",
-                )
-                .prefetch_related(
-                    "deadline__condition_attributes",
-                    "deadline__initial_calculations",
-                    "deadline__update_calculations",
-                )
-                .all()
-                if dl.deadline.update_calculations.count()
-                    or dl.deadline.default_to_created_at
-                    or dl.deadline.attribute
+                dl.deadline for dl in self.deadlines.all()
+                    .select_related(
+                        "deadline", "deadline__attribute", "deadline__phase", 
+                        "deadline__phase__common_project_phase","deadline__phase__project_subtype", "deadline__subtype",
+                        "deadline__attribute", "deadline__date_type")
+                    .prefetch_related(
+                        "deadline__update_calculations"
+                    )
+                if any([
+                    dl.deadline.update_calculations.exists(),
+                    dl.deadline.default_to_created_at,
+                    dl.deadline.attribute
+                ])
             ],
             user,
             initial=False,
+            preview_attribute_data=preview_attributes,
+            confirmed_fields=confirmed_fields
         )
 
     # Calculate a preview schedule without saving anything
-    def get_preview_deadlines(self, updated_attributes, subtype):
+    def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None):
+        confirmed_fields = confirmed_fields or []
+
         # Filter out deadlines that would be deleted
         project_dls = {
             dl.deadline: dl.date
-            for dl in self.deadlines.all()
-            .select_related("deadline", "deadline__phase", "deadline__subtype", "deadline__attribute")
-            .prefetch_related("deadline__initial_calculations", "deadline__update_calculations")
-            if dl.deadline.subtype == subtype
+            for dl in self.deadlines.filter(deadline__subtype=subtype)
+            .select_related(
+                "deadline", "deadline__phase", "deadline__phase__common_project_phase", "deadline__phase__project_subtype",
+                "deadline__subtype", "deadline__attribute", "deadline__date_type")
+            .prefetch_related("deadline__initial_calculations","deadline__update_calculations")
         }
 
         # List deadlines that would be created
@@ -589,23 +632,22 @@ class Project(models.Model):
             if value:
                 project_dls[dl] = value
 
-
         # Generate newly added deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in new_dls.keys()
-                if dl.initial_calculations.count() or dl.default_to_created_at
+                if dl.initial_calculations.exists() or dl.default_to_created_at
             ],
             None,
             initial=True,
             preview=True,
+            confirmed_fields=confirmed_fields,
         )}
-
         # Update all deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in project_dls
-                if dl.update_calculations.count() \
+                if dl.update_calculations.exists() \
                     or dl.default_to_created_at \
                     or dl.attribute
             ],
@@ -613,8 +655,12 @@ class Project(models.Model):
             initial=False,
             preview=True,
             preview_attribute_data=updated_attributes,
+            confirmed_fields=confirmed_fields,
         )}
-
+        # Add visibility booleans
+        for identifier, value in updated_attribute_data.items():
+            if type(value) == bool:
+                project_dls[identifier] = value
         return project_dls
 
     @property
@@ -1271,6 +1317,10 @@ class ProjectDeadline(models.Model):
         editable=False,
         null=True,
         blank=True,
+    )
+    editable = models.BooleanField(
+        verbose_name=_("editable"),
+        default=True,
     )
 
     @property
