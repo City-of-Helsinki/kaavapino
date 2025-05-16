@@ -76,6 +76,8 @@ class Command(BaseCommand):
 
                 # Delete deadlines that are no longer needed
                 for deadline in to_be_removed:
+                    if not deadline.attribute:
+                        continue
                     previous_value = project.attribute_data.pop(deadline.attribute.identifier, None)
                     if verbose and previous_value: logging.info(f"Removed attribute {deadline.attribute.identifier} from attribute_data")
                 ProjectDeadline.objects.filter(project=project, deadline__in=to_be_removed).delete()
