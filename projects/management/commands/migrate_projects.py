@@ -94,6 +94,13 @@ class Command(BaseCommand):
                 )
                 if verbose: logging.info(f'Set calculated deadlines: {results}')
 
+                for project_dl in project.deadlines.all():
+                    if not project_dl.deadline.attribute:
+                        continue
+                    if project.attribute_data.get(project_dl.deadline.attribute.identifier, None) is None:
+                        project.attribute_data[project_dl.deadline.attribute.identifier] = project_dl.date
+                        if verbose: logging.info(f'Set attribute {project_dl.deadline.attribute.identifier}={project_dl.date} in attribute_data')
+
                 updated_attribute_data = project.attribute_data
                 changed_attribute_data = numpy.setdiff1d(list(updated_attribute_data.keys()), list(original_attribute_data.keys()))
                 if verbose: logging.info(f'Changed attribute_data: {", ".join(changed_attribute_data)}')
