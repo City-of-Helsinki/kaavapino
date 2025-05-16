@@ -63,7 +63,8 @@ class Command(BaseCommand):
                         deadline=deadline,
                         generated=True
                     )
-                    if verbose: logging.info(f'Created ProjectDeadline {new_project_deadline.deadline.attribute.identifier}')
+                    if verbose:
+                        logging.info(f'Created ProjectDeadline {new_project_deadline.deadline.attribute.identifier if new_project_deadline.deadline.attribute else new_project_deadline.deadline.abbreviation}')
                     if deadline.deadlinegroup:
                         vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
                         if vis_bool and not vis_bool in project.attribute_data:
