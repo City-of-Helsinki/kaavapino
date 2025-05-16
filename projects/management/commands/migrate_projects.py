@@ -58,11 +58,13 @@ class Command(BaseCommand):
                 project_deadlines = list(ProjectDeadline.objects.filter(project=project, deadline__in=applicable_deadlines))
                 generated_deadlines = []
                 for deadline in to_be_added:
-                    new_project_deadline = ProjectDeadline.objects.create(
+                    new_project_deadline, created = ProjectDeadline.objects.get_or_create(
                         project=project,
                         deadline=deadline,
-                        generated=True
+                        defaults={"generated": True}
                     )
+                    if not created:
+                        continue
                     if verbose:
                         logging.info(f'Created ProjectDeadline {new_project_deadline.deadline.attribute.identifier if new_project_deadline.deadline.attribute else new_project_deadline.deadline.abbreviation}')
                     if deadline.deadlinegroup:
