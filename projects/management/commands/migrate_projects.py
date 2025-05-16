@@ -100,6 +100,7 @@ class Command(BaseCommand):
                     if project.attribute_data.get(project_dl.deadline.attribute.identifier, None) is None:
                         project.attribute_data[project_dl.deadline.attribute.identifier] = project_dl.date
                         if verbose: logging.info(f'Set attribute {project_dl.deadline.attribute.identifier}={project_dl.date} in attribute_data')
+                project.save()
 
                 updated_attribute_data = project.attribute_data
                 changed_attribute_data = numpy.setdiff1d(list(updated_attribute_data.keys()), list(original_attribute_data.keys()))
