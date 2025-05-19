@@ -88,7 +88,7 @@ class Command(BaseCommand):
 
                 # Calculate date values for new deadlines, project attribute_data is updated within method
                 results = project._set_calculated_deadlines(
-                    deadlines=to_be_added,
+                    deadlines=[*to_be_added, *to_be_preserved],
                     user=user,
                     initial=True,
                 )
