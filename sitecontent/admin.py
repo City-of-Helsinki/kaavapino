@@ -19,7 +19,6 @@ from projects.importing import attribute, deadline
 from openpyxl import load_workbook
 
 import json
-import traceback
 
 class FooterLinkInline(SortableInlineAdminMixin, admin.TabularInline):
     model = FooterLink
@@ -112,8 +111,8 @@ def activate_excel(obj):
         clear_cache()
         obj.update(status=ExcelFile.STATUS_ACTIVE, error=None, task_id=None)
         ExcelFile.objects.all().exclude(~Q(type=obj.type) | Q(file=obj.file)).update(status=ExcelFile.STATUS_INACTIVE, updated=None, task_id=None)
-    except (AttributeImporterException,DeadlineImporterException, Exception) as e:
-        obj.update(status=ExcelFile.STATUS_ERROR, error=traceback.format_exception_only(e), task_id=None)
+    except (AttributeImporterException,DeadlineImporterException, Exception) as exc:
+        obj.update(status=ExcelFile.STATUS_ERROR, error=repr(exc), task_id=None)
 
 @admin.action
 def activate(modeladmin, request, queryset):
