@@ -91,6 +91,7 @@ class Command(BaseCommand):
                     deadlines=[*to_be_added, *to_be_preserved],
                     user=user,
                     initial=True,
+                    preview_attribute_data=project.attribute_data,
                 )
                 if verbose: logging.info(f'Set calculated deadlines: {results}')
 
