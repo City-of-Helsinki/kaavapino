@@ -273,12 +273,12 @@ def render_template(project, document_template, preview):
             if preview:
                 target_property = None
 
-                if attribute.static_property:
+                if attribute.static_property and not attribute.static_property == "pino_number":
                     target_identifier = None
                     target_property = attribute.static_property
-
-                target_identifier = \
-                    get_top_level_attribute(attribute).identifier
+                else:
+                    target_identifier = \
+                        get_top_level_attribute(attribute).identifier
 
                 target_phase_id = None
                 target_section_name = None

@@ -1,5 +1,6 @@
 import logging
 import re
+from django.db.utils import IntegrityError
 from typing import Iterable, Sequence, List
 
 from openpyxl import load_workbook
@@ -14,6 +15,7 @@ from projects.models import (
     DateCalculation,
     DeadlineDateCalculation,
     DeadlineDistance,
+    DeadlineDistanceConditionAttribute,
     ProjectSubtype,
     ProjectPhase,
 )
@@ -45,8 +47,8 @@ DEADLINE_ERROR_PAST_DUE = "mitä tapahtuu, jos aikatauluun merkittyä  päiväm�
 DEADLINE_ERROR_DATE_TYPE_MISMATCH = "virheilmoitus, jos valittu päivä ei ole oikeaa päivätyyppiä"
 DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edelliseen etappiin ei täyty, kun käyttäjä editoi aikataulua "
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
+DEADLINE_GROUP = "(v1.1) ryhmä"
 
-DEADLINE_V10 = "rivi koskee versiota 1.0"
 DEADLINE_V11 = "rivi koskee versiota 1.1"
 
 # Date type row indices
@@ -135,10 +137,9 @@ class DeadlineImporter:
                 self.column_index[column.lower()] = index
 
     def _check_if_row_valid(self, row: Sequence) -> bool:
-        v10 = row[self.column_index[DEADLINE_V10]]
         v11 = row[self.column_index[DEADLINE_V11]]
 
-        if self.options.get("kv") == "1.0" and v10 == "ei":
+        if self.options.get("kv") == "1.0" and v11 == "kyllä":
             return False
 
         if self.options.get("kv") == "1.1" and v11 == "ei":
@@ -176,6 +177,23 @@ class DeadlineImporter:
                 "business_days_only": True,
             },
         )
+
+        try:
+            DateType.objects.update_or_create(
+                identifier="lomapäivät",
+                defaults={
+                    "name": "Lomapäivät",
+                    "exclude_selected": False,
+                    "business_days_only": False,
+                }
+            )
+        except IntegrityError:
+            with transaction.atomic():
+                date_type = DateType.objects.get(identifier="lomapäivät")
+                date_type.name = "Lomapäivät"
+                date_type.exclude_selected = False
+                date_type.business_days_only = False
+                date_type.save()
 
     def _create_datetypes(self, datetype_rows):
         def create_automatic_date(date_string):
@@ -373,10 +391,11 @@ class DeadlineImporter:
                     identifier=confirmation_attribute
                 )
             except Attribute.DoesNotExist:
-                logger.warning(
-                    f"Ignored invalid confirmation attribute identifier {confirmation_attribute} for deadline {abbreviation}."
-                )
-                confirmation_attribute = None
+                if confirmation_attribute:
+                    logger.warning(
+                        f"Ignored invalid confirmation attribute identifier {confirmation_attribute} for deadline {abbreviation}."
+                    )
+                    confirmation_attribute = None
 
             deadline_types = []
             for dl_type in re.split(
@@ -439,6 +458,7 @@ class DeadlineImporter:
             error_date_type_mismatch = row[self.column_index[DEADLINE_ERROR_DATE_TYPE_MISMATCH]]
             error_min_distance_previous = row[self.column_index[DEADLINE_ERROR_MIN_DISTANCE_PREV]]
             warning_min_distance_next = row[self.column_index[DEADLINE_WARNING_MIN_DISTANCE_NEXT]]
+            deadlinegroup = row[self.column_index[DEADLINE_GROUP]]
             index = i + 1
 
             deadline, _ = Deadline.objects.update_or_create(
@@ -455,7 +475,8 @@ class DeadlineImporter:
                     "error_min_distance_previous": error_min_distance_previous,
                     "warning_min_distance_next": warning_min_distance_next,
                     "default_to_created_at": default_to_created_at,
-                    "index": index,
+                    "deadlinegroup": deadlinegroup,
+                    "index": index
                 },
             )
 
@@ -608,9 +629,10 @@ class DeadlineImporter:
         "xx - a; yy - b"
         "{% if kaavaprosessin_kokoluokka == S %} xx + a {% endif %}"
         "{% if kaavaprosessin_kokoluokka in [M, L, XL] %} xx + as {% endif %}"
+        "{% if <attribute_identifier> and/or !<attribute_identifier> } xx + ay {% endif %}"
         """
-        def parse_distance(distance_string):
-            def add_distance(calc, attr=None):
+        def parse_minimum_distance(distance_string):
+            def add_distance(calc, condition_operator=None, condition_attributes=None):
                 try:
                     try:
                         [reference, operator, distance] = \
@@ -622,7 +644,8 @@ class DeadlineImporter:
                         Deadline.objects.get(subtype=subtype, abbreviation=reference),
                         operator,
                         distance,
-                        [attr] if attr else [],
+                        condition_operator,
+                        condition_attributes or [],
                     ))
 
                 except Deadline.DoesNotExist:
@@ -631,6 +654,33 @@ class DeadlineImporter:
                     )
 
                 return distances
+
+            def create_distance_condition(condition_string):
+                if ' or ' in condition_string:
+                    attrs = condition_string.split(' or ')
+                    condition_operator = 'or'
+                elif ' and ' in condition_string:
+                    attrs = condition_string.split(' and ')
+                    condition_operator = 'and'
+                else:
+                    attrs = [cond]
+                    condition_operator = None
+
+                condition_attributes = []
+                for attr in attrs:
+                    negate = attr[0] == "!"
+                    identifier = attr if not negate else attr[1:]
+                    try:
+                        condition_attribute, created = DeadlineDistanceConditionAttribute.objects.get_or_create(
+                            attribute=Attribute.objects.get(identifier=identifier),
+                            negate=negate
+                        )
+                        condition_attributes.append(condition_attribute)
+                    except (Attribute.DoesNotExist, AssertionError):
+                        logger.warning(
+                            f"Ignored an invalid minimum distance specification {identifier} for deadline {abbreviation}; attribute not found."
+                        )
+                return condition_operator, condition_attributes
 
             distances = []
             conditions_parsed = self._parse_conditions(distance_string)
@@ -658,13 +708,8 @@ class DeadlineImporter:
                     elif not cond:
                         add_distance(calc)
                     else:
-                        try:
-                            attr = Attribute.objects.get(identifier=cond)
-                            add_distance(calc, attr)
-                        except (Attribute.DoesNotExist, AssertionError):
-                            logger.warning(
-                                f"Ignored an invalid minimum distance specification {cond} for deadline {abbreviation}; attribute not found."
-                            )
+                        condition_operator, condition_attributes = create_distance_condition(cond)
+                        add_distance(calc, condition_operator, condition_attributes)
 
             return distances
 
@@ -719,7 +764,7 @@ class DeadlineImporter:
 
             # Create minimum distance relations
             if row[self.column_index[DEADLINE_MINIMUM_DISTANCE]]:
-                parsed = enumerate(parse_distance(
+                parsed = enumerate(parse_minimum_distance(
                     row[self.column_index[DEADLINE_MINIMUM_DISTANCE]]
                 ))
 
@@ -727,22 +772,19 @@ class DeadlineImporter:
                     row[self.column_index[DEADLINE_CALCULATION_DATE_TYPE]],
                     "minimum distance",
                 )
-                row[self.column_index[DEADLINE_DISTANCE_DATE_TYPE]]
 
-                for index, (target, operator, distance, conditions) in parsed:
-                    distance = DeadlineDistance.objects.create(
+                for index, (target, operator, distance, condition_operator, condition_attributes) in parsed:
+                    deadline_distance = DeadlineDistance.objects.create(
                         deadline=deadline if operator == "+" else target,
                         previous_deadline=target if operator == "+" else deadline,
                         distance_from_previous=distance,
                         date_type=distance_datetype,
+                        condition_operator=condition_operator,
                         index=index,
                     )
-                    distance.conditions.set(conditions)
-                    distance.save()
-            else:
-                logger.warning(
-                    f"No minimum distance information found for {row[self.column_index[DEADLINE_ABBREVIATION]]}."
-                )
+                    deadline_distance.condition_attributes.set(condition_attributes)
+                    deadline_distance.save()
+
 
     @transaction.atomic
     def run(self):
@@ -770,6 +812,7 @@ class DeadlineImporter:
 
         # Delete existing calculations and distances
         DeadlineDistance.objects.all().delete()
+        DeadlineDistanceConditionAttribute.objects.all().delete()
         DateCalculation.objects.all().delete()
 
         for subtype in ProjectSubtype.objects.all():

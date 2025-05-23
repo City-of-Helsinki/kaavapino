@@ -4,6 +4,7 @@ import re
 
 import requests
 from requests.exceptions import Timeout
+import datetime
 
 from django.conf import settings
 from django.core.cache import cache
@@ -20,8 +21,16 @@ logger = logging.getLogger(__name__)
 VALID_IDENTIFIER_PATTERN = re.compile("^\d{4}_\d{1,3}$")
 
 
+def get_active_projects_queryset():
+    return Project.objects.filter(
+        archived=False,
+        onhold=False,
+        modified_at__gte=timezone.now()-datetime.timedelta(days=7)
+    )
+
+
 def refresh_on_map_overview_cache():
-    projects = Project.objects.all()
+    projects = get_active_projects_queryset()
     logger.info(f"Caching Geoserver data for {len(projects)} projects")
     for project in projects:
         identifier = project.attribute_data.get("hankenumero")
@@ -48,9 +57,9 @@ def refresh_on_map_overview_cache():
 
 def refresh_project_schedule_cache():
     project_schedule_cache = cache.get("serialized_project_schedules", {})
-    logger.info(f"Recalculating and caching project schedule for all projects")
+    logger.info(f"Recalculating and caching project schedule for all active projects")
 
-    for project in Project.objects.all():
+    for project in get_active_projects_queryset():
         deadlines = project.deadlines.filter(deadline__subtype=project.subtype)
         schedule = ProjectDeadlineSerializer(
             deadlines,
@@ -92,7 +101,7 @@ def cache_queued_project_report_data():
 
 
 def cache_kaavoitus_api_data():
-    projects = Project.objects.all()
+    projects = get_active_projects_queryset()
     logger.info(f"Caching Kaavoitus-API data for {len(projects)} projects")
 
     for project in projects:

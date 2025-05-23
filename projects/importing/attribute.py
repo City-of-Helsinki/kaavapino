@@ -79,6 +79,7 @@ ATTRIBUTE_CHARACTER_LIMIT = "merkkien enimmäismäärä"
 ATTRIBUTE_VALIDATION_REGEX = "regex sääntö"
 ATTRIBUTE_HIGHLIGHT_GROUP = "korostettavat kentät"
 ATTRIBUTE_EDIT_PRIVILEGE = "kenellä on oikeus muokata tietoa"
+ATTRIBUTE_VIEW_PRIVILEGE = "kenellä on oikeus nähdä tieto"
 ATTRIBUTE_ERROR = "virhetilanne"
 ATTRIBUTE_PLACEHOLDER = "syöttökentässä näkyvä ohjeistusteksti"
 ATTRIBUTE_ASSISTIVE_TEXT = "kentän alla näkyvä lyhyt vinkki"
@@ -86,6 +87,10 @@ ATTRIBUTE_ERROR_TEXT = "virheteksti"
 ATTRIBUTE_FIELD_ROLE = "rooli kenen kenttä"
 ATTRIBUTE_FIELD_SUBROLE = "alirooli kenen kenttä"
 ATTRIBUTE_FIELDSET_TOTAL = "fieldsettien lukumäärä"
+ATTRIBUTE_GROUP = "ryhmä"
+ATTRIBUTE_SUBGROUP = "alaryhmä"
+ATTRIBUTE_API_VISIBILITY = "tieto siirtyy kaavoitusapiin"
+
 # TODO: ask for a dedicated column for uniqueness at some point
 ATTRIBUTE_ERROR_UNIQUE = [
     "Virhe. Nimi on jo käytössä",
@@ -94,7 +99,6 @@ ATTRIBUTE_ERROR_UNIQUE = [
 ATTRIBUTE_AUTO_VALUE_KEY_FIELD = "yhteystietojen automaattisen täytön lähdekenttä"
 ATTRIBUTE_AUTO_VALUE_MAPPING = "yhteystietojen automaattisen täytön avain-arvoparit"
 
-ATTRIBUTE_V10 = "rivi koskee versiota 1.0"
 ATTRIBUTE_V11 = "rivi koskee versiota 1.1"
 
 # Attribute object mappings for static Project fields
@@ -604,10 +608,9 @@ class AttributeImporter:
         name = row[self.column_index[ATTRIBUTE_NAME]]
         attr_type = row[self.column_index[ATTRIBUTE_TYPE]]
 
-        v10 = row[self.column_index[ATTRIBUTE_V10]]
         v11 = row[self.column_index[ATTRIBUTE_V11]]
 
-        if self.options.get("kv") == "1.0" and v10 == "ei":
+        if self.options.get("kv") == "1.0" and v11 == "kyllä":
             return False
 
         if self.options.get("kv") == "1.1" and v11 == "ei":
@@ -894,6 +897,15 @@ class AttributeImporter:
                     if match_text in privilege_list:
                         edit_privilege = privilege
                         break
+            
+            viewing_privilege = row[self.column_index[ATTRIBUTE_VIEW_PRIVILEGE]]
+
+            if viewing_privilege:
+                viewing_privilege_list = re.split(r",\s*", viewing_privilege.lower())
+                for match_text, privilege in USER_PRIVILEGES.items():
+                    if match_text in viewing_privilege_list:
+                        viewing_privilege = privilege
+                        break
 
             field_roles = row[self.column_index[ATTRIBUTE_FIELD_ROLE]]
             if field_roles == "automaattinen tieto, jota ei voi muokata":
@@ -908,6 +920,9 @@ class AttributeImporter:
             data_source_key = row[self.column_index[EXT_DATA_SOURCE_KEY]]
             key_attribute_path = row[self.column_index[EXT_DATA_PARENT_KEY_ATTRIBUTE]]
             ad_data_key = row[self.column_index[EXT_DATA_AD_KEY]]
+            attributegroup = row[self.column_index[ATTRIBUTE_GROUP]]
+            attributesubgroup = row[self.column_index[ATTRIBUTE_SUBGROUP]]
+            api_visibility = True if row[self.column_index[ATTRIBUTE_API_VISIBILITY]] == "kyllä" else False
 
             attribute, created = Attribute.objects.update_or_create(
                 identifier=identifier,
@@ -944,6 +959,7 @@ class AttributeImporter:
                     "static_property": static_property,
                     "owner_editable": owner_editable,
                     "edit_privilege": edit_privilege,
+                    "viewing_privilege": viewing_privilege,
                     "owner_viewable": True,
                     "view_privilege": "browse",
                     "data_source": data_source,
@@ -952,7 +968,10 @@ class AttributeImporter:
                     "ad_data_key": ad_data_key,
                     "field_roles": field_roles,
                     "field_subroles": field_subroles,
-                    "fieldset_total":fieldset_total
+                    "fieldset_total": fieldset_total,
+                    "attributegroup": attributegroup,
+                    "attributesubgroup": attributesubgroup,
+                    "api_visibility": api_visibility,
                 },
             )
             if created:

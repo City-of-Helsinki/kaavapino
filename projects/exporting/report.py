@@ -7,7 +7,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from openpyxl import Workbook
 
-from projects.models import Attribute, Report, Project
+from projects.models import Attribute, Report, Project, Deadline
 from projects.helpers import (
     get_fieldset_path,
     get_flat_attribute_data,
@@ -15,6 +15,8 @@ from projects.helpers import (
     set_ad_data_in_attribute_data,
     set_automatic_attributes,
 )
+
+from projects.serializers.utils import should_display_deadline
 
 logger = logging.getLogger(__name__)
 
@@ -270,6 +272,15 @@ def render_report_to_response(
                                 f"Could not handle attribute {attr} for project {project}."
                             )
 
+                exclude_from_disp = []
+                for disp_attr in display_values:
+                    dls = Deadline.objects.filter(attribute__identifier=disp_attr)
+                    if not dls:
+                        continue
+                    if not any([should_display_deadline(project, dl) for dl in dls]):
+                        exclude_from_disp.append(disp_attr)
+                for excluded in exclude_from_disp:
+                    del display_values[excluded]
                 # combine attribute display values into one string
                 data[col.id] = ", ".join([
                     str(display_values.get(attr.identifier, ""))
