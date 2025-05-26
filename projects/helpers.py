@@ -736,7 +736,7 @@ def set_automatic_attributes(attribute_data):
             target, source = [target[1]], [source[1]]
         key = get_attribute_data(source, attribute_data)
         if isinstance(key, list):
-            value = ", ".join([auto_attr.get_value(k) for k in key])
+            value = ", ".join([v for k in key if (v := auto_attr.get_value(k)) is not None])
         else:
             value = auto_attr.get_value(key)
         if value:
