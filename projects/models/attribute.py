@@ -423,6 +423,10 @@ class Attribute(models.Model):
         null=True,
         blank=True,
     )
+    api_visibility = models.BooleanField(
+        verbose_name=_("Visible to Kaavoitus-API"),
+        default=False,
+    )
     objects = AttributeQuerySet.as_manager()
 
     admin_description = "Projektin kenttien hallinta. Muutokset tänne vaatii mahdollisesti myös muutoksia dokumenttipohjiin."

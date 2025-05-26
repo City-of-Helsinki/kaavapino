@@ -112,7 +112,7 @@ JWT_AUTH = {
 }
 DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
-DATABASES = {"default": env.db()}
+DATABASES = {"default": env.db(engine='kaavapino.db_wrapper')}
 
 SENTINELS = []
 

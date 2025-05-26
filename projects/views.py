@@ -32,7 +32,15 @@ from rest_framework_extensions.mixins import NestedViewSetMixin
 
 from projects.exporting.document import render_template
 from projects.exporting.report import render_report_to_response
-from projects.helpers import DOCUMENT_CONTENT_TYPES, get_file_type, TRUE, get_attribute_lock_data
+from projects.helpers import (
+    DOCUMENT_CONTENT_TYPES,
+    get_file_type,
+    TRUE,
+    get_attribute_lock_data,
+    set_ad_data_in_attribute_data,
+    get_in_personnel_data,
+    set_geoserver_data_in_attribute_data,
+)
 from projects.importing import AttributeImporter, AttributeUpdater
 from projects.models import (
     FieldComment,
@@ -104,7 +112,7 @@ from projects.serializers.projecttype import (
 )
 from projects.serializers.report import ReportSerializer
 from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateSerializer, DeadlineValidationSerializer
-from projects.serializers.utils import get_dl_vis_bool_name, should_display_deadline
+from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
 
@@ -337,6 +345,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["action"] = self.action
+        context["confirmed_fields"] = self.request.data.get('confirmed_fields', [])
 
         if self.action == "list":
             context["project_schedule_cache"] = \
@@ -359,6 +368,65 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     )
     def simple(self, request, pk):
         return Response(SimpleProjectSerializer(self.get_object()).data)
+
+    @extend_schema(
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            401: OpenApiTypes.STR
+        }
+    )
+    @action(
+        methods=["get"],
+        detail=True,
+        permission_classes=[IsAuthenticated, ProjectPermissions],
+    )
+    def simple_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
+        project = ProjectSerializer(self.get_object(), context={"request": request}).data
+        attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+        response = {
+            "project_name": project.get("name"),
+        }
+        attribute_data = project.get("attribute_data", None)
+        if not attribute_data:
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        set_ad_data_in_attribute_data(attribute_data)
+        set_geoserver_data_in_attribute_data(attribute_data)
+
+        for key, value in attribute_data.items():
+            attribute = attributes.get(key)
+            if not attribute or not attribute.api_visibility:
+                continue
+
+            if not value:
+                continue
+
+            if attribute.value_type == Attribute.TYPE_FIELDSET:
+                fieldset = []
+                for entry in value:  # fieldset
+                    fieldset_obj = {}
+                    for k, v in entry.items():
+                        fieldset_attr = attributes.get(k, None)
+                        if not fieldset_attr or not fieldset_attr.api_visibility:
+                            continue
+                        if fieldset_attr.value_type == Attribute.TYPE_PERSONNEL:
+                            v = get_in_personnel_data(v, "name", False)
+                        elif fieldset_attr.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+                            v = "".join([item["insert"] for item in v["ops"]]).strip()
+                        fieldset_obj[k] = v
+                    if fieldset_obj:
+                        fieldset.append(fieldset_obj)
+                if fieldset:
+                    response[key] = fieldset
+            elif attribute.value_type == Attribute.TYPE_USER:
+                response[key] = get_in_personnel_data(value, "name", True)
+            elif attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+                response[key] = "".join([item["insert"] for item in value["ops"]]).strip()
+            else:
+                response[key] = value
+
+        return Response(response)
 
     @extend_schema(
         request=ProjectFileSerializer,
@@ -918,12 +986,32 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
+        # Store the original confirmed_fields before calling update
+        # should prevent confirmed fields from moving when updating or validating 
+        confirmed_fields = request.data.get('confirmed_fields', [])
+        original_attribute_data = request.data.get('attribute_data', {})
+        
         if not fake:
-            return super().update(request, *args, **kwargs)
-
+        # Actual update logic that saves to db
+            result = super().update(request, *args, **kwargs)
+            
+            return result
+        
+        # When using fake mode, we need to pass the fake=True parameter to the serializer
+        # This will ensure Project.update_attribute_data respects confirmed_fields
+        request._fake = True  # Add a private attribute to indicate this is a fake call
+        # Validation logic ?fake
         # Run update in 'ghost' mode where no changes are applied to database but result is returned
         with transaction.atomic():
             result = super().update(request, *args, **kwargs)
+            
+            # Before returning, check if we need to restore original values for confirmed fields
+            if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
+                # Restore original values for confirmed fields
+                for field in confirmed_fields:
+                    if field in original_attribute_data and field in result.data['attribute_data']:
+                        result.data['attribute_data'][field] = original_attribute_data[field]
+            #Prevents saving anything to database but returns values that have been changed by validation to frontend
             transaction.set_rollback(True)
             return result
 

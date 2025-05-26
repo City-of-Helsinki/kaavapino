@@ -151,6 +151,7 @@ class DateTypeAdmin(admin.ModelAdmin):
         if 'forced_dates' in form.changed_data:  # Delete cached lautakunnan_kokouspäivät dates
             cache_keys = cache.keys("*")
             keys_to_delete = list(filter(lambda k: k.startswith(f"datetype_{obj.identifier}_dates_"), cache_keys))
+            keys_to_delete.append("serialized_date_types")
             cache.delete_many(keys_to_delete)
 
 
@@ -166,8 +167,8 @@ class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin):
 
 class ProjectDeadlineInline(admin.TabularInline):
     model = ProjectDeadline
-    fields = ("deadline", "date")
-    readonly_fields = ("deadline", "date")
+    fields = ("deadline", "editable", "date")
+    readonly_fields = ("deadline",)
     extra = 0
     can_delete = False
 
@@ -296,6 +297,15 @@ class ProjectAdmin(OSMGeoAdmin):
         super(ProjectAdmin, self).save_model(request, obj, form, change)
         if 'phase' in form.changed_data:
             ProjectDocumentDownloadLog.objects.filter(project=obj).update(invalidated=True)
+
+    def save_formset(self, request, obj, formset, change):
+        super(ProjectAdmin, self).save_formset(request, obj, formset, change)
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, ProjectDeadline) and instance.deadline.attribute:
+                project = instance.project
+                project.attribute_data[instance.deadline.attribute.identifier] = instance.date
+                project.save()
 
 class ProjectCardSectionAttributeInline(SortableInlineAdminMixin, admin.TabularInline):
     model = ProjectCardSectionAttribute
