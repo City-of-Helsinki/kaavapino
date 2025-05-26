@@ -1432,6 +1432,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         for attribute_identifier, value in attribute_data.items():
             try:
                 attribute = attribute_objects.get(attribute_identifier)
+                if not attribute:
+                    continue
                 if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
