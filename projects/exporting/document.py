@@ -207,7 +207,7 @@ def render_template(project, document_template, preview):
                     if fieldset_item.get("_deleted") or not item_attr:
                         continue
 
-                    display_value, raw_value, element_data = \
+                    display_value, raw_value, element_data, raw_to_display_mapped = \
                         get_display_and_raw_value(item_attr, v)
 
                     fieldset_object[k] = display_value
@@ -219,7 +219,7 @@ def render_template(project, document_template, preview):
                     fieldset_object["index"] = index
                     result.append(fieldset_object)
 
-            return (result, value, element_data)
+            return (result, value, element_data, None)
         elif attribute.multiple_choice and not ignore_multiple_choice:
             value = value or []
             display_list = [
@@ -230,15 +230,17 @@ def render_template(project, document_template, preview):
             raw_list = [
                 _get_raw_value(i, attribute) for i in value
             ]
+            raw_to_display_mapped = {_get_raw_value(i, attribute): get_display_and_raw_value(attribute, i, ignore_multiple_choice=True)[0] for i in value}
             all_element_data = [
                 get_display_and_raw_value(
                     attribute, i, ignore_multiple_choice=True
                 )[2] for i in value
             ]
+
             if all_element_data:
                 element_data = all_element_data[0]
 
-            return (display_list, raw_list, element_data)
+            return (display_list, raw_list, element_data, raw_to_display_mapped)
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
@@ -324,7 +326,7 @@ def render_template(project, document_template, preview):
                 else:
                     display_value = RichText(display_value, **text_args)
 
-        return (display_value, _get_raw_value(value, attribute), text_args)
+        return (display_value, _get_raw_value(value, attribute), text_args, None)
 
     attribute_data = project.attribute_data
     try:
@@ -341,8 +343,8 @@ def render_template(project, document_template, preview):
     def process_attribute(attr):
         value = attribute_data.get(attr.identifier)
         identifier = attr.identifier
-        display_value, raw_value, element_data = get_display_and_raw_value(attr, value)
-        return identifier, display_value, raw_value, element_data
+        display_value, raw_value, element_data, raw_to_display_mapped = get_display_and_raw_value(attr, value)
+        return identifier, display_value, raw_value, element_data, raw_to_display_mapped
 
     full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in Attribute.objects.all()]
 
@@ -351,11 +353,13 @@ def render_template(project, document_template, preview):
         for future in concurrent.futures.as_completed(future_to_attr):
             attr = future_to_attr[future]
 
-            identifier, display_value, raw_value, element_data = future.result()
+            identifier, display_value, raw_value, element_data, raw_to_display_mapped = future.result()
             attribute_data_display[identifier] = display_value
             attribute_element_data[identifier] = element_data
             if attr.value_type != Attribute.TYPE_FIELDSET:
                 attribute_data_display[identifier + "__raw"] = raw_value
+            if raw_to_display_mapped:
+                attribute_data_display[identifier + "__map"] = raw_to_display_mapped
 
     attribute_files = ProjectAttributeFile.objects \
         .filter(project=project, archived_at=None) \
@@ -393,7 +397,7 @@ def render_template(project, document_template, preview):
             attribute_file.file.path.split('.')[-1].lower() in image_formats
 
         if file_format_is_supported:
-            display_value, __, __ = get_display_and_raw_value(
+            display_value, __, __, __ = get_display_and_raw_value(
                 attribute_file.attribute,
                 attribute_file.file.path,
             )
