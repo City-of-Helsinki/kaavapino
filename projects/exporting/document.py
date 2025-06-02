@@ -117,6 +117,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
             value = {"ops": [{"insert": f"{value}"}] }
 
         operations = value["ops"]
+        ordered_counter = 0
 
         for index, operation in enumerate(operations, start=1):
             insert = operation.get("insert", None)
@@ -134,7 +135,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                               color=color
                               )
                 continue
-            _color = get_color(preview,color,attributes)
+            _color = get_color(preview, color, attributes)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
             _sub = get_sub(_script)
@@ -144,6 +145,34 @@ def get_rich_text_display_value(value, preview=False, **text_args):
             _underline = attributes.get("underline", False)
             _strike = attributes.get("strike", False)
             _font = attributes.get("font", None)
+            _is_ordered = attributes.get("isOrderList", False)
+            _is_bulleted = attributes.get("isBulleted", False)
+
+            if "\n" in insert and (_is_ordered or _is_bulleted):
+                ordered_counter = 0
+                original, insert = insert.rsplit('\n', 1)
+                rich_text.add(original + "\n",
+                              color=_color,
+                              size=_size,
+                              subscript=_sub,
+                              superscript=_super,
+                              bold=_bold,
+                              italic=_italic,
+                              underline=_underline,
+                              strike=_strike,
+                              font=_font,
+                              url_id=url_id
+                              )
+
+            prefix = ""
+            if _is_ordered:
+                ordered_counter += 1
+                prefix = f'   {ordered_counter}. '
+            elif _is_bulleted:
+                prefix = f'   - '
+
+            if prefix:
+                rich_text.add(prefix, color=_color)
 
             rich_text.add(insert,
                           color=_color,
@@ -164,9 +193,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
     return rich_text
 
 def get_color(preview,color,attributes):
-    if not preview:
-        return None
-    elif color:
+    if preview:
         return color
     else:
         return attributes.get("color", None)
