@@ -258,7 +258,7 @@ def render_template(project, document_template, preview):
                         width_mm = int((150/dpi) * 25.4)
                         height_mm = None
 
-                    display_value = InlineImage(doc, value, width=Mm(width_mm), height=Mm(height_mm))
+                    display_value = InlineImage(doc, value, width=Mm(width_mm) if width_mm else None, height=Mm(height_mm) if height_mm else None)
                 except (FileNotFoundError, UnidentifiedImageError):
                     log.error(f'Image not found or is corrupted at {value}')
                     display_value = None
