@@ -1,5 +1,39 @@
 from projects.models import Attribute
 
+VIS_BOOL_MAP = {
+    'kaynnistys_1': None,
+    'periaatteet_esillaolokerta_1': 'jarjestetaan_periaatteet_esillaolo_1',
+    'periaatteet_esillaolokerta_2': 'jarjestetaan_periaatteet_esillaolo_2',
+    'periaatteet_esillaolokerta_3': 'jarjestetaan_periaatteet_esillaolo_3',
+    'periaatteet_lautakuntakerta_1': 'periaatteet_lautakuntaan_1',
+    'periaatteet_lautakuntakerta_2': 'periaatteet_lautakuntaan_2',
+    'periaatteet_lautakuntakerta_3': 'periaatteet_lautakuntaan_3',
+    'periaatteet_lautakuntakerta_4': 'periaatteet_lautakuntaan_4',
+    'oas_esillaolokerta_1': 'jarjestetaan_oas_esillaolo_1',
+    'oas_esillaolokerta_2': 'jarjestetaan_oas_esillaolo_2',
+    'oas_esillaolokerta_3': 'jarjestetaan_oas_esillaolo_3',
+    'luonnos_esillaolokerta_1': 'jarjestetaan_luonnos_esillaolo_1',
+    'luonnos_esillaolokerta_2': 'jarjestetaan_luonnos_esillaolo_2',
+    'luonnos_esillaolokerta_3': 'jarjestetaan_luonnos_esillaolo_3',
+    'luonnos_lautakuntakerta_1': 'kaavaluonnos_lautakuntaan_1',
+    'luonnos_lautakuntakerta_2': 'kaavaluonnos_lautakuntaan_2',
+    'luonnos_lautakuntakerta_3': 'kaavaluonnos_lautakuntaan_3',
+    'luonnos_lautakuntakerta_4': 'kaavaluonnos_lautakuntaan_4',
+    'ehdotus_nahtavillaolokerta_1': 'kaavaehdotus_nahtaville_1',
+    'ehdotus_nahtavillaolokerta_2': 'kaavaehdotus_uudelleen_nahtaville_2',
+    'ehdotus_nahtavillaolokerta_3': 'kaavaehdotus_uudelleen_nahtaville_3',
+    'ehdotus_nahtavillaolokerta_4': 'kaavaehdotus_uudelleen_nahtaville_4',
+    'ehdotus_lautakuntakerta_1': 'kaavaehdotus_lautakuntaan_1',
+    'ehdotus_lautakuntakerta_2': 'kaavaehdotus_lautakuntaan_2',
+    'ehdotus_lautakuntakerta_3': 'kaavaehdotus_lautakuntaan_3',
+    'ehdotus_lautakuntakerta_4': 'kaavaehdotus_lautakuntaan_4',
+    'tarkistettu_ehdotus_lautakuntakerta_1': 'tarkistettu_ehdotus_lautakuntaan_1',
+    'tarkistettu_ehdotus_lautakuntakerta_2': 'tarkistettu_ehdotus_lautakuntaan_2',
+    'tarkistettu_ehdotus_lautakuntakerta_3': 'tarkistettu_ehdotus_lautakuntaan_3',
+    'tarkistettu_ehdotus_lautakuntakerta_4': 'tarkistettu_ehdotus_lautakuntaan_4',
+    'hyvaksyminen_1': None,
+    'voimaantulo_1': None
+}
 
 def _is_attribute_required(attribute: Attribute):
     if not attribute.generated:
@@ -58,41 +92,7 @@ def _set_fieldset_path(fieldset_content, path, parent_obj, i, identifier, value)
             next_obj[identifier] = value
 
 def get_dl_vis_bool_name(group_name):
-    vis_bool_map = {
-        'kaynnistys_1': None,
-        'periaatteet_esillaolokerta_1': 'jarjestetaan_periaatteet_esillaolo_1',
-        'periaatteet_esillaolokerta_2': 'jarjestetaan_periaatteet_esillaolo_2',
-        'periaatteet_esillaolokerta_3': 'jarjestetaan_periaatteet_esillaolo_3',
-        'periaatteet_lautakuntakerta_1': 'periaatteet_lautakuntaan_1',
-        'periaatteet_lautakuntakerta_2': 'periaatteet_lautakuntaan_2',
-        'periaatteet_lautakuntakerta_3': 'periaatteet_lautakuntaan_3',
-        'periaatteet_lautakuntakerta_4': 'periaatteet_lautakuntaan_4',
-        'oas_esillaolokerta_1': 'jarjestetaan_oas_esillaolo_1',
-        'oas_esillaolokerta_2': 'jarjestetaan_oas_esillaolo_2',
-        'oas_esillaolokerta_3': 'jarjestetaan_oas_esillaolo_3',
-        'luonnos_esillaolokerta_1': 'jarjestetaan_luonnos_esillaolo_1',
-        'luonnos_esillaolokerta_2': 'jarjestetaan_luonnos_esillaolo_2',
-        'luonnos_esillaolokerta_3': 'jarjestetaan_luonnos_esillaolo_3',
-        'luonnos_lautakuntakerta_1': 'kaavaluonnos_lautakuntaan_1',
-        'luonnos_lautakuntakerta_2': 'kaavaluonnos_lautakuntaan_2',
-        'luonnos_lautakuntakerta_3': 'kaavaluonnos_lautakuntaan_3',
-        'luonnos_lautakuntakerta_4': 'kaavaluonnos_lautakuntaan_4',
-        'ehdotus_nahtavillaolokerta_1': 'kaavaehdotus_nahtaville_1',
-        'ehdotus_nahtavillaolokerta_2': 'kaavaehdotus_uudelleen_nahtaville_2',
-        'ehdotus_nahtavillaolokerta_3': 'kaavaehdotus_uudelleen_nahtaville_3',
-        'ehdotus_nahtavillaolokerta_4': 'kaavaehdotus_uudelleen_nahtaville_4',
-        'ehdotus_lautakuntakerta_1': 'kaavaehdotus_lautakuntaan_1',
-        'ehdotus_lautakuntakerta_2': 'kaavaehdotus_lautakuntaan_2',
-        'ehdotus_lautakuntakerta_3': 'kaavaehdotus_lautakuntaan_3',
-        'ehdotus_lautakuntakerta_4': 'kaavaehdotus_lautakuntaan_4',
-        'tarkistettu_ehdotus_lautakuntakerta_1': 'tarkistettu_ehdotus_lautakuntaan_1',
-        'tarkistettu_ehdotus_lautakuntakerta_2': 'tarkistettu_ehdotus_lautakuntaan_2',
-        'tarkistettu_ehdotus_lautakuntakerta_3': 'tarkistettu_ehdotus_lautakuntaan_3',
-        'tarkistettu_ehdotus_lautakuntakerta_4': 'tarkistettu_ehdotus_lautakuntaan_4',
-        'hyvaksyminen_1': None,
-        'voimaantulo_1': None
-    }
-    return vis_bool_map[group_name] if group_name in vis_bool_map else None
+    return VIS_BOOL_MAP[group_name] if group_name in VIS_BOOL_MAP else None
 
 def should_display_deadline(project, deadline):
     if not project or not deadline:

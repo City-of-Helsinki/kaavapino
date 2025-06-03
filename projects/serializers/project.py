@@ -56,7 +56,7 @@ from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
-from projects.serializers.utils import _set_fieldset_path, get_dl_vis_bool_name
+from projects.serializers.utils import VIS_BOOL_MAP, _set_fieldset_path, get_dl_vis_bool_name
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
@@ -501,6 +501,12 @@ class ProjectListSerializer(serializers.ModelSerializer):
                 )
             elif value:
                 return_data[identifier] = value
+
+        # Add deadline visibility booleans (needed in timeline preview)
+        for vis_bool in VIS_BOOL_MAP.values():
+            value = attribute_data.get(vis_bool, None)
+            if value != None:
+                return_data[vis_bool] = value
 
         return return_data
 
