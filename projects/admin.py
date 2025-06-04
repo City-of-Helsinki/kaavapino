@@ -167,7 +167,7 @@ class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin):
 
 class ProjectDeadlineInline(admin.TabularInline):
     model = ProjectDeadline
-    fields = ("deadline", "date")
+    fields = ("deadline", "editable", "date")
     readonly_fields = ("deadline",)
     extra = 0
     can_delete = False

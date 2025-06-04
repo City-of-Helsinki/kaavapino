@@ -34,7 +34,6 @@ from projects.models import ProjectDocumentDownloadLog
 
 log = logging.getLogger(__name__)
 
-MAX_WIDTH_MM = 170  # Max InlineImage width
 DEFAULT_IMG_DPI = (72, 72)  # For cases where dpi value is not available in metadata
 
 
@@ -116,8 +115,9 @@ def get_rich_text_display_value(value, preview=False, **text_args):
         if isinstance(value, str):
             log.warning(f"Plain string found when processing richtext value: {value} (converted to dict)")
             value = {"ops": [{"insert": f"{value}"}] }
-        
+
         operations = value["ops"]
+        ordered_counter = 0
 
         for index, operation in enumerate(operations, start=1):
             insert = operation.get("insert", None)
@@ -135,7 +135,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                               color=color
                               )
                 continue
-            _color = get_color(preview,color,attributes)
+            _color = get_color(preview, color, attributes)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
             _sub = get_sub(_script)
@@ -145,6 +145,34 @@ def get_rich_text_display_value(value, preview=False, **text_args):
             _underline = attributes.get("underline", False)
             _strike = attributes.get("strike", False)
             _font = attributes.get("font", None)
+            _is_ordered = attributes.get("isOrderList", False)
+            _is_bulleted = attributes.get("isBulleted", False)
+
+            if "\n" in insert and (_is_ordered or _is_bulleted):
+                ordered_counter = 0
+                original, insert = insert.rsplit('\n', 1)
+                rich_text.add(original + "\n",
+                              color=_color,
+                              size=_size,
+                              subscript=_sub,
+                              superscript=_super,
+                              bold=_bold,
+                              italic=_italic,
+                              underline=_underline,
+                              strike=_strike,
+                              font=_font,
+                              url_id=url_id
+                              )
+
+            prefix = ""
+            if _is_ordered:
+                ordered_counter += 1
+                prefix = f'   {ordered_counter}. '
+            elif _is_bulleted:
+                prefix = f'   - '
+
+            if prefix:
+                rich_text.add(prefix, color=_color)
 
             rich_text.add(insert,
                           color=_color,
@@ -165,9 +193,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
     return rich_text
 
 def get_color(preview,color,attributes):
-    if not preview:
-        return None
-    elif color:
+    if preview:
         return color
     else:
         return attributes.get("color", None)
@@ -207,7 +233,7 @@ def render_template(project, document_template, preview):
                     if fieldset_item.get("_deleted") or not item_attr:
                         continue
 
-                    display_value, raw_value, element_data = \
+                    display_value, raw_value, element_data, raw_to_display_mapped = \
                         get_display_and_raw_value(item_attr, v)
 
                     fieldset_object[k] = display_value
@@ -219,7 +245,7 @@ def render_template(project, document_template, preview):
                     fieldset_object["index"] = index
                     result.append(fieldset_object)
 
-            return (result, value, element_data)
+            return (result, value, element_data, None)
         elif attribute.multiple_choice and not ignore_multiple_choice:
             value = value or []
             display_list = [
@@ -230,31 +256,39 @@ def render_template(project, document_template, preview):
             raw_list = [
                 _get_raw_value(i, attribute) for i in value
             ]
+            raw_to_display_mapped = {_get_raw_value(i, attribute): get_display_and_raw_value(attribute, i, ignore_multiple_choice=True)[0] for i in value}
             all_element_data = [
                 get_display_and_raw_value(
                     attribute, i, ignore_multiple_choice=True
                 )[2] for i in value
             ]
+
             if all_element_data:
                 element_data = all_element_data[0]
 
-            return (display_list, raw_list, element_data)
+            return (display_list, raw_list, element_data, raw_to_display_mapped)
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
-                if not "kansikuva" in attribute.identifier:
-                    try:
-                        with PImage.open(value) as img:
-                            width_px = img.width
-                            dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
-                            dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
-                        width_mm = int((width_px/dpi) * 25.4)
-                        display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else Mm(width_mm))
-                    except (FileNotFoundError, UnidentifiedImageError):
-                        log.error(f'Image not found or is corrupted at {value}')
-                        display_value = None
-                else:
-                    display_value = InlineImage(doc, value, width=Mm(212), height=Mm(172))
+                try:
+                    with PImage.open(value) as img:
+                        dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
+                        dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
+
+                    if "kansikuva" in attribute.identifier:
+                        width_mm = int((212/dpi) * 25.4)
+                        height_mm = int((172/dpi) * 25.4)
+                    elif attribute.identifier in ["sijaintikartta", "kaavakartta_a4", "havainnekuva", "kuvaliite_suojelukohteet", "ilmakuva"]:
+                        width_mm = int((170/dpi) * 25.4)
+                        height_mm = None
+                    else:
+                        width_mm = int((150/dpi) * 25.4)
+                        height_mm = None
+
+                    display_value = InlineImage(doc, value, width=Mm(width_mm) if width_mm else None, height=Mm(height_mm) if height_mm else None)
+                except (FileNotFoundError, UnidentifiedImageError):
+                    log.error(f'Image not found or is corrupted at {value}')
+                    display_value = None
             else:
                 display_value = value
         else:
@@ -273,12 +307,12 @@ def render_template(project, document_template, preview):
             if preview:
                 target_property = None
 
-                if attribute.static_property:
+                if attribute.static_property and not attribute.static_property == "pino_number":
                     target_identifier = None
                     target_property = attribute.static_property
-
-                target_identifier = \
-                    get_top_level_attribute(attribute).identifier
+                else:
+                    target_identifier = \
+                        get_top_level_attribute(attribute).identifier
 
                 target_phase_id = None
                 target_section_name = None
@@ -324,7 +358,7 @@ def render_template(project, document_template, preview):
                 else:
                     display_value = RichText(display_value, **text_args)
 
-        return (display_value, _get_raw_value(value, attribute), text_args)
+        return (display_value, _get_raw_value(value, attribute), text_args, None)
 
     attribute_data = project.attribute_data
     try:
@@ -341,8 +375,8 @@ def render_template(project, document_template, preview):
     def process_attribute(attr):
         value = attribute_data.get(attr.identifier)
         identifier = attr.identifier
-        display_value, raw_value, element_data = get_display_and_raw_value(attr, value)
-        return identifier, display_value, raw_value, element_data
+        display_value, raw_value, element_data, raw_to_display_mapped = get_display_and_raw_value(attr, value)
+        return identifier, display_value, raw_value, element_data, raw_to_display_mapped
 
     full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in Attribute.objects.all()]
 
@@ -351,11 +385,13 @@ def render_template(project, document_template, preview):
         for future in concurrent.futures.as_completed(future_to_attr):
             attr = future_to_attr[future]
 
-            identifier, display_value, raw_value, element_data = future.result()
+            identifier, display_value, raw_value, element_data, raw_to_display_mapped = future.result()
             attribute_data_display[identifier] = display_value
             attribute_element_data[identifier] = element_data
             if attr.value_type != Attribute.TYPE_FIELDSET:
                 attribute_data_display[identifier + "__raw"] = raw_value
+            if raw_to_display_mapped:
+                attribute_data_display[identifier + "__map"] = raw_to_display_mapped
 
     attribute_files = ProjectAttributeFile.objects \
         .filter(project=project, archived_at=None) \
@@ -393,7 +429,7 @@ def render_template(project, document_template, preview):
             attribute_file.file.path.split('.')[-1].lower() in image_formats
 
         if file_format_is_supported:
-            display_value, __, __ = get_display_and_raw_value(
+            display_value, __, __, __ = get_display_and_raw_value(
                 attribute_file.attribute,
                 attribute_file.file.path,
             )

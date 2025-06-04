@@ -56,7 +56,7 @@ from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
     has_project_attribute_file_permissions,
 )
-from projects.serializers.utils import _set_fieldset_path, get_dl_vis_bool_name
+from projects.serializers.utils import VIS_BOOL_MAP, _set_fieldset_path, get_dl_vis_bool_name
 from projects.serializers.fields import AttributeDataField
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
@@ -84,6 +84,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
     deadline = serializers.SerializerMethodField()
     generated = serializers.BooleanField()
     edited = serializers.DateTimeField()
+    editable = serializers.BooleanField()
 
     @extend_schema_field(DeadlineSerializer)
     def get_deadline(self, projectdeadline):
@@ -500,6 +501,12 @@ class ProjectListSerializer(serializers.ModelSerializer):
                 )
             elif value:
                 return_data[identifier] = value
+
+        # Add deadline visibility booleans (needed in timeline preview)
+        for vis_bool in VIS_BOOL_MAP.values():
+            value = attribute_data.get(vis_bool, None)
+            if value != None:
+                return_data[vis_bool] = value
 
         return return_data
 
@@ -1306,6 +1313,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             attributes__identifier__in=self._get_keys()
         )
         for section in deadline_sections:
+            if section.phase.name == "Luonnos" and not self.instance.create_draft or (
+            section.phase.name == "Periaatteet" and not self.instance.create_principles):
+                continue
             serializer_class = create_section_serializer(
                 section,
                 context=self.context,
@@ -1360,7 +1370,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
         if subtype_changed:
-            should_update_deadlines = False
+            return True
         elif instance:
             attr_identifiers = list(attribute_data.keys())
             should_update_deadlines = bool(
@@ -1428,6 +1438,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         for attribute_identifier, value in attribute_data.items():
             try:
                 attribute = attribute_objects.get(attribute_identifier)
+                if not attribute:
+                    continue
                 if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
                     if value is None:
                         tmp_attribute_data[attribute_identifier] = []
@@ -1488,6 +1500,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             preview = self.instance.get_preview_deadlines(
                 attribute_data,
                 subtype,
+                self.context["confirmed_fields"],
             )
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
@@ -1536,20 +1549,23 @@ class ProjectSerializer(serializers.ModelSerializer):
                 identifier = dl.deadline.confirmation_attribute.identifier
             except AttributeError:
                 return None
+            
+            new_confirm_val = attribute_data.get(identifier, None)
+            old_confirm_val = self.instance.attribute_data.get(identifier, None)
 
-            if identifier in valid_attributes:
-                return bool(valid_attributes.get(identifier, False))
-
-            if identifier in dl.project.attribute_data:
-                return bool(dl.project.attribute_data.get(identifier, False))
-
-            return None
+            # Newly confirmed values can be edited (not counted as confirmed)
+            if not old_confirm_val:
+                return False
+            # Previously confirmed values cannot be edited, unless they are newly set to false.
+            if new_confirm_val == None:
+                return True
+            return new_confirm_val
 
         # Confirmed deadlines can't be edited
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl
             in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
-            if is_confirmed(dl) and dl.deadline.attribute
+            if not dl.editable or (is_confirmed(dl) and dl.deadline.attribute)
         ] if self.instance else []
 
         if confirmed_deadlines:
@@ -1760,6 +1776,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
+        confirmed_fields = self.context["confirmed_fields"]
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
@@ -1786,7 +1803,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         cache.delete(f'deadline_sections:{privilege}:{owner}:{instance.pk if instance else None}')
 
         should_update_deadlines = self._get_should_update_deadlines(
-            subtype_changed, instance, attribute_data,
+            subtype_changed or draft_principles_changed, instance, attribute_data,
         )
         self.context['should_update_deadlines'] = \
             should_update_deadlines or should_generate_deadlines
@@ -1800,7 +1817,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             self.update_initial_data(validated_data)
             if attribute_data:
-                instance.update_attribute_data(attribute_data)
+                instance.update_attribute_data(attribute_data, confirmed_fields=confirmed_fields)
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
 
@@ -1817,9 +1834,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=user, preview_attributes=attribute_data)
+                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
             elif should_update_deadlines:
-                project.update_deadlines(user=user, preview_attributes=attribute_data)
+                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
 
