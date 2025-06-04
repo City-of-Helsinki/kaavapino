@@ -115,6 +115,7 @@ PHASE_SECTION_NAME = "tietoryhmä"
 PUBLIC_ATTRIBUTE = "tiedon julkisuus"  # kyllä/ei julkinen
 HELP_TEXT = "ohje tiedon syöttäjälle"
 HELP_LINK = "ohjeeseen liittyvä linkki"
+HELP_IMG_LINK = "ohjeeseen liittyvä kuvalinkki"
 
 # Project card related columns
 CARD_SECTION_NAME = "tieto näkyy projektikortissa; projektikortin osio"
@@ -825,6 +826,11 @@ class AttributeImporter:
                 help_link = row[self.column_index[HELP_LINK]].strip()
             except (IndexError, AttributeError):
                 help_link = None
+            
+            try:
+                help_img_link = row[self.column_index[HELP_IMG_LINK]].strip()
+            except (IndexError, AttributeError):
+                help_img_link = None
 
             is_public = row[self.column_index[PUBLIC_ATTRIBUTE]] == "kyllä"
             is_required = row[self.column_index[ATTRIBUTE_REQUIRED]] == "kyllä"
@@ -934,6 +940,7 @@ class AttributeImporter:
                     "hide_conditions": hide_conditions,
                     "help_text": help_text,
                     "help_link": help_link,
+                    "help_img_link": help_img_link,
                     "public": is_public,
                     "required": is_required,
                     "searchable": is_searchable,
