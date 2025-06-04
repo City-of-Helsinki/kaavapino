@@ -34,6 +34,7 @@ from projects.models import ProjectDocumentDownloadLog
 
 log = logging.getLogger(__name__)
 
+MAX_WIDTH_MM = 170  # Max InlineImage width
 DEFAULT_IMG_DPI = (72, 72)  # For cases where dpi value is not available in metadata
 
 
@@ -115,7 +116,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
         if isinstance(value, str):
             log.warning(f"Plain string found when processing richtext value: {value} (converted to dict)")
             value = {"ops": [{"insert": f"{value}"}] }
-
+        
         operations = value["ops"]
         ordered_counter = 0
 
@@ -270,25 +271,19 @@ def render_template(project, document_template, preview):
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
-                try:
-                    with PImage.open(value) as img:
-                        dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
-                        dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
-
-                    if "kansikuva" in attribute.identifier:
-                        width_mm = int((212/dpi) * 25.4)
-                        height_mm = int((172/dpi) * 25.4)
-                    elif attribute.identifier in ["sijaintikartta", "kaavakartta_a4", "havainnekuva", "kuvaliite_suojelukohteet", "ilmakuva"]:
-                        width_mm = int((170/dpi) * 25.4)
-                        height_mm = None
-                    else:
-                        width_mm = int((150/dpi) * 25.4)
-                        height_mm = None
-
-                    display_value = InlineImage(doc, value, width=Mm(width_mm) if width_mm else None, height=Mm(height_mm) if height_mm else None)
-                except (FileNotFoundError, UnidentifiedImageError):
-                    log.error(f'Image not found or is corrupted at {value}')
-                    display_value = None
+                if not "kansikuva" in attribute.identifier:
+                    try:
+                        with PImage.open(value) as img:
+                            width_px = img.width
+                            dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
+                            dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
+                        width_mm = int((width_px/dpi) * 25.4)
+                        display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else Mm(width_mm))
+                    except (FileNotFoundError, UnidentifiedImageError):
+                        log.error(f'Image not found or is corrupted at {value}')
+                        display_value = None
+                else:
+                    display_value = InlineImage(doc, value, width=Mm(212), height=Mm(172))
             else:
                 display_value = value
         else:
