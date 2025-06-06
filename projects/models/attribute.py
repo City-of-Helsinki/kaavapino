@@ -318,6 +318,7 @@ class Attribute(models.Model):
     )
     help_text = models.TextField(verbose_name=_("Help text"), blank=True)
     help_link = models.URLField(verbose_name=_("Help link"), max_length=2048, blank=True, null=True)
+    help_img_link = models.URLField(verbose_name=_("Help image link"), max_length=2048, blank=True, null=True)
     broadcast_changes = models.BooleanField(default=False)
     autofill_readonly = models.BooleanField(verbose_name=_("read-only autofill field"), null=True)
     autofill_rule = models.JSONField(
