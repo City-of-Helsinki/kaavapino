@@ -197,7 +197,8 @@ def get_color(preview,color,attributes):
     if preview:
         return color
     else:
-        return attributes.get("color", None)
+        return None
+
 def get_sub(_script):
     if _script == "sub":
         return True
