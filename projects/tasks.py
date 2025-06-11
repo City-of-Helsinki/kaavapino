@@ -40,7 +40,7 @@ def refresh_on_map_overview_cache():
             continue
 
         url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
-        if not project in active_projects and cache.get(url, False):
+        if project not in active_projects and cache.get(url, False):
             # Skip inactive projects that are already cached
             continue
 
