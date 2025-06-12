@@ -135,7 +135,7 @@ def update_paikkatieto(attribute_data, use_cached=True):
             )
             if response.status_code == 200:
                 paikkatieto_data = response.json()
-                cache.set(url, paikkatieto_data, 86400)  # 24 hours
+                cache.set(url, paikkatieto_data, None)  # Refreshed automatically with task
             else:
                 cache.set(url, "error", 900)  # 15 minutes
         except Timeout:
