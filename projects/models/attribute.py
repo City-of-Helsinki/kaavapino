@@ -4,6 +4,7 @@ import re
 from collections.abc import Sequence
 from collections import OrderedDict
 from html import escape
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -686,7 +687,8 @@ class Attribute(models.Model):
             else:
                 return '{:,}'.format(value).replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DECIMAL and self.unit in ["ha", "k-m2"]:
-            return '{:,}'.format(int(float(value))).replace(',', ' ')
+            return '{:,}'.format(int(Decimal(float(value)).to_integral_value(rounding=ROUND_HALF_UP)))\
+                .replace(',', ' ')
         elif self.value_type == Attribute.TYPE_DATE:
             try:
                 if isinstance(value, bool):

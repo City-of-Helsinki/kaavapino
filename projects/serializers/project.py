@@ -667,8 +667,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         url = f"{settings.KAAVOITUS_API_BASE_URL}/geoserver/v1/suunnittelualue/{identifier}"
         geoserver_data  = cache.get(url)
+        is_inactive = self.instance.modified_at <= timezone.now()-datetime.timedelta(days=7)
 
-        if not geoserver_data:
+        if not geoserver_data or is_inactive:
             try:
                 response = requests.get(
                     url,
@@ -676,7 +677,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 )
                 if response.status_code == 200:
                     geoserver_data = response.json()
-                    cache.set(url, geoserver_data, 86400)
+                    cache.set(url, geoserver_data, None)
                 else:
                     cache.set(url, "error", 3600)
             except Timeout:
