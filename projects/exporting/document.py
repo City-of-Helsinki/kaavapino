@@ -34,6 +34,7 @@ from projects.models import ProjectDocumentDownloadLog
 
 log = logging.getLogger(__name__)
 
+MAX_WIDTH_MM = 170  # Max InlineImage width
 DEFAULT_IMG_DPI = (72, 72)  # For cases where dpi value is not available in metadata
 
 
@@ -115,8 +116,9 @@ def get_rich_text_display_value(value, preview=False, **text_args):
         if isinstance(value, str):
             log.warning(f"Plain string found when processing richtext value: {value} (converted to dict)")
             value = {"ops": [{"insert": f"{value}"}] }
-
+        
         operations = value["ops"]
+        ordered_counter = 0
 
         for index, operation in enumerate(operations, start=1):
             insert = operation.get("insert", None)
@@ -134,7 +136,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                               color=color
                               )
                 continue
-            _color = get_color(preview,color,attributes)
+            _color = get_color(preview, color, attributes)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
             _sub = get_sub(_script)
@@ -144,6 +146,34 @@ def get_rich_text_display_value(value, preview=False, **text_args):
             _underline = attributes.get("underline", False)
             _strike = attributes.get("strike", False)
             _font = attributes.get("font", None)
+            _is_ordered = attributes.get("isOrderList", False)
+            _is_bulleted = attributes.get("isBulleted", False)
+
+            if "\n" in insert and (_is_ordered or _is_bulleted):
+                ordered_counter = 0
+                original, insert = insert.rsplit('\n', 1)
+                rich_text.add(original + "\n",
+                              color=_color,
+                              size=_size,
+                              subscript=_sub,
+                              superscript=_super,
+                              bold=_bold,
+                              italic=_italic,
+                              underline=_underline,
+                              strike=_strike,
+                              font=_font,
+                              url_id=url_id
+                              )
+
+            prefix = ""
+            if _is_ordered:
+                ordered_counter += 1
+                prefix = f'   {ordered_counter}. '
+            elif _is_bulleted:
+                prefix = f'   - '
+
+            if prefix:
+                rich_text.add(prefix, color=_color)
 
             rich_text.add(insert,
                           color=_color,
@@ -164,12 +194,11 @@ def get_rich_text_display_value(value, preview=False, **text_args):
     return rich_text
 
 def get_color(preview,color,attributes):
-    if not preview:
-        return None
-    elif color:
+    if preview:
         return color
     else:
-        return attributes.get("color", None)
+        return None
+
 def get_sub(_script):
     if _script == "sub":
         return True
@@ -243,25 +272,19 @@ def render_template(project, document_template, preview):
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
             if doc_type == 'docx':
-                try:
-                    with PImage.open(value) as img:
-                        dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
-                        dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
-
-                    if "kansikuva" in attribute.identifier:
-                        width_mm = int((212/dpi) * 25.4)
-                        height_mm = int((172/dpi) * 25.4)
-                    elif attribute.identifier in ["sijaintikartta", "kaavakartta_a4", "havainnekuva", "kuvaliite_suojelukohteet", "ilmakuva"]:
-                        width_mm = int((170/dpi) * 25.4)
-                        height_mm = None
-                    else:
-                        width_mm = int((150/dpi) * 25.4)
-                        height_mm = None
-
-                    display_value = InlineImage(doc, value, width=Mm(width_mm), height=Mm(height_mm))
-                except (FileNotFoundError, UnidentifiedImageError):
-                    log.error(f'Image not found or is corrupted at {value}')
-                    display_value = None
+                if not "kansikuva" in attribute.identifier:
+                    try:
+                        with PImage.open(value) as img:
+                            width_px = img.width
+                            dpi = float(img.info.get('dpi', DEFAULT_IMG_DPI)[0])
+                            dpi = dpi if dpi > 0 else DEFAULT_IMG_DPI[0]
+                        width_mm = int((width_px/dpi) * 25.4)
+                        display_value = InlineImage(doc, value, width=Mm(MAX_WIDTH_MM) if width_mm > MAX_WIDTH_MM else Mm(width_mm))
+                    except (FileNotFoundError, UnidentifiedImageError):
+                        log.error(f'Image not found or is corrupted at {value}')
+                        display_value = None
+                else:
+                    display_value = InlineImage(doc, value, width=Mm(212), height=Mm(172))
             else:
                 display_value = value
         else:
