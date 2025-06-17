@@ -72,26 +72,45 @@ class PersonnelList(APIView):
         #Ensure URL is properly constructed
         url = base_url + ("?" + "&".join(query_params) if query_params else "")
 
-        response = requests.get(
-            url,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "consistencyLevel": "eventual",  # ✅ Required for `endsWith`
-            },
-        )
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "ConsistencyLevel": "eventual",
+        }
+        
+        # Handle pagination inputs
+        try:
+            limit = int(request.query_params.get("limit", "100"))
+            offset = int(request.query_params.get("offset", "0"))
+        except ValueError:
+            return Response("Invalid limit or offset", status=status.HTTP_400_BAD_REQUEST)
 
-        if response.status_code == 200:
-            return Response(PersonnelSerializer(
-                response.json().get("value", []),
-                many=True,
-            ).data)
-        elif response.status_code == 401:
-            return Response(
-                "Kaavapino server not authorized to access users",
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        else:
-            return Response(f"Bad request: {response.text}", status=status.HTTP_400_BAD_REQUEST)
+        max_required = offset + limit
+        results = []
+        next_url = url
+
+        # Fetch pages until we have enough or run out
+        while next_url and len(results) < max_required:
+            response = requests.get(next_url, headers=headers)
+
+            if response.status_code == 401:
+                return Response(
+                    "Kaavapino server not authorized to access users",
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            elif response.status_code != 200:
+                return Response(f"Bad request: {response.text}", status=status.HTTP_400_BAD_REQUEST)
+
+            data = response.json()
+            page = data.get("value", [])
+            results.extend(page)
+            next_url = data.get("@odata.nextLink")
+
+        paginated_results = results[offset:offset + limit]
+
+        return Response(PersonnelSerializer(
+            paginated_results,
+            many=True,
+        ).data)
 
 
 class PersonnelDetail(APIView):
