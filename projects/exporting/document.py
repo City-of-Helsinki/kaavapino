@@ -82,6 +82,37 @@ def get_attribute_subtitle(target_identifier, target_phase_id, project):
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
+def get_first_editable_phase( project, attribute, target_identifier):
+    def is_editable_in_phase(phase, attribute):
+        if not attribute:
+            return False
+        categorization = attribute.categorizations.filter(
+                        common_project_phase=phase.common_project_phase,
+                        includes_principles=project.create_principles,
+                        includes_draft=project.create_draft
+                    ).first()
+        
+        return categorization and not (
+            "katsottava tieto" in categorization.value.lower() or 
+            "päivitettävä tieto in " in categorization.value.lower())
+
+    target_attribute = Attribute.objects.get(identifier=target_identifier) if target_identifier else None
+    use_target_attribute = False
+
+    if not (is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute)):
+        # If field appears in multiple sections, find the first occurance where it is editable
+        phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=attribute.identifier,
+            project_subtype=project.subtype,).order_by("index")
+        if not phase_queryset:
+            # use target_attribute if regular not found (likely inside fieldset)
+            phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=target_identifier,
+            project_subtype=project.subtype,).order_by("index")
+            use_target_attribute = True
+        for phase in phase_queryset:
+            if is_editable_in_phase(phase, target_attribute if use_target_attribute else attribute):
+                return phase
+    return get_closest_phase(project, attribute.identifier, target_identifier)
+
 
 def get_closest_phase(project, identifier, parent_identifier=None):
     if parent_identifier == "vastuuhenkilo_nimi":
@@ -314,7 +345,7 @@ def render_template(project, document_template, preview):
                 target_section_name = None
                 if target_identifier:
                     try:
-                        target_phase_id = get_closest_phase(project, attribute.identifier,target_identifier).id
+                        target_phase_id = get_first_editable_phase(project, attribute, target_identifier).id
                         target_section_name = get_attribute_subtitle(target_identifier, target_phase_id, project)
                     except AttributeError:
                         pass
