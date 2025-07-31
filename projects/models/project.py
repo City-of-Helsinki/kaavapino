@@ -270,12 +270,6 @@ class Project(models.Model):
     def update_attribute_data(self, data, confirmed_fields=None, fake=False):
         confirmed_fields = confirmed_fields or []
 
-        for attr_id, value in data.items():
-            if attr_id in confirmed_fields:
-                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
-
-            self.attribute_data[attr_id] = value
-
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
 
@@ -289,6 +283,10 @@ class Project(models.Model):
                 log.warning(f"Attribute {identifier} not found")
                 continue
 
+            if identifier in confirmed_fields:
+                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
+
+            self.attribute_data[identifier] = value
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 geometry_query_params = {"attribute": attribute, "project": self}
                 if not value:
