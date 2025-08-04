@@ -87,6 +87,7 @@ def test_get_attribute_data(request_data, project, attribute_data):
         **(
             {
                 "kaavaprosessin_kokoluokka": project.subtype.name,
+                "kaavaprosessin_kokoluokka_readonly": project.subtype.name,
                 "kaavan_vaihe": project.phase.prefixed_name,
             }
             if project else {}
