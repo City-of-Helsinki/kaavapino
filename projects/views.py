@@ -381,52 +381,72 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         detail=True,
         permission_classes=[IsAuthenticated, ProjectPermissions],
     )
-    def simple_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
-        project = ProjectSerializer(self.get_object(), context={"request": request}).data
+    def attribute_data_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
+        project = self.get_object()
         attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
-        response = {
-            "project_name": project.get("name"),
-        }
-        attribute_data = project.get("attribute_data", None)
+        attribute_data = project.attribute_data
         if not attribute_data:
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        set_ad_data_in_attribute_data(attribute_data)
-        set_geoserver_data_in_attribute_data(attribute_data)
+        cache_key = f'attribute_data_filtered_{self.get_object().pk}'
+        response = cache.get(cache_key)
 
-        for key, value in attribute_data.items():
-            attribute = attributes.get(key)
-            if not attribute or not attribute.api_visibility:
-                continue
+        if not response:
+            response = {}
+            set_ad_data_in_attribute_data(attribute_data)
+            set_geoserver_data_in_attribute_data(attribute_data)
 
-            if not value:
-                continue
+            for key, value in attribute_data.items():
+                attribute = attributes.get(key)
+                if not attribute or not attribute.api_visibility:
+                    continue
 
-            if attribute.value_type == Attribute.TYPE_FIELDSET:
-                fieldset = []
-                for entry in value:  # fieldset
-                    fieldset_obj = {}
-                    for k, v in entry.items():
-                        fieldset_attr = attributes.get(k, None)
-                        if not fieldset_attr or not fieldset_attr.api_visibility:
+                if not value:
+                    continue
+
+                name = attribute.name
+
+                if attribute.value_type == Attribute.TYPE_FIELDSET:
+                    fieldset = []
+                    for entry in value:  # fieldset
+                        fieldset_obj = {}
+                        deleted = entry.get('_deleted', False)
+                        if deleted:
                             continue
-                        if fieldset_attr.value_type == Attribute.TYPE_PERSONNEL:
-                            v = get_in_personnel_data(v, "name", False)
-                        elif fieldset_attr.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-                            v = "".join([item["insert"] for item in v["ops"]]).strip()
-                        fieldset_obj[k] = v
-                    if fieldset_obj:
-                        fieldset.append(fieldset_obj)
-                if fieldset:
-                    response[key] = fieldset
-            elif attribute.value_type == Attribute.TYPE_USER:
-                response[key] = get_in_personnel_data(value, "name", True)
-            elif attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-                response[key] = "".join([item["insert"] for item in value["ops"]]).strip()
-            else:
-                response[key] = value
+                        for k, v in entry.items():
+                            fieldset_attr = attributes.get(k, None)
+                            if not fieldset_attr or not fieldset_attr.api_visibility:
+                                continue
+                            if fieldset_attr.value_type == Attribute.TYPE_PERSONNEL:
+                                v = get_in_personnel_data(v, "name", False)
+                            elif fieldset_attr.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+                                v = "".join([item["insert"] for item in v["ops"]]).strip() if v else None
+                            fieldset_obj[k] = v
+                        if fieldset_obj:
+                            fieldset.append(fieldset_obj)
+                    if fieldset:
+                        response[name] = fieldset
+                elif attribute.value_type == Attribute.TYPE_USER:
+                    response[name] = get_in_personnel_data(value, "name", True)
+                elif attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
+                    try:
+                        response[name] = "".join([item["insert"] for item in value["ops"]]).strip()
+                    except TypeError:
+                        response[name] = value
+                else:
+                    response[name] = value
+            cache.set(cache_key, response, 60 * 60 * 6)
 
         return Response(response)
+
+    @action(
+        methods=['get'],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+    )
+    def pino_numbers(self, request):
+        pino_numbers = Project.objects.values_list('pino_number', flat=True)
+        return Response(pino_numbers)
 
     @extend_schema(
         request=ProjectFileSerializer,

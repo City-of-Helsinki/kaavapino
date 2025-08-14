@@ -173,12 +173,14 @@ class ReportColumn(models.Model):
         for identifier in identifiers:
             try:
                 attribute = Attribute.objects.get(identifier=identifier)
-                postfix = postfix.replace(
-                    "{"+identifier+"}",
-                    attribute.get_attribute_display(
-                        attribute_data.pop(identifier, "")
-                    ),
+                attribute_display = attribute.get_attribute_display(
+                    attribute_data.pop(identifier, "")
                 )
+                if attribute_display is not None:
+                    postfix = postfix.replace(
+                        "{" + identifier + "}",
+                        attribute_display,
+                    )
             except Attribute.DoesNotExist:
                 pass
 
