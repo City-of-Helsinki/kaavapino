@@ -335,6 +335,7 @@ class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
         return phase.projects.filter(
             self.context.get("query", Q()),
             public=True,
+            onhold=False,
         ).count()
 
     def get_projects(self, phase):
@@ -342,6 +343,7 @@ class ProjectPhaseOverviewSerializer(serializers.ModelSerializer):
             phase.projects.filter(
                 self.context.get("query", Q()),
                 public=True,
+                onhold=False,
             ).select_related("subtype", "subtype__project_type", "user"),
             many=True,
         ).data
