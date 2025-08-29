@@ -738,6 +738,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 unitquery,
                 project__subtype_id__in=projectsize_int,
                 project__public=True,
+                project__onhold=False,
                 deadline__attribute__identifier__in=suggested_date_attrs,
                 date__gte=start_date,
                 date__lte=end_date,
@@ -773,6 +774,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 unitquery,
                 project__subtype_id__in=projectsize_int,
                 project__public=True,
+                project__onhold=False,
                 deadline__attribute__identifier__in=meeting_attrs,
                 date__gte=start_date,
                 date__lte=end_date,
@@ -790,6 +792,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     Q(attribute_data__hyvaksymispaatos_pvm__lte=date)
                     ),
                     public=True,
+                    onhold=False,
                     pk__in=[p.pk for p in projects_in_range],
                 ).order_by("pk")
                 for date in date_range
@@ -937,7 +940,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def overview_on_map(self, request):
         valid_filters = self._get_valid_filters("filters_on_map")
         query = self._get_query(valid_filters)
-        queryset = Project.objects.filter(query, public=True)\
+        queryset = Project.objects.filter(query, public=True, onhold=False)\
             .prefetch_related("phase", "phase__common_project_phase", "phase__project_subtype",
                               "subtype", "subtype__project_type",
                               "user",
