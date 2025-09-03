@@ -514,8 +514,14 @@ class ProjectListSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(ProjectDeadlineSerializer(many=True))
     def get_deadlines(self, project):
-        project_schedule_cache = self.context["project_schedule_cache"]
-        return project_schedule_cache.get(project.pk, [])
+        project_schedule_cache = self.context.get("project_schedule_cache", {})
+        if project.pk in project_schedule_cache:
+            return project_schedule_cache[project.pk]
+        schedule_data = ProjectDeadlineSerializer(project.deadlines, many=True, allow_null=True, required=False).data
+        schedule_cache = cache.get("serialized_project_schedules", {})
+        schedule_cache[project.pk] = schedule_data
+        cache.set("serialized_project_schedules", schedule_cache, None)
+        return schedule_data
 
     @extend_schema_field(ProjectPrioritySerializer(many=False))
     def get_priority(self, project):
