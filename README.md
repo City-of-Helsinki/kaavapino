@@ -5,7 +5,7 @@ Project management system for city planning projects.
 
 * PostgreSQL (>= 9.3)
 * Python (>= 3.6)
-
+ 
 ## Development
 
 It is possible to either use `docker-compose` or set up the development environment manually
