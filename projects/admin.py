@@ -5,7 +5,7 @@ from django.contrib import admin, messages
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.db import transaction
 from django.utils import timezone
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import gettext_lazy as _
 from django.core.cache import cache
 
 from projects.models import (
