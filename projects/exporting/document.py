@@ -32,6 +32,8 @@ from projects.helpers import (
 )
 from projects.models import ProjectDocumentDownloadLog
 
+from time import time
+
 log = logging.getLogger(__name__)
 
 MAX_WIDTH_MM = 170  # Max InlineImage width
@@ -59,10 +61,7 @@ def _set_fieldset_path(fieldset_path, attribute_data_display, identifier, value)
 
 
 def get_top_level_attribute(attribute):
-    if not attribute.fieldsets.count():
-        return attribute
-    else:
-        return get_top_level_attribute(attribute.fieldsets.first())
+    return attribute.fieldsets.first() or attribute
 
 
 def get_attribute_subtitle(target_identifier, target_phase_id, project):
@@ -82,7 +81,7 @@ def get_attribute_subtitle(target_identifier, target_phase_id, project):
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
-def get_first_editable_phase( project, attribute, target_identifier):
+def get_first_editable_phase(project, attribute, target_identifier):
     def is_editable_in_phase(phase, attribute):
         if not attribute:
             return False
@@ -96,7 +95,8 @@ def get_first_editable_phase( project, attribute, target_identifier):
             "katsottava tieto" in categorization.value.lower() or 
             "päivitettävä tieto in " in categorization.value.lower())
 
-    target_attribute = Attribute.objects.get(identifier=target_identifier) if target_identifier else None
+    target_attribute = Attribute.objects.prefetch_related("categorizations").get(identifier=target_identifier) \
+        if target_identifier else None
     use_target_attribute = False
 
     if not (is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute)):
@@ -241,6 +241,7 @@ def get_super(_script):
     else:
         return False
 def render_template(project, document_template, preview):
+    start_time = time()
     doc_type = get_file_type(document_template.file.path)
 
     if doc_type == 'docx':
@@ -250,7 +251,7 @@ def render_template(project, document_template, preview):
 
     attribute_data_display = {}
     attribute_element_data = {}
-    attributes = {a.identifier: a for a in Attribute.objects.all()}
+    attributes = {a.identifier: a for a in Attribute.objects.all().prefetch_related('fieldsets', 'categorizations')}
 
     def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
@@ -405,8 +406,10 @@ def render_template(project, document_template, preview):
         display_value, raw_value, element_data, raw_to_display_mapped = get_display_and_raw_value(attr, value)
         return identifier, display_value, raw_value, element_data, raw_to_display_mapped
 
-    full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in Attribute.objects.all()]
+    full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in Attribute.objects.all()\
+                           .prefetch_related('fieldsets', 'categorizations')]
 
+    processing_start_time = time()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_to_attr = {executor.submit(process_attribute, attr): attr for attr, _ in full_attribute_data}
         for future in concurrent.futures.as_completed(future_to_attr):
@@ -420,6 +423,7 @@ def render_template(project, document_template, preview):
             if raw_to_display_mapped:
                 attribute_data_display[identifier + "__map"] = raw_to_display_mapped
 
+    print(f"Processing attributes took {time() - processing_start_time} seconds")
     attribute_files = ProjectAttributeFile.objects \
         .filter(project=project, archived_at=None) \
         .order_by(
@@ -486,6 +490,10 @@ def render_template(project, document_template, preview):
 
     output = None
 
+
+    prep_time = time()
+    print(f"Preparation of document {document_template.name} for project {project.name} took {prep_time - start_time} seconds")
+
     if doc_type == 'docx':
         try:
             doc.render(attribute_data_display, jinja_env)
@@ -507,7 +515,9 @@ def render_template(project, document_template, preview):
             document_template=document_template,
             phase=project.phase.common_project_phase,
         )
-
+    end_time = time()
+    print(f"Rendering of document {document_template.name} for project {project.name} took {end_time - prep_time} seconds")
+    print(f"Total time for document {document_template.name} for project {project.name} was {end_time - start_time} seconds")
     return output.getvalue() if output else "error"
 
 
