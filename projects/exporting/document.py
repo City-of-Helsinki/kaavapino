@@ -82,7 +82,7 @@ def get_attribute_subtitle(target_identifier, target_phase_id, project):
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
-def get_first_editable_phase(project, attribute, target_identifier):
+def get_first_editable_phase(project, attribute, target_attribute):
     def is_editable_in_phase(phase, attribute):
         if not attribute:
             return False
@@ -91,13 +91,10 @@ def get_first_editable_phase(project, attribute, target_identifier):
                         includes_principles=project.create_principles,
                         includes_draft=project.create_draft
                     ).first()
-        
         return categorization and not (
             "katsottava tieto" in categorization.value.lower() or 
             "päivitettävä tieto in " in categorization.value.lower())
-
-    target_attribute = Attribute.objects.prefetch_related("categorizations").get(identifier=target_identifier) \
-        if target_identifier else None
+    target_identifier = target_attribute.identifier if target_attribute else None
     use_target_attribute = False
 
     if not (is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute)):
@@ -371,17 +368,17 @@ def render_template(project, document_template, preview):
                 target_property = None
 
                 if attribute.static_property and not attribute.static_property == "pino_number":
-                    target_identifier = None
+                    target_attribute = None
                     target_property = attribute.static_property
                 else:
-                    target_identifier = \
-                        get_top_level_attribute(attribute).identifier
+                    target_attribute = get_top_level_attribute(attribute)
 
                 target_phase_id = None
                 target_section_name = None
+                target_identifier = target_attribute.identifier if target_attribute else None
                 if target_identifier:
                     try:
-                        target_phase_id = get_first_editable_phase(project, attribute, target_identifier).id
+                        target_phase_id = get_first_editable_phase(project, attribute, target_attribute).id
                         target_section_name = get_attribute_subtitle(target_identifier, target_phase_id, project)
                     except AttributeError:
                         pass
