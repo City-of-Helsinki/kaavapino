@@ -241,6 +241,34 @@ def get_super(_script):
     else:
         return False
 def render_template(project, document_template, preview):
+
+    def fetch_relevant_attributes(doc):
+        variables = list(doc.get_undeclared_template_variables())
+        for i,var in enumerate(variables):
+            if '__raw' in var:
+                variables[i] = var.replace('__raw','')
+            if '__map' in var:
+                variables[i] = var.replace('__map','')
+
+        base_qs = Attribute.objects.filter(identifier__in=variables).prefetch_related(
+            'fieldsets', 'categorizations', 'fieldset_attributes',
+            'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+        )
+        # Collect identifiers for nested fieldset attributes
+        fieldset_attrs = [a for a in base_qs if a.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]]
+        nested_ids = set()
+        for attr in fieldset_attrs:
+            nested_ids.update(attr.fieldset_attributes.values_list('identifier', flat=True))
+        if nested_ids:
+            nested_qs = Attribute.objects.filter(identifier__in=nested_ids).prefetch_related(
+                'fieldsets', 'categorizations', 'fieldset_attributes',
+                'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+            )
+            return list(base_qs) + list(nested_qs)
+        else:
+            return list(base_qs)
+
+
     start_time = time()
     doc_type = get_file_type(document_template.file.path)
 
@@ -251,7 +279,7 @@ def render_template(project, document_template, preview):
 
     attribute_data_display = {}
     attribute_element_data = {}
-    attributes = {a.identifier: a for a in Attribute.objects.all().prefetch_related('fieldsets', 'categorizations')}
+    relevant_attributes = {a.identifier: a for a in fetch_relevant_attributes(doc)}
 
     def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
@@ -263,7 +291,7 @@ def render_template(project, document_template, preview):
             for index, fieldset_item in enumerate(value) if value else []:
                 fieldset_object = {}
                 for k, v in fieldset_item.items():
-                    item_attr = attributes.get(k)
+                    item_attr = relevant_attributes.get(k)
                     if fieldset_item.get("_deleted") or not item_attr:
                         continue
 
@@ -406,8 +434,7 @@ def render_template(project, document_template, preview):
         display_value, raw_value, element_data, raw_to_display_mapped = get_display_and_raw_value(attr, value)
         return identifier, display_value, raw_value, element_data, raw_to_display_mapped
 
-    full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in Attribute.objects.all()\
-                           .prefetch_related('fieldsets', 'categorizations')]
+    full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in relevant_attributes.values()]
 
     processing_start_time = time()
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -425,7 +452,7 @@ def render_template(project, document_template, preview):
 
     print(f"Processing attributes took {time() - processing_start_time} seconds")
     attribute_files = ProjectAttributeFile.objects \
-        .filter(project=project, archived_at=None) \
+        .filter(project=project, archived_at=None, attribute__identifier__in=relevant_attributes.keys()) \
         .order_by(
             "fieldset_path_str",
             "attribute__pk",
