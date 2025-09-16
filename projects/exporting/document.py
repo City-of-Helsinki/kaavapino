@@ -95,18 +95,19 @@ def get_first_editable_phase(project, attribute, target_attribute):
     target_identifier = target_attribute.identifier if target_attribute else None
     use_target_attribute = False
 
-    if not (is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute)):
-        # If field appears in multiple sections, find the first occurance where it is editable
-        phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=attribute.identifier,
-            project_subtype=project.subtype,).order_by("index")
-        if not phase_queryset:
-            # use target_attribute if regular not found (likely inside fieldset)
-            phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=target_identifier,
-            project_subtype=project.subtype,).order_by("index")
-            use_target_attribute = True
-        for phase in phase_queryset:
-            if is_editable_in_phase(phase, target_attribute if use_target_attribute else attribute):
-                return phase
+    if is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute):
+        return get_closest_phase(project, attribute.identifier, target_identifier)
+    # If field appears in multiple sections, find the first occurance where it is editable
+    phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=attribute.identifier,
+        project_subtype=project.subtype,).order_by("index")
+    if not phase_queryset:
+        # use target_attribute if regular not found (likely inside fieldset)
+        phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=target_identifier,
+        project_subtype=project.subtype,).order_by("index")
+        use_target_attribute = True
+    for phase in phase_queryset:
+        if is_editable_in_phase(phase, target_attribute if use_target_attribute else attribute):
+            return phase
     return get_closest_phase(project, attribute.identifier, target_identifier)
 
 
