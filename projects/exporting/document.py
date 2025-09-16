@@ -33,8 +33,6 @@ from projects.helpers import (
 )
 from projects.models import ProjectDocumentDownloadLog
 
-from time import time
-
 log = logging.getLogger(__name__)
 
 MAX_WIDTH_MM = 170  # Max InlineImage width
@@ -272,8 +270,6 @@ def render_template(project, document_template, preview):
             return list(base_qs)
 
 
-    start_time = time()
-    print("Starting render")
     doc_type = get_file_type(document_template.file.path)
 
     if doc_type == 'docx':
@@ -284,7 +280,6 @@ def render_template(project, document_template, preview):
     attribute_data_display = {}
     attribute_element_data = {}
     relevant_attributes = {a.identifier: a for a in fetch_relevant_attributes(doc)}
-    print("Relevant attributes fetched in ", time() - start_time, "seconds")
     def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
         text_args = None
@@ -440,7 +435,6 @@ def render_template(project, document_template, preview):
 
     full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in relevant_attributes.values()]
 
-    processing_start_time = time()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_to_attr = {executor.submit(process_attribute, attr): attr for attr, _ in full_attribute_data}
         for future in concurrent.futures.as_completed(future_to_attr):
@@ -454,7 +448,6 @@ def render_template(project, document_template, preview):
             if raw_to_display_mapped:
                 attribute_data_display[identifier + "__map"] = raw_to_display_mapped
 
-    print(f"Processing attributes took {time() - processing_start_time} seconds")
     attribute_files = ProjectAttributeFile.objects \
         .filter(project=project, archived_at=None, attribute__identifier__in=relevant_attributes.keys()) \
         .order_by(
@@ -521,10 +514,6 @@ def render_template(project, document_template, preview):
 
     output = None
 
-
-    prep_time = time()
-    print(f"Preparation of document {document_template.name} for project {project.name} took {prep_time - start_time} seconds")
-
     if doc_type == 'docx':
         try:
             doc.render(attribute_data_display, jinja_env)
@@ -546,9 +535,6 @@ def render_template(project, document_template, preview):
             document_template=document_template,
             phase=project.phase.common_project_phase,
         )
-    end_time = time()
-    print(f"Rendering of document {document_template.name} for project {project.name} took {end_time - prep_time} seconds")
-    print(f"Total time for document {document_template.name} for project {project.name} was {end_time - start_time} seconds")
     return output.getvalue() if output else "error"
 
 
