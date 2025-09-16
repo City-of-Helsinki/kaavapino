@@ -17,6 +17,7 @@ from pptx.parts.image import Image
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
+from django.core.cache import cache
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
 from PIL import Image as PImage, UnidentifiedImageError
@@ -243,12 +244,17 @@ def get_super(_script):
 def render_template(project, document_template, preview):
 
     def fetch_relevant_attributes(doc):
-        variables = list(doc.get_undeclared_template_variables())
-        for i,var in enumerate(variables):
-            if '__raw' in var:
-                variables[i] = var.replace('__raw','')
-            if '__map' in var:
-                variables[i] = var.replace('__map','')
+        cached_vars = cache.get(f"document_template_variables:{doc.template_file.path}", None)
+        if cached_vars:
+            variables = cached_vars
+        else:
+            variables = list(doc.get_undeclared_template_variables())
+            for i,var in enumerate(variables):
+                if '__raw' in var:
+                    variables[i] = var.replace('__raw','')
+                if '__map' in var:
+                    variables[i] = var.replace('__map','')
+            cache.set(f"document_template_variables:{doc.template_file.path}", variables, 3600*24*7)
 
         base_qs = Attribute.objects.filter(identifier__in=variables).prefetch_related(
             'fieldsets', 'categorizations', 'fieldset_attributes',
@@ -270,6 +276,7 @@ def render_template(project, document_template, preview):
 
 
     start_time = time()
+    print("Starting render")
     doc_type = get_file_type(document_template.file.path)
 
     if doc_type == 'docx':
@@ -280,7 +287,7 @@ def render_template(project, document_template, preview):
     attribute_data_display = {}
     attribute_element_data = {}
     relevant_attributes = {a.identifier: a for a in fetch_relevant_attributes(doc)}
-
+    print("Relevant attributes fetched in ", time() - start_time, "seconds")
     def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
         text_args = None
