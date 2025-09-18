@@ -1,0 +1,55 @@
+name: Unit Tests
+
+on: pull_request
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:13-3.1
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        ports: ["5432:5432"]
+      
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+
+    env:
+      DATABASE_URL: postgres://test_user:test_pass@localhost:5432/test_db
+      DJANGO_SETTINGS_MODULE: kaavapino.settings
+      SECRET_KEY: dummy  # Required by Django
+      ALLOWED_HOSTS: "*"
+      REDIS_SENTINELS: ""
+      CORS_ALLOWED_ORIGINS: ""
+      CSRF_TRUSTED_ORIGINS: ""
+      GRAPH_API_LOGIN_BASE_URL: https://login.microsoftonline.com
+      GRAPH_API_TENANT_ID: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install GeoDjango packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libproj-dev gdal-bin
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: "1.8.5"
+
+      - name: Install dependencies
+        run: |
+          poetry install --no-root
+      - name: Run tests
+        run: poetry run pytest

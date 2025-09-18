@@ -43,8 +43,9 @@ def f_user():
 def f_admin(f_user, f_admin_group):
     f_user.is_superuser = True
     f_user.is_staff = True
-    f_user.save()
     f_user.additional_groups.set([f_admin_group])
+    f_user.privilege = "admin"
+    f_user.save()
     return f_user
 
 

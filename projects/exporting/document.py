@@ -17,6 +17,7 @@ from pptx.parts.image import Image
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
+from django.core.cache import cache
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
 from PIL import Image as PImage, UnidentifiedImageError
@@ -59,10 +60,7 @@ def _set_fieldset_path(fieldset_path, attribute_data_display, identifier, value)
 
 
 def get_top_level_attribute(attribute):
-    if not attribute.fieldsets.count():
-        return attribute
-    else:
-        return get_top_level_attribute(attribute.fieldsets.first())
+    return attribute.fieldsets.first() or attribute
 
 
 def get_attribute_subtitle(target_identifier, target_phase_id, project):
@@ -82,7 +80,7 @@ def get_attribute_subtitle(target_identifier, target_phase_id, project):
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
-def get_first_editable_phase( project, attribute, target_identifier):
+def get_first_editable_phase(project, attribute, target_attribute):
     def is_editable_in_phase(phase, attribute):
         if not attribute:
             return False
@@ -91,26 +89,25 @@ def get_first_editable_phase( project, attribute, target_identifier):
                         includes_principles=project.create_principles,
                         includes_draft=project.create_draft
                     ).first()
-        
         return categorization and not (
             "katsottava tieto" in categorization.value.lower() or 
             "päivitettävä tieto in " in categorization.value.lower())
-
-    target_attribute = Attribute.objects.get(identifier=target_identifier) if target_identifier else None
+    target_identifier = target_attribute.identifier if target_attribute else None
     use_target_attribute = False
 
-    if not (is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute)):
-        # If field appears in multiple sections, find the first occurance where it is editable
-        phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=attribute.identifier,
-            project_subtype=project.subtype,).order_by("index")
-        if not phase_queryset:
-            # use target_attribute if regular not found (likely inside fieldset)
-            phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=target_identifier,
-            project_subtype=project.subtype,).order_by("index")
-            use_target_attribute = True
-        for phase in phase_queryset:
-            if is_editable_in_phase(phase, target_attribute if use_target_attribute else attribute):
-                return phase
+    if is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute):
+        return get_closest_phase(project, attribute.identifier, target_identifier)
+    # If field appears in multiple sections, find the first occurance where it is editable
+    phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=attribute.identifier,
+        project_subtype=project.subtype,).order_by("index")
+    if not phase_queryset:
+        # use target_attribute if regular not found (likely inside fieldset)
+        phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=target_identifier,
+        project_subtype=project.subtype,).order_by("index")
+        use_target_attribute = True
+    for phase in phase_queryset:
+        if is_editable_in_phase(phase, target_attribute if use_target_attribute else attribute):
+            return phase
     return get_closest_phase(project, attribute.identifier, target_identifier)
 
 
@@ -241,6 +238,39 @@ def get_super(_script):
     else:
         return False
 def render_template(project, document_template, preview):
+
+    def fetch_relevant_attributes(doc):
+        cached_vars = cache.get(f"document_template_variables:{doc.template_file.path}", None)
+        if cached_vars:
+            variables = cached_vars
+        else:
+            variables = list(doc.get_undeclared_template_variables())
+            for i,var in enumerate(variables):
+                if '__raw' in var:
+                    variables[i] = var.replace('__raw','')
+                if '__map' in var:
+                    variables[i] = var.replace('__map','')
+            cache.set(f"document_template_variables:{doc.template_file.path}", variables, 3600*24*7)
+
+        base_qs = Attribute.objects.filter(identifier__in=variables).prefetch_related(
+            'fieldsets', 'categorizations', 'fieldset_attributes',
+            'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+        )
+        # Collect identifiers for nested fieldset attributes
+        fieldset_attrs = [a for a in base_qs if a.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]]
+        nested_ids = set()
+        for attr in fieldset_attrs:
+            nested_ids.update(attr.fieldset_attributes.values_list('identifier', flat=True))
+        if nested_ids:
+            nested_qs = Attribute.objects.filter(identifier__in=nested_ids).prefetch_related(
+                'fieldsets', 'categorizations', 'fieldset_attributes',
+                'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+            )
+            return list(base_qs) + list(nested_qs)
+        else:
+            return list(base_qs)
+
+
     doc_type = get_file_type(document_template.file.path)
 
     if doc_type == 'docx':
@@ -250,8 +280,7 @@ def render_template(project, document_template, preview):
 
     attribute_data_display = {}
     attribute_element_data = {}
-    attributes = {a.identifier: a for a in Attribute.objects.all()}
-
+    relevant_attributes = {a.identifier: a for a in fetch_relevant_attributes(doc)}
     def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
         text_args = None
@@ -262,7 +291,7 @@ def render_template(project, document_template, preview):
             for index, fieldset_item in enumerate(value) if value else []:
                 fieldset_object = {}
                 for k, v in fieldset_item.items():
-                    item_attr = attributes.get(k)
+                    item_attr = relevant_attributes.get(k)
                     if fieldset_item.get("_deleted") or not item_attr:
                         continue
 
@@ -335,17 +364,17 @@ def render_template(project, document_template, preview):
                 target_property = None
 
                 if attribute.static_property and not attribute.static_property == "pino_number":
-                    target_identifier = None
+                    target_attribute = None
                     target_property = attribute.static_property
                 else:
-                    target_identifier = \
-                        get_top_level_attribute(attribute).identifier
+                    target_attribute = get_top_level_attribute(attribute)
 
                 target_phase_id = None
                 target_section_name = None
+                target_identifier = target_attribute.identifier if target_attribute else None
                 if target_identifier:
                     try:
-                        target_phase_id = get_first_editable_phase(project, attribute, target_identifier).id
+                        target_phase_id = get_first_editable_phase(project, attribute, target_attribute).id
                         target_section_name = get_attribute_subtitle(target_identifier, target_phase_id, project)
                     except AttributeError:
                         pass
@@ -405,7 +434,7 @@ def render_template(project, document_template, preview):
         display_value, raw_value, element_data, raw_to_display_mapped = get_display_and_raw_value(attr, value)
         return identifier, display_value, raw_value, element_data, raw_to_display_mapped
 
-    full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in Attribute.objects.all()]
+    full_attribute_data = [(attr, attribute_data.get(attr.identifier)) for attr in relevant_attributes.values()]
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_to_attr = {executor.submit(process_attribute, attr): attr for attr, _ in full_attribute_data}
@@ -421,7 +450,7 @@ def render_template(project, document_template, preview):
                 attribute_data_display[identifier + "__map"] = raw_to_display_mapped
 
     attribute_files = ProjectAttributeFile.objects \
-        .filter(project=project, archived_at=None) \
+        .filter(project=project, archived_at=None, attribute__identifier__in=relevant_attributes.keys()) \
         .order_by(
             "fieldset_path_str",
             "attribute__pk",
@@ -507,7 +536,6 @@ def render_template(project, document_template, preview):
             document_template=document_template,
             phase=project.phase.common_project_phase,
         )
-
     return output.getvalue() if output else "error"
 
 
