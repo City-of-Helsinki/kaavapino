@@ -77,3 +77,6 @@ pytest-django = "4.5.2"
 pytest-lazy-fixture = "0.6.3"
 factory_boy = "3.2.1"
 pytest-factoryboy = "2.1.0"
+
+[tool.coverage.run]
+omit = ["*/migrations/*", "schema.py", "wsgi.py", "louhi.py", "manage.py", "*/tests/*"]
