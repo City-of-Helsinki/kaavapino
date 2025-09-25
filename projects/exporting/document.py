@@ -280,7 +280,8 @@ def render_template(project, document_template, preview):
 
     attribute_data_display = {}
     attribute_element_data = {}
-    relevant_attributes = {a.identifier: a for a in fetch_relevant_attributes(doc)}
+    relevant_attributes = {a.identifier: a for a in 
+                           (fetch_relevant_attributes(doc) if doc else Attribute.objects.all())}
     def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
         text_args = None
