@@ -604,3 +604,12 @@ class ReportFilterAttributeChoice(models.Model):
 
     def __str__(self):
         return f"{self.report_filter}: {self.name}"
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+auditlog.register(Report)
+auditlog.register(ReportColumn)
+auditlog.register(ReportColumnPostfix)
+auditlog.register(ReportFilter)
+auditlog.register(ReportFilterAttributeChoice)

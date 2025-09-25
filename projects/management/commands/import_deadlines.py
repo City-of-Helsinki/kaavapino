@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from projects.importing import DeadlineImporter, DeadlineImporterException
-
+from auditlog.context import disable_auditlog
 
 class Command(BaseCommand):
     help = "Import deadlines from Excel file"
@@ -14,8 +14,9 @@ class Command(BaseCommand):
         parser.add_argument("--kv", nargs="?", default="1.1", type=str)
 
     def handle(self, *args, **options):
-        attribute_importer = DeadlineImporter(options)
+        deadline_importer = DeadlineImporter(options)
         try:
-            attribute_importer.run()
+            with disable_auditlog():
+                deadline_importer.run()
         except DeadlineImporterException as e:
             raise CommandError(e)

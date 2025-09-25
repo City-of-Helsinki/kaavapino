@@ -120,3 +120,9 @@ class GroupPrivilege(models.Model):
             self.group.name,
             dict(PRIVILEGE_LEVELS)[self.privilege_level],
         )
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+auditlog.register(User, mask_fields=["password"])
+auditlog.register(GroupPrivilege)
