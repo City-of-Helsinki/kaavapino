@@ -2,7 +2,7 @@ import ast
 import operator
 import hashlib
 
-from django.utils.encoding import force_bytes, force_text
+from django.utils.encoding import force_bytes, force_str
 from django.utils.text import slugify
 from private_storage.storage.files import PrivateFileSystemStorage
 
@@ -33,7 +33,7 @@ class KaavapinoPrivateStorage(PrivateFileSystemStorage):
     def url(self, name):
         # Make sure reverse_lazy() is evaluated, as Python 3 won't do this here.
         if self.url_postfix:
-            self.base_url = force_text(self.base_url).replace(
+            self.base_url = force_str(self.base_url).replace(
                 f"/{self.url_postfix}", ""
             )
         return super(PrivateFileSystemStorage, self).url(name)

@@ -1,4 +1,4 @@
-from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin
+from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin, SortableAdminBase
 from django import forms
 from django.apps import apps
 from django.contrib import admin, messages
@@ -103,7 +103,7 @@ class DateCalculation(admin.ModelAdmin):
 
 
 @admin.register(Deadline)
-class DeadlineAdmin(admin.ModelAdmin):
+class DeadlineAdmin(admin.ModelAdmin, SortableAdminBase):
     inlines = (InitialCalculationInline, UpdateCalculationInline)
     exclude = ("initial_calculations", "update_calculations")
 
@@ -161,7 +161,7 @@ class ProjectPhaseDeadlineSectionAttributeInline(SortableInlineAdminMixin, admin
 
 
 @admin.register(ProjectPhaseDeadlineSection)
-class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin):
+class ProjectPhaseDeadlineSectionAdmin(admin.ModelAdmin, SortableAdminBase):
     inlines = (ProjectPhaseDeadlineSectionAttributeInline,)
 
 
@@ -180,7 +180,7 @@ class AttributeValueChoiceInline(SortableInlineAdminMixin, admin.TabularInline):
 
 
 @admin.register(Attribute)
-class AttributeAdmin(admin.ModelAdmin):
+class AttributeAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = (
         "name",
         "value_type",
@@ -352,7 +352,7 @@ class ProjectPhaseSectionInline(SortableInlineAdminMixin, admin.TabularInline):
 
 
 @admin.register(ProjectPhase)
-class ProjectPhaseAdmin(admin.ModelAdmin):
+class ProjectPhaseAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("common_project_phase", "project_type", "project_subtype")
     exclude = ("index",)
     inlines = (ProjectPhaseSectionInline,)
@@ -372,7 +372,7 @@ class ProjectPhaseSectionAttributeInline(SortableInlineAdminMixin, admin.Tabular
 
 
 @admin.register(ProjectPhaseSection)
-class ProjectPhaseSectionAdmin(admin.ModelAdmin):
+class ProjectPhaseSectionAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("name", "phase")
     exclude = ("index",)
     inlines = (ProjectPhaseSectionAttributeInline,)
@@ -390,13 +390,13 @@ class ProjectProjectSubtypeInline(SortableInlineAdminMixin, admin.TabularInline)
 
 
 @admin.register(ProjectSubtype)
-class ProjectSubtypeAdmin(admin.ModelAdmin):
+class ProjectSubtypeAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("name",)
     inlines = (ProjectPhaseInline,)
 
 
 @admin.register(ProjectType)
-class ProjectTypeAdmin(admin.ModelAdmin):
+class ProjectTypeAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("name",)
     inlines = (ProjectProjectSubtypeInline,)
 
@@ -421,7 +421,7 @@ class ReportColumnPostfixInline(admin.TabularInline):
 
 
 @admin.register(ReportColumn)
-class ReportColumnAdmin(admin.ModelAdmin):
+class ReportColumnAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("__str__",)
     inlines = (ReportColumnPostfixInline,)
     filter_horizontal = ("condition", "attributes")
@@ -429,7 +429,7 @@ class ReportColumnAdmin(admin.ModelAdmin):
 
 
 @admin.register(Report)
-class ReportAdmin(admin.ModelAdmin):
+class ReportAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("name",)
     inlines = (ReportColumnInline,)
     readonly_fields = ("previewable",)
@@ -441,7 +441,7 @@ class ReportFilterAttributeChoiceInline(admin.TabularInline):
 
 
 @admin.register(ReportFilter)
-class ReportFilterAdmin(admin.ModelAdmin):
+class ReportFilterAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("name", "type")
     inlines = (ReportFilterAttributeChoiceInline,)
     filter_horizontal = ("attributes",)
