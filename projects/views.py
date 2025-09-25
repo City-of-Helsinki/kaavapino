@@ -1,5 +1,6 @@
 import pytz
 import csv
+import re
 from datetime import datetime, timedelta, date
 import logging
 
@@ -298,41 +299,19 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         return queryset.filter(Q(user__uuid__in=users_list) | Q(user__ad_id__in=users_list))
 
     def _search(self, search, queryset):
-        # def search_field_for_attribute(attr):
-        #     if attr.static_property:
-        #         return attr.static_property
-        #     elif not attr.fieldset_attribute_target.count():
-        #         return f"attribute_data__{attr.identifier}"
-        #     else:
-        #         fieldset_path = [attr.identifier]
-        #         while attr.fieldset_attribute_target.count():
-        #             attr = attr.fieldset_attribute_target.get().attribute_source
-        #             fieldset_path.append(attr.identifier)
-        #
-        #         fieldset_path.reverse()
-        #         field_string = "__".join(fieldset_path)
-        #         return f"attribute_data__{field_string}"
-
-        # search_fields = [
-        #     search_field_for_attribute(attr)
-        #     for attr in Attribute.objects.filter(searchable=True)
-        # ] + ['subtype__project_type__name', 'user__ad_id']
-        # return queryset \
-        #     .annotate(search=SearchVector(*search_fields)) \
-        #     .filter(Q(search__icontains=search) | Q(search=search))
+        def escape_tsquery(term):
+            return re.sub(r'([&|!:()*])', r'\\\1', term)
 
         # Add 'like' condition for partial matching of single lexeme even
         # it prevents bitmap heap scan of gin index. This might be removed
-        # if it cerates performance issues in the future
+        # if it creates performance issues in the future
         combined_queryset = queryset.filter(Q(vector_column__icontains=search))
         # Django creates plainto_tsquery() whereas we want to use to_tsquery(),
         # so we'll create our own query to allow prefix matching
-        terms = search.split()
+        terms = [escape_tsquery(t) for t in search.split()]
         tsquery = " & ".join(terms)
         tsquery += ":*"
         combined_queryset |= queryset.extra(where=["vector_column @@ to_tsquery(%s)"], params=[tsquery])
-
-        # log.info(combined_queryset.query)
         return combined_queryset
 
     @staticmethod
