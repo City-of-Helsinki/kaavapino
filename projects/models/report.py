@@ -7,7 +7,7 @@ from django.db.models.functions import Cast
 from django.db.models.fields.related import ForeignKey
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
-from django.contrib.postgres.fields.jsonb import KeyTextTransform
+from django.db.models.fields.json import KeyTextTransform
 from django.core.serializers.json import DjangoJSONEncoder
 
 from projects.helpers import get_fieldset_path
