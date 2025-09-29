@@ -86,3 +86,9 @@ class ProjectDocumentDownloadLog(models.Model):
         on_delete=models.CASCADE,
     )
     invalidated = models.BooleanField(default=False)
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+auditlog.register(DocumentTemplate)
+#auditlog.register(ProjectDocumentDownloadLog)

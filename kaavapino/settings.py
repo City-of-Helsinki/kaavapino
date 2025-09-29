@@ -189,6 +189,7 @@ INSTALLED_APPS = [
     "users",
     "django_q",
     "drf_spectacular",
+    "auditlog",
 ]
 
 if env.str("ELASTIC_APM_SERVER_URL") and env.str("ELASTIC_APM_SECRET_TOKEN"):
@@ -203,6 +204,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "auditlog.middleware.AuditlogMiddleware",
 ]
 
 TEMPLATES = [
@@ -343,3 +345,7 @@ SPECTACULAR_SETTINGS = {
         "persistAuthorization": True,
     },
 }
+
+# Auditlog
+AUDITLOG_DISABLE_REMOTE_ADDR = False
+AUDITLOG_DISABLE_ON_RAW_SAVE = True

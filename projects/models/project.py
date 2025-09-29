@@ -1444,3 +1444,34 @@ class FieldCommentFieldsetPathLocation(FieldsetPathLocation):
 
     class Meta(FieldsetPathLocation.Meta):
         unique_together = ("index", "target")
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+#auditlog.register(BaseAttributeMatrixStructure)
+#auditlog.register(BaseAttributeMatrixCell)
+auditlog.register(ProjectType)
+auditlog.register(ProjectSubtype)
+auditlog.register(ProjectPriority)
+auditlog.register(Project, exclude_fields=["vector_column"])
+auditlog.register(ProjectFloorAreaSection)
+auditlog.register(ProjectFloorAreaSectionAttribute)
+#auditlog.register(ProjectFloorAreaSectionAttributeMatrixStructure)
+#auditlog.register(ProjectFloorAreaSectionAttributeMatrixCell)
+auditlog.register(CommonProjectPhase)
+auditlog.register(ProjectPhase)
+#auditlog.register(ProjectPhaseLog)
+auditlog.register(ProjectPhaseSection)
+auditlog.register(ProjectPhaseSectionAttribute)
+auditlog.register(ProjectCardSection)
+auditlog.register(ProjectPhaseFieldSetAttributeIndex)
+auditlog.register(ProjectAttributeFile)
+#auditlog.register(PhaseAttributeMatrixStructure)
+#auditlog.register(PhaseAttributeMatrixCell)
+#auditlog.register(ProjectAttributeMultipolygonGeometry)
+#auditlog.register(ProjectDeadline)
+auditlog.register(ProjectPhaseDeadlineSectionAttribute)
+auditlog.register(ProjectPhaseDeadlineSection)
+auditlog.register(FieldsetPathLocation)
+auditlog.register(ProjectAttributeFileFieldsetPathLocation)
+auditlog.register(FieldCommentFieldsetPathLocation)
