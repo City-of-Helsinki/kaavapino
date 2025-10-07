@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, date
 import logging
 
 from django.contrib.postgres.search import SearchVector
+from django.conf import settings
 from django.core.exceptions import FieldError
 from django.core.cache import cache
 from django.db import transaction
@@ -414,6 +415,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                         response[name] = value
                 else:
                     response[name] = value
+
+            # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
+            url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
+            response["Projektin osoite"] = url
+            response["Projekti on toistaiseksi keskeytynyt"] = project.onhold
+            response["Projekti on arkistoitu"] = project.archived
+
             cache.set(cache_key, response, 60 * 60 * 6)
 
         return Response(response)
