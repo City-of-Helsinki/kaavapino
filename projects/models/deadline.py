@@ -989,3 +989,16 @@ class DeadlineDateCalculation(models.Model):
 
     class Meta:
         ordering = ("index",)
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+auditlog.register(Deadline)
+#auditlog.register(DeadlineDistanceConditionAttribute)
+auditlog.register(DeadlineDistance)
+auditlog.register(DateType)
+auditlog.register(ForcedDate)
+auditlog.register(AutomaticDate)
+auditlog.register(DateCalculation)
+auditlog.register(DateCalculationAttribute)
+auditlog.register(DeadlineDateCalculation)

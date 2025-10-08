@@ -143,3 +143,12 @@ class ExcelFile(models.Model):
         self.set_error(error)
         self.task_id = task_id
         self.save()
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+auditlog.register(FooterLink)
+auditlog.register(FooterSection)
+auditlog.register(ListViewAttributeColumn)
+auditlog.register(TargetFloorArea)
+auditlog.register(ExcelFile)

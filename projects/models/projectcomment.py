@@ -119,3 +119,10 @@ class LastReadTimestamp(models.Model):
         verbose_name = _("last read timestamp")
         verbose_name_plural = _("last read timestamps")
         unique_together = ("user", "project")
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+#auditlog.register(ProjectComment)
+#auditlog.register(FieldComment)
+#auditlog.register(LastReadTimestamp)

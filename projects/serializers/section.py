@@ -35,7 +35,7 @@ FIELD_TYPES = {
     Attribute.TYPE_LINK: serializers.CharField,
     Attribute.TYPE_INTEGER: serializers.IntegerField,
     Attribute.TYPE_DECIMAL: serializers.DecimalField,
-    Attribute.TYPE_BOOLEAN: serializers.NullBooleanField,
+    Attribute.TYPE_BOOLEAN: serializers.BooleanField,
     Attribute.TYPE_DATE: serializers.DateField,
     # TODO handle image and file fields later
     Attribute.TYPE_IMAGE: serializers.JSONField,  # TODO: Figure out file uploads with DRF

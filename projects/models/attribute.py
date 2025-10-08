@@ -1065,3 +1065,19 @@ class OverviewFilterAttribute(models.Model):
 
     def __str__(self):
         return f"{self.overview_filter.name}/{self.attribute.name}"
+
+
+# Register auditlog for models
+from auditlog.registry import auditlog
+auditlog.register(DataRetentionPlan)
+auditlog.register(Attribute)
+auditlog.register(AttributeValueChoice)
+auditlog.register(AttributeAutoValue)
+auditlog.register(AttributeAutoValueMapping)
+#auditlog.register(AttributeLock)
+auditlog.register(AttributeCategorization)
+auditlog.register(FieldSetAttribute)
+auditlog.register(DocumentLinkSection)
+auditlog.register(DocumentLinkFieldSet)
+auditlog.register(OverviewFilter)
+auditlog.register(OverviewFilterAttribute)

@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from projects.importing import AttributeImporter, AttributeImporterException
+from auditlog.context import disable_auditlog
 
 
 class Command(BaseCommand):
@@ -17,6 +18,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         attribute_importer = AttributeImporter(options)
         try:
-            attribute_importer.run()
+            with disable_auditlog():
+                attribute_importer.run()
         except AttributeImporterException as e:
             raise CommandError(e)

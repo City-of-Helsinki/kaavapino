@@ -1,4 +1,4 @@
-from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin
+from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin, SortableAdminBase
 from django.contrib import admin, messages
 from django.contrib.admin.models import LogEntry
 from django.db.models import Q
@@ -26,7 +26,7 @@ class FooterLinkInline(SortableInlineAdminMixin, admin.TabularInline):
 
 
 @admin.register(FooterSection)
-class FooterSectionAdmin(admin.ModelAdmin):
+class FooterSectionAdmin(admin.ModelAdmin, SortableAdminBase):
     inlines = (FooterLinkInline,)
 
 
