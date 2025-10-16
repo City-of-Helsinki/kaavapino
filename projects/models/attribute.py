@@ -777,7 +777,7 @@ class AttributeValueChoice(models.Model):
         ordering = ("index",)
 
     def __str__(self):
-        return self.value
+        return str(self.value)
 
 
 class AttributeAutoValue(models.Model):
