@@ -127,8 +127,13 @@ SPECIAL_COLUMN_NAME = "Selite"
 def render_report_to_response(
     report: Report, project_ids, response, preview=False, limit=None,
 ):
-    projects = Project.objects.filter(pk__in=project_ids)
-    cols = report.columns.order_by("index")
+    projects = Project.objects.filter(pk__in=project_ids).prefetch_related("subtype")
+    cols = report.columns.order_by("index").prefetch_related(
+        "attributes", "condition", "attributes__fieldsets",
+        "postfixes", "postfixes__subtypes", "postfixes__show_conditions",
+        "postfixes__show_not_conditions", "postfixes__hide_conditions",
+        "postfixes__hide_not_conditions"
+    )
     if preview:
         cols = cols.filter(Q(preview=True) | Q(preview_only=True))
     else:
@@ -206,6 +211,7 @@ def render_report_to_response(
                 if value:
                     row_gen_data[a.identifier] = value
 
+        gen_attr_objects = {a.identifier: a for a in Attribute.objects.filter(identifier__in=row_gen_data.keys())}
         # Special case to generate multiple rows
         for gen_attr in (row_gen_data.keys() or [None]):
             # Raw values into display values
@@ -230,7 +236,7 @@ def render_report_to_response(
                     if gen_attr in data:
                         display_values[gen_attr] = \
                             _get_display_value(
-                                Attribute.objects.get(identifier=gen_attr),
+                                gen_attr_objects.get(gen_attr),
                                 col,
                                 row_gen_data[gen_attr],
                             )
@@ -272,9 +278,18 @@ def render_report_to_response(
                                 f"Could not handle attribute {attr} for project {project}."
                             )
 
+                # Optimize Deadline queries by prefetching all needed deadlines once
+                if 'deadlines_by_attr' not in locals():
+                    deadlines = Deadline.objects.filter(
+                        attribute__identifier__in=display_values.keys()
+                    ).select_related('attribute')
+                    deadlines_by_attr = {}
+                    for dl in deadlines:
+                        deadlines_by_attr.setdefault(dl.attribute.identifier, []).append(dl)
+
                 exclude_from_disp = []
                 for disp_attr in display_values:
-                    dls = Deadline.objects.filter(attribute__identifier=disp_attr)
+                    dls = deadlines_by_attr.get(disp_attr, [])
                     if not dls:
                         continue
                     if not any([should_display_deadline(project, dl) for dl in dls]):
