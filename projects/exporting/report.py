@@ -278,18 +278,9 @@ def render_report_to_response(
                                 f"Could not handle attribute {attr} for project {project}."
                             )
 
-                # Optimize Deadline queries by prefetching all needed deadlines once
-                if 'deadlines_by_attr' not in locals():
-                    deadlines = Deadline.objects.filter(
-                        attribute__identifier__in=display_values.keys()
-                    ).select_related('attribute')
-                    deadlines_by_attr = {}
-                    for dl in deadlines:
-                        deadlines_by_attr.setdefault(dl.attribute.identifier, []).append(dl)
-
                 exclude_from_disp = []
                 for disp_attr in display_values:
-                    dls = deadlines_by_attr.get(disp_attr, [])
+                    dls = Deadline.objects.filter(attribute__identifier=disp_attr).prefetch_related("subtype", "phase")
                     if not dls:
                         continue
                     if not any([should_display_deadline(project, dl) for dl in dls]):
