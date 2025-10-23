@@ -115,12 +115,10 @@ class ReportColumn(models.Model):
     )
 
     def generate_postfix(self, project, attribute_data=None):
-        postfixes = self.postfixes.filter(
-            subtypes__in=[project.subtype],
-        )
+        postfixes = [pf for pf in self.postfixes.all() if project.subtype in pf.subtypes.all()]
         postfix = None
 
-        if not postfixes.count():
+        if len(postfixes) == 0:
             return ""
 
         # Fallback doesn't include data from external APIs
