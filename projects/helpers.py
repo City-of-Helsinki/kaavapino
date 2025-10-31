@@ -770,15 +770,16 @@ def get_attribute_data_filtered_response(attributes, project, use_cached=True):
         set_ad_data_in_attribute_data(attribute_data)
         set_geoserver_data_in_attribute_data(attribute_data)
 
-        for key, value in attribute_data.items():
-            attribute = attributes.get(key)
-            if not attribute or not attribute.api_visibility:
+        for attribute in attributes.values():
+            if not attribute.api_visibility:
                 continue
+
+            value = attribute_data.get(attribute.identifier, None)
+            identifier = attribute.identifier
 
             if not value:
+                response[identifier] = ""
                 continue
-
-            name = attribute.identifier
 
             if attribute.value_type == "fieldset":
                 fieldset = []
@@ -799,16 +800,16 @@ def get_attribute_data_filtered_response(attributes, project, use_cached=True):
                     if fieldset_obj:
                         fieldset.append(fieldset_obj)
                 if fieldset:
-                    response[name] = fieldset
+                    response[identifier] = fieldset
             elif attribute.value_type == "user":
-                response[name] = get_in_personnel_data(value, "name", True)
+                response[identifier] = get_in_personnel_data(value, "name", True)
             elif attribute.value_type in ["rich_text", "rich_text_short"]:
                 try:
-                    response[name] = "".join([item["insert"] for item in value["ops"]]).strip()
+                    response[identifier] = "".join([item["insert"] for item in value["ops"]]).strip()
                 except TypeError:
-                    response[name] = value
+                    response[identifier] = value
             else:
-                response[name] = value
+                response[identifier] = value
 
         response = sanitize_attribute_data_filter_result(attributes, response)
 
@@ -881,8 +882,11 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
             if isinstance(value, list):
                 attribute_data[key] = "; ".join(value)  # TODO value fix string
         elif attribute.value_type == "date":
-            date = datetime.strptime(value, "%Y-%m-%d")
-            attribute_data[key] = date.strftime("%d.%m.%Y")
+            try:
+                date = datetime.strptime(value, "%Y-%m-%d")
+                attribute_data[key] = date.strftime("%d.%m.%Y")
+            except ValueError:
+                attribute_data[key] = value
 
     return {attributes.get(k).name if attributes.get(k) is not None else k: v for k, v in attribute_data.items()}
 
