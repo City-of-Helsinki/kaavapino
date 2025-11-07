@@ -64,7 +64,7 @@ from projects.models import (
     ProjectPriority,
     DateType,
 )
-from projects.models.attribute import AttributeLock
+from projects.models.attribute import AttributeLock, FieldSetAttribute
 from projects.models.utils import create_identifier
 from projects.permissions.attributes import AttributeLockPermissions
 from projects.permissions.comments import CommentPermissions
@@ -362,9 +362,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def attribute_data_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
         project = self.get_object()
         attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+        ignored = FieldSetAttribute.objects.all().values_list('attribute_target', flat=True)
         if not project.attribute_data:
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response(get_attribute_data_filtered_response(attributes, project))
+        return Response(get_attribute_data_filtered_response(attributes, ignored, project))
 
     @action(
         methods=['get'],

@@ -760,7 +760,7 @@ def get_attribute_lock_data(attribute_identifier):
     return {"attribute_identifier": attribute_identifier}
 
 
-def get_attribute_data_filtered_response(attributes, project, use_cached=True):
+def get_attribute_data_filtered_response(attributes, ignored, project, use_cached=True):
     cache_key = f'attribute_data_filtered_{project.pk}'
     response = cache.get(cache_key) if use_cached else None
 
@@ -771,7 +771,7 @@ def get_attribute_data_filtered_response(attributes, project, use_cached=True):
         set_geoserver_data_in_attribute_data(attribute_data)
 
         for attribute in attributes.values():
-            if not attribute.api_visibility:
+            if not attribute.api_visibility or attribute.id in ignored:
                 continue
 
             value = attribute_data.get(attribute.identifier, None)
@@ -812,6 +812,7 @@ def get_attribute_data_filtered_response(attributes, project, use_cached=True):
                 response[identifier] = value
 
         response = sanitize_attribute_data_filter_result(attributes, response)
+
 
         # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
         url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
@@ -861,13 +862,13 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                 for item in value:
                     if "investointi_kustannukset_muu_aihe" in item.keys() and "investointi_kustannukset_muu_maara" in item.keys():
                         items.append(f"{item.get('investointi_kustannukset_muu_aihe', 'N/A')}: {item.get('investointi_kustannukset_muu_maara', 'N/A')}")
-                attribute_data[key] = ";".join(items)
+                attribute_data[key] = "; ".join(items)
             elif attribute.identifier == "muut_kustannukset_fieldset":
                 items = []
                 for item in value:
                     if "muut_kustannukset_aihe" in item.keys() and "muut_kustannukset_maara" in item.keys():
                         items.append(f"{item.get('muut_kustannukset_aihe', 'N/A')}: {item.get('muut_kustannukset_maara', 'N/A')}")
-                attribute_data[key] = ";".join(items)
+                attribute_data[key] = "; ".join(items)
             elif attribute.identifier in ["tarvittava_selvitys_fieldset", "kaavoittaja_fieldset", "liikennesuunnittelun_asiantuntija_fieldset",
                               "yhteyshenkilo_maankayttosopimus_fieldset", "liikennesuunnitelma_fieldset", "paikkatietoasiantuntija_fieldset",
                               "suunnitteluavustaja_fieldset", "yleissuunnittelun_asiantuntija_fieldset", "kaupunkitilan_asiantuntija_fieldset",
@@ -877,7 +878,7 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                 items = []
                 for item in value:
                     items.append(", ".join(item for item in item.values() if item))
-                attribute_data[key] = ";".join(items)
+                attribute_data[key] = "; ".join(items)
         elif attribute.value_type == "choice":
             if isinstance(value, list):
                 attribute_data[key] = "; ".join(value)  # TODO value fix string
@@ -888,7 +889,37 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
             except ValueError:
                 attribute_data[key] = value
 
-    return {attributes.get(k).name if attributes.get(k) is not None else k: v for k, v in attribute_data.items()}
+    # Bad but necessary way to check if result has multiple attributes with same name
+    # --> in that case use attribute identifier instead of name as key in response
+    name_count_map = {}
+    for attribute in attributes.values():
+        count = name_count_map.get(attribute.name, 0)
+        count += 1
+        name_count_map[attribute.name] = count
+
+    response = {}
+    for key, value in attribute_data.items():
+        attribute = attributes.get(key, None)
+        if attribute is None:
+            response[key] = value
+            continue
+
+        try:
+            if attribute.value_type == "fieldset":
+                fieldset_value = []
+                for list_item in value:
+                    obj = {}
+                    for f_key, f_value in list_item.items():
+                        attribute = attributes.get(f_key, None)
+                        obj[attribute.name if attribute else f_key] = f_value
+                    fieldset_value.append(obj)
+                value = fieldset_value
+        except Exception:
+            pass
+
+        name = attributes.get(key).name
+        response[name if name_count_map.get(name, 0) == 1 else key] = value
+    return response
 
 
 DOCUMENT_CONTENT_TYPES = {
