@@ -39,9 +39,7 @@ from projects.helpers import (
     get_file_type,
     TRUE,
     get_attribute_lock_data,
-    set_ad_data_in_attribute_data,
-    get_in_personnel_data,
-    set_geoserver_data_in_attribute_data,
+    get_attribute_data_filtered_response,
 )
 from projects.importing import AttributeImporter, AttributeUpdater
 from projects.models import (
@@ -66,7 +64,7 @@ from projects.models import (
     ProjectPriority,
     DateType,
 )
-from projects.models.attribute import AttributeLock
+from projects.models.attribute import AttributeLock, FieldSetAttribute
 from projects.models.utils import create_identifier
 from projects.permissions.attributes import AttributeLockPermissions
 from projects.permissions.comments import CommentPermissions
@@ -364,67 +362,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def attribute_data_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
         project = self.get_object()
         attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
-        attribute_data = project.attribute_data
-        if not attribute_data:
+        ignored = FieldSetAttribute.objects.all().values_list('attribute_target', flat=True)
+        if not project.attribute_data:
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        cache_key = f'attribute_data_filtered_{self.get_object().pk}'
-        response = cache.get(cache_key)
-
-        if not response:
-            response = {}
-            set_ad_data_in_attribute_data(attribute_data)
-            set_geoserver_data_in_attribute_data(attribute_data)
-
-            for key, value in attribute_data.items():
-                attribute = attributes.get(key)
-                if not attribute or not attribute.api_visibility:
-                    continue
-
-                if not value:
-                    continue
-
-                name = attribute.name
-
-                if attribute.value_type == Attribute.TYPE_FIELDSET:
-                    fieldset = []
-                    for entry in value:  # fieldset
-                        fieldset_obj = {}
-                        deleted = entry.get('_deleted', False)
-                        if deleted:
-                            continue
-                        for k, v in entry.items():
-                            fieldset_attr = attributes.get(k, None)
-                            if not fieldset_attr or not fieldset_attr.api_visibility:
-                                continue
-                            if fieldset_attr.value_type == Attribute.TYPE_PERSONNEL:
-                                v = get_in_personnel_data(v, "name", False)
-                            elif fieldset_attr.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-                                v = "".join([item["insert"] for item in v["ops"]]).strip() if v else None
-                            fieldset_obj[k] = v
-                        if fieldset_obj:
-                            fieldset.append(fieldset_obj)
-                    if fieldset:
-                        response[name] = fieldset
-                elif attribute.value_type == Attribute.TYPE_USER:
-                    response[name] = get_in_personnel_data(value, "name", True)
-                elif attribute.value_type in [Attribute.TYPE_RICH_TEXT, Attribute.TYPE_RICH_TEXT_SHORT]:
-                    try:
-                        response[name] = "".join([item["insert"] for item in value["ops"]]).strip()
-                    except TypeError:
-                        response[name] = value
-                else:
-                    response[name] = value
-
-            # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
-            url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
-            response["Projektin osoite"] = url
-            response["Projekti on toistaiseksi keskeytynyt"] = project.onhold
-            response["Projekti on arkistoitu"] = project.archived
-
-            cache.set(cache_key, response, 60 * 60 * 6)
-
-        return Response(response)
+        return Response(get_attribute_data_filtered_response(attributes, ignored, project))
 
     @action(
         methods=['get'],

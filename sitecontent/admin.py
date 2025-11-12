@@ -17,6 +17,7 @@ from django_q.tasks import async_task
 from django.core.cache import cache
 from projects.importing import attribute, deadline
 from openpyxl import load_workbook
+from auditlog.context import disable_auditlog
 
 import json
 
@@ -105,14 +106,15 @@ def clear_cache():
     cache.delete_many(keys_to_delete)
 
 def activate_excel(obj):
-    try:
-        importer = get_importer(obj)
-        importer.run()
-        clear_cache()
-        obj.update(status=ExcelFile.STATUS_ACTIVE, error=None, task_id=None)
-        ExcelFile.objects.all().exclude(~Q(type=obj.type) | Q(file=obj.file)).update(status=ExcelFile.STATUS_INACTIVE, updated=None, task_id=None)
-    except (AttributeImporterException,DeadlineImporterException, Exception) as exc:
-        obj.update(status=ExcelFile.STATUS_ERROR, error=repr(exc), task_id=None)
+    with disable_auditlog():
+        try:
+            importer = get_importer(obj)
+            importer.run()
+            clear_cache()
+            obj.update(status=ExcelFile.STATUS_ACTIVE, error=None, task_id=None)
+            ExcelFile.objects.all().exclude(~Q(type=obj.type) | Q(file=obj.file)).update(status=ExcelFile.STATUS_INACTIVE, updated=None, task_id=None)
+        except (AttributeImporterException,DeadlineImporterException, Exception) as exc:
+            obj.update(status=ExcelFile.STATUS_ERROR, error=repr(exc), task_id=None)
 
 @admin.action
 def activate(modeladmin, request, queryset):

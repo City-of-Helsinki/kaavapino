@@ -48,7 +48,14 @@ class Command(BaseCommand):
                 "func": "projects.tasks.check_archived_projects",
                 "defaults": {
                     "schedule_type": Schedule.CRON,
-                    "cron": "0 2 * * *"
+                    "cron": "0 2 * * *",
+                }
+            },
+            {
+                "func": "projects.tasks.cache_attribute_data_filtered",
+                "defaults": {
+                    "schedule_type": Schedule.CRON,
+                    "cron": "0 6,12 * * *"
                 }
             }
         ]

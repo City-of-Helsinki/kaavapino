@@ -16,7 +16,7 @@ class TestAttributeSchemaSerializer:
         [
             (pytest.lazy_fixture("f_user_attribute"), list),
             (pytest.lazy_fixture("f_choice_attribute"), list),
-            (Attribute(value_type=Attribute.TYPE_SHORT_STRING), type(None)),
+            (pytest.lazy_fixture("f_short_string_attribute"), type(None)),
         ],
     )
     def test_get_choices(self, attribute, instanceof):

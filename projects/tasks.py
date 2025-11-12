@@ -12,9 +12,9 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from projects.exporting.report import render_report_to_response
-from projects.models import Project, Report, DataRetentionPlan
+from projects.models import Project, Report, DataRetentionPlan, Attribute
 from projects.serializers.project import ProjectDeadlineSerializer
-from projects.helpers import set_kaavoitus_api_data_in_attribute_data
+from projects.helpers import set_kaavoitus_api_data_in_attribute_data, get_attribute_data_filtered_response
 
 logger = logging.getLogger(__name__)
 
@@ -142,3 +142,12 @@ def check_archived_projects():
         if (diff_days / 365) > 5:  # Clear audit log data after 5 years has passed from archived_at
             project.clear_audit_log_data()
 
+
+def cache_attribute_data_filtered():
+    projects = Project.objects.all()
+    logger.info(f"Caching {len(projects)} projects for attribute_data_filtered request")
+
+    attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+
+    for project in projects:
+        get_attribute_data_filtered_response(attributes, project, use_cached=False)

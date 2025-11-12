@@ -952,6 +952,11 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
                 for phase_section in phase.sections.all():
                     attributes.update([attribute for attribute in phase_section.attributes.all()])
 
+            fieldset_attributes = set(filter(lambda a: a.value_type == Attribute.TYPE_FIELDSET, attributes))
+            for attribute in fieldset_attributes:
+                sub_attributes = FieldSetAttribute.objects.filter(attribute_source=attribute)
+                attributes.update([a.attribute_target for a in sub_attributes])
+
             roles = set()
             subroles = set()
 
