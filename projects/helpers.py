@@ -816,9 +816,11 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
 
         # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
         url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
-        response["Projektin osoite"] = url
-        response["Projekti on toistaiseksi keskeytynyt"] = project.onhold
-        response["Projekti on arkistoitu"] = project.archived
+        response["project_url"] = url
+        response["on_hold"] = project.onhold
+        response["archived"] = project.archived
+        response["created_at"] = project.created_at.strftime("%d.%m.%Y %H:%M:%S") if project.created_at else ""
+        response["modified_at"] = project.modified_at.strftime("%d.%m.%Y %H:%M:%S") if project.modified_at else ""
 
         cache.set(cache_key, response, 60 * 60 * 6)
 
@@ -850,12 +852,12 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                     if "hakijalta_perittava_maksu" in item.keys():
                         hakija_maksu_hyvaksyminen.append(float(item.get('hakijalta_perittava_maksu', 0)))
 
-                attribute_data["Hakija_taho"] = "; ".join(hakija_taho)
-                attribute_data["Hakija_maksu_oas"] = sum(hakija_maksu_oas)
-                attribute_data["Hakija_maksu_ehdotus"] = sum(hakija_maksu_ehdotus)
-                attribute_data["Hakija_maksu_hyvaksyminen"] = sum(hakija_maksu_hyvaksyminen)
+                attribute_data["hakija_taho"] = "; ".join(hakija_taho)
+                attribute_data["hakija_maksu_oas"] = sum(hakija_maksu_oas)
+                attribute_data["hakija_maksu_ehdotus"] = sum(hakija_maksu_ehdotus)
+                attribute_data["hakija_maksu_hyvaksyminen"] = sum(hakija_maksu_hyvaksyminen)
                 hakija_maksu_yhteensa = sum([sum(hakija_maksu_oas), sum(hakija_maksu_ehdotus), sum(hakija_maksu_hyvaksyminen)])
-                attribute_data["Kaavaprojekti_maksu_yhteensa"] = hakija_maksu_yhteensa
+                attribute_data["kaavaprojekti_maksu_yhteensa"] = hakija_maksu_yhteensa
                 attribute_data.pop("hakija_fieldset", None)
             elif attribute.identifier == "investointi_kustannukset_muu_fieldset":
                 items = []
@@ -869,6 +871,14 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                     if "muut_kustannukset_aihe" in item.keys() and "muut_kustannukset_maara" in item.keys():
                         items.append(f"{item.get('muut_kustannukset_aihe', 'N/A')}: {item.get('muut_kustannukset_maara', 'N/A')}")
                 attribute_data[key] = "; ".join(items)
+            elif attribute.identifier == "muu_asiantuntija_kaupungin_fieldset":
+                items = []
+                for item in value:
+                    nimi = item.get("muu_asiantuntija_kaupungin_nimi", None)
+                    tehtava = item.get("muu_asiantuntija_kaupungin_tehtava", None)
+                    if nimi and tehtava:
+                        items.append(f"{nimi}: {tehtava}")
+                attribute_data["muu_asiantuntija_kaupungin_fieldset"] = "; ".join(items)
             elif attribute.identifier in ["tarvittava_selvitys_fieldset", "kaavoittaja_fieldset", "liikennesuunnittelun_asiantuntija_fieldset",
                               "yhteyshenkilo_maankayttosopimus_fieldset", "liikennesuunnitelma_fieldset", "paikkatietoasiantuntija_fieldset",
                               "suunnitteluavustaja_fieldset", "yleissuunnittelun_asiantuntija_fieldset", "kaupunkitilan_asiantuntija_fieldset",
@@ -889,37 +899,7 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
             except ValueError:
                 attribute_data[key] = value
 
-    # Bad but necessary way to check if result has multiple attributes with same name
-    # --> in that case use attribute identifier instead of name as key in response
-    name_count_map = {}
-    for attribute in attributes.values():
-        count = name_count_map.get(attribute.name, 0)
-        count += 1
-        name_count_map[attribute.name] = count
-
-    response = {}
-    for key, value in attribute_data.items():
-        attribute = attributes.get(key, None)
-        if attribute is None:
-            response[key] = value
-            continue
-
-        try:
-            if attribute.value_type == "fieldset":
-                fieldset_value = []
-                for list_item in value:
-                    obj = {}
-                    for f_key, f_value in list_item.items():
-                        attribute = attributes.get(f_key, None)
-                        obj[attribute.name if attribute else f_key] = f_value
-                    fieldset_value.append(obj)
-                value = fieldset_value
-        except Exception:
-            pass
-
-        name = attributes.get(key).name
-        response[name if name_count_map.get(name, 0) == 1 else key] = value
-    return response
+    return attribute_data
 
 
 DOCUMENT_CONTENT_TYPES = {
