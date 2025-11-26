@@ -331,7 +331,7 @@ Q_CLUSTER = {
     'queue_limit': 30,
     'catch_up': False,
     'redis': {
-        'sentinels': SENTINELS,
+        'sentinel': SENTINELS,
         'master_name': redis_url.hostname,
         'db': 3,
         'password': env.str("REDIS_PASSWORD"),
