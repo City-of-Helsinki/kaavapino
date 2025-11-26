@@ -322,7 +322,7 @@ CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
 
 redis_url = urlparse(env.str("REDIS_URL"))
 Q_CLUSTER = {
-    'name': "Kaavapino-QCluster",
+    'name': "kaavapino-qcluster",
     'timeout': 1200,
     'retry': 1800,
     'max_attempts': 1,
@@ -330,6 +330,7 @@ Q_CLUSTER = {
     'recycle': 100,
     'queue_limit': 30,
     'catch_up': False,
+    'broker_class': 'django_q.brokers.redis_broker.Redis',
     'redis': {
         'sentinel': SENTINELS,
         'master_name': redis_url.hostname,
