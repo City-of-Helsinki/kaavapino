@@ -15,7 +15,6 @@ import environ
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
-from urllib.parse import urlparse
 
 project_root = environ.Path(__file__) - 2
 
@@ -320,7 +319,6 @@ USE_X_FORWARDED_HOST = env.bool("USE_X_FORWARDED_HOST")
 CSRF_COOKIE_DOMAIN = env.str("CSRF_COOKIE_DOMAIN")
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
 
-redis_url = urlparse(env.str("REDIS_URL"))
 Q_CLUSTER = {
     'name': "kaavapino-qcluster",
     'timeout': 1200,
@@ -329,20 +327,8 @@ Q_CLUSTER = {
     'workers': 4,
     'recycle': 100,
     'queue_limit': 30,
+    'orm': 'default',
     'catch_up': False,
-    'broker_class': 'django_q.brokers.redis_broker.Redis',
-    'redis': {
-        'sentinel': SENTINELS,
-        'master_name': redis_url.hostname,
-        'db': 3,
-        'password': env.str("REDIS_PASSWORD"),
-        'sentinel_password': env.str("REDIS_PASSWORD", default=None),
-    } if SENTINELS else {
-        'host': redis_url.hostname,
-        'port': redis_url.port or 6379,
-        'db': 3,
-        'password': env.str("REDIS_PASSWORD")
-    }
 }
 
 HELUSERS_PASSWORD_LOGIN_DISABLED = env.bool("HELUSERS_PASSWORD_LOGIN_DISABLED")
