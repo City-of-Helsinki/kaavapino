@@ -826,6 +826,11 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
 
     return response
 
+def check_format_date(date):
+    try:
+        return datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
+    except Exception:
+        return date
 
 def sanitize_attribute_data_filter_result(attributes, attribute_data):
     for key, value in copy.deepcopy(attribute_data).items():
@@ -836,9 +841,13 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
         if attribute.value_type == "fieldset":
             if attribute.identifier == "hakija_fieldset":
                 hakija_taho = []
-                hakija_maksu_oas = []
-                hakija_maksu_ehdotus = []
-                hakija_maksu_hyvaksyminen = []
+                hakijalta_perittava_maksu_oas = []
+                hakijalta_perittava_maksu_ehdotus = []
+                hakijalta_perittava_maksu = []
+                hakemuksen_saapumispaivamaara = []
+                laskutuspyynto_oas = []
+                laskutuspyynto_ehdotus = []
+                laskutuspyynto_hyvaksymisen_jalkeen = []
 
                 for item in value:
                     if "hakija_yritys" in item.keys():
@@ -846,18 +855,41 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                     elif "hakijan_etunimi_yksityishenkilo" in item.keys() and "hakijan_sukunimi_yksityishenkilo" in item.keys():
                         hakija_taho.append(f"Hakija yksityishenkilö")
                     if "hakijalta_perittava_maksu_oas" in item.keys():
-                        hakija_maksu_oas.append(float(item.get('hakijalta_perittava_maksu_oas', 0)))
+                        hakijalta_perittava_maksu_oas.append(float(item.get('hakijalta_perittava_maksu_oas', 0)))
                     if "hakijalta_perittava_maksu_ehdotus" in item.keys():
-                        hakija_maksu_ehdotus.append(float(item.get('hakijalta_perittava_maksu_ehdotus', 0)))
+                        hakijalta_perittava_maksu_ehdotus.append(float(item.get('hakijalta_perittava_maksu_ehdotus', 0)))
                     if "hakijalta_perittava_maksu" in item.keys():
-                        hakija_maksu_hyvaksyminen.append(float(item.get('hakijalta_perittava_maksu', 0)))
+                        hakijalta_perittava_maksu.append(float(item.get('hakijalta_perittava_maksu', 0)))
+                    if "hakemuksen_saapumispaivamaara" in item.keys():
+                        val = item.get('hakemuksen_saapumispaivamaara', None)
+                        if val:
+                            hakemuksen_saapumispaivamaara.append(check_format_date(val))
+                    if "laskutuspyynto_oas" in item.keys():
+                        val = item.get('laskutuspyynto_oas', None)
+                        if val:
+                            laskutuspyynto_oas.append(check_format_date(val))
+                    if "laskutuspyynto_ehdotus" in item.keys():
+                        val = item.get('laskutuspyynto_ehdotus', None)
+                        if val:
+                            laskutuspyynto_ehdotus.append(check_format_date(val))
+                    if "laskutuspyynto_hyvaksymisen_jalkeen" in item.keys():
+                        val = item.get('laskutuspyynto_hyvaksymisen_jalkeen', None)
+                        if val:
+                            laskutuspyynto_hyvaksymisen_jalkeen.append(check_format_date(val))
+
 
                 attribute_data["hakija_taho"] = "; ".join(hakija_taho)
-                attribute_data["hakija_maksu_oas"] = sum(hakija_maksu_oas)
-                attribute_data["hakija_maksu_ehdotus"] = sum(hakija_maksu_ehdotus)
-                attribute_data["hakija_maksu_hyvaksyminen"] = sum(hakija_maksu_hyvaksyminen)
-                hakija_maksu_yhteensa = sum([sum(hakija_maksu_oas), sum(hakija_maksu_ehdotus), sum(hakija_maksu_hyvaksyminen)])
+                attribute_data["hakijalta_perittava_maksu_oas"] = sum(hakijalta_perittava_maksu_oas)
+                attribute_data["hakijalta_perittava_maksu_ehdotus"] = sum(hakijalta_perittava_maksu_ehdotus)
+                attribute_data["hakijalta_perittava_maksu"] = sum(hakijalta_perittava_maksu)
+                hakija_maksu_yhteensa = sum([sum(hakijalta_perittava_maksu_oas), sum(hakijalta_perittava_maksu_ehdotus), sum(hakijalta_perittava_maksu)])
                 attribute_data["kaavaprojekti_maksu_yhteensa"] = hakija_maksu_yhteensa
+
+                attribute_data["hakemuksen_saapumispaivamaara"] = "; ".join(hakemuksen_saapumispaivamaara)
+                attribute_data["laskutuspyynto_oas"] = "; ".join(laskutuspyynto_oas)
+                attribute_data["laskutuspyynto_ehdotus"] = "; ".join(laskutuspyynto_ehdotus)
+                attribute_data["laskutuspyynto_hyvaksymisen_jalkeen"] = "; ".join(laskutuspyynto_hyvaksymisen_jalkeen)
+
                 attribute_data.pop("hakija_fieldset", None)
             elif attribute.identifier == "investointi_kustannukset_muu_fieldset":
                 items = []
@@ -893,11 +925,7 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
             if isinstance(value, list):
                 attribute_data[key] = "; ".join(value)  # TODO value fix string
         elif attribute.value_type == "date":
-            try:
-                date = datetime.strptime(value, "%Y-%m-%d")
-                attribute_data[key] = date.strftime("%d.%m.%Y")
-            except ValueError:
-                attribute_data[key] = value
+            attribute_data[key] = check_format_date(value)
 
     return attribute_data
 
