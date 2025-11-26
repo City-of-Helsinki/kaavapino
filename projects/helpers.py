@@ -816,7 +816,7 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
 
         # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
         url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
-        response["project_url"] = url
+        response["projektin_osoite"] = url
         response["on_hold"] = project.onhold
         response["archived"] = project.archived
         response["created_at"] = project.created_at.strftime("%d.%m.%Y %H:%M:%S") if project.created_at else ""
@@ -876,7 +876,6 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                         val = item.get('laskutuspyynto_hyvaksymisen_jalkeen', None)
                         if val:
                             laskutuspyynto_hyvaksymisen_jalkeen.append(check_format_date(val))
-
 
                 attribute_data["hakija_taho"] = "; ".join(hakija_taho)
                 attribute_data["hakijalta_perittava_maksu_oas"] = sum(hakijalta_perittava_maksu_oas)
