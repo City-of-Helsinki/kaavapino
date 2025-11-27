@@ -12,7 +12,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from projects.exporting.report import render_report_to_response
-from projects.models import Project, Report, DataRetentionPlan, Attribute
+from projects.models import Project, Report, DataRetentionPlan, Attribute, FieldSetAttribute
 from projects.serializers.project import ProjectDeadlineSerializer
 from projects.helpers import set_kaavoitus_api_data_in_attribute_data, get_attribute_data_filtered_response
 
@@ -148,6 +148,7 @@ def cache_attribute_data_filtered():
     logger.info(f"Caching {len(projects)} projects for attribute_data_filtered request")
 
     attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+    ignored = FieldSetAttribute.objects.all().values_list('attribute_target', flat=True)
 
     for project in projects:
-        get_attribute_data_filtered_response(attributes, project, use_cached=False)
+        get_attribute_data_filtered_response(attributes, ignored, project, use_cached=False)

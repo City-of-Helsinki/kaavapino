@@ -120,7 +120,7 @@ if env.str("REDIS_SENTINELS"):
     DJANGO_REDIS_CONNECTION_FACTORY = 'django_redis.pool.SentinelConnectionFactory'
     for sentinel in env.str("REDIS_SENTINELS").split(","):
         host, port = sentinel.split(":")
-        SENTINELS.append((host, port))
+        SENTINELS.append((host, int(port)))
 
 CACHES = {
     "default": {
@@ -320,11 +320,15 @@ CSRF_COOKIE_DOMAIN = env.str("CSRF_COOKIE_DOMAIN")
 CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS').split(',')
 
 Q_CLUSTER = {
-    "name": "projects",
-    "orm": "default",
-    "retry": 3600,
-    "timeout": 1800,
-    "max_attempts": 1,
+    'name': "kaavapino-qcluster",
+    'timeout': 1200,
+    'retry': 1800,
+    'max_attempts': 1,
+    'workers': 4,
+    'recycle': 100,
+    'queue_limit': 30,
+    'orm': 'default',
+    'catch_up': False,
 }
 
 HELUSERS_PASSWORD_LOGIN_DISABLED = env.bool("HELUSERS_PASSWORD_LOGIN_DISABLED")
