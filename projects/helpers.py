@@ -832,6 +832,14 @@ def check_format_date(date):
     except Exception:
         return date
 
+def safe_float(value):
+    try:
+        return float(value)
+    except TypeError:
+        return float(0)
+    except Exception as exc:
+        log.error(f"Error on safe_float for value: {value}", exc)
+
 def sanitize_attribute_data_filter_result(attributes, attribute_data):
     for key, value in copy.deepcopy(attribute_data).items():
         attribute = attributes.get(key)
@@ -855,11 +863,11 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                     elif "hakijan_etunimi_yksityishenkilo" in item.keys() and "hakijan_sukunimi_yksityishenkilo" in item.keys():
                         hakija_taho.append(f"Hakija yksityishenkilö")
                     if "hakijalta_perittava_maksu_oas" in item.keys():
-                        hakijalta_perittava_maksu_oas.append(float(item.get('hakijalta_perittava_maksu_oas', 0)))
+                        hakijalta_perittava_maksu_oas.append(safe_float(item.get('hakijalta_perittava_maksu_oas', 0)))
                     if "hakijalta_perittava_maksu_ehdotus" in item.keys():
-                        hakijalta_perittava_maksu_ehdotus.append(float(item.get('hakijalta_perittava_maksu_ehdotus', 0)))
+                        hakijalta_perittava_maksu_ehdotus.append(safe_float(item.get('hakijalta_perittava_maksu_ehdotus', 0)))
                     if "hakijalta_perittava_maksu" in item.keys():
-                        hakijalta_perittava_maksu.append(float(item.get('hakijalta_perittava_maksu', 0)))
+                        hakijalta_perittava_maksu.append(safe_float(item.get('hakijalta_perittava_maksu', 0)))
                     if "hakemuksen_saapumispaivamaara" in item.keys():
                         val = item.get('hakemuksen_saapumispaivamaara', None)
                         if val:
