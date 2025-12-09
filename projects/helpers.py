@@ -835,10 +835,9 @@ def check_format_date(date):
 def safe_float(value):
     try:
         return float(value)
-    except TypeError:
-        return float(0)
     except Exception as exc:
         log.error(f"Error on safe_float for value: {value}", exc)
+        return float(0)
 
 def sanitize_attribute_data_filter_result(attributes, attribute_data):
     for key, value in copy.deepcopy(attribute_data).items():
