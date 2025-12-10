@@ -760,6 +760,20 @@ def get_attribute_lock_data(attribute_identifier):
     return {"attribute_identifier": attribute_identifier}
 
 
+def check_format_date(date):
+    try:
+        return datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
+    except Exception:
+        return date
+
+def safe_float(value):
+    try:
+        return float(value)
+    except Exception as exc:
+        log.error(f"Error on safe_float for value: {value}", exc)
+        return float(0)
+
+
 def get_attribute_data_filtered_response(attributes, ignored, project, use_cached=True):
     cache_key = f'attribute_data_filtered_{project.pk}'
     response = cache.get(cache_key) if use_cached else None
@@ -793,10 +807,14 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
                         if not fieldset_attr or not fieldset_attr.api_visibility:
                             continue
                         if fieldset_attr.value_type == "personnel":
-                            v = get_in_personnel_data(v, "name", False)
+                            _v = get_in_personnel_data(v, "name", False)
                         elif fieldset_attr.value_type in ["rich_text", "rich_text_short"]:
-                            v = "".join([item["insert"] for item in v["ops"]]).strip() if v else None
-                        fieldset_obj[k] = v
+                            _v = "".join([item["insert"] for item in v["ops"]]).strip() if v else None
+                        elif fieldset_attr.value_type == "date":
+                            _v = check_format_date(v)
+                        else:
+                            _v = v
+                        fieldset_obj[k] = _v
                     if fieldset_obj:
                         fieldset.append(fieldset_obj)
                 if fieldset:
@@ -826,18 +844,6 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
 
     return response
 
-def check_format_date(date):
-    try:
-        return datetime.strptime(date, "%Y-%m-%d").strftime("%d.%m.%Y")
-    except Exception:
-        return date
-
-def safe_float(value):
-    try:
-        return float(value)
-    except Exception as exc:
-        log.error(f"Error on safe_float for value: {value}", exc)
-        return float(0)
 
 def sanitize_attribute_data_filter_result(attributes, attribute_data):
     for key, value in copy.deepcopy(attribute_data).items():
@@ -851,7 +857,6 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                 hakijalta_perittava_maksu_oas = []
                 hakijalta_perittava_maksu_ehdotus = []
                 hakijalta_perittava_maksu = []
-                hakemuksen_saapumispaivamaara = []
                 laskutuspyynto_oas = []
                 laskutuspyynto_ehdotus = []
                 laskutuspyynto_hyvaksymisen_jalkeen = []
@@ -867,10 +872,6 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                         hakijalta_perittava_maksu_ehdotus.append(safe_float(item.get('hakijalta_perittava_maksu_ehdotus', 0)))
                     if "hakijalta_perittava_maksu" in item.keys():
                         hakijalta_perittava_maksu.append(safe_float(item.get('hakijalta_perittava_maksu', 0)))
-                    if "hakemuksen_saapumispaivamaara" in item.keys():
-                        val = item.get('hakemuksen_saapumispaivamaara', None)
-                        if val:
-                            hakemuksen_saapumispaivamaara.append(check_format_date(val))
                     if "laskutuspyynto_oas" in item.keys():
                         val = item.get('laskutuspyynto_oas', None)
                         if val:
@@ -891,7 +892,6 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                 hakija_maksu_yhteensa = sum([sum(hakijalta_perittava_maksu_oas), sum(hakijalta_perittava_maksu_ehdotus), sum(hakijalta_perittava_maksu)])
                 attribute_data["kaavaprojekti_maksu_yhteensa"] = hakija_maksu_yhteensa
 
-                attribute_data["hakemuksen_saapumispaivamaara"] = "; ".join(hakemuksen_saapumispaivamaara)
                 attribute_data["laskutuspyynto_oas"] = "; ".join(laskutuspyynto_oas)
                 attribute_data["laskutuspyynto_ehdotus"] = "; ".join(laskutuspyynto_ehdotus)
                 attribute_data["laskutuspyynto_hyvaksymisen_jalkeen"] = "; ".join(laskutuspyynto_hyvaksymisen_jalkeen)
