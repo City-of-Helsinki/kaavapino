@@ -891,12 +891,21 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                 attribute_data["hakijalta_perittava_maksu"] = sum(hakijalta_perittava_maksu)
                 hakija_maksu_yhteensa = sum([sum(hakijalta_perittava_maksu_oas), sum(hakijalta_perittava_maksu_ehdotus), sum(hakijalta_perittava_maksu)])
                 attribute_data["kaavaprojekti_maksu_yhteensa"] = hakija_maksu_yhteensa
-
                 attribute_data["laskutuspyynto_oas"] = "; ".join(laskutuspyynto_oas)
                 attribute_data["laskutuspyynto_ehdotus"] = "; ".join(laskutuspyynto_ehdotus)
                 attribute_data["laskutuspyynto_hyvaksymisen_jalkeen"] = "; ".join(laskutuspyynto_hyvaksymisen_jalkeen)
 
                 attribute_data.pop("hakija_fieldset", None)
+            elif attribute.identifier == "hakemus_fieldset":
+                hakemuksen_saapumispaivamaara = []
+                for item in value:
+                    if "hakemuksen_saapumispaivamaara" in item.keys():
+                        val = item.get('hakemuksen_saapumispaivamaara', None)
+                        if val:
+                            hakemuksen_saapumispaivamaara.append(check_format_date(val))
+
+                attribute_data["hakemuksen_saapumispaivamaara"] = "; ".join(hakemuksen_saapumispaivamaara)
+                attribute_data.pop("hakemus_fieldset", None)
             elif attribute.identifier == "investointi_kustannukset_muu_fieldset":
                 items = []
                 for item in value:
