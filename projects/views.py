@@ -324,6 +324,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["action"] = self.action
         context["confirmed_fields"] = self.request.data.get('confirmed_fields', [])
+        # Extract locked attributes (temporary, not saved to DB) and add field names and VALUES to context
+        locked_attributes = self.request.data.get('lockedAttributes', {})
+        context["locked_fields"] = list(locked_attributes.keys()) if isinstance(locked_attributes, dict) else []
+        context["locked_attributes_data"] = locked_attributes if isinstance(locked_attributes, dict) else {}
+        
+        # DEBUG: Log locked fields extraction
+        if context["locked_fields"]:
+            log.info(f"[LOCK_DEBUG] Extracted locked_fields from request: {context['locked_fields']}")
+            log.info(f"[LOCK_DEBUG] lockedAttributes raw data: {locked_attributes}")
 
         if self.action == "list":
             context["project_schedule_cache"] = \

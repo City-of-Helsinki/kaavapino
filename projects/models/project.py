@@ -1,5 +1,6 @@
 import itertools
 import logging
+from datetime import datetime, date, timedelta
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
@@ -9,6 +10,7 @@ from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.expressions import Value
@@ -16,6 +18,7 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 from private_storage.fields import PrivateFileField
+from rest_framework.exceptions import ValidationError
 from PIL import Image, ImageOps
 
 from projects.actions import verbs
@@ -267,14 +270,28 @@ class Project(models.Model):
         self.attribute_data = {}
         self.update_attribute_data(data)
 
-    def update_attribute_data(self, data, confirmed_fields=None, fake=False):
+    def update_attribute_data(self, data, confirmed_fields=None, fake=False, locked_attributes_data=None):
+        from datetime import datetime
         confirmed_fields = confirmed_fields or []
+        locked_attributes_data = locked_attributes_data or {}
 
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
 
         if not data:
             return False
+
+        # DEBUG: Log what we're protecting
+        if confirmed_fields:
+            log.info(f"[LOCK_DEBUG] update_attribute_data - confirmed_fields (protected): {confirmed_fields}")
+            log.info(f"[LOCK_DEBUG] update_attribute_data - data keys to process: {list(data.keys())}")
+        
+        log.info(f"[LOCK_DEBUG] update_attribute_data - fake={fake}, has locked_attributes_data={bool(locked_attributes_data)}")
+        if locked_attributes_data:
+            log.info(f"[LOCK_DEBUG] update_attribute_data - locked_attributes_data: {locked_attributes_data}")
+
+        # No reverse validation - let normal phase validation handle date ordering
+        # Lock protection only applies to the locked fields themselves
 
         for identifier, value in data.items():
             try:
@@ -284,6 +301,7 @@ class Project(models.Model):
                 continue
 
             if identifier in confirmed_fields:
+                log.info(f"[LOCK_DEBUG] SKIPPING protected field: {identifier} (value would be: {value})")
                 continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
 
             self.attribute_data[identifier] = value
@@ -407,6 +425,7 @@ class Project(models.Model):
                 # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
                 identifier = deadline.attribute.identifier
                 if identifier in confirmed_fields:
+                    log.info(f"[LOCK_DEBUG] _set_calculated_deadline - BLOCKED recalculation for protected field: {identifier} (keeping: {date})")
                     return date # Don't allow editing confirmed fields
 
                 # Prioritize value from preview_attribute_data over calculated value
@@ -547,15 +566,28 @@ class Project(models.Model):
 
         # Update attribute-based deadlines
         dls_to_update = []
+        # DEBUG: Log deadline update protection
+        if confirmed_fields:
+            log.info(f"[LOCK_DEBUG] update_deadlines - confirmed_fields (protected): {confirmed_fields}")
+        
         for dl in self.deadlines.all().select_related("deadline__attribute"):
             if not dl.deadline.attribute:
+                continue
+
+            # Skip locked/confirmed fields - they should not be updated
+            if dl.deadline.attribute.identifier in confirmed_fields:
+                log.info(f"[LOCK_DEBUG] SKIPPING deadline update for protected field: {dl.deadline.attribute.identifier} (current: {dl.date})")
                 continue
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
             value = value if value != 'null' else None
             if dl.date != value:
+                log.info(f"[LOCK_DEBUG] Updating deadline {dl.deadline.attribute.identifier}: {dl.date} -> {value}")
                 dl.date = value
                 dls_to_update.append(dl)
+        
+        if dls_to_update:
+            log.info(f"[LOCK_DEBUG] Bulk updating {len(dls_to_update)} deadlines")
         self.deadlines.bulk_update(dls_to_update, ['date'])
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
