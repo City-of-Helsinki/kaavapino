@@ -304,6 +304,11 @@ class Project(models.Model):
                 log.info(f"[LOCK_DEBUG] SKIPPING protected field: {identifier} (value would be: {value})")
                 continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
 
+            # Skip writes to locked attributes in preview/validation mode
+            if fake and locked_attributes_data and identifier in locked_attributes_data:
+                log.info(f"[LOCK_DEBUG] SKIPPING locked field on preview: {identifier} (incoming value: {value}, locked value: {locked_attributes_data.get(identifier)})")
+                continue
+
             self.attribute_data[identifier] = value
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
                 geometry_query_params = {"attribute": attribute, "project": self}
