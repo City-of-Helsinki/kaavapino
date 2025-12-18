@@ -329,11 +329,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         locked_attributes = self.request.data.get('lockedAttributes', {})
         context["locked_fields"] = list(locked_attributes.keys()) if isinstance(locked_attributes, dict) else []
         context["locked_attributes_data"] = locked_attributes if isinstance(locked_attributes, dict) else {}
-        
-        # DEBUG: Log locked fields extraction
-        if context["locked_fields"]:
-            log.info(f"[LOCK_DEBUG] Extracted locked_fields from request: {context['locked_fields']}")
-            log.info(f"[LOCK_DEBUG] lockedAttributes raw data: {locked_attributes}")
 
         if self.action == "list":
             context["project_schedule_cache"] = \
@@ -993,7 +988,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                                 if k in resp_attr and resp_attr.get(k) != v:
                                     locked_conflicts.append(k)
                         if locked_conflicts:
-                            log.info(f"[LOCK_DEBUG] Preview attempted to modify locked fields: {locked_conflicts}")
                             transaction.set_rollback(True)
                             return Response({
                                 'locked_fields': locked_conflicts,
@@ -1008,7 +1002,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                     
                 except ValidationError as ve:
                     # ValidationError during preview - extract affected fields and return locked_fields format
-                    log.info(f"[LOCK_DEBUG] ValidationError during preview, rolling back")
                     transaction.set_rollback(True)
                     
                     # Extract field names from ValidationError detail
@@ -1019,8 +1012,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                             affected_fields = list(ve.detail['attribute_data'].keys())
                         else:
                             affected_fields = list(ve.detail.keys())
-                    
-                    log.info(f"[LOCK_DEBUG] Affected fields from ValidationError: {affected_fields}")
                     
                     # Return locked_fields response format for frontend
                     if affected_fields:

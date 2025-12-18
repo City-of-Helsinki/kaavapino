@@ -281,18 +281,6 @@ class Project(models.Model):
         if not data:
             return False
 
-        # DEBUG: Log what we're protecting
-        if confirmed_fields:
-            log.info(f"[LOCK_DEBUG] update_attribute_data - confirmed_fields (protected): {confirmed_fields}")
-            log.info(f"[LOCK_DEBUG] update_attribute_data - data keys to process: {list(data.keys())}")
-        
-        log.info(f"[LOCK_DEBUG] update_attribute_data - fake={fake}, has locked_attributes_data={bool(locked_attributes_data)}")
-        if locked_attributes_data:
-            log.info(f"[LOCK_DEBUG] update_attribute_data - locked_attributes_data: {locked_attributes_data}")
-
-        # No reverse validation - let normal phase validation handle date ordering
-        # Lock protection only applies to the locked fields themselves
-
         for identifier, value in data.items():
             try:
                 attribute = Attribute.objects.get(identifier=identifier)
@@ -301,12 +289,10 @@ class Project(models.Model):
                 continue
 
             if identifier in confirmed_fields:
-                log.info(f"[LOCK_DEBUG] SKIPPING protected field: {identifier} (value would be: {value})")
                 continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
 
             # Skip writes to locked attributes in preview/validation mode
             if fake and locked_attributes_data and identifier in locked_attributes_data:
-                log.info(f"[LOCK_DEBUG] SKIPPING locked field on preview: {identifier} (incoming value: {value}, locked value: {locked_attributes_data.get(identifier)})")
                 continue
 
             self.attribute_data[identifier] = value
@@ -430,7 +416,6 @@ class Project(models.Model):
                 # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
                 identifier = deadline.attribute.identifier
                 if identifier in confirmed_fields:
-                    log.info(f"[LOCK_DEBUG] _set_calculated_deadline - BLOCKED recalculation for protected field: {identifier} (keeping: {date})")
                     return date # Don't allow editing confirmed fields
 
                 # Prioritize value from preview_attribute_data over calculated value
@@ -571,9 +556,6 @@ class Project(models.Model):
 
         # Update attribute-based deadlines
         dls_to_update = []
-        # DEBUG: Log deadline update protection
-        if confirmed_fields:
-            log.info(f"[LOCK_DEBUG] update_deadlines - confirmed_fields (protected): {confirmed_fields}")
         
         for dl in self.deadlines.all().select_related("deadline__attribute"):
             if not dl.deadline.attribute:
@@ -581,18 +563,14 @@ class Project(models.Model):
 
             # Skip locked/confirmed fields - they should not be updated
             if dl.deadline.attribute.identifier in confirmed_fields:
-                log.info(f"[LOCK_DEBUG] SKIPPING deadline update for protected field: {dl.deadline.attribute.identifier} (current: {dl.date})")
                 continue
 
             value = self.attribute_data.get(dl.deadline.attribute.identifier)
             value = value if value != 'null' else None
             if dl.date != value:
-                log.info(f"[LOCK_DEBUG] Updating deadline {dl.deadline.attribute.identifier}: {dl.date} -> {value}")
                 dl.date = value
                 dls_to_update.append(dl)
         
-        if dls_to_update:
-            log.info(f"[LOCK_DEBUG] Bulk updating {len(dls_to_update)} deadlines")
         self.deadlines.bulk_update(dls_to_update, ['date'])
         # Calculate automatic values for newly added deadlines
         self._set_calculated_deadlines(
@@ -740,11 +718,9 @@ class Project(models.Model):
                 self.attribute_data[attribute.identifier] = None
                 updated = True
         if updated:
-            log.info(f"Clearing data by data_retention_plan '{data_retention_plan}' from project '{self}'")
             self.save()
 
     def clear_audit_log_data(self):
-        log.info(f"Clearing audit log data from project '{self}'")
         LogEntry.objects.filter(object_id=str(self.pk)).delete()  # Clears django-admin logs from django_admin_log table
         ActStreamAction.objects.filter(target_object_id=str(self.pk)).delete()  # Clear audit logs from actstream_action table
 

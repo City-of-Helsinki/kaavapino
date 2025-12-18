@@ -1793,12 +1793,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         # Combine confirmed and locked fields into single protected list
         protected_fields = list(set(confirmed_fields + locked_fields))
         
-        # DEBUG: Log protected fields combination
-        log.info(f"[LOCK_DEBUG] Serializer - confirmed_fields: {confirmed_fields}")
-        log.info(f"[LOCK_DEBUG] Serializer - locked_fields: {locked_fields}")
-        log.info(f"[LOCK_DEBUG] Serializer - protected_fields (combined): {protected_fields}")
-        log.info(f"[LOCK_DEBUG] Serializer - attribute_data keys: {list(attribute_data.keys())}")
-        
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
