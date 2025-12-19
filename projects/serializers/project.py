@@ -1784,8 +1784,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             pass
 
     def update(self, instance: Project, validated_data: dict) -> Project:
-        import logging
-        log = logging.getLogger(__name__)
+        
+        
         
         attribute_data = validated_data.pop("attribute_data", {})
         confirmed_fields = self.context["confirmed_fields"]

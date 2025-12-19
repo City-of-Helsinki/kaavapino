@@ -1,6 +1,5 @@
 import itertools
 import logging
-from datetime import datetime, date, timedelta
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
@@ -10,7 +9,6 @@ from django.contrib.gis.db import models
 from django.contrib.postgres.fields import ArrayField
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
-from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.serializers.json import DjangoJSONEncoder, json
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.expressions import Value
@@ -18,7 +16,6 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 from private_storage.fields import PrivateFileField
-from rest_framework.exceptions import ValidationError
 from PIL import Image, ImageOps
 
 from projects.actions import verbs
