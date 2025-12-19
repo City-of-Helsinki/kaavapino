@@ -270,6 +270,60 @@ class Project(models.Model):
         self.attribute_data = {}
         self.update_attribute_data(data)
 
+    def _should_skip_attribute_update(self, identifier, confirmed_fields, fake, locked_attributes_data):
+        """Check if attribute update should be skipped."""
+        if identifier in confirmed_fields:
+            return True
+        if fake and locked_attributes_data and identifier in locked_attributes_data:
+            return True
+        return False
+
+    def _update_geometry_attribute(self, attribute, value):
+        """Handle geometry type attribute updates."""
+        geometry_query_params = {"attribute": attribute, "project": self}
+        if not value:
+            ProjectAttributeMultipolygonGeometry.objects.filter(
+                **geometry_query_params
+            ).delete()
+        else:
+            ProjectAttributeMultipolygonGeometry.objects.update_or_create(
+                **geometry_query_params, defaults={"geometry": value}
+            )
+
+    def _update_file_or_image_attribute(self, identifier, value):
+        """Handle file or image type attribute updates."""
+        if not value:
+            self.attribute_data.pop(identifier, None)
+
+    def _update_fieldset_attribute(self, identifier, attribute, value):
+        """Handle fieldset type attribute updates."""
+        serialized_value = attribute.serialize_value(value)
+        if not serialized_value:
+            self.attribute_data.pop(identifier, None)
+        else:
+            self.attribute_data[identifier] = serialized_value
+
+    def _update_standard_attribute(self, identifier, attribute, value):
+        """Handle standard type attribute updates."""
+        serialized_value = attribute.serialize_value(value)
+        if serialized_value is not None:
+            self.attribute_data[identifier] = serialized_value
+        else:
+            self.attribute_data.pop(identifier, None)
+
+    def _process_single_attribute(self, identifier, value, attribute):
+        """Process a single attribute update based on its type."""
+        self.attribute_data[identifier] = value
+        
+        if attribute.value_type == Attribute.TYPE_GEOMETRY:
+            self._update_geometry_attribute(attribute, value)
+        elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
+            self._update_file_or_image_attribute(identifier, value)
+        elif attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
+            self._update_fieldset_attribute(identifier, attribute, value)
+        else:
+            self._update_standard_attribute(identifier, attribute, value)
+
     def update_attribute_data(self, data, confirmed_fields=None, fake=False, locked_attributes_data=None):
         from datetime import datetime
         confirmed_fields = confirmed_fields or []
@@ -288,40 +342,10 @@ class Project(models.Model):
                 log.warning(f"Attribute {identifier} not found")
                 continue
 
-            if identifier in confirmed_fields:
-                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
-
-            # Skip writes to locked attributes in preview/validation mode
-            if fake and locked_attributes_data and identifier in locked_attributes_data:
+            if self._should_skip_attribute_update(identifier, confirmed_fields, fake, locked_attributes_data):
                 continue
 
-            self.attribute_data[identifier] = value
-            if attribute.value_type == Attribute.TYPE_GEOMETRY:
-                geometry_query_params = {"attribute": attribute, "project": self}
-                if not value:
-                    ProjectAttributeMultipolygonGeometry.objects.filter(
-                        **geometry_query_params
-                    ).delete()
-                else:
-                    ProjectAttributeMultipolygonGeometry.objects.update_or_create(
-                        **geometry_query_params, defaults={"geometry": value}
-                    )
-            elif attribute.value_type in [Attribute.TYPE_IMAGE, Attribute.TYPE_FILE]:
-                if not value:
-                    self.attribute_data.pop(identifier, None)
-            elif attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
-                serialized_value = attribute.serialize_value(value)
-                if not serialized_value:
-                    self.attribute_data.pop(identifier, None)
-                else:
-                    self.attribute_data[identifier] = serialized_value
-            else:
-                serialized_value = attribute.serialize_value(value)
-
-                if serialized_value is not None:
-                    self.attribute_data[identifier] = serialized_value
-                else:
-                    self.attribute_data.pop(identifier, None)
+            self._process_single_attribute(identifier, value, attribute)
 
         return True
 
