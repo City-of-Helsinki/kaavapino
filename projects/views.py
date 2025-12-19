@@ -28,6 +28,7 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework_extensions.mixins import NestedViewSetMixin
@@ -324,6 +325,10 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["action"] = self.action
         context["confirmed_fields"] = self.request.data.get('confirmed_fields', [])
+        # Extract locked attributes (temporary, not saved to DB) and add field names and VALUES to context
+        locked_attributes = self.request.data.get('lockedAttributes', {})
+        context["locked_fields"] = list(locked_attributes.keys()) if isinstance(locked_attributes, dict) else []
+        context["locked_attributes_data"] = locked_attributes if isinstance(locked_attributes, dict) else {}
 
         if self.action == "list":
             context["project_schedule_cache"] = \
@@ -937,12 +942,20 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
+        # Normalize fake flag to boolean
+        is_fake = str(fake).lower() in ['1', 'true', 't', 'yes']
         # Store the original confirmed_fields before calling update
         # should prevent confirmed fields from moving when updating or validating 
         confirmed_fields = request.data.get('confirmed_fields', [])
-        original_attribute_data = request.data.get('attribute_data', {})
+        # Capture the persisted snapshot before any mutation
+        try:
+            project_instance = self.get_object()
+            original_attribute_data = dict(project_instance.attribute_data or {})
+        except Exception:
+            original_attribute_data = {}
+        locked_attributes = request.data.get('lockedAttributes', {})
         
-        if not fake:
+        if not is_fake:
         # Actual update logic that saves to db
             result = super().update(request, *args, **kwargs)
             
@@ -954,17 +967,74 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # Validation logic ?fake
         # Run update in 'ghost' mode where no changes are applied to database but result is returned
         with transaction.atomic():
-            result = super().update(request, *args, **kwargs)
-            
-            # Before returning, check if we need to restore original values for confirmed fields
-            if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
-                # Restore original values for confirmed fields
-                for field in confirmed_fields:
-                    if field in original_attribute_data and field in result.data['attribute_data']:
-                        result.data['attribute_data'][field] = original_attribute_data[field]
-            #Prevents saving anything to database but returns values that have been changed by validation to frontend
-            transaction.set_rollback(True)
-            return result
+            # Only use new locking logic if lockedAttributes is not empty
+            if locked_attributes and isinstance(locked_attributes, dict) and len(locked_attributes) > 0:
+                try:
+                    result = super().update(request, *args, **kwargs)
+
+                    # Before returning, check if we need to restore original values for confirmed fields
+                    if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
+                        # Restore original values for confirmed fields
+                        for field in confirmed_fields:
+                            if field in original_attribute_data and field in result.data['attribute_data']:
+                                result.data['attribute_data'][field] = original_attribute_data[field]
+
+                    # If locked fields were attempted to be changed during preview, return structured error and echo original payload
+                    try:
+                        resp_attr = result.data.get('attribute_data', {}) if hasattr(result, 'data') else {}
+                        locked_conflicts = []
+                        if isinstance(locked_attributes, dict) and isinstance(resp_attr, dict):
+                            for k, v in locked_attributes.items():
+                                if k in resp_attr and resp_attr.get(k) != v:
+                                    locked_conflicts.append(k)
+                        if locked_conflicts:
+                            transaction.set_rollback(True)
+                            return Response({
+                                'locked_fields': locked_conflicts,
+                                'attribute_data': original_attribute_data
+                            }, status=status.HTTP_400_BAD_REQUEST)
+                    except Exception as exc:
+                        log.error(f"[LOCK_DEBUG] Error while evaluating locked field conflicts: {exc}")
+
+                    # Prevent saving anything to database but returns values for normal preview success
+                    transaction.set_rollback(True)
+                    return result
+                    
+                except ValidationError as ve:
+                    # ValidationError during preview - extract affected fields and return locked_fields format
+                    transaction.set_rollback(True)
+                    
+                    # Extract field names from ValidationError detail
+                    affected_fields = []
+                    if hasattr(ve, 'detail') and isinstance(ve.detail, dict):
+                        # DRF ValidationError with field-level errors
+                        if 'attribute_data' in ve.detail and isinstance(ve.detail['attribute_data'], dict):
+                            affected_fields = list(ve.detail['attribute_data'].keys())
+                        else:
+                            affected_fields = list(ve.detail.keys())
+                    
+                    # Return locked_fields response format for frontend
+                    if affected_fields:
+                        return Response({
+                            'locked_fields': affected_fields,
+                            'attribute_data': original_attribute_data
+                        }, status=status.HTTP_400_BAD_REQUEST)
+                    else:
+                        # Re-raise if we can't determine affected fields
+                        raise
+            else:
+                # No locked attributes - use original validation logic
+                result = super().update(request, *args, **kwargs)
+                
+                # Before returning, check if we need to restore original values for confirmed fields
+                if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
+                    # Restore original values for confirmed fields
+                    for field in confirmed_fields:
+                        if field in original_attribute_data and field in result.data['attribute_data']:
+                            result.data['attribute_data'][field] = original_attribute_data[field]
+                # Prevents saving anything to database but returns values that have been changed by validation to frontend
+                transaction.set_rollback(True)
+                return result
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):

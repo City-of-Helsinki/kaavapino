@@ -1784,8 +1784,15 @@ class ProjectSerializer(serializers.ModelSerializer):
             pass
 
     def update(self, instance: Project, validated_data: dict) -> Project:
+        
+        
+        
         attribute_data = validated_data.pop("attribute_data", {})
         confirmed_fields = self.context["confirmed_fields"]
+        locked_fields = self.context.get("locked_fields", [])
+        # Combine confirmed and locked fields into single protected list
+        protected_fields = list(set(confirmed_fields + locked_fields))
+        
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
@@ -1826,7 +1833,15 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             self.update_initial_data(validated_data)
             if attribute_data:
-                instance.update_attribute_data(attribute_data, confirmed_fields=confirmed_fields)
+                # Check if this is a fake/preview request
+                is_fake = hasattr(self.context.get("request"), "_fake") and self.context["request"]._fake
+                locked_attrs_data = self.context.get("locked_attributes_data", {})
+                instance.update_attribute_data(
+                    attribute_data, 
+                    confirmed_fields=protected_fields,
+                    fake=is_fake,
+                    locked_attributes_data=locked_attrs_data
+                )
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
 
@@ -1843,9 +1858,9 @@ class ProjectSerializer(serializers.ModelSerializer):
                 project.update_attribute_data(cleared_attributes)
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
+                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=protected_fields)
             elif should_update_deadlines:
-                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
+                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=protected_fields)
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
 
