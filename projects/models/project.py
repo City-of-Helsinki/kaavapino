@@ -17,7 +17,6 @@ from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 from private_storage.fields import PrivateFileField
-from rest_framework.exceptions import ValidationError
 from PIL import Image, ImageOps
 
 from projects.actions import verbs
