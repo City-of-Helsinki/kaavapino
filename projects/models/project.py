@@ -1,6 +1,6 @@
 import itertools
 import logging
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
