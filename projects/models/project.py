@@ -1,3 +1,4 @@
+import datetime
 import itertools
 import logging
 
@@ -392,7 +393,96 @@ class Project(models.Model):
             return False
         return self._check_condition(deadline, preview_attributes)
 
+    def _coerce_date_value(self, value):
+        if value is None:
+            return None
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        if isinstance(value, datetime.date):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.date.fromisoformat(value)
+            except ValueError:
+                try:
+                    return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+                except ValueError:
+                    return None
+        return None
+
+    def _resolve_deadline_date(self, deadline, preview_attribute_data=None):
+        if not deadline:
+            return None
+
+        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
+        if identifier and preview_attribute_data and identifier in preview_attribute_data:
+            return self._coerce_date_value(preview_attribute_data[identifier])
+
+        if identifier:
+            attr_value = self.attribute_data.get(identifier)
+            coerced_value = self._coerce_date_value(attr_value)
+            if coerced_value:
+                return coerced_value
+
+        try:
+            return self.deadlines.get(deadline=deadline).date
+        except ProjectDeadline.DoesNotExist:
+            return None
+
+    def _min_distance_target_date(self, prev_date, distance, deadline):
+        if not prev_date:
+            return None
+
+        if distance.date_type:
+            min_candidate = distance.date_type.valid_days_from(
+                prev_date,
+                distance.distance_from_previous,
+            )
+        else:
+            min_candidate = prev_date + datetime.timedelta(days=distance.distance_from_previous)
+
+        if not min_candidate:
+            return None
+
+        if deadline.date_type:
+            return deadline.date_type.get_closest_valid_date(min_candidate)
+        return min_candidate
+
+    def _enforce_distance_requirements(self, deadline, date, preview_attribute_data=None):
+        current_date = self._coerce_date_value(date)
+        if not current_date:
+            return date
+
+        combined_attributes = dict(self.attribute_data or {})
+        if preview_attribute_data:
+            combined_attributes.update(preview_attribute_data)
+
+        for distance in deadline.distances_to_previous.all():
+            if not distance.check_conditions(combined_attributes):
+                continue
+
+            prev_date = self._resolve_deadline_date(distance.previous_deadline, preview_attribute_data)
+            prev_date = self._coerce_date_value(prev_date)
+            if not prev_date:
+                continue
+
+            min_target = self._min_distance_target_date(prev_date, distance, deadline)
+            if not min_target:
+                continue
+
+            if current_date < min_target:
+                current_date = min_target
+
+        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
+        if preview_attribute_data is not None and identifier and current_date:
+            preview_attribute_data[identifier] = current_date
+
+        return current_date
+
     def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}, confirmed_fields={}):
+        deadline_id = getattr(deadline, 'pk', None)
+        identifier = getattr(getattr(deadline, 'attribute', None), 'identifier', None)
+        base_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
         if not date:
             return None
         try:
@@ -417,6 +507,12 @@ class Project(models.Model):
 
                 # Prioritize value from preview_attribute_data over calculated value
                 date = preview_attribute_data[identifier] if identifier in preview_attribute_data else date
+
+            date = self._enforce_distance_requirements(
+                deadline,
+                date,
+                preview_attribute_data if preview else None,
+            )
 
             if preview or not project_deadline.editable:
                 return date
@@ -445,7 +541,7 @@ class Project(models.Model):
                         old_value=old_value,
                         new_value=new_value,
                     )
-
+            calculated_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
             return date
 
     def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False, confirmed_fields={}):
