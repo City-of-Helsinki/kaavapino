@@ -545,6 +545,8 @@ class Project(models.Model):
             calculated_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
             return date
 
+        return None
+
     def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data=None, is_recursing=False, confirmed_fields=None):
         if preview_attribute_data is None:
             preview_attribute_data = {}
