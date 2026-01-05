@@ -484,7 +484,6 @@ class Project(models.Model):
             preview_attribute_data = {}
         if confirmed_fields is None:
             confirmed_fields = {}
-        base_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
         if not date:
             return None
         try:
