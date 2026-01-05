@@ -484,7 +484,6 @@ class Project(models.Model):
         if confirmed_fields is None:
             confirmed_fields = {}
         deadline_id = getattr(deadline, 'pk', None)
-        identifier = getattr(getattr(deadline, 'attribute', None), 'identifier', None)
         base_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
         if not date:
             return None
