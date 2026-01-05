@@ -478,7 +478,11 @@ class Project(models.Model):
 
         return current_date
 
-    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}, confirmed_fields={}):
+    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data=None, confirmed_fields=None):
+        if preview_attribute_data is None:
+            preview_attribute_data = {}
+        if confirmed_fields is None:
+            confirmed_fields = {}
         deadline_id = getattr(deadline, 'pk', None)
         identifier = getattr(getattr(deadline, 'attribute', None), 'identifier', None)
         base_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
@@ -543,7 +547,11 @@ class Project(models.Model):
             calculated_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
             return date
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False, confirmed_fields={}):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data=None, is_recursing=False, confirmed_fields=None):
+        if preview_attribute_data is None:
+            preview_attribute_data = {}
+        if confirmed_fields is None:
+            confirmed_fields = {}
         if ignore is None:
             ignore = []
         results = {}
