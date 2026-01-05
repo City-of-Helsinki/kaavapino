@@ -541,7 +541,6 @@ class Project(models.Model):
                         old_value=old_value,
                         new_value=new_value,
                     )
-            calculated_date_display = date.isoformat() if hasattr(date, 'isoformat') else date
             return date
 
         return None
