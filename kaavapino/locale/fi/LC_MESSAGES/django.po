@@ -974,6 +974,10 @@ msgstr "kuvaus"
 msgid "archived at"
 msgstr "arkistoitu"
 
+#: projects/models/project.py:222
+msgid "onhold at"
+msgstr "keskeytynyt"
+
 #: projects/models/project.py:1076
 msgid "fieldset path string"
 msgstr "kenttäryhmän polku merkkijonona"
