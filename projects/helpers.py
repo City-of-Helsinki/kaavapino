@@ -835,8 +835,10 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
         # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
         url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
         response["projektin_osoite"] = url
-        response["on_hold"] = project.onhold
+        response["onhold"] = project.onhold
+        response["onhold_at"] = project.onhold_at.strftime("%d.%m.%Y %H:%M:%S") if project.onhold_at else ""
         response["archived"] = project.archived
+        response["archived_at"] = project.archived_at.strftime("%d.%m.%Y %H:%M:%S") if project.archived_at else ""
         response["created_at"] = project.created_at.strftime("%d.%m.%Y %H:%M:%S") if project.created_at else ""
         response["modified_at"] = project.modified_at.strftime("%d.%m.%Y %H:%M:%S") if project.modified_at else ""
 
