@@ -1,6 +1,7 @@
 import datetime
 import re
 import logging
+import time
 import numpy as np
 import requests
 from requests.exceptions import Timeout
@@ -1277,6 +1278,22 @@ class ProjectSerializer(serializers.ModelSerializer):
                 self.context["request"].data.get('attribute_data'),
             )
 
+    def _get_attribute_cache(self, identifiers):
+        cache = self.context.setdefault("attribute_cache", {})
+        if not identifiers:
+            return cache
+
+        clean_ids = [
+            identifier
+            for identifier in identifiers
+            if isinstance(identifier, str) and identifier
+        ]
+        missing = [identifier for identifier in clean_ids if identifier not in cache]
+        if missing:
+            fetched_attributes = Attribute.objects.filter(identifier__in=missing)
+            cache.update({attr.identifier: attr for attr in fetched_attributes})
+        return cache
+
     def generate_sections_data(
         self,
         phase: ProjectPhase,
@@ -1418,6 +1435,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         return should_update_deadlines
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
+        attribute_cache = self.context.setdefault("attribute_cache", {})
         static_property_attributes = {}
         if self.instance:
             static_properties = [
@@ -1428,25 +1446,36 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "create_principles",
                 "create_draft",
             ]
+            static_property_map = {
+                attr.static_property: attr
+                for attr in Attribute.objects.filter(static_property__in=static_properties)
+            }
             for static_property in static_properties:
-                try:
-                    try:
-                        attr = validate_attributes[static_property]
-                    except KeyError:
-                        continue
-
-                    static_property_attributes[
-                        Attribute.objects.get(static_property=static_property).identifier
-                    ] = attr
-                except Attribute.DoesNotExist:
+                attr_obj = static_property_map.get(static_property)
+                if not attr_obj:
                     continue
+                try:
+                    attr_value = validate_attributes[static_property]
+                except KeyError:
+                    continue
+
+                static_property_attributes[attr_obj.identifier] = attr_value
+                attribute_cache[attr_obj.identifier] = attr_obj
 
         if not attribute_data:
             return static_property_attributes
 
+        validation_metrics = self.context.setdefault("validation_metrics", {})
+        if "start" not in validation_metrics:
+            validation_metrics["start"] = time.monotonic()
+        validation_metrics.setdefault("deadline_calc", 0.0)
+
         tmp_attribute_data = {}
-        attribute_objects = { attribute.identifier: attribute for attribute in Attribute.objects.filter(
-            identifier__in=attribute_data.keys())}
+        attribute_objects = {
+            attribute.identifier: attribute
+            for attribute in Attribute.objects.filter(identifier__in=attribute_data.keys())
+        }
+        attribute_cache.update(attribute_objects)
         for attribute_identifier, value in attribute_data.items():
             try:
                 attribute = attribute_objects.get(attribute_identifier)
@@ -1513,6 +1542,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 attribute_data,
                 subtype,
                 self.context["confirmed_fields"],
+                timing_metrics=validation_metrics,
             )
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
@@ -1634,6 +1664,16 @@ class ProjectSerializer(serializers.ModelSerializer):
             for dl in updated_dls:
                 dl.generated = False
             ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
+
+        if validation_metrics.get("start") is not None:
+            total_duration = time.monotonic() - validation_metrics["start"]
+            log.info(
+                "Project validation finished project=%s should_update_deadlines=%s total=%.3fs deadline_calc=%.3fs",
+                getattr(self.instance, "pk", None),
+                should_update_deadlines,
+                total_duration,
+                validation_metrics.get("deadline_calc", 0.0),
+            )
 
         return {**static_property_attributes, **valid_attributes}
 
@@ -1759,11 +1799,17 @@ class ProjectSerializer(serializers.ModelSerializer):
             # create function, even if the `update_attribute_data())` method
             # only sets values and does not make a `save()` call
             if attribute_data:
-                project.update_attribute_data(attribute_data)
+                attribute_cache = self._get_attribute_cache(attribute_data.keys())
+                project.update_attribute_data(attribute_data, attribute_cache=attribute_cache)
                 project.save()
 
             user=self.context["request"].user
-            project.update_deadlines(user=user, initial=True, preview_attributes=project.attribute_data)
+            project.update_deadlines(
+                user=user,
+                initial=True,
+                preview_attributes=project.attribute_data,
+                timing_metrics=self.context.get("validation_metrics"),
+            )
             for dl in project.deadlines.all():
                 self.create_deadline_updates_log(
                     dl.deadline, project, user, None, dl.date
@@ -1834,7 +1880,12 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             self.update_initial_data(validated_data)
             if attribute_data:
-                instance.update_attribute_data(attribute_data, confirmed_fields=confirmed_fields)
+                attribute_cache = self._get_attribute_cache(attribute_data.keys())
+                instance.update_attribute_data(
+                    attribute_data,
+                    confirmed_fields=confirmed_fields,
+                    attribute_cache=attribute_cache,
+                )
 
             project = super(ProjectSerializer, self).update(instance, validated_data)
 
@@ -1848,12 +1899,26 @@ class ProjectSerializer(serializers.ModelSerializer):
                     for project_dl in project.deadlines.all().select_related("deadline", "deadline__attribute")
                     if project_dl.deadline.attribute
                 }
-                project.update_attribute_data(cleared_attributes)
+                cleared_cache = self._get_attribute_cache(cleared_attributes.keys())
+                project.update_attribute_data(
+                    cleared_attributes,
+                    attribute_cache=cleared_cache,
+                )
                 self.log_updates_attribute_data(cleared_attributes)
                 project.deadlines.all().delete()
-                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
+                project.update_deadlines(
+                    user=user,
+                    preview_attributes=attribute_data,
+                    confirmed_fields=confirmed_fields,
+                    timing_metrics=self.context.get("validation_metrics"),
+                )
             elif should_update_deadlines:
-                project.update_deadlines(user=user, preview_attributes=attribute_data, confirmed_fields=confirmed_fields)
+                project.update_deadlines(
+                    user=user,
+                    preview_attributes=attribute_data,
+                    confirmed_fields=confirmed_fields,
+                    timing_metrics=self.context.get("validation_metrics"),
+                )
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
 
