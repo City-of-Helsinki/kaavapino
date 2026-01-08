@@ -1365,6 +1365,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             elif archived is True:
                 attrs["archived_at"] = timezone.now()
 
+        onhold = attrs.get("onhold")
+        was_onhold = self.instance and self.instance.onhold
+
+        if onhold is True and not was_onhold:
+            attrs["onhold_at"] = timezone.now()
+        elif onhold is False and was_onhold:
+            attrs["onhold_at"] = None
+
         if attrs.get("subtype") and self.instance is not None:
             attrs["phase"] = self._validate_phase(attrs)
 
