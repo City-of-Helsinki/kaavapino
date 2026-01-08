@@ -1,6 +1,7 @@
 import datetime
 import itertools
 import logging
+import time
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
@@ -273,8 +274,9 @@ class Project(models.Model):
         self.attribute_data = {}
         self.update_attribute_data(data)
 
-    def update_attribute_data(self, data, confirmed_fields=None, fake=False):
+    def update_attribute_data(self, data, confirmed_fields=None, fake=False, attribute_cache=None):
         confirmed_fields = confirmed_fields or []
+        attribute_cache = attribute_cache or {}
 
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
@@ -282,10 +284,20 @@ class Project(models.Model):
         if not data:
             return False
 
+        identifiers_to_fetch = [
+            identifier
+            for identifier in data.keys()
+            if isinstance(identifier, str) and identifier not in attribute_cache
+        ]
+        if identifiers_to_fetch:
+            fetched_attributes = Attribute.objects.filter(
+                identifier__in=identifiers_to_fetch
+            ).prefetch_related("value_choices")
+            attribute_cache.update({attr.identifier: attr for attr in fetched_attributes})
+
         for identifier, value in data.items():
-            try:
-                attribute = Attribute.objects.get(identifier=identifier)
-            except Attribute.DoesNotExist:
+            attribute = attribute_cache.get(identifier)
+            if not attribute:
                 log.warning(f"Attribute {identifier} not found")
                 continue
 
@@ -528,8 +540,12 @@ class Project(models.Model):
                 ))
                 new_value = json.loads(json.dumps(date, default=str))
 
-                self.update_attribute_data( \
-                    {deadline.attribute.identifier: date})
+                self.update_attribute_data(
+                    {deadline.attribute.identifier: date},
+                    attribute_cache={
+                        deadline.attribute.identifier: deadline.attribute
+                    },
+                )
 
                 if old_value != new_value:
                     action.send(
@@ -545,15 +561,44 @@ class Project(models.Model):
 
         return None
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data=None, is_recursing=False, confirmed_fields=None):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data=None, is_recursing=False, confirmed_fields=None, calculation_cache=None, timing_metrics=None):
         if preview_attribute_data is None:
             preview_attribute_data = {}
         if confirmed_fields is None:
             confirmed_fields = {}
         if ignore is None:
             ignore = []
+        calc_start = time.monotonic() if timing_metrics is not None else None
         results = {}
         fillers = []
+
+        def _cache_key_for(deadline_obj):
+            if not (preview and calculation_cache is not None):
+                return None
+            preview_scope = id(preview_attribute_data) if preview_attribute_data else 0
+            return (deadline_obj.pk, initial, preview_scope)
+
+        def _process_deadline(deadline_obj, calculate_deadline_fn):
+            cache_key = _cache_key_for(deadline_obj)
+            if cache_key and cache_key in calculation_cache:
+                cached_value = calculation_cache[cache_key]
+                if cached_value is not None:
+                    return cached_value
+
+            computed_date = calculate_deadline_fn(self, preview_attributes=preview_attribute_data)
+            result = self._set_calculated_deadline(
+                deadline_obj,
+                computed_date,
+                user,
+                preview,
+                preview_attribute_data,
+                confirmed_fields=confirmed_fields,
+            )
+
+            if cache_key and result is not None:
+                calculation_cache[cache_key] = result
+
+            return result
 
         for deadline in deadlines:
             if initial:
@@ -579,18 +624,13 @@ class Project(models.Model):
                         preview=preview,
                         preview_attribute_data=preview_attribute_data,
                         is_recursing=True,
-                        confirmed_fields=confirmed_fields
+                        confirmed_fields=confirmed_fields,
+                        calculation_cache=calculation_cache,
+                        timing_metrics=timing_metrics,
                     )
                 }
 
-            result = self._set_calculated_deadline(
-                deadline,
-                calculate_deadline(self, preview_attributes=preview_attribute_data),
-                user,
-                preview,
-                preview_attribute_data,
-                confirmed_fields=confirmed_fields
-            )
+            result = _process_deadline(deadline, calculate_deadline)
             if not result:
                 fillers += [deadline]
 
@@ -603,22 +643,19 @@ class Project(models.Model):
             else:
                 calculate_deadline = deadline.calculate_updated
 
-            self._set_calculated_deadline(
-                deadline,
-                calculate_deadline(self, preview_attributes=preview_attribute_data),
-                user,
-                preview,
-                preview_attribute_data,
-                confirmed_fields=confirmed_fields
-            )
+            _process_deadline(deadline, calculate_deadline)
 
         if not is_recursing:
             self.save()
 
+        if calc_start is not None:
+            elapsed = time.monotonic() - calc_start
+            timing_metrics["deadline_calc"] = timing_metrics.get("deadline_calc", 0.0) + elapsed
+
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}):
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None):
         deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
 
         # Delete no longer relevant deadlines and create missing
@@ -674,7 +711,8 @@ class Project(models.Model):
             user,
             initial=True,
             preview_attribute_data=preview_attributes,
-            confirmed_fields=confirmed_fields
+            confirmed_fields=confirmed_fields,
+            timing_metrics=timing_metrics,
         )
 
         # Update automatic deadlines
@@ -697,11 +735,12 @@ class Project(models.Model):
             user,
             initial=False,
             preview_attribute_data=preview_attributes,
-            confirmed_fields=confirmed_fields
+            confirmed_fields=confirmed_fields,
+            timing_metrics=timing_metrics,
         )
 
     # Calculate a preview schedule without saving anything
-    def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None):
+    def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
         confirmed_fields = confirmed_fields or []
 
         # Filter out deadlines that would be deleted
@@ -738,6 +777,8 @@ class Project(models.Model):
                 project_dls[dl] = value
 
         # Generate newly added deadlines
+        calculation_cache = {}
+
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             [
                 dl for dl in new_dls.keys()
@@ -747,6 +788,8 @@ class Project(models.Model):
             initial=True,
             preview=True,
             confirmed_fields=confirmed_fields,
+            calculation_cache=calculation_cache,
+            timing_metrics=timing_metrics,
         )}
         # Update all deadlines
         project_dls = {**project_dls, **self._set_calculated_deadlines(
@@ -761,6 +804,8 @@ class Project(models.Model):
             preview=True,
             preview_attribute_data=updated_attributes,
             confirmed_fields=confirmed_fields,
+            calculation_cache=calculation_cache,
+            timing_metrics=timing_metrics,
         )}
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
