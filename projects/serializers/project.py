@@ -1786,6 +1786,8 @@ class ProjectSerializer(serializers.ModelSerializer):
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
         confirmed_fields = self.context["confirmed_fields"]
+        onhold = validated_data.get("onhold")
+        onhold_changed = onhold is not None and onhold != instance.onhold
         subtype = validated_data.get("subtype")
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
@@ -1795,6 +1797,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
         user=self.context["request"].user
+
+        if onhold_changed:
+            instance.onhold_at = timezone.now() if onhold else None
 
         if phase_changed:
             ProjectPhaseLog.objects.create(

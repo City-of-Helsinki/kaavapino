@@ -218,6 +218,11 @@ class Project(models.Model):
         blank=True,
     )
     onhold = models.BooleanField(default=False)
+    onhold_at = models.DateTimeField(
+        verbose_name=_("onhold at"),
+        null=True,
+        blank=True,
+    )
     owner_edit_override = models.BooleanField(default=False)
 
     # For indexing
