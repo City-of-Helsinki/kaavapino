@@ -1586,9 +1586,36 @@ class ProjectSerializer(serializers.ModelSerializer):
             if not serializer.is_valid(raise_exception=False):
                 errors.update(serializer.errors)
             valid_attributes.update(serializer.validated_data)
-        # If we should validate attribute data, then raise errors if they exist
-        if self.should_validate_attributes() and errors:
-            raise ValidationError(errors)
+
+        # Check if this is a fake (preview) request
+        is_fake_request = getattr(self.context.get("request"), "_fake", False)
+
+        # For fake requests, merge preview values into valid_attributes
+        # This applies backend-corrected dates silently instead of raising errors
+        if is_fake_request and preview:
+            # Collect deadline attribute identifiers for filtering errors
+            deadline_attribute_identifiers = set()
+            for key, value in preview.items():
+                # preview dict has mixed keys: Deadline objects and string identifiers (for booleans)
+                # Only process Deadline objects that have an attribute
+                if hasattr(key, 'attribute') and key.attribute:
+                    identifier = key.attribute.identifier
+                    deadline_attribute_identifiers.add(identifier)
+                    # Apply corrected preview value to valid_attributes
+                    if value is not None:
+                        valid_attributes[identifier] = value
+
+            # Filter out deadline date errors - they're auto-corrected via preview
+            non_date_errors = {
+                k: v for k, v in errors.items()
+                if k not in deadline_attribute_identifiers
+            }
+            if self.should_validate_attributes() and non_date_errors:
+                raise ValidationError(non_date_errors)
+        else:
+            # If we should validate attribute data, then raise errors if they exist
+            if self.should_validate_attributes() and errors:
+                raise ValidationError(errors)
 
 
         def is_confirmed(dl):

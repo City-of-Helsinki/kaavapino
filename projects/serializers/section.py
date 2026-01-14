@@ -98,9 +98,13 @@ def get_regex_validator(attribute):
     return validate
 
 
-def get_deadline_validator(attribute, subtype, preview):
+def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
     def validate(value):
         if not preview:
+            return
+
+        # Skip validation for fake requests - preview values will be applied instead
+        if is_fake_request:
             return
 
         for attr_dl in attribute.deadline.filter(subtype=subtype) \
@@ -170,7 +174,7 @@ def get_deadline_validator(attribute, subtype, preview):
 
     return validate
 
-def create_attribute_field_data(attribute, validation, project, preview):
+def create_attribute_field_data(attribute, validation, project, preview, is_fake_request=False):
     """Create data for initializing attribute field serializer."""
     field_arguments = {}
     field_class = FIELD_TYPES.get(attribute.value_type, None)
@@ -191,6 +195,7 @@ def create_attribute_field_data(attribute, validation, project, preview):
             attribute,
             project.phase.project_subtype,
             preview,
+            is_fake_request=is_fake_request,
         )]
 
     if attribute.value_type == Attribute.TYPE_CHOICE:
@@ -229,7 +234,7 @@ def create_attribute_field_data(attribute, validation, project, preview):
     return FieldData(field_class, field_arguments)
 
 
-def create_fieldset_field_data(attribute, validation, project, preview):
+def create_fieldset_field_data(attribute, validation, project, preview, is_fake_request=False):
     """Dynamically create a serializer for a fieldset type Attribute instance."""
     serializer_fields = {}
     field_arguments = {}
@@ -242,7 +247,7 @@ def create_fieldset_field_data(attribute, validation, project, preview):
         .order_by("fieldset_attribute_source")
         .prefetch_related("deadline")
     ):
-        field_data = create_attribute_field_data(attr, validation, project, preview)
+        field_data = create_attribute_field_data(attr, validation, project, preview, is_fake_request=is_fake_request)
         if not field_data.field_class:
             # TODO: Handle this by failing instead of continuing
             continue
@@ -281,6 +286,7 @@ def create_section_serializer(
     """
 
     request = context.get("request", None)
+    is_fake_request = getattr(request, "_fake", False) if request else False
     attribute_data = get_attribute_data(request, project)
 
     if not request:
@@ -319,11 +325,11 @@ def create_section_serializer(
     for attribute in section_attributes:
         if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             field_data = create_fieldset_field_data(
-                attribute, validation, project, preview,
+                attribute, validation, project, preview, is_fake_request=is_fake_request,
             )
         else:
             field_data = create_attribute_field_data(
-                attribute, validation, project, preview,
+                attribute, validation, project, preview, is_fake_request=is_fake_request,
             )
 
             if not field_data.field_class:
