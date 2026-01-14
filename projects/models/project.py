@@ -221,7 +221,7 @@ class Project(models.Model):
     )
     onhold = models.BooleanField(default=False)
     onhold_at = models.DateTimeField(
-        verbose_name=_("on hold at"),
+        verbose_name=_("onhold at"),
         null=True,
         blank=True,
     )
