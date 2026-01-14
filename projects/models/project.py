@@ -509,7 +509,7 @@ class Project(models.Model):
             else:
                 project_deadline = ProjectDeadline.objects.get(project=self, deadline=deadline)
         except ProjectDeadline.DoesNotExist:
-            return
+            return None
 
         if project_deadline:
             if deadline.attribute and deadline.attribute.identifier:
