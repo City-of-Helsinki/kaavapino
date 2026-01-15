@@ -944,28 +944,53 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         original_attribute_data = request.data.get('attribute_data', {})
         
         if not fake:
-        # Actual update logic that saves to db
-            result = super().update(request, *args, **kwargs)
-            
-            return result
+            # Actual update logic that saves to db
+            return super().update(request, *args, **kwargs)
         
-        # When using fake mode, we need to pass the fake=True parameter to the serializer
-        # This will ensure Project.update_attribute_data respects confirmed_fields
-        request._fake = True  # Add a private attribute to indicate this is a fake call
-        # Validation logic ?fake
-        # Run update in 'ghost' mode where no changes are applied to database but result is returned
-        with transaction.atomic():
-            result = super().update(request, *args, **kwargs)
-            
-            # Before returning, check if we need to restore original values for confirmed fields
-            if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
-                # Restore original values for confirmed fields
-                for field in confirmed_fields:
-                    if field in original_attribute_data and field in result.data['attribute_data']:
-                        result.data['attribute_data'][field] = original_attribute_data[field]
-            #Prevents saving anything to database but returns values that have been changed by validation to frontend
-            transaction.set_rollback(True)
-            return result
+        # KAAV-3492: Simple fast-path for fake validation requests
+        # Just calculate preview deadlines and return them directly
+        project = self.get_object()
+        
+        # Log what was received
+        log.info(f"KAAV-3492 RECEIVED: {len(original_attribute_data)} keys")
+        date_keys_received = {k: v for k, v in original_attribute_data.items() if isinstance(v, str) and len(v) == 10 and v[4] == '-'}
+        log.info(f"KAAV-3492 RECEIVED dates: {date_keys_received}")
+        
+        # Get preview deadlines (corrected dates)
+        preview = project.get_preview_deadlines(
+            original_attribute_data,
+            project.subtype,
+            confirmed_fields,
+        )
+        
+        # Build result from preview values
+        result_attribute_data = {}
+        if preview:
+            for key, value in preview.items():
+                # preview dict has Deadline objects as keys
+                if hasattr(key, 'attribute') and key.attribute:
+                    identifier = key.attribute.identifier
+                    if value is not None:
+                        # Format date as string
+                        if hasattr(value, 'isoformat'):
+                            result_attribute_data[identifier] = value.isoformat()
+                        else:
+                            result_attribute_data[identifier] = value
+        
+        # For any payload keys not in result, keep original (for booleans etc)
+        for key in original_attribute_data:
+            if key not in result_attribute_data:
+                result_attribute_data[key] = original_attribute_data[key]
+        
+        # Log corrections
+        corrections = {}
+        for k, v in result_attribute_data.items():
+            if k in date_keys_received and str(date_keys_received[k]) != str(v):
+                corrections[k] = f"{date_keys_received[k]} -> {v}"
+        log.info(f"KAAV-3492 CORRECTIONS: {corrections if corrections else 'none'}")
+        log.info(f"KAAV-3492 RETURNING: {len(result_attribute_data)} keys")
+        
+        return Response({"attribute_data": result_attribute_data})
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
