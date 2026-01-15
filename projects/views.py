@@ -951,10 +951,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # Just calculate preview deadlines and return them directly
         project = self.get_object()
         
-        # Log what was received
-        log.info(f"KAAV-3492 RECEIVED: {len(original_attribute_data)} keys")
         date_keys_received = {k: v for k, v in original_attribute_data.items() if isinstance(v, str) and len(v) == 10 and v[4] == '-'}
-        log.info(f"KAAV-3492 RECEIVED dates: {date_keys_received}")
         
         # Get preview deadlines (corrected dates)
         preview = project.get_preview_deadlines(
