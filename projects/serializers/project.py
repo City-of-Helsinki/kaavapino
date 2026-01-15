@@ -1594,8 +1594,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         # Check if this is a fake (preview) request
         is_fake_request = getattr(self.context.get("request"), "_fake", False)
-        
-        log.info(f"KAAV-3492 DEBUG: is_fake_request={is_fake_request}, preview={preview is not None}, preview_count={len(preview) if preview else 0}")
 
         # For fake requests, merge preview values into valid_attributes
         # This applies backend-corrected dates silently instead of raising errors
@@ -1611,8 +1609,6 @@ class ProjectSerializer(serializers.ModelSerializer):
                     # Apply corrected preview value to valid_attributes
                     if value is not None:
                         valid_attributes[identifier] = value
-                        log.info(f"KAAV-3492 DEBUG: Applied preview {identifier}={value}")
-
             # Filter out deadline date errors - they're auto-corrected via preview
             non_date_errors = {
                 k: v for k, v in errors.items()
@@ -1716,7 +1712,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
         result = {**static_property_attributes, **valid_attributes}
-        log.info(f"KAAV-3492 DEBUG: _validate_attribute_data returning {len(result)} keys: {list(result.keys())[:10]}...")
         return result
 
     def _validate_public(self, attrs):

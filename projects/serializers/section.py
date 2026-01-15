@@ -292,11 +292,13 @@ def create_section_serializer(
     if not request:
         return None
 
-    # KAAV-3492: Only process attributes that are in the REQUEST payload (not the full merged attribute_data)
-    request_attribute_data = request.data.get("attribute_data", {}) if request else {}
-    if not isinstance(request_attribute_data, Mapping):
-        request_attribute_data = {}
-    payload_keys = set(request_attribute_data.keys()) if request_attribute_data else set()
+    # For fake requests only, filter to attributes in the REQUEST payload
+    # For normal requests, process all relevant attributes (original behavior)
+    payload_keys = None
+    if is_fake_request:
+        request_attribute_data = request.data.get("attribute_data", {}) if request else {}
+        if isinstance(request_attribute_data, Mapping) and request_attribute_data:
+            payload_keys = set(request_attribute_data.keys())
 
     if isinstance(section, ProjectPhaseSection):
         section_attributes = [
@@ -309,7 +311,7 @@ def create_section_serializer(
                 .prefetch_related("attribute__deadline")
             )
             if is_relevant_attribute(section_attribute, attribute_data)
-            and section_attribute.attribute.identifier in payload_keys
+            and (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
     elif isinstance(section, ProjectFloorAreaSection):
         section_attributes = [
@@ -317,7 +319,7 @@ def create_section_serializer(
             for section_attribute
             in section.projectfloorareasectionattribute_set.order_by("index")
             if is_relevant_attribute(section_attribute, attribute_data)
-            and section_attribute.attribute.identifier in payload_keys
+            and (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
     elif isinstance(section, ProjectPhaseDeadlineSection):
         section_attributes = [
@@ -325,7 +327,7 @@ def create_section_serializer(
             for section_attribute
             in section.projectphasedeadlinesectionattribute_set.all()
             .select_related("attribute").prefetch_related("attribute__deadline")
-            if section_attribute.attribute.identifier in payload_keys
+            if (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
     else:
         return None
