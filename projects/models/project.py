@@ -803,7 +803,7 @@ class Project(models.Model):
             None,
             initial=False,
             preview=True,
-            preview_attribute_data=updated_attributes,
+            preview_attribute_data=updated_attribute_data,
             confirmed_fields=confirmed_fields,
             calculation_cache=calculation_cache,
             timing_metrics=timing_metrics,
