@@ -486,7 +486,10 @@ class Project(models.Model):
 
         identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
         if preview_attribute_data is not None and identifier and current_date:
+            old_val = preview_attribute_data.get(identifier)
             preview_attribute_data[identifier] = current_date
+            if old_val != current_date:
+                log.warning(f"[CASCADE DEBUG]   _enforce_distance: UPDATED preview_attribute_data[{identifier}] = {current_date} (was {old_val})")
 
         return current_date
 
@@ -570,6 +573,13 @@ class Project(models.Model):
             ignore = []
         calc_start = time.monotonic() if timing_metrics is not None else None
         results = {}
+        
+        # DEBUG: Log entry
+        dl_names = [getattr(getattr(dl, 'attribute', None), 'identifier', None) or str(dl) for dl in deadlines]
+        ignore_names = [getattr(getattr(dl, 'attribute', None), 'identifier', None) or str(dl) for dl in ignore]
+        log.warning(f"[CASCADE DEBUG] _set_calculated_deadlines ENTRY: initial={initial}, is_recursing={is_recursing}")
+        log.warning(f"[CASCADE DEBUG]   deadlines to process: {dl_names}")
+        log.warning(f"[CASCADE DEBUG]   ignore list: {ignore_names}")
         fillers = []
 
         def _cache_key_for(deadline_obj):
@@ -579,13 +589,22 @@ class Project(models.Model):
             return (deadline_obj.pk, initial, preview_scope)
 
         def _process_deadline(deadline_obj, calculate_deadline_fn):
+            dl_identifier = getattr(getattr(deadline_obj, 'attribute', None), 'identifier', None) or str(deadline_obj)
             cache_key = _cache_key_for(deadline_obj)
             if cache_key and cache_key in calculation_cache:
                 cached_value = calculation_cache[cache_key]
                 if cached_value is not None:
+                    log.warning(f"[CASCADE DEBUG]   _process_deadline CACHE HIT: {dl_identifier} -> {cached_value}")
                     return cached_value
 
             computed_date = calculate_deadline_fn(self, preview_attributes=preview_attribute_data)
+            log.warning(f"[CASCADE DEBUG]   _process_deadline CALCULATED: {dl_identifier} -> {computed_date}")
+            
+            # DEBUG: Log relevant preview_attribute_data values for phase dates
+            phase_keys = ['oasvaihe_paattyy_pvm', 'ehdotusvaihe_alkaa_pvm', 'ehdotusvaihe_paattyy_pvm', 'tarkistettuehdotusvaihe_alkaa_pvm', 'tarkistettuehdotusvaihe_paattyy_pvm']
+            relevant = {k: preview_attribute_data.get(k) for k in phase_keys if k in preview_attribute_data}
+            log.warning(f"[CASCADE DEBUG]     preview_attribute_data phase values: {relevant}")
+            
             result = self._set_calculated_deadline(
                 deadline_obj,
                 computed_date,
@@ -601,18 +620,28 @@ class Project(models.Model):
             return result
 
         for deadline in deadlines:
+            dl_identifier = getattr(getattr(deadline, 'attribute', None), 'identifier', None) or str(deadline)
             if initial:
                 calculate_deadline = deadline.calculate_initial
+                all_deps = deadline.initial_depends_on
                 dependencies = [
-                    dl for dl in deadline.initial_depends_on
+                    dl for dl in all_deps
                     if dl not in ignore
                 ]
             else:
                 calculate_deadline = deadline.calculate_updated
+                all_deps = deadline.update_depends_on
                 dependencies = [
-                    dl for dl in deadline.update_depends_on
+                    dl for dl in all_deps
                     if dl not in ignore
                 ]
+            
+            # DEBUG: Log dependencies for each deadline
+            all_dep_names = [getattr(getattr(dl, 'attribute', None), 'identifier', None) or str(dl) for dl in all_deps]
+            filtered_dep_names = [getattr(getattr(dl, 'attribute', None), 'identifier', None) or str(dl) for dl in dependencies]
+            if all_dep_names:
+                log.warning(f"[CASCADE DEBUG]   {dl_identifier}: all_deps={all_dep_names}, after_filter={filtered_dep_names}")
+            
             if dependencies:
                 ignore += dependencies
                 results = { **results,
@@ -631,6 +660,7 @@ class Project(models.Model):
                 }
 
             result = _process_deadline(deadline, calculate_deadline)
+            log.warning(f"[CASCADE DEBUG]   FINAL result for {dl_identifier}: {result}")
             if not result:
                 fillers += [deadline]
 
@@ -645,7 +675,7 @@ class Project(models.Model):
 
             _process_deadline(deadline, calculate_deadline)
 
-        if not is_recursing:
+        if not is_recursing and not preview:
             self.save()
 
         if calc_start is not None:
@@ -776,6 +806,11 @@ class Project(models.Model):
             if value:
                 project_dls[dl] = value
 
+        # DEBUG: Log phase dates in updated_attribute_data before calculations
+        phase_keys = ['oasvaihe_alkaa_pvm', 'oasvaihe_paattyy_pvm', 'ehdotusvaihe_alkaa_pvm', 'ehdotusvaihe_paattyy_pvm', 'tarkistettuehdotusvaihe_alkaa_pvm', 'tarkistettuehdotusvaihe_paattyy_pvm']
+        phase_vals = {k: updated_attribute_data.get(k) for k in phase_keys}
+        log.warning(f"[CASCADE DEBUG] get_preview_deadlines: BEFORE calculations, phase dates: {phase_vals}")
+
         # Generate newly added deadlines
         calculation_cache = {}
 
@@ -807,6 +842,11 @@ class Project(models.Model):
             calculation_cache=calculation_cache,
             timing_metrics=timing_metrics,
         )}
+        
+        # DEBUG: Log phase dates AFTER all calculations
+        phase_vals_after = {k: updated_attribute_data.get(k) for k in phase_keys}
+        log.warning(f"[CASCADE DEBUG] get_preview_deadlines: AFTER calculations, phase dates: {phase_vals_after}")
+        
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
             if type(value) == bool:
