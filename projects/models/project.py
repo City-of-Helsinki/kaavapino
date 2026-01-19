@@ -512,10 +512,11 @@ class Project(models.Model):
 
         if project_deadline:
             if deadline.attribute and deadline.attribute.identifier:
-                # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
+                # Check if the attribute is in confirmed_fields - if so, keep the original value
                 identifier = deadline.attribute.identifier
                 if identifier in confirmed_fields:
-                    return date # Don't allow editing confirmed fields
+                    # Get the original confirmed value - don't let calculation overwrite it
+                    return self.attribute_data.get(identifier)
 
                 # NOTE: Removed line that prioritized preview_attribute_data over calculated value
                 # This was preventing cascade updates (ehdotus -> tarkistettu_ehdotus)
@@ -702,21 +703,24 @@ class Project(models.Model):
                 dl.date = value
                 dls_to_update.append(dl)
         self.deadlines.bulk_update(dls_to_update, ['date'])
-        # Calculate automatic values for newly added deadlines
-        self._set_calculated_deadlines(
-            [
-                dl.deadline for dl in generated_deadlines
-                if dl.deadline.initial_calculations.exists() \
-                    or dl.deadline.default_to_created_at
-            ],
-            user,
-            initial=True,
-            preview_attribute_data=preview_attributes,
-            confirmed_fields=confirmed_fields,
-            timing_metrics=timing_metrics,
-        )
+        
+        # Calculate initial values for newly added deadlines
+        if generated_deadlines:
+            self._set_calculated_deadlines(
+                [
+                    dl.deadline for dl in generated_deadlines
+                    if dl.deadline.initial_calculations.exists() \
+                        or dl.deadline.default_to_created_at
+                ],
+                user,
+                initial=True,
+                preview_attribute_data=preview_attributes,
+                confirmed_fields=confirmed_fields,
+                timing_metrics=timing_metrics,
+            )
 
-        # Update automatic deadlines
+        # Update automatic deadlines (phase boundaries, etc.)
+        # confirmed_fields protection in _set_calculated_deadline prevents confirmed dates from changing
         self._set_calculated_deadlines(
             [
                 dl.deadline for dl in self.deadlines.all()
