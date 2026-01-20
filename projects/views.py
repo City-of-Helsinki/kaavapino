@@ -951,8 +951,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # Just calculate preview deadlines and return them directly
         project = self.get_object()
         
-        date_keys_received = {k: v for k, v in original_attribute_data.items() if isinstance(v, str) and len(v) == 10 and v[4] == '-'}
-        
         # Get preview deadlines (corrected dates)
         preview = project.get_preview_deadlines(
             original_attribute_data,
@@ -978,14 +976,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         for key in original_attribute_data:
             if key not in result_attribute_data:
                 result_attribute_data[key] = original_attribute_data[key]
-        
-        # Log corrections
-        corrections = {}
-        for k, v in result_attribute_data.items():
-            if k in date_keys_received and str(date_keys_received[k]) != str(v):
-                corrections[k] = f"{date_keys_received[k]} -> {v}"
-        log.info(f"KAAV-3492 CORRECTIONS: {corrections if corrections else 'none'}")
-        log.info(f"KAAV-3492 RETURNING: {len(result_attribute_data)} keys")
         
         return Response({"attribute_data": result_attribute_data})
 
