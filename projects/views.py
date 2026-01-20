@@ -1766,6 +1766,9 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                         return validate_date(valid_date, initial_error_reason="invalid_date")
 
                     for distance in attr_dl.distances_to_previous.all():
+                        # Skip this distance rule if its conditions are not met
+                        if not distance.check_conditions(project.attribute_data):
+                            continue
                         try:
                             prev_dl = project.deadlines.get(deadline=distance.previous_deadline)
                             if distance.date_type:
@@ -1789,6 +1792,9 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                             pass
 
                     for distance in attr_dl.distances_to_next.all():
+                        # Skip this distance rule if its conditions are not met
+                        if not distance.check_conditions(project.attribute_data):
+                            continue
                         try:
                             next_dl = project.deadlines.get(deadline=distance.deadline)
                             if distance.date_type:
