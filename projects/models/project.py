@@ -460,6 +460,60 @@ class Project(models.Model):
             return deadline.date_type.get_closest_valid_date(min_candidate)
         return min_candidate
 
+    def _get_esillaolo_off_distance_override(self, deadline, combined_attributes):
+        """
+        Check if esilläolo is OFF for periaatteet/luonnos phases and return override distance config.
+        For lautakunta deadlines when esilläolo is OFF, we should calculate from phase start (maaraaika)
+        or from maaraaika (lautakunnassa), not from esilläolo_paattyy.
+        
+        Reads distance values from DB instead of hardcoding them.
+        
+        Returns: (base_date_key, distance_days) or None
+        """
+        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
+        if not identifier:
+            return None
+        
+        def get_db_distance(dl, target_prev_identifier):
+            """Get distance from DB for a specific previous deadline identifier."""
+            for dist in dl.distances_to_previous.all():
+                prev_id = getattr(getattr(dist.previous_deadline, "attribute", None), "identifier", None)
+                if prev_id == target_prev_identifier:
+                    return dist.distance_from_previous
+            return None
+        
+        # Check for luonnos lautakunta deadlines
+        if identifier == "kaavaluonnos_kylk_aineiston_maaraaika":
+            esillaolo_on = combined_attributes.get("jarjestetaan_luonnos_esillaolo_1")
+            lautakunta_on = combined_attributes.get("kaavaluonnos_lautakuntaan_1")
+            if not esillaolo_on and lautakunta_on:
+                distance = get_db_distance(deadline, "luonnosvaihe_alkaa_pvm")
+                return ("luonnosvaihe_alkaa_pvm", distance)
+        
+        if identifier == "milloin_kaavaluonnos_lautakunnassa":
+            esillaolo_on = combined_attributes.get("jarjestetaan_luonnos_esillaolo_1")
+            lautakunta_on = combined_attributes.get("kaavaluonnos_lautakuntaan_1")
+            if not esillaolo_on and lautakunta_on:
+                distance = get_db_distance(deadline, "viimeistaan_mielipiteet_luonnos")
+                return ("kaavaluonnos_kylk_aineiston_maaraaika", distance)
+        
+        # Check for periaatteet lautakunta deadlines
+        if identifier == "periaatteet_lautakunta_aineiston_maaraaika":
+            esillaolo_on = combined_attributes.get("jarjestetaan_periaatteet_esillaolo_1")
+            lautakunta_on = combined_attributes.get("periaatteet_lautakuntaan_1")
+            if not esillaolo_on and lautakunta_on:
+                distance = get_db_distance(deadline, "periaatteetvaihe_alkaa_pvm")
+                return ("periaatteetvaihe_alkaa_pvm", distance)
+        
+        if identifier == "milloin_periaatteet_lautakunnassa":
+            esillaolo_on = combined_attributes.get("jarjestetaan_periaatteet_esillaolo_1")
+            lautakunta_on = combined_attributes.get("periaatteet_lautakuntaan_1")
+            if not esillaolo_on and lautakunta_on:
+                distance = get_db_distance(deadline, "viimeistaan_mielipiteet_periaatteista")
+                return ("periaatteet_lautakunta_aineiston_maaraaika", distance)
+        
+        return None
+
     def _enforce_distance_requirements(self, deadline, date, preview_attribute_data=None):
         current_date = self._coerce_date_value(date)
         if not current_date:
@@ -468,6 +522,26 @@ class Project(models.Model):
         combined_attributes = dict(self.attribute_data or {})
         if preview_attribute_data:
             combined_attributes.update(preview_attribute_data)
+
+        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
+
+        # Special handling for luonnos/periaatteet lautakunta when esilläolo is OFF
+        # In this case, calculate from phase start or maaraaika instead of esilläolo_paattyy
+        override = self._get_esillaolo_off_distance_override(deadline, combined_attributes)
+        if override:
+            base_date_key, distance_days = override
+            base_date = combined_attributes.get(base_date_key)
+            base_date = self._coerce_date_value(base_date)
+            if base_date:
+                min_target = base_date + datetime.timedelta(days=distance_days)
+                if deadline.date_type:
+                    min_target = deadline.date_type.get_closest_valid_date(min_target)
+                if current_date < min_target:
+                    current_date = min_target
+                # Skip normal distance enforcement for this case
+                if preview_attribute_data is not None and identifier and current_date:
+                    preview_attribute_data[identifier] = current_date
+                return current_date
 
         for distance in deadline.distances_to_previous.all():
             if not distance.check_conditions(combined_attributes):
@@ -861,11 +935,9 @@ class Project(models.Model):
                 self.attribute_data[attribute.identifier] = None
                 updated = True
         if updated:
-            log.info(f"Clearing data by data_retention_plan '{data_retention_plan}' from project '{self}'")
             self.save()
 
     def clear_audit_log_data(self):
-        log.info(f"Clearing audit log data from project '{self}'")
         LogEntry.objects.filter(object_id=str(self.pk)).delete()  # Clears django-admin logs from django_admin_log table
         ActStreamAction.objects.filter(target_object_id=str(self.pk)).delete()  # Clear audit logs from actstream_action table
 
