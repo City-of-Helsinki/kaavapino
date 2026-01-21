@@ -216,6 +216,7 @@ class Deadline(models.Model):
             condition_result = False
             base_attr = calculation.datecalculation.base_date_attribute
             base_deadline = calculation.datecalculation.base_date_deadline
+            base_dl_id = getattr(getattr(base_deadline, "attribute", None), "identifier", None) if base_deadline else None
 
             # When calculating previews, do not use base deadlines that will be deleted
             if base_deadline and not project.is_deadline_applicable(base_deadline, preview_attributes):
@@ -257,7 +258,8 @@ class Deadline(models.Model):
                             date_calc.base_date_deadline.abbreviation,
                             date_calc.constant
                             )
-                return calculation.datecalculation.calculate(project, datetype, preview_attributes)
+                calc_result = calculation.datecalculation.calculate(project, datetype, preview_attributes)
+                return calc_result
             return None
 
         attribute_data = {**project.attribute_data, **preview_attributes}

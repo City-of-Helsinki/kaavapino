@@ -19,6 +19,7 @@ echo 'DEBUG=True' >> .env
 - Imports & schedules: Excel-driven management commands (`projects/management/commands/`) load attributes, deadlines, list views, and report types. Deadlines depend on attributes—run `import_attributes` before `import_deadlines`.
 - Async jobs use Django-Q (`projects/tasks.py`) for document exports, cache refreshes, and background calculations. Ensure new heavy work is scheduled rather than blocking HTTP requests.
 - Testing is via `pytest` with factories in `projects/tests/factories.py`. Prefer `pytest -k` or module-level targets when scoping fixes.
+- **Logging: Always use `log.info()` for debug/trace logging unless explicitly specified otherwise.** `log.debug()` is not visible in normal operation and should be avoided for troubleshooting.
 
 ## Backend Workflows
 - Docker: `docker-compose up` brings up API + db; `docker exec -it kaavapino-api bash` drops you into the container for management commands.

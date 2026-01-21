@@ -460,89 +460,6 @@ class Project(models.Model):
             return deadline.date_type.get_closest_valid_date(min_candidate)
         return min_candidate
 
-    def _get_esillaolo_off_distance_override(self, deadline, combined_attributes):
-        """
-        Check if esilläolo is OFF for periaatteet/luonnos phases and return override distance config.
-        For lautakunta deadlines when esilläolo is OFF, we should calculate from phase start (maaraaika)
-        or from maaraaika (lautakunnassa), not from esilläolo_paattyy.
-        
-        Reads distance values from DB instead of hardcoding them.
-        
-        Returns: (base_date_key, distance_days) or None
-        """
-        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
-        if not identifier:
-            return None
-        
-        def get_db_distance(dl, target_prev_identifier):
-            """Get distance from DB for a specific previous deadline identifier."""
-            for dist in dl.distances_to_previous.all():
-                prev_id = getattr(getattr(dist.previous_deadline, "attribute", None), "identifier", None)
-                if prev_id == target_prev_identifier:
-                    return dist.distance_from_previous
-            return None
-        
-        # Check for luonnos lautakunta deadlines
-        if identifier == "kaavaluonnos_kylk_aineiston_maaraaika":
-            esillaolo_on = combined_attributes.get("jarjestetaan_luonnos_esillaolo_1")
-            lautakunta_on = combined_attributes.get("kaavaluonnos_lautakuntaan_1")
-            if not esillaolo_on and lautakunta_on:
-                distance = get_db_distance(deadline, "luonnosvaihe_alkaa_pvm")
-                return ("luonnosvaihe_alkaa_pvm", distance)
-        
-        if identifier == "milloin_kaavaluonnos_lautakunnassa":
-            esillaolo_on = combined_attributes.get("jarjestetaan_luonnos_esillaolo_1")
-            lautakunta_on = combined_attributes.get("kaavaluonnos_lautakuntaan_1")
-            if not esillaolo_on and lautakunta_on:
-                distance = get_db_distance(deadline, "viimeistaan_mielipiteet_luonnos")
-                return ("kaavaluonnos_kylk_aineiston_maaraaika", distance)
-        
-        # Check for periaatteet lautakunta deadlines
-        if identifier == "periaatteet_lautakunta_aineiston_maaraaika":
-            esillaolo_on = combined_attributes.get("jarjestetaan_periaatteet_esillaolo_1")
-            lautakunta_on = combined_attributes.get("periaatteet_lautakuntaan_1")
-            if not esillaolo_on and lautakunta_on:
-                distance = get_db_distance(deadline, "periaatteetvaihe_alkaa_pvm")
-                return ("periaatteetvaihe_alkaa_pvm", distance)
-        
-        if identifier == "milloin_periaatteet_lautakunnassa":
-            esillaolo_on = combined_attributes.get("jarjestetaan_periaatteet_esillaolo_1")
-            lautakunta_on = combined_attributes.get("periaatteet_lautakuntaan_1")
-            if not esillaolo_on and lautakunta_on:
-                distance = get_db_distance(deadline, "viimeistaan_mielipiteet_periaatteista")
-                return ("periaatteet_lautakunta_aineiston_maaraaika", distance)
-        
-        return None
-
-    def _get_latest_esillaolo_date(self, base_identifier, combined_attributes, preview_attribute_data):
-        """
-        KAAV-3492: Find the latest esillaolo_paattyy or mielipiteet date from all variants (_1, _2, _3, etc.)
-        that are enabled (visibility boolean = True).
-        
-        This handles the case where DB distance rules only exist for _1 and _2 but not _3.
-        """
-        latest_date = None
-        
-        # Check variants 1-5 (should cover all possible esillaolo groups)
-        for i in range(1, 6):
-            suffix = "" if i == 1 else f"_{i}"
-            attr_key = f"{base_identifier}{suffix}"
-            
-            # Check if the date exists in preview_attribute_data or combined_attributes
-            date_value = None
-            if preview_attribute_data:
-                date_value = preview_attribute_data.get(attr_key)
-            if not date_value:
-                date_value = combined_attributes.get(attr_key)
-            
-            if date_value:
-                coerced = self._coerce_date_value(date_value)
-                if coerced:
-                    if latest_date is None or coerced > latest_date:
-                        latest_date = coerced
-        
-        return latest_date
-
     def _enforce_distance_requirements(self, deadline, date, preview_attribute_data=None):
         current_date = self._coerce_date_value(date)
         if not current_date:
@@ -553,85 +470,31 @@ class Project(models.Model):
             combined_attributes.update(preview_attribute_data)
 
         identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
-
-        # Special handling for luonnos/periaatteet lautakunta when esilläolo is OFF
-        # In this case, calculate from phase start or maaraaika instead of esilläolo_paattyy
-        override = self._get_esillaolo_off_distance_override(deadline, combined_attributes)
-        if override:
-            base_date_key, distance_days = override
-            base_date = combined_attributes.get(base_date_key)
-            base_date = self._coerce_date_value(base_date)
-            if base_date:
-                min_target = base_date + datetime.timedelta(days=distance_days)
-                if deadline.date_type:
-                    min_target = deadline.date_type.get_closest_valid_date(min_target)
-                if current_date < min_target:
-                    current_date = min_target
-                # Skip normal distance enforcement for this case
-                if preview_attribute_data is not None and identifier and current_date:
-                    preview_attribute_data[identifier] = current_date
-                return current_date
-
-        # KAAV-3492: Special handling for lautakunta deadlines that depend on esillaolo
-        # The DB may only have distance rules for _1 and _2 variants, but not _3, _4, etc.
-        # We need to dynamically find the latest esillaolo_paattyy and enforce distance from it.
-        if identifier == "periaatteet_lautakunta_aineiston_maaraaika":
-            # Find the latest periaatteet esillaolo_paattyy date from any variant
-            latest_esillaolo = self._get_latest_esillaolo_date(
-                "milloin_periaatteet_esillaolo_paattyy", 
-                combined_attributes, 
-                preview_attribute_data
-            )
-            if latest_esillaolo:
-                # Get the distance value from the first matching DB rule (they should all be the same)
-                distance_days = 5  # Default fallback
-                for dist in deadline.distances_to_previous.all():
-                    prev_id = getattr(getattr(dist.previous_deadline, "attribute", None), "identifier", None)
-                    if prev_id and "esillaolo_paattyy" in prev_id:
-                        distance_days = dist.distance_from_previous
-                        break
-                
-                min_target = latest_esillaolo + datetime.timedelta(days=distance_days)
-                if deadline.date_type:
-                    min_target = deadline.date_type.get_closest_valid_date(min_target)
-                if current_date < min_target:
-                    current_date = min_target
-
-        if identifier == "milloin_periaatteet_lautakunnassa":
-            # Find the latest periaatteet esillaolo_paattyy date from any variant (same as P6)
-            latest_esillaolo = self._get_latest_esillaolo_date(
-                "milloin_periaatteet_esillaolo_paattyy", 
-                combined_attributes, 
-                preview_attribute_data
-            )
-            if latest_esillaolo:
-                distance_days = 27  # Default fallback
-                for dist in deadline.distances_to_previous.all():
-                    prev_id = getattr(getattr(dist.previous_deadline, "attribute", None), "identifier", None)
-                    if prev_id and "esillaolo_paattyy" in prev_id:
-                        distance_days = dist.distance_from_previous
-                        break
-                
-                min_target = latest_esillaolo + datetime.timedelta(days=distance_days)
-                if deadline.date_type:
-                    min_target = deadline.date_type.get_closest_valid_date(min_target)
-                if current_date < min_target:
-                    current_date = min_target
+        log.info(f"[DISTANCE] Enforcing for {identifier}, requested date: {current_date}")
 
         for distance in deadline.distances_to_previous.all():
-            if not distance.check_conditions(combined_attributes):
+            prev_id = getattr(getattr(distance.previous_deadline, "attribute", None), "identifier", None)
+            conditions_ok = distance.check_conditions(combined_attributes)
+            log.info(f"[DISTANCE]   Rule from {prev_id}: {distance.distance_from_previous} days, conditions_ok={conditions_ok}")
+            
+            if not conditions_ok:
                 continue
 
             prev_date = self._resolve_deadline_date(distance.previous_deadline, preview_attribute_data)
             prev_date = self._coerce_date_value(prev_date)
+            log.info(f"[DISTANCE]   prev_date for {prev_id}: {prev_date}")
+            
             if not prev_date:
                 continue
 
             min_target = self._min_distance_target_date(prev_date, distance, deadline)
+            log.info(f"[DISTANCE]   min_target: {min_target}")
+            
             if not min_target:
                 continue
 
             if current_date < min_target:
+                log.info(f"[DISTANCE]   Adjusting {identifier} from {current_date} to {min_target}")
                 current_date = min_target
 
         if preview_attribute_data is not None and identifier and current_date:
@@ -644,6 +507,7 @@ class Project(models.Model):
             preview_attribute_data = {}
         if confirmed_fields is None:
             confirmed_fields = {}
+        
         if not date:
             return None
         try:
@@ -722,7 +586,7 @@ class Project(models.Model):
         calc_start = time.monotonic() if timing_metrics is not None else None
         results = {}
         fillers = []
-
+        
         def _cache_key_for(deadline_obj):
             if not (preview and calculation_cache is not None):
                 return None
@@ -730,6 +594,7 @@ class Project(models.Model):
             return (deadline_obj.pk, initial, preview_scope)
 
         def _process_deadline(deadline_obj, calculate_deadline_fn):
+            dl_id = getattr(getattr(deadline_obj, "attribute", None), "identifier", None)
             cache_key = _cache_key_for(deadline_obj)
             if cache_key and cache_key in calculation_cache:
                 cached_value = calculation_cache[cache_key]
@@ -737,6 +602,7 @@ class Project(models.Model):
                     return cached_value
 
             computed_date = calculate_deadline_fn(self, preview_attributes=preview_attribute_data)
+            
             result = self._set_calculated_deadline(
                 deadline_obj,
                 computed_date,
@@ -947,23 +813,72 @@ class Project(models.Model):
                 if date_value and not current_vis:
                     # Date is being set for a disabled group - enable it
                     updated_attribute_data[vis_bool] = True
+
+        # KAAV-3517: Determine which deadlines actually CHANGED value (not just sent by frontend)
+        # The frontend sends all deadline values, but we only want to enforce distances
+        # on deadlines where the user actually moved them (value differs from current)
+        actually_changed = set()
+        for key, new_value in updated_attributes.items():
+            old_value = self.attribute_data.get(key)
+            old_coerced = self._coerce_date_value(old_value) if old_value else None
+            new_coerced = self._coerce_date_value(new_value) if new_value else None
+            if old_coerced != new_coerced:
+                actually_changed.add(key)
+
         for dl in project_dls.keys():
             if not dl.attribute:
                 continue
 
             value = updated_attribute_data.get(dl.attribute.identifier)
+            identifier = dl.attribute.identifier
 
             if value:
-                project_dls[dl] = value
+                # KAAV-3517: Only apply distance enforcement to deadlines that:
+                # 1. Actually changed (value differs from database)
+                # 2. AND their minimum distance is actually violated
+                # Otherwise keep the value as-is without any adjustment
+                if identifier in actually_changed:
+                    current_date = self._coerce_date_value(value)
+                    needs_enforcement = False
+
+                    if current_date:
+                        for distance in dl.distances_to_previous.all():
+                            combined = {**self.attribute_data, **updated_attribute_data}
+                            if not distance.check_conditions(combined):
+                                continue
+                            prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                            prev_date = self._coerce_date_value(prev_date)
+                            if not prev_date:
+                                continue
+                            min_target = self._min_distance_target_date(prev_date, distance, dl)
+                            if min_target and current_date < min_target:
+                                needs_enforcement = True
+                                break
+
+                    if needs_enforcement:
+                        enforced_value = self._enforce_distance_requirements(
+                            dl,
+                            value,
+                            preview_attribute_data=updated_attribute_data,
+                        )
+                        project_dls[dl] = enforced_value
+                        if enforced_value and enforced_value != value:
+                            updated_attribute_data[dl.attribute.identifier] = enforced_value
+                    else:
+                        project_dls[dl] = value
+                else:
+                    project_dls[dl] = value
 
         # Generate newly added deadlines
         calculation_cache = {}
 
+        new_dls_to_calc = [
+            dl for dl in new_dls.keys()
+            if dl.initial_calculations.exists() or dl.default_to_created_at
+        ]
+        
         project_dls = {**project_dls, **self._set_calculated_deadlines(
-            [
-                dl for dl in new_dls.keys()
-                if dl.initial_calculations.exists() or dl.default_to_created_at
-            ],
+            new_dls_to_calc,
             None,
             initial=True,
             preview=True,
@@ -972,13 +887,18 @@ class Project(models.Model):
             timing_metrics=timing_metrics,
         )}
         # Update all deadlines
+        # KAAV-3428: Only recalculate deadlines that have update_calculations or default_to_created_at.
+        # Deadlines that only have dl.attribute should NOT be recalculated - their values are already
+        # set and distance enforcement was already applied (if in updated_attributes) or should be
+        # left alone (if not in updated_attributes). This prevents unwanted cascade effects.
+        update_dls_to_calc = [
+            dl for dl in project_dls
+            if dl.update_calculations.exists() \
+                or dl.default_to_created_at
+        ]
+
         project_dls = {**project_dls, **self._set_calculated_deadlines(
-            [
-                dl for dl in project_dls
-                if dl.update_calculations.exists() \
-                    or dl.default_to_created_at \
-                    or dl.attribute
-            ],
+            update_dls_to_calc,
             None,
             initial=False,
             preview=True,
