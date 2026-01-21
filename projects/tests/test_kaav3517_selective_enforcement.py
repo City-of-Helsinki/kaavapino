@@ -14,7 +14,7 @@ Key behaviors tested:
 """
 import datetime
 import pytest
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+from unittest.mock import Mock
 
 from projects.models import (
     Attribute,
@@ -432,9 +432,7 @@ class TestEdgeCases:
         mock_project_for_preview.attribute_data = {
             "milloin_periaatteet_esillaolo_alkaa": "2026-01-15",
         }
-        
-        new_date = datetime.date(2026, 1, 10)  # User moves it earlier
-        
+
         # Check enforcement - no distance rules exist
         needs_enforcement = False
         for distance in mock_deadline_esillaolo_alkaa.distances_to_previous.all():

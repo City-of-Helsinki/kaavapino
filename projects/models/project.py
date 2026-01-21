@@ -594,7 +594,6 @@ class Project(models.Model):
             return (deadline_obj.pk, initial, preview_scope)
 
         def _process_deadline(deadline_obj, calculate_deadline_fn):
-            dl_id = getattr(getattr(deadline_obj, "attribute", None), "identifier", None)
             cache_key = _cache_key_for(deadline_obj)
             if cache_key and cache_key in calculation_cache:
                 cached_value = calculation_cache[cache_key]
