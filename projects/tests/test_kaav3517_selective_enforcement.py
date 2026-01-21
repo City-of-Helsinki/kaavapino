@@ -337,19 +337,12 @@ class TestCascadePrevention:
             if old_coerced != new_coerced:
                 actually_changed.add(key)
         
-        # Build result dict - unchanged deadlines keep their sent value without processing
-        result = {}
-        for identifier, value in updated_attributes.items():
-            if identifier not in actually_changed:
-                # NOT changed - keep as-is, no enforcement check
-                result[identifier] = value
-            else:
-                # Changed - would go through enforcement check (not tested here)
-                result[identifier] = value
+        # Verify only the moved deadline is detected as changed
+        assert actually_changed == {"periaatteet_lautakunta_aineiston_maaraaika"}
         
-        # The unchanged deadlines should have their values preserved
-        assert result["milloin_periaatteet_esillaolo_alkaa"] == "2026-01-15"
-        assert result["milloin_periaatteet_esillaolo_paattyy"] == "2026-01-29"
+        # The unchanged deadlines should have their values preserved (not in actually_changed)
+        assert "milloin_periaatteet_esillaolo_alkaa" not in actually_changed
+        assert "milloin_periaatteet_esillaolo_paattyy" not in actually_changed
     
     def test_moved_deadline_only_enforced_if_violated(self):
         """The moved deadline should only be adjusted if its minimum is violated."""
