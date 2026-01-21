@@ -514,6 +514,35 @@ class Project(models.Model):
         
         return None
 
+    def _get_latest_esillaolo_date(self, base_identifier, combined_attributes, preview_attribute_data):
+        """
+        KAAV-3492: Find the latest esillaolo_paattyy or mielipiteet date from all variants (_1, _2, _3, etc.)
+        that are enabled (visibility boolean = True).
+        
+        This handles the case where DB distance rules only exist for _1 and _2 but not _3.
+        """
+        latest_date = None
+        
+        # Check variants 1-5 (should cover all possible esillaolo groups)
+        for i in range(1, 6):
+            suffix = "" if i == 1 else f"_{i}"
+            attr_key = f"{base_identifier}{suffix}"
+            
+            # Check if the date exists in preview_attribute_data or combined_attributes
+            date_value = None
+            if preview_attribute_data:
+                date_value = preview_attribute_data.get(attr_key)
+            if not date_value:
+                date_value = combined_attributes.get(attr_key)
+            
+            if date_value:
+                coerced = self._coerce_date_value(date_value)
+                if coerced:
+                    if latest_date is None or coerced > latest_date:
+                        latest_date = coerced
+        
+        return latest_date
+
     def _enforce_distance_requirements(self, deadline, date, preview_attribute_data=None):
         current_date = self._coerce_date_value(date)
         if not current_date:
@@ -543,6 +572,52 @@ class Project(models.Model):
                     preview_attribute_data[identifier] = current_date
                 return current_date
 
+        # KAAV-3492: Special handling for lautakunta deadlines that depend on esillaolo
+        # The DB may only have distance rules for _1 and _2 variants, but not _3, _4, etc.
+        # We need to dynamically find the latest esillaolo_paattyy and enforce distance from it.
+        if identifier == "periaatteet_lautakunta_aineiston_maaraaika":
+            # Find the latest periaatteet esillaolo_paattyy date from any variant
+            latest_esillaolo = self._get_latest_esillaolo_date(
+                "milloin_periaatteet_esillaolo_paattyy", 
+                combined_attributes, 
+                preview_attribute_data
+            )
+            if latest_esillaolo:
+                # Get the distance value from the first matching DB rule (they should all be the same)
+                distance_days = 5  # Default fallback
+                for dist in deadline.distances_to_previous.all():
+                    prev_id = getattr(getattr(dist.previous_deadline, "attribute", None), "identifier", None)
+                    if prev_id and "esillaolo_paattyy" in prev_id:
+                        distance_days = dist.distance_from_previous
+                        break
+                
+                min_target = latest_esillaolo + datetime.timedelta(days=distance_days)
+                if deadline.date_type:
+                    min_target = deadline.date_type.get_closest_valid_date(min_target)
+                if current_date < min_target:
+                    current_date = min_target
+
+        if identifier == "milloin_periaatteet_lautakunnassa":
+            # Find the latest periaatteet esillaolo_paattyy date from any variant (same as P6)
+            latest_esillaolo = self._get_latest_esillaolo_date(
+                "milloin_periaatteet_esillaolo_paattyy", 
+                combined_attributes, 
+                preview_attribute_data
+            )
+            if latest_esillaolo:
+                distance_days = 27  # Default fallback
+                for dist in deadline.distances_to_previous.all():
+                    prev_id = getattr(getattr(dist.previous_deadline, "attribute", None), "identifier", None)
+                    if prev_id and "esillaolo_paattyy" in prev_id:
+                        distance_days = dist.distance_from_previous
+                        break
+                
+                min_target = latest_esillaolo + datetime.timedelta(days=distance_days)
+                if deadline.date_type:
+                    min_target = deadline.date_type.get_closest_valid_date(min_target)
+                if current_date < min_target:
+                    current_date = min_target
+
         for distance in deadline.distances_to_previous.all():
             if not distance.check_conditions(combined_attributes):
                 continue
@@ -559,7 +634,6 @@ class Project(models.Model):
             if current_date < min_target:
                 current_date = min_target
 
-        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
         if preview_attribute_data is not None and identifier and current_date:
             preview_attribute_data[identifier] = current_date
 
@@ -847,6 +921,32 @@ class Project(models.Model):
 
         # Update attribute-based deadlines
         updated_attribute_data = {**self.attribute_data, **updated_attributes}
+        
+        # KAAV-3492: For new deadlines, set their visibility booleans so distance conditions are met
+        # This mirrors the logic in update_deadlines that sets vis_bool for generated deadlines
+        for dl in new_dls.keys():
+            if dl.deadlinegroup:
+                vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+                if vis_bool and vis_bool not in updated_attribute_data:
+                    # New deadlines are always visible (True) - they're being added
+                    updated_attribute_data[vis_bool] = True
+        
+        # KAAV-3492: For existing deadlines, if dates are being provided for a group that was 
+        # previously disabled, enable its visibility boolean. This happens when user "adds" a 
+        # new esillaolo group - the deadlines exist but the visibility was False.
+        for dl in project_dls.keys():
+            if not dl.deadlinegroup:
+                continue
+            vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+            if not vis_bool:
+                continue
+            # Check if date is being provided for this deadline in updated_attributes
+            if dl.attribute:
+                date_value = updated_attributes.get(dl.attribute.identifier)
+                current_vis = updated_attribute_data.get(vis_bool)
+                if date_value and not current_vis:
+                    # Date is being set for a disabled group - enable it
+                    updated_attribute_data[vis_bool] = True
         for dl in project_dls.keys():
             if not dl.attribute:
                 continue
