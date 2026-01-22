@@ -262,13 +262,16 @@ class Deadline(models.Model):
             return None
 
         attribute_data = {**project.attribute_data, **preview_attributes}
+        
+        identifier = getattr(self.attribute, "identifier", None) if self.attribute else None
+        is_phase_boundary = identifier and ("vaihe_alkaa_pvm" in identifier or "vaihe_paattyy_pvm" in identifier)
 
         result = None
         for calculation in calculations:
             tmp = _calculate_condition_result(attribute_data, calculation)
             if tmp is None:
                 continue
-            if self.attribute and ("vaihe_alkaa_pvm" in self.attribute.identifier or "vaihe_paattyy_pvm" in self.attribute.identifier):  # Calculate latest date
+            if is_phase_boundary:
                 result = tmp if (not result or tmp > result) else result
             else:  # Return first calculation of whose condition is met
                 result = tmp

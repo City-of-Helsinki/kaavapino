@@ -17,11 +17,9 @@ import pytest
 from unittest.mock import Mock
 
 from projects.models import (
-    Attribute,
     Deadline,
     DeadlineDistance,
     Project,
-    ProjectSubtype,
 )
 
 

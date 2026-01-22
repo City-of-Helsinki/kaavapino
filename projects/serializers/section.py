@@ -18,7 +18,7 @@ from projects.models import (
     ProjectPhaseDeadlineSection,
     ProjectSubtype,
 )
-from projects.serializers.utils import _is_attribute_required
+from projects.serializers.utils import get_dl_vis_bool_name
 
 from collections.abc import Mapping
 from collections import namedtuple
@@ -109,6 +109,13 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
 
         for attr_dl in attribute.deadline.filter(subtype=subtype) \
             .select_related("date_type"):
+            # KAAV-3517: Skip validation for deadlines whose visibility is False
+            # When a deadline group is "deleted" (visibility set to False),
+            # we shouldn't validate its dates
+            if attr_dl.deadlinegroup:
+                vis_bool = get_dl_vis_bool_name(attr_dl.deadlinegroup)
+                if vis_bool and preview.get(vis_bool) is False:
+                    continue
             # validate datetype
             try:
                 assert attr_dl.date_type.is_valid_date(value)

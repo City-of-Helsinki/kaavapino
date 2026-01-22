@@ -535,17 +535,17 @@ class Project(models.Model):
                 # This was preventing cascade updates (ehdotus -> tarkistettu_ehdotus)
                 # The calculated value should always win; confirmed_fields handles locked fields
 
-            date = self._enforce_distance_requirements(
+            enforced_date = self._enforce_distance_requirements(
                 deadline,
                 date,
                 preview_attribute_data if preview else None,
             )
 
             if preview or not project_deadline.editable:
-                return date
+                return enforced_date
 
-            if not project_deadline.date == date:
-                project_deadline.date = date
+            if project_deadline.date != enforced_date:
+                project_deadline.date = enforced_date
                 project_deadline.save()
 
             if deadline.attribute:
@@ -553,10 +553,10 @@ class Project(models.Model):
                     self.attribute_data.get(deadline.attribute.identifier),
                     default=str,
                 ))
-                new_value = json.loads(json.dumps(date, default=str))
+                new_value = json.loads(json.dumps(enforced_date, default=str))
 
                 self.update_attribute_data(
-                    {deadline.attribute.identifier: date},
+                    {deadline.attribute.identifier: enforced_date},
                     attribute_cache={
                         deadline.attribute.identifier: deadline.attribute
                     },
@@ -572,7 +572,7 @@ class Project(models.Model):
                         old_value=old_value,
                         new_value=new_value,
                     )
-            return date
+            return enforced_date
 
         return None
 
@@ -786,7 +786,7 @@ class Project(models.Model):
 
         # Update attribute-based deadlines
         updated_attribute_data = {**self.attribute_data, **updated_attributes}
-        
+
         # KAAV-3492: For new deadlines, set their visibility booleans so distance conditions are met
         # This mirrors the logic in update_deadlines that sets vis_bool for generated deadlines
         for dl in new_dls.keys():
@@ -799,17 +799,49 @@ class Project(models.Model):
         # KAAV-3492: For existing deadlines, if dates are being provided for a group that was 
         # previously disabled, enable its visibility boolean. This happens when user "adds" a 
         # new esillaolo group - the deadlines exist but the visibility was False.
+        # BUT: If the frontend EXPLICITLY sent the visibility boolean (e.g. False for deletion),
+        # respect that and don't override it.
+        # ALSO: If a primary vis_bool (e.g. periaatteet_lautakuntaan_1) is explicitly False,
+        # don't auto-enable the related secondary vis_bools (_2, _3, _4).
+        
+        # First, collect which primary vis_bools are explicitly disabled
+        explicitly_disabled_primary = set()
+        for key, value in updated_attributes.items():
+            if key.endswith('_1') and value is False:
+                # Extract base name (e.g. "periaatteet_lautakuntaan" from "periaatteet_lautakuntaan_1")
+                base_name = key[:-2]  # Remove "_1"
+                explicitly_disabled_primary.add(base_name)
+        
         for dl in project_dls.keys():
             if not dl.deadlinegroup:
                 continue
             vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
             if not vis_bool:
                 continue
+            
+            # If frontend explicitly sent this visibility boolean, respect it - don't override
+            if vis_bool in updated_attributes:
+                continue
+            
+            # Check if this is a secondary slot (_2, _3, _4) whose primary (_1) was explicitly disabled
+            if len(vis_bool) >= 2 and vis_bool[-2] == '_' and vis_bool[-1] in '234':
+                base_name = vis_bool[:-2]  # Remove "_2", "_3", or "_4"
+                if base_name in explicitly_disabled_primary:
+                    continue
+            
             # Check if date is being provided for this deadline in updated_attributes
+            # BUT: Only auto-enable if the visibility was PREVIOUSLY True in the project.
+            # If it was False, don't auto-enable just because the date exists.
             if dl.attribute:
                 date_value = updated_attributes.get(dl.attribute.identifier)
                 current_vis = updated_attribute_data.get(vis_bool)
+                # Check what the STORED visibility was before this request
+                stored_vis = self.attribute_data.get(vis_bool)
                 if date_value and not current_vis:
+                    # Only auto-enable if it was previously visible (True) or not yet set (None)
+                    # If it was explicitly False in the database, keep it False
+                    if stored_vis is False:
+                        continue
                     # Date is being set for a disabled group - enable it
                     updated_attribute_data[vis_bool] = True
 
@@ -875,7 +907,7 @@ class Project(models.Model):
             dl for dl in new_dls.keys()
             if dl.initial_calculations.exists() or dl.default_to_created_at
         ]
-        
+
         project_dls = {**project_dls, **self._set_calculated_deadlines(
             new_dls_to_calc,
             None,
@@ -906,6 +938,7 @@ class Project(models.Model):
             calculation_cache=calculation_cache,
             timing_metrics=timing_metrics,
         )}
+
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
             if type(value) == bool:
