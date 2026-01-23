@@ -923,9 +923,29 @@ class Project(models.Model):
                         if enforced_value and enforced_value != value:
                             updated_attribute_data[dl.attribute.identifier] = enforced_value
                     else:
-                        project_dls[dl] = value
+                        # KAAV-3492: Even when distance is satisfied, snap to date_type
+                        # Per AT2.5.1: "Deadline must be a work day" - auto-correct to valid day
+                        snapped_value = value
+                        if dl.date_type:
+                            coerced = self._coerce_date_value(value)
+                            if coerced:
+                                valid_date = dl.date_type.get_closest_valid_date(coerced)
+                                if valid_date and valid_date != coerced:
+                                    snapped_value = valid_date
+                                    updated_attribute_data[dl.attribute.identifier] = valid_date
+                        project_dls[dl] = snapped_value
                 else:
-                    project_dls[dl] = value
+                    # KAAV-3492: For unchanged deadlines, still snap to date_type
+                    # This ensures all dates are valid for their date_type
+                    snapped_value = value
+                    if dl.date_type:
+                        coerced = self._coerce_date_value(value)
+                        if coerced:
+                            valid_date = dl.date_type.get_closest_valid_date(coerced)
+                            if valid_date and valid_date != coerced:
+                                snapped_value = valid_date
+                                updated_attribute_data[dl.attribute.identifier] = valid_date
+                    project_dls[dl] = snapped_value
 
         # KAAV-3492 FIX: Forward cascade - when a deadline is set/changed, push subsequent 
         # deadlines forward if they now violate their distance rules.
