@@ -497,6 +497,14 @@ class Project(models.Model):
                 log.info(f"[DISTANCE]   Adjusting {identifier} from {current_date} to {min_target}")
                 current_date = min_target
 
+        # After distance checks, also snap to the deadline's date_type if one exists
+        # This ensures lautakunta dates are always valid Tuesdays, even if the user
+        # selected a date that satisfies distance requirements but isn't a valid day
+        if deadline.date_type and current_date:
+            valid_date = deadline.date_type.get_closest_valid_date(current_date)
+            if valid_date and valid_date != current_date:
+                current_date = valid_date
+
         if preview_attribute_data is not None and identifier and current_date:
             preview_attribute_data[identifier] = current_date
 
@@ -856,6 +864,25 @@ class Project(models.Model):
             if old_coerced != new_coerced:
                 actually_changed.add(key)
 
+        # KAAV-3492 FIX: When a visibility bool changes from False to True (group re-add),
+        # treat ALL associated deadline dates as "changed" even if the date values are the same.
+        # This ensures distance enforcement happens for re-added groups after delete+save.
+        vis_bools_enabled = set()
+        for key, new_value in updated_attributes.items():
+            old_value = self.attribute_data.get(key)
+            # Check if this is a visibility bool that changed from False/None to True
+            if isinstance(new_value, bool) and new_value is True and old_value is not True:
+                vis_bools_enabled.add(key)
+        
+        # For each deadline, if its visibility bool was just enabled, mark its date as "changed"
+        for dl in project_dls.keys():
+            if not dl.deadlinegroup or not dl.attribute:
+                continue
+            vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+            if vis_bool and vis_bool in vis_bools_enabled:
+                # This deadline's group was just re-enabled - treat its date as changed
+                actually_changed.add(dl.attribute.identifier)
+
         for dl in project_dls.keys():
             if not dl.attribute:
                 continue
@@ -899,6 +926,88 @@ class Project(models.Model):
                         project_dls[dl] = value
                 else:
                     project_dls[dl] = value
+
+        # KAAV-3492 FIX: Forward cascade - when a deadline is set/changed, push subsequent 
+        # deadlines forward if they now violate their distance rules.
+        # This handles the case where esillaolo is added and lautakunta (which comes AFTER)
+        # needs to be pushed forward to maintain the required distance.
+        #
+        # Per UX80.4.2.6: Element groups have a defined ORDER within each phase:
+        # - Periaatteet: Esilläolo (1-3), then Lautakunta (4-7)
+        # - So when esillaolo is added, lautakunta must come AFTER it with min distance
+        
+        # Build a map of deadline -> attribute identifier for quick lookup
+        dl_to_identifier = {dl: dl.attribute.identifier for dl in project_dls.keys() if dl.attribute}
+        identifier_to_dl = {v: k for k, v in dl_to_identifier.items()}
+        
+        # Track which deadlines were changed (either by user or by enforcement)
+        changed_identifiers = set(actually_changed)
+        
+        # Iterate until no more changes (cascade propagation)
+        max_iterations = 50  # Safety limit to prevent infinite loops
+        iteration = 0
+        while iteration < max_iterations:
+            iteration += 1
+            new_changes = set()
+            
+            for changed_id in changed_identifiers:
+                if changed_id not in identifier_to_dl:
+                    continue
+                changed_dl = identifier_to_dl[changed_id]
+                changed_date = self._coerce_date_value(updated_attribute_data.get(changed_id))
+                if not changed_date:
+                    continue
+                
+                # Check all deadlines that have a distance rule FROM this deadline
+                for distance in changed_dl.distances_to_next.all():
+                    next_dl = distance.deadline
+                    if not next_dl.attribute:
+                        continue
+                    next_id = next_dl.attribute.identifier
+                    
+                    # Skip if next deadline is not in our working set (not visible/applicable)
+                    if next_dl not in project_dls:
+                        continue
+                    
+                    # Check if distance conditions are met (includes visibility bool checks)
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    if not distance.check_conditions(combined):
+                        continue
+                    
+                    next_date = self._coerce_date_value(updated_attribute_data.get(next_id))
+                    if not next_date:
+                        # Also try project_dls value
+                        next_date = self._coerce_date_value(project_dls.get(next_dl))
+                    if not next_date:
+                        continue
+                    
+                    # Calculate minimum target date for the next deadline
+                    min_target = self._min_distance_target_date(changed_date, distance, next_dl)
+                    if not min_target:
+                        continue
+                    
+                    # If next deadline violates the distance, push it forward
+                    if next_date < min_target:
+                        log.info(f"[CASCADE] Pushing {next_id} from {next_date} to {min_target} (distance from {changed_id})")
+                        # Enforce the distance (this also snaps to valid dates like lautakunta Tuesdays)
+                        enforced_date = self._enforce_distance_requirements(
+                            next_dl,
+                            min_target,
+                            preview_attribute_data=updated_attribute_data,
+                        )
+                        if enforced_date and enforced_date != next_date:
+                            updated_attribute_data[next_id] = enforced_date
+                            project_dls[next_dl] = enforced_date
+                            new_changes.add(next_id)
+            
+            if not new_changes:
+                break  # No more changes, cascade complete
+            
+            # For next iteration, only process newly changed deadlines
+            changed_identifiers = new_changes
+        
+        if iteration >= max_iterations:
+            log.warning(f"[CASCADE] Hit max iterations ({max_iterations}), possible cycle in deadline distances")
 
         # Generate newly added deadlines
         calculation_cache = {}
