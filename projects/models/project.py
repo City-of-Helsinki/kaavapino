@@ -770,6 +770,11 @@ class Project(models.Model):
     def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
         confirmed_fields = confirmed_fields or []
 
+        # KAAV-3492 DEBUG: Log what's being updated
+        log.info(f"[KAAV-3492 BACKEND] get_preview_deadlines called with:")
+        log.info(f"[KAAV-3492 BACKEND]   updated_attributes: {updated_attributes}")
+        log.info(f"[KAAV-3492 BACKEND]   confirmed_fields: {confirmed_fields}")
+
         # Filter out deadlines that would be deleted
         project_dls = {
             dl.deadline: dl.date
@@ -863,6 +868,7 @@ class Project(models.Model):
             new_coerced = self._coerce_date_value(new_value) if new_value else None
             if old_coerced != new_coerced:
                 actually_changed.add(key)
+                log.info(f"[KAAV-3492 BACKEND] Detected change: {key} from {old_coerced} to {new_coerced}")
 
         # KAAV-3492 FIX: When a visibility bool changes from False to True (group re-add),
         # treat ALL associated deadline dates as "changed" even if the date values are the same.
@@ -873,6 +879,7 @@ class Project(models.Model):
             # Check if this is a visibility bool that changed from False/None to True
             if isinstance(new_value, bool) and new_value is True and old_value is not True:
                 vis_bools_enabled.add(key)
+                log.info(f"[KAAV-3492 BACKEND] Visibility bool enabled: {key}")
         
         # For each deadline, if its visibility bool was just enabled, mark its date as "changed"
         for dl in project_dls.keys():
@@ -882,6 +889,9 @@ class Project(models.Model):
             if vis_bool and vis_bool in vis_bools_enabled:
                 # This deadline's group was just re-enabled - treat its date as changed
                 actually_changed.add(dl.attribute.identifier)
+                log.info(f"[KAAV-3492 BACKEND] Marking {dl.attribute.identifier} as changed due to vis_bool {vis_bool}")
+
+        log.info(f"[KAAV-3492 BACKEND] actually_changed set: {actually_changed}")
 
         for dl in project_dls.keys():
             if not dl.attribute:
@@ -896,6 +906,7 @@ class Project(models.Model):
                 # 2. AND their minimum distance is actually violated
                 # Otherwise keep the value as-is without any adjustment
                 if identifier in actually_changed:
+                    log.info(f"[KAAV-3492 BACKEND] Processing changed deadline: {identifier}, value={value}")
                     current_date = self._coerce_date_value(value)
                     needs_enforcement = False
 
@@ -909,11 +920,14 @@ class Project(models.Model):
                             if not prev_date:
                                 continue
                             min_target = self._min_distance_target_date(prev_date, distance, dl)
+                            log.info(f"[KAAV-3492 BACKEND]   Checking distance: prev={prev_date}, min_target={min_target}, current={current_date}")
                             if min_target and current_date < min_target:
                                 needs_enforcement = True
+                                log.info(f"[KAAV-3492 BACKEND]   VIOLATION: {identifier} needs enforcement")
                                 break
 
                     if needs_enforcement:
+                        log.info(f"[KAAV-3492 BACKEND]   Calling _enforce_distance_requirements for {identifier}")
                         enforced_value = self._enforce_distance_requirements(
                             dl,
                             value,
@@ -921,8 +935,10 @@ class Project(models.Model):
                         )
                         project_dls[dl] = enforced_value
                         if enforced_value and enforced_value != value:
+                            log.info(f"[KAAV-3492 BACKEND]   ENFORCED: {identifier} changed from {value} to {enforced_value}")
                             updated_attribute_data[dl.attribute.identifier] = enforced_value
                     else:
+                        log.info(f"[KAAV-3492 BACKEND]   NO ENFORCEMENT NEEDED for {identifier}, keeping value={value}")
                         # KAAV-3492: Even when distance is satisfied, snap to date_type
                         # Per AT2.5.1: "Deadline must be a work day" - auto-correct to valid day
                         snapped_value = value
@@ -956,6 +972,8 @@ class Project(models.Model):
         # - Periaatteet: Esilläolo (1-3), then Lautakunta (4-7)
         # - So when esillaolo is added, lautakunta must come AFTER it with min distance
         
+        log.info(f"[KAAV-3492 BACKEND] Starting forward cascade with changed_identifiers: {actually_changed}")
+        
         # Build a map of deadline -> attribute identifier for quick lookup
         dl_to_identifier = {dl: dl.attribute.identifier for dl in project_dls.keys() if dl.attribute}
         identifier_to_dl = {v: k for k, v in dl_to_identifier.items()}
@@ -964,11 +982,11 @@ class Project(models.Model):
         changed_identifiers = set(actually_changed)
         
         # Iterate until no more changes (cascade propagation)
-        max_iterations = 50  # Safety limit to prevent infinite loops
-        iteration = 0
-        while iteration < max_iterations:
-            iteration += 1
+        # Max iterations = number of deadlines (worst case: linear dependency chain)
+        max_iterations = len(project_dls)
+        for iteration in range(1, max_iterations + 1):
             new_changes = set()
+            log.info(f"[KAAV-3492 BACKEND] Cascade iteration {iteration}, processing: {changed_identifiers}")
             
             for changed_id in changed_identifiers:
                 if changed_id not in identifier_to_dl:
@@ -977,6 +995,8 @@ class Project(models.Model):
                 changed_date = self._coerce_date_value(updated_attribute_data.get(changed_id))
                 if not changed_date:
                     continue
+                
+                log.info(f"[KAAV-3492 BACKEND]   Checking cascade from {changed_id} (date={changed_date})")
                 
                 # Check all deadlines that have a distance rule FROM this deadline
                 for distance in changed_dl.distances_to_next.all():
@@ -987,11 +1007,13 @@ class Project(models.Model):
                     
                     # Skip if next deadline is not in our working set (not visible/applicable)
                     if next_dl not in project_dls:
+                        log.info(f"[KAAV-3492 BACKEND]     {next_id} not in project_dls, skipping")
                         continue
                     
                     # Check if distance conditions are met (includes visibility bool checks)
                     combined = {**self.attribute_data, **updated_attribute_data}
                     if not distance.check_conditions(combined):
+                        log.info(f"[KAAV-3492 BACKEND]     {next_id} distance conditions not met, skipping")
                         continue
                     
                     next_date = self._coerce_date_value(updated_attribute_data.get(next_id))
@@ -999,12 +1021,15 @@ class Project(models.Model):
                         # Also try project_dls value
                         next_date = self._coerce_date_value(project_dls.get(next_dl))
                     if not next_date:
+                        log.info(f"[KAAV-3492 BACKEND]     {next_id} has no date, skipping")
                         continue
                     
                     # Calculate minimum target date for the next deadline
                     min_target = self._min_distance_target_date(changed_date, distance, next_dl)
                     if not min_target:
                         continue
+                    
+                    log.info(f"[KAAV-3492 BACKEND]     {next_id}: next_date={next_date}, min_target={min_target}, needs_push={next_date < min_target}")
                     
                     # If next deadline violates the distance, push it forward
                     if next_date < min_target:
@@ -1021,6 +1046,7 @@ class Project(models.Model):
                             new_changes.add(next_id)
             
             if not new_changes:
+                log.info(f"[KAAV-3492 BACKEND] Cascade complete after {iteration} iteration(s)")
                 break  # No more changes, cascade complete
             
             # For next iteration, only process newly changed deadlines
@@ -1028,6 +1054,8 @@ class Project(models.Model):
         
         if iteration >= max_iterations:
             log.warning(f"[CASCADE] Hit max iterations ({max_iterations}), possible cycle in deadline distances")
+
+        log.info(f"[KAAV-3492 BACKEND] Final updated_attribute_data after cascade: {updated_attribute_data}")
 
         # Generate newly added deadlines
         calculation_cache = {}
@@ -1067,6 +1095,40 @@ class Project(models.Model):
             calculation_cache=calculation_cache,
             timing_metrics=timing_metrics,
         )}
+
+        # KAAV-3492: After phase boundaries are recalculated, enforce distances on
+        # attribute-only deadlines that depend on those boundaries. These deadlines
+        # were excluded from update_dls_to_calc by KAAV-3428 but still need distance enforcement.
+        for dl in project_dls.keys():
+            if not hasattr(dl, 'attribute') or not dl.attribute:
+                continue
+            identifier = dl.attribute.identifier
+            # Skip deadlines already processed by update_calculations
+            if dl in update_dls_to_calc:
+                continue
+            # Skip deadlines that were in the original cascade
+            if identifier in actually_changed:
+                continue
+            # Check if any of its distance rules are now violated
+            current_date = self._coerce_date_value(updated_attribute_data.get(identifier))
+            if not current_date:
+                continue
+            for distance in dl.distances_to_previous.all():
+                combined = {**self.attribute_data, **updated_attribute_data}
+                if not distance.check_conditions(combined):
+                    continue
+                prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                prev_date = self._coerce_date_value(prev_date)
+                if not prev_date:
+                    continue
+                min_target = self._min_distance_target_date(prev_date, distance, dl)
+                if min_target and current_date < min_target:
+                    log.info(f"[KAAV-3492 POST-CALC] Enforcing {identifier} from {current_date} to min {min_target}")
+                    enforced = self._enforce_distance_requirements(dl, min_target, updated_attribute_data)
+                    if enforced and enforced != current_date:
+                        updated_attribute_data[identifier] = enforced
+                        project_dls[dl] = enforced
+                    break
 
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
