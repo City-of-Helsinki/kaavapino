@@ -537,6 +537,10 @@ class Project(models.Model):
                 identifier = deadline.attribute.identifier
                 if identifier in confirmed_fields:
                     # Get the original confirmed value - don't let calculation overwrite it
+                    # KAAV-3492 FIX: If previewing, prefer the value from the request (preview_attribute_data)
+                    # because self.attribute_data might be stale (e.g. if user just edited it)
+                    if preview and preview_attribute_data and identifier in preview_attribute_data:
+                        return preview_attribute_data.get(identifier)
                     return self.attribute_data.get(identifier)
 
                 # NOTE: Removed line that prioritized preview_attribute_data over calculated value
@@ -882,14 +886,80 @@ class Project(models.Model):
                 log.info(f"[KAAV-3492 BACKEND] Visibility bool enabled: {key}")
         
         # For each deadline, if its visibility bool was just enabled, mark its date as "changed"
-        for dl in project_dls.keys():
+        for dl in sorted(project_dls.keys(), key=lambda x: x.index):
             if not dl.deadlinegroup or not dl.attribute:
                 continue
             vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
             if vis_bool and vis_bool in vis_bools_enabled:
+                identifier = dl.attribute.identifier
+                
+                # Check for stale date: Group enabled, but date matches stored value
+                current_val = updated_attribute_data.get(identifier)
+                stored_val = self.attribute_data.get(identifier)
+                
+                current_date = self._coerce_date_value(current_val)
+                stored_date = self._coerce_date_value(stored_val)
+                
+                if current_date and current_date == stored_date:
+                    # Calculate target date based on predecessors
+                    max_target = None
+                    for distance in dl.distances_to_previous.all():
+                        combined = {**self.attribute_data, **updated_attribute_data}
+                        if not distance.check_conditions(combined):
+                            continue
+                        prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                        prev_date = self._coerce_date_value(prev_date)
+                        if not prev_date:
+                            continue
+                        target = self._min_distance_target_date(prev_date, distance, dl)
+                        if target and (not max_target or target > max_target):
+                            max_target = target
+                    
+                    # SPECIAL CASE (AT1.5.3): Opinions deadline ("viimeistaan_mielipiteet")
+                    # defaults to matching "esillaolo_paattyy" if no distance rules exist
+                    if not max_target and "viimeistaan_mielipiteet" in identifier:
+                        # Find sibling "esillaolo_paattyy" in same group
+                        sibling = next((d for d in project_dls.keys() if d.deadlinegroup == dl.deadlinegroup and "esillaolo_paattyy" in (d.attribute.identifier if d.attribute else "")), None)
+                        if sibling and sibling.attribute:
+                            # Use updated_attribute_data if present (already snapped), else stored
+                            sib_id = sibling.attribute.identifier
+                            sib_val = updated_attribute_data.get(sib_id) or self.attribute_data.get(sib_id)
+                            if sib_val:
+                                max_target = self._coerce_date_value(sib_val)
+                                log.info(f"[KAAV-3492 BACKEND] Derived target for {identifier} from {sib_id}: {max_target}")
+                    
+                    # If current date creates a gap (is later than target), snap it back
+                    if max_target and current_date > max_target:
+                        log.info(f"[KAAV-3492 BACKEND] Snapping stale date {identifier} from {current_date} to {max_target}")
+                        updated_attribute_data[identifier] = max_target
+                        
+                        # UX80.4.2.3.7: When adding element row, update phase boundaries
+                        # so cascade calculates from the correct snapped position
+                        if "_paattyy" in identifier:
+                            # Map identifier patterns to phase boundary pairs
+                            PHASE_BOUNDARY_MAP = {
+                                "oas": ("oasvaihe_paattyy_pvm", "ehdotusvaihe_alkaa_pvm"),
+                                "periaatteet": ("periaatteetvaihe_paattyy_pvm", "oasvaihe_alkaa_pvm"),
+                                "luonnos": ("luonnosvaihe_paattyy_pvm", "ehdotusvaihe_alkaa_pvm"),
+                            }
+                            # Special case: ehdotus but not tarkistettu
+                            if "ehdotus" in identifier and "tarkistettu" not in identifier:
+                                boundaries = ("ehdotusvaihe_paattyy_pvm", "tarkistettuehdotusvaihe_alkaa_pvm")
+                            else:
+                                boundaries = next((v for k, v in PHASE_BOUNDARY_MAP.items() if k in identifier), None)
+                            
+                            if boundaries:
+                                phase_end_id, next_phase_start_id = boundaries
+                                current_phase_end = self._coerce_date_value(updated_attribute_data.get(phase_end_id))
+                                if current_phase_end and max_target != current_phase_end:
+                                    log.info(f"[KAAV-3492 BACKEND] Updating phase boundary {phase_end_id} to {max_target}")
+                                    updated_attribute_data[phase_end_id] = max_target
+                                    updated_attribute_data[next_phase_start_id] = max_target
+                                    actually_changed.update([phase_end_id, next_phase_start_id])
+
                 # This deadline's group was just re-enabled - treat its date as changed
-                actually_changed.add(dl.attribute.identifier)
-                log.info(f"[KAAV-3492 BACKEND] Marking {dl.attribute.identifier} as changed due to vis_bool {vis_bool}")
+                actually_changed.add(identifier)
+                log.info(f"[KAAV-3492 BACKEND] Marking {identifier} as changed due to vis_bool {vis_bool}")
 
         log.info(f"[KAAV-3492 BACKEND] actually_changed set: {actually_changed}")
 
@@ -1160,6 +1230,10 @@ class Project(models.Model):
                         continue
                     min_target = self._min_distance_target_date(prev_date, distance, dl)
                     if min_target and current_date < min_target:
+                        # KAAV-3492: Do not try to enforce confirmed fields
+                        if confirmed_fields and identifier in confirmed_fields:
+                            continue
+
                         log.info(f"[CONVERGENCE CHECK] {identifier} violates distance rule (prev={prev_date}, min={min_target})")
                         cascade_queue.add(identifier)
                         break
@@ -1190,6 +1264,9 @@ class Project(models.Model):
                                     continue
                                 min_target = self._min_distance_target_date(prev_date, distance, changed_dl)
                                 if min_target and current_date < min_target:
+                                    if confirmed_fields and changed_id in confirmed_fields:
+                                        log.info(f"[CONVERGENCE ENFORCE] Skipping confirmed {changed_id}")
+                                        continue
                                     log.info(f"[CONVERGENCE ENFORCE] {changed_id} from {current_date} to {min_target}")
                                     enforced = self._enforce_distance_requirements(changed_dl, min_target, updated_attribute_data)
                                     if enforced and enforced != current_date:
@@ -1224,6 +1301,9 @@ class Project(models.Model):
                                 
                             min_target = self._min_distance_target_date(current_date, distance, next_dl)
                             if min_target and next_date < min_target:
+                                if confirmed_fields and next_id in confirmed_fields:
+                                    log.info(f"[CONVERGENCE PUSH] Skipping confirmed {next_id}")
+                                    continue
                                 log.info(f"[CONVERGENCE PUSH] Pushing {next_id} from {next_date} to {min_target} (because {changed_id} moved)")
                                 new_cascade_changes.add(next_id)
                                 iteration_changes.add(next_id)
