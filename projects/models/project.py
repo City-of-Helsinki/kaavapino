@@ -935,21 +935,21 @@ class Project(models.Model):
                         
                         # UX80.4.2.3.7: When adding element row, update phase boundaries
                         # so cascade calculates from the correct snapped position
-                        if "_paattyy" in identifier:
-                            # Map identifier patterns to phase boundary pairs
-                            PHASE_BOUNDARY_MAP = {
-                                "oas": ("oasvaihe_paattyy_pvm", "ehdotusvaihe_alkaa_pvm"),
-                                "periaatteet": ("periaatteetvaihe_paattyy_pvm", "oasvaihe_alkaa_pvm"),
-                                "luonnos": ("luonnosvaihe_paattyy_pvm", "ehdotusvaihe_alkaa_pvm"),
-                            }
-                            # Special case: ehdotus but not tarkistettu
-                            if "ehdotus" in identifier and "tarkistettu" not in identifier:
-                                boundaries = ("ehdotusvaihe_paattyy_pvm", "tarkistettuehdotusvaihe_alkaa_pvm")
-                            else:
-                                boundaries = next((v for k, v in PHASE_BOUNDARY_MAP.items() if k in identifier), None)
+                        if "_paattyy" in identifier and dl.phase:
+                            # Derive phase boundary identifiers dynamically from phase name
+                            phase_name = dl.phase.common_project_phase.name.lower().replace(" ", "")
+                            phase_end_id = f"{phase_name}vaihe_paattyy_pvm"
                             
-                            if boundaries:
-                                phase_end_id, next_phase_start_id = boundaries
+                            # Get next phase by index order
+                            next_phase = ProjectPhase.objects.filter(
+                                project_subtype=dl.phase.project_subtype,
+                                index__gt=dl.phase.index
+                            ).order_by('index').first()
+                            
+                            if next_phase:
+                                next_name = next_phase.common_project_phase.name.lower().replace(" ", "")
+                                next_phase_start_id = f"{next_name}vaihe_alkaa_pvm"
+                                
                                 current_phase_end = self._coerce_date_value(updated_attribute_data.get(phase_end_id))
                                 if current_phase_end and max_target != current_phase_end:
                                     log.info(f"[KAAV-3492 BACKEND] Updating phase boundary {phase_end_id} to {max_target}")
