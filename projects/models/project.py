@@ -1055,7 +1055,7 @@ class Project(models.Model):
         if iteration >= max_iterations:
             log.warning(f"[CASCADE] Hit max iterations ({max_iterations}), possible cycle in deadline distances")
 
-        log.info(f"[KAAV-3492 BACKEND] Final updated_attribute_data after cascade: {updated_attribute_data}")
+        log.info(f"[KAAV-3492 BACKEND] After first cascade: {updated_attribute_data}")
 
         # Generate newly added deadlines
         calculation_cache = {}
@@ -1074,61 +1074,176 @@ class Project(models.Model):
             calculation_cache=calculation_cache,
             timing_metrics=timing_metrics,
         )}
-        # Update all deadlines
+        
         # KAAV-3428: Only recalculate deadlines that have update_calculations or default_to_created_at.
-        # Deadlines that only have dl.attribute should NOT be recalculated - their values are already
-        # set and distance enforcement was already applied (if in updated_attributes) or should be
-        # left alone (if not in updated_attributes). This prevents unwanted cascade effects.
         update_dls_to_calc = [
             dl for dl in project_dls
             if dl.update_calculations.exists() \
                 or dl.default_to_created_at
         ]
 
-        project_dls = {**project_dls, **self._set_calculated_deadlines(
-            update_dls_to_calc,
-            None,
-            initial=False,
-            preview=True,
-            preview_attribute_data=updated_attribute_data,
-            confirmed_fields=confirmed_fields,
-            calculation_cache=calculation_cache,
-            timing_metrics=timing_metrics,
-        )}
+        # KAAV-3492 FIX: Unified convergence loop that alternates between:
+        # 1. Recalculating phases (clearing cache!)
+        # 2. Enforcing attribute-only deadlines
+        # 3. Cascading changes
+        max_convergence_iterations = 10
+        
+        # Deadlines processed by update_calculations are "calculated deadlines"
+        calculated_dl_identifiers = {
+            dl.attribute.identifier for dl in update_dls_to_calc 
+            if hasattr(dl, 'attribute') and dl.attribute
+        }
 
-        # KAAV-3492: After phase boundaries are recalculated, enforce distances on
-        # attribute-only deadlines that depend on those boundaries. These deadlines
-        # were excluded from update_dls_to_calc by KAAV-3428 but still need distance enforcement.
-        for dl in project_dls.keys():
-            if not hasattr(dl, 'attribute') or not dl.attribute:
-                continue
-            identifier = dl.attribute.identifier
-            # Skip deadlines already processed by update_calculations
-            if dl in update_dls_to_calc:
-                continue
-            # Skip deadlines that were in the original cascade
-            if identifier in actually_changed:
-                continue
-            # Check if any of its distance rules are now violated
-            current_date = self._coerce_date_value(updated_attribute_data.get(identifier))
-            if not current_date:
-                continue
-            for distance in dl.distances_to_previous.all():
-                combined = {**self.attribute_data, **updated_attribute_data}
-                if not distance.check_conditions(combined):
+        for convergence_iteration in range(1, max_convergence_iterations + 1):
+            log.info(f"[CONVERGENCE] Iteration {convergence_iteration} starting")
+            iteration_changes = set()
+            
+            # Step 1: Recalculate phase boundaries
+            # We MUST clear the cache to ensure new values are used
+            calculation_cache = {}
+            
+            recalc_results = self._set_calculated_deadlines(
+                update_dls_to_calc,
+                None,
+                initial=False,
+                preview=True,
+                preview_attribute_data=updated_attribute_data,
+                confirmed_fields=confirmed_fields,
+                calculation_cache=calculation_cache,
+                timing_metrics=timing_metrics,
+            )
+            project_dls = {**project_dls, **recalc_results}
+            
+            # Detect changes from recalculation
+            for dl, new_date in recalc_results.items():
+                if not hasattr(dl, 'attribute') or not dl.attribute:
                     continue
-                prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
-                prev_date = self._coerce_date_value(prev_date)
-                if not prev_date:
+                identifier = dl.attribute.identifier
+                old_date = self._coerce_date_value(updated_attribute_data.get(identifier))
+                new_date_coerced = self._coerce_date_value(new_date)
+                
+                # Update if different or if new value is set for the first time
+                if (new_date_coerced and old_date != new_date_coerced) or \
+                   (new_date_coerced and not old_date):
+                    log.info(f"[CONVERGENCE] {identifier} recalculated: {old_date} -> {new_date_coerced}")
+                    updated_attribute_data[identifier] = new_date_coerced
+                    iteration_changes.add(identifier)
+            
+            # Step 2 & 3: Enforce attribute-only deadlines AND Cascade
+            # We mix these because a push might trigger an enforcement, which triggers a recalc
+            
+            # Start queue with changes from Step 1
+            cascade_queue = iteration_changes.copy()
+            
+            # Also check ALL attribute-only deadlines for violations in every iteration
+            # This catches cases like T3 (attribute-only) needing to move because T2 moved
+            for dl in project_dls.keys():
+                if not hasattr(dl, 'attribute') or not dl.attribute:
                     continue
-                min_target = self._min_distance_target_date(prev_date, distance, dl)
-                if min_target and current_date < min_target:
-                    log.info(f"[KAAV-3492 POST-CALC] Enforcing {identifier} from {current_date} to min {min_target}")
-                    enforced = self._enforce_distance_requirements(dl, min_target, updated_attribute_data)
-                    if enforced and enforced != current_date:
-                        updated_attribute_data[identifier] = enforced
-                        project_dls[dl] = enforced
-                    break
+                identifier = dl.attribute.identifier
+                if identifier in calculated_dl_identifiers:
+                    continue # Handled by recalc
+                if identifier in cascade_queue:
+                    continue # Already in queue
+                
+                current_date = self._coerce_date_value(updated_attribute_data.get(identifier))
+                if not current_date:
+                    continue
+                    
+                for distance in dl.distances_to_previous.all():
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    if not distance.check_conditions(combined):
+                        continue
+                    prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                    prev_date = self._coerce_date_value(prev_date)
+                    if not prev_date:
+                        continue
+                    min_target = self._min_distance_target_date(prev_date, distance, dl)
+                    if min_target and current_date < min_target:
+                        log.info(f"[CONVERGENCE CHECK] {identifier} violates distance rule (prev={prev_date}, min={min_target})")
+                        cascade_queue.add(identifier)
+                        break
+
+            if cascade_queue:
+                log.info(f"[CONVERGENCE] Processing cascade queue: {len(cascade_queue)} items")
+                for cascade_iter in range(1, 11):
+                    new_cascade_changes = set()
+                    
+                    for changed_id in cascade_queue:
+                        # 1. Enforce self (if not calculated)
+                        changed_dl = identifier_to_dl.get(changed_id)
+                        if not changed_dl:
+                            continue
+                            
+                        current_val = updated_attribute_data.get(changed_id)
+                        current_date = self._coerce_date_value(current_val)
+                        
+                        if changed_id not in calculated_dl_identifiers and current_date:
+                            needs_enforcement = False
+                            for distance in changed_dl.distances_to_previous.all():
+                                combined = {**self.attribute_data, **updated_attribute_data}
+                                if not distance.check_conditions(combined):
+                                    continue
+                                prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                                prev_date = self._coerce_date_value(prev_date)
+                                if not prev_date:
+                                    continue
+                                min_target = self._min_distance_target_date(prev_date, distance, changed_dl)
+                                if min_target and current_date < min_target:
+                                    log.info(f"[CONVERGENCE ENFORCE] {changed_id} from {current_date} to {min_target}")
+                                    enforced = self._enforce_distance_requirements(changed_dl, min_target, updated_attribute_data)
+                                    if enforced and enforced != current_date:
+                                        updated_attribute_data[changed_id] = enforced
+                                        project_dls[changed_dl] = enforced
+                                        iteration_changes.add(changed_id)
+                                        current_date = enforced 
+                        
+                        # 2. Push dependents (Forward Cascade)
+                        if not current_date:
+                            continue
+
+                        for distance in changed_dl.distances_to_next.all():
+                            next_dl = distance.deadline
+                            if not next_dl.attribute:
+                                continue
+                            next_id = next_dl.attribute.identifier
+                            if next_dl not in project_dls:
+                                continue
+                            
+                            combined = {**self.attribute_data, **updated_attribute_data}
+                            if not distance.check_conditions(combined):
+                                continue
+                                
+                            next_val = updated_attribute_data.get(next_id)
+                            if not next_val:
+                                next_val = project_dls.get(next_dl)
+                                
+                            next_date = self._coerce_date_value(next_val)
+                            if not next_date:
+                                continue
+                                
+                            min_target = self._min_distance_target_date(current_date, distance, next_dl)
+                            if min_target and next_date < min_target:
+                                log.info(f"[CONVERGENCE PUSH] Pushing {next_id} from {next_date} to {min_target} (because {changed_id} moved)")
+                                new_cascade_changes.add(next_id)
+                                iteration_changes.add(next_id)
+                                updated_attribute_data[next_id] = min_target
+
+                    if not new_cascade_changes:
+                        break
+                    cascade_queue = new_cascade_changes
+
+            # Check if converged
+            if not iteration_changes:
+                log.info(f"[CONVERGENCE] Converged after {convergence_iteration} iteration(s)")
+                break
+        
+        if convergence_iteration >= max_convergence_iterations:
+            log.warning(f"[CONVERGENCE] Hit max iterations ({max_convergence_iterations})")
+        
+        log.info(f"[KAAV-3492 BACKEND] Final after convergence: {updated_attribute_data}")
+
+
 
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
