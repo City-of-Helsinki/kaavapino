@@ -190,6 +190,7 @@ INSTALLED_APPS = [
     "django_q",
     "drf_spectacular",
     "auditlog",
+    "resilient_logger"
 ]
 
 if env.str("ELASTIC_APM_SERVER_URL") and env.str("ELASTIC_APM_SECRET_TOKEN"):
@@ -259,6 +260,9 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
+        'resilient': {
+            "class": "resilient_logger.handlers.ResilientLogHandler",
+        },
         'stdout': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -353,3 +357,26 @@ SPECTACULAR_SETTINGS = {
 # Auditlog
 AUDITLOG_DISABLE_REMOTE_ADDR = False
 AUDITLOG_DISABLE_ON_RAW_SAVE = True
+
+# Resilient logger
+RESILIENT_LOGGER = {
+    "origin": "Kaavapino",
+    "environment": "kaavapino",
+    #"environment": env("AUDIT_LOG_ENV"),
+    "sources": [
+        { "class": "resilient_logger.sources.ResilientLogSource" },
+        { "class": "resilient_logger.sources.DjangoAuditLogSource" },
+    ],
+    #"targets": [{
+    #    "class": "resilient_logger.targets.ElasticsearchLogTarget",
+    #    "es_url": env("AUDIT_LOG_ES_URL"),
+    #    "es_username": env("AUDIT_LOG_ES_USERNAME"),
+    #    "es_password": env("AUDIT_LOG_ES_PASSWORD"),
+    #    "es_index": env("AUDIT_LOG_ES_INDEX"),
+    #    "required": True
+    #}],
+    "batch_limit": 5000,
+    "chunk_size": 500,
+    "submit_unsent_entries": True,
+    "clear_sent_entries": True,
+}
