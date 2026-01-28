@@ -471,7 +471,6 @@ class Project(models.Model):
         identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
 
         for distance in deadline.distances_to_previous.all():
-            prev_id = getattr(getattr(distance.previous_deadline, "attribute", None), "identifier", None)
             conditions_ok = distance.check_conditions(combined_attributes)
             
             if not conditions_ok:
