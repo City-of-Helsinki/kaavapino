@@ -1248,7 +1248,7 @@ class Project(models.Model):
                         current_date = self._coerce_date_value(current_val)
                         
                         if changed_id not in calculated_dl_identifiers and current_date:
-                            needs_enforcement = False
+
                             for distance in changed_dl.distances_to_previous.all():
                                 combined = {**self.attribute_data, **updated_attribute_data}
                                 if not distance.check_conditions(combined):
