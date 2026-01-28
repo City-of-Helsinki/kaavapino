@@ -301,8 +301,7 @@ class Project(models.Model):
                 log.warning(f"Attribute {identifier} not found")
                 continue
 
-            if identifier in confirmed_fields:
-                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
+
 
             self.attribute_data[identifier] = value
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
@@ -470,31 +469,26 @@ class Project(models.Model):
             combined_attributes.update(preview_attribute_data)
 
         identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
-        log.info(f"[DISTANCE] Enforcing for {identifier}, requested date: {current_date}")
 
         for distance in deadline.distances_to_previous.all():
             prev_id = getattr(getattr(distance.previous_deadline, "attribute", None), "identifier", None)
             conditions_ok = distance.check_conditions(combined_attributes)
-            log.info(f"[DISTANCE]   Rule from {prev_id}: {distance.distance_from_previous} days, conditions_ok={conditions_ok}")
             
             if not conditions_ok:
                 continue
 
             prev_date = self._resolve_deadline_date(distance.previous_deadline, preview_attribute_data)
             prev_date = self._coerce_date_value(prev_date)
-            log.info(f"[DISTANCE]   prev_date for {prev_id}: {prev_date}")
             
             if not prev_date:
                 continue
 
             min_target = self._min_distance_target_date(prev_date, distance, deadline)
-            log.info(f"[DISTANCE]   min_target: {min_target}")
             
             if not min_target:
                 continue
 
             if current_date < min_target:
-                log.info(f"[DISTANCE]   Adjusting {identifier} from {current_date} to {min_target}")
                 current_date = min_target
 
         # After distance checks, also snap to the deadline's date_type if one exists
@@ -535,13 +529,18 @@ class Project(models.Model):
             if deadline.attribute and deadline.attribute.identifier:
                 # Check if the attribute is in confirmed_fields - if so, keep the original value
                 identifier = deadline.attribute.identifier
+                # Check if the attribute is in confirmed_fields - if so, keep the original value
+                identifier = deadline.attribute.identifier
                 if identifier in confirmed_fields:
                     # Get the original confirmed value - don't let calculation overwrite it
                     # KAAV-3492 FIX: If previewing, prefer the value from the request (preview_attribute_data)
                     # because self.attribute_data might be stale (e.g. if user just edited it)
                     if preview and preview_attribute_data and identifier in preview_attribute_data:
-                        return preview_attribute_data.get(identifier)
-                    return self.attribute_data.get(identifier)
+                        val = preview_attribute_data.get(identifier)
+                        return val
+                    
+                    val = self.attribute_data.get(identifier)
+                    return val
 
                 # NOTE: Removed line that prioritized preview_attribute_data over calculated value
                 # This was preventing cascade updates (ehdotus -> tarkistettu_ehdotus)
@@ -774,10 +773,7 @@ class Project(models.Model):
     def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
         confirmed_fields = confirmed_fields or []
 
-        # KAAV-3492 DEBUG: Log what's being updated
-        log.info(f"[KAAV-3492 BACKEND] get_preview_deadlines called with:")
-        log.info(f"[KAAV-3492 BACKEND]   updated_attributes: {updated_attributes}")
-        log.info(f"[KAAV-3492 BACKEND]   confirmed_fields: {confirmed_fields}")
+        confirmed_fields = confirmed_fields or []
 
         # Filter out deadlines that would be deleted
         project_dls = {
