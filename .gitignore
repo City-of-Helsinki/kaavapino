@@ -119,3 +119,15 @@ media/
 
 # MacOS
 .DS_Store
+
+# Locally removed files
+010925_projektitiedot.xlsx
+1.0_aikataulutiedot.xlsx
+1.0_projektitiedot.xlsx
+121125_projektitiedot.xlsx
+200225_aikataulutiedot.xlsx
+230925_projektitiedot.xlsx
+media.zip
+test_251125_aikataulutiedot.xlsx
+test_261125_aikataulutiedot.xlsx
+~$040425_projektitiedot.xlsx
