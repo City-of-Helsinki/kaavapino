@@ -362,10 +362,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def attribute_data_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
         project = self.get_object()
         attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+        generated_attributes = Attribute.objects.filter(calculations__isnull=False)
         ignored = FieldSetAttribute.objects.all().values_list('attribute_target', flat=True)
         if not project.attribute_data:
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response(get_attribute_data_filtered_response(attributes, ignored, project))
+        return Response(get_attribute_data_filtered_response(attributes, generated_attributes, ignored, project))
 
     @action(
         methods=['get'],
