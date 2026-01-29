@@ -281,10 +281,13 @@ class Project(models.Model):
         if not data:
             return False
 
+        attributes_by_identifier = Attribute.objects.filter(
+            identifier__in=data.keys()
+        ).in_bulk(field_name="identifier")
+
         for identifier, value in data.items():
-            try:
-                attribute = Attribute.objects.get(identifier=identifier)
-            except Attribute.DoesNotExist:
+            attribute = attributes_by_identifier.get(identifier)
+            if not attribute:
                 log.warning(f"Attribute {identifier} not found")
                 continue
 

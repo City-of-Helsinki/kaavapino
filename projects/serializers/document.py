@@ -43,15 +43,24 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.DATE)
     def get_last_downloaded(self, document_template):
-        try:
-            last_downloaded = document_template.document_download_log \
-                .filter(project=self.context["project"], invalidated=False) \
-                .order_by("-created_at") \
-                .first().created_at
-        except AttributeError:
-            last_downloaded = None
+        cache = getattr(document_template, "_prefetched_objects_cache", {}) or {}
+        logs = cache.get("document_download_log")
 
-        return last_downloaded
+        if logs is None:
+            log = (
+                document_template.document_download_log.filter(
+                    project=self.context["project"],
+                    invalidated=False,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            return getattr(log, "created_at", None)
+
+        if not logs:
+            return None
+
+        return max((l.created_at for l in logs if l.created_at), default=None)
 
     @extend_schema_field(inline_serializer(
         name='phases',
@@ -64,27 +73,23 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
         many=True,
     ))
     def get_phases(self, document_template):
-        phases = document_template.common_project_phases.all()
-        phase_list = []
         project = self.context["project"]
 
+        cache = getattr(document_template, "_prefetched_objects_cache", {}) or {}
+        logs = cache.get("document_download_log") or []
+
+        phases = document_template.common_project_phases.all()
+        phase_list = []
+
         for phase in phases:
-            try:
-                project_phase = phase.phases.get(
-                    project_subtype=project.subtype,
-                )
-            except ProjectPhase.DoesNotExist:
+            project_phase = next(iter(phase.phases.all()), None)
+            if not project_phase:
                 continue
 
-            try:
-                last_downloaded = document_template.document_download_log \
-                    .filter(project=project) \
-                    .filter(phase=phase) \
-                    .filter(invalidated=False) \
-                    .order_by("-created_at") \
-                    .first().created_at
-            except AttributeError:
-                last_downloaded = None
+            last_downloaded = max(
+                (l.created_at for l in logs if l.phase_id == phase.id and l.created_at),
+                default=None,
+            )
 
             phase_ended = project_phase.index < project.phase.index
             phase_list.append({

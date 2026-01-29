@@ -17,18 +17,16 @@ class UserSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_role_name(self, user):
-        if not user.all_groups.count():
+        groups = list(getattr(user, "all_groups", []) or [])
+        if not groups:
             return None
 
-        role = user.all_groups[0]
-        for group in user.all_groups:
-            if role.groupprivilege.as_int < group.groupprivilege.as_int:
-                role = group
+        def privilege_rank(g):
+            gp = getattr(g, "groupprivilege", None)
+            return getattr(gp, "as_int", -1)
 
-        if not role:
-            return None
-
-        return role.name
+        role = max(groups, key=privilege_rank, default=None)
+        return getattr(role, "name", None) if role else None
 
     class Meta:
         model = get_user_model()

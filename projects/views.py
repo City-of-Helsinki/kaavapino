@@ -9,7 +9,7 @@ from django.conf import settings
 from django.core.exceptions import FieldError
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Prefetch
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.utils import timezone
@@ -64,6 +64,7 @@ from projects.models import (
     ProjectPriority,
     DateType,
 )
+from projects.models.document import ProjectDocumentDownloadLog
 from projects.models.attribute import AttributeLock, FieldSetAttribute
 from projects.models.utils import create_identifier
 from projects.permissions.attributes import AttributeLockPermissions
@@ -181,7 +182,14 @@ class ProjectPagination(pagination.PageNumberPagination):
     ),
 )
 class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
-    queryset = Project.objects.all().select_related("user", "subtype", "subtype__project_type", "phase")
+    queryset = Project.objects.all().select_related(
+        "user",
+        "subtype",
+        "subtype__project_type",
+        "phase",
+        "phase__common_project_phase",
+        "priority",
+    )
     permission_classes = [IsAuthenticated, ProjectPermissions]
     filter_backends = (filters.OrderingFilter,)
     pagination_class = ProjectPagination
@@ -984,20 +992,41 @@ class ProjectCardSchemaViewSet(viewsets.ReadOnlyModelViewSet):
         project_id = self.request.query_params.get('project', None)
         if not project_id:
             return self.queryset
-        else:
-            try:
-                project = Project.objects.get(pk=int(project_id))
-            except Project.DoesNotExist:
-                raise Http404
-            filtered = []
-            for item in self.queryset:
-                dls = Deadline.objects.filter(attribute=item.attribute)
-                if not dls:
-                    continue
-                if not any(should_display_deadline(project, dl) for dl in dls):
-                    filtered.append(item.pk)
-            return self.queryset.exclude(pk__in=filtered)
-            
+
+        try:
+            project = Project.objects.get(pk=int(project_id))
+        except (ValueError, TypeError, Project.DoesNotExist):
+            raise Http404
+
+        qs = self.queryset
+
+        attribute_ids = list(
+            qs.values_list("attribute_id", flat=True).distinct()
+        )
+        if not attribute_ids:
+            return qs
+
+        deadlines = (
+            Deadline.objects.filter(attribute_id__in=attribute_ids)
+            .select_related("phase", "subtype")
+            .prefetch_related("phase__common_project_phase")
+        )
+
+        deadlines_by_attribute = {}
+        for dl in deadlines:
+            deadlines_by_attribute.setdefault(dl.attribute_id, []).append(dl)
+
+        excluded_attribute_ids = [
+            attr_id
+            for attr_id, dls in deadlines_by_attribute.items()
+            if dls and not any(should_display_deadline(project, dl) for dl in dls)
+        ]
+
+        if not excluded_attribute_ids:
+            return qs
+
+        return qs.exclude(attribute_id__in=excluded_attribute_ids)
+
 
 class AttributePagination(pagination.PageNumberPagination):
     page_size = 2000
@@ -1170,22 +1199,67 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
     ],
 )
 class ProjectTypeSchemaViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectType.objects.all()
+    queryset = ProjectType.objects.all().prefetch_related(
+        # Makes obj.subtypes.all() cheap and predictable
+        "subtypes",
+        "subtypes__phases",
+        "subtypes__phases__common_project_phase",
+        "subtypes__phases__sections",
+        "subtypes__phases__deadline_sections",
+        "subtypes__floor_area_sections",
+    )
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+
+        project_param = request.query_params.get("project")
+        try:
+            project_id = int(project_param) if project_param else None
+        except (TypeError, ValueError):
+            project_id = None
+
+        if project_id:
+            self.project = (
+                Project.objects.filter(pk=project_id)
+                .select_related(
+                    "user",
+                    "subtype",
+                    "subtype__project_type",
+                    "phase",
+                    "phase__common_project_phase",
+                )
+                .prefetch_related(
+                    # Used heavily by schema serializers (confirmed deadlines etc.)
+                    Prefetch(
+                        "deadlines",
+                        queryset=ProjectDeadline.objects.select_related(
+                            "deadline",
+                            "deadline__attribute",
+                            "deadline__confirmation_attribute",
+                            "project",
+                        ),
+                    )
+                )
+                .first()
+            )
+        else:
+            self.project = None
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["project"] = getattr(self, "project", None)
+        return context
 
     def get_serializer_class(self):
         user = self.request.user
 
         owner = self.request.query_params.get("owner")
-        project = self.request.query_params.get("project")
+        project = getattr(self, "project", None)
 
-        try:
-            project = Project.objects.get(pk=int(project))
-        except Exception:
-            project = None
-
-        is_owner = \
-            owner in ["1", "true", "True"] or \
-            project and project.user == user
+        is_owner = (
+                owner in ["1", "true", "True"]
+                or (project is not None and project.user == user)
+        )
 
         if is_owner:
             return {
@@ -1342,16 +1416,48 @@ class DocumentViewSet(ReadOnlyModelViewSet):
         return context
 
     def get_queryset(self):
-        phases = CommonProjectPhase.objects.filter(
-            phases__project_subtype=self.project.subtype,
+        subtype = self.project.subtype
+
+        common_phases_qs = (
+            CommonProjectPhase.objects.all()
+            .prefetch_related(
+                Prefetch(
+                    "phases",
+                    queryset=ProjectPhase.objects.filter(project_subtype=subtype).select_related(
+                        "common_project_phase",
+                        "project_subtype",
+                    ),
+                )
+            )
         )
-        return DocumentTemplate.objects.filter(
-            common_project_phases__in=phases,
-        ).distinct()
+
+        download_logs_qs = (
+            ProjectDocumentDownloadLog.objects.filter(
+                project=self.project,
+                invalidated=False,
+            )
+            .select_related("phase")
+            .only("id", "created_at", "project_id", "document_template_id", "phase_id", "invalidated")
+        )
+
+        return (
+            DocumentTemplate.objects.filter(
+                common_project_phases__phases__project_subtype=subtype,
+            )
+            .prefetch_related(
+                Prefetch("common_project_phases", queryset=common_phases_qs),
+                Prefetch("document_download_log", queryset=download_logs_qs),
+            )
+            .distinct()
+        )
 
     def get_project(self):
         project_id = self.kwargs.get("project_pk")
-        project = Project.objects.filter(pk=project_id).first()
+        project = (
+            Project.objects.filter(pk=project_id)
+            .select_related("subtype", "phase", "phase__common_project_phase")
+            .first()
+        )
 
         if not project:
             raise Http404

@@ -616,41 +616,28 @@ class ProjectPhaseSchemaSerializer(serializers.Serializer):
         return sections
 
     def get_sections(self, phase):
-        try:
-            context = self.context
-        except AttributeError:
-            context = {}
-
-        try:
-            query_params = getattr(self.context["request"], "GET", {})
-        except KeyError:
-            query_params = {}
-
-        try:
-            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
-        except (ValueError, TypeError, Project.DoesNotExist):
-            project = None
-
+        project = self.context.get("project", None)
         return self._get_sections(
-            context.get("privilege"),
-            context.get("owner"),
+            self.context.get("privilege"),
+            self.context.get("owner"),
             phase,
             project,
         )
 
     def get_status(self, phase):
         try:
-            query_params = getattr(self.context["request"], "GET", {})
-            project = Project.objects.select_related("phase", "phase__common_project_phase") \
-                .get(pk=int(query_params.get("project")))
-            project_phase = project.phase.common_project_phase
-            return "Vaihe suoritettu" if project_phase.index > phase.common_project_phase.index \
-                else "Vaihe aloittamatta" if project_phase.index < phase.common_project_phase.index \
-                else "Vaihe käynnissä"
-        except (KeyError, ValueError, TypeError, Project.DoesNotExist):
-            pass
+            project = self.context.get("project", None)
+            if not project:
+                return "Vaiheen tila ei tiedossa"
 
-        return "Vaiheen tila ei tiedossa"
+            project_phase = project.phase.common_project_phase
+            return (
+                "Vaihe suoritettu" if project_phase.index > phase.common_project_phase.index
+                else "Vaihe aloittamatta" if project_phase.index < phase.common_project_phase.index
+                else "Vaihe käynnissä"
+            )
+        except Exception:
+            return "Vaiheen tila ei tiedossa"
 
 
 class ProjectFloorAreaSchemaSerializer(BaseMatrixableSchemaSerializer):
@@ -768,25 +755,6 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
 
         return deadline_sections
 
-    def get_sections(self, phase):
-        try:
-            context = self.context
-        except AttributeError:
-            context = {}
-
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
-        except (ValueError, TypeError, Project.DoesNotExist):
-            project = None
-
-        return self._get_sections(
-            context.get("privilege"),
-            context.get("owner"),
-            phase,
-            project,
-        )
-
     @staticmethod
     def _get_grouped_sections(privilege, owner, phase, project=None):
         grouped_sections = [
@@ -832,21 +800,20 @@ class ProjectPhaseDeadlineSectionsSerializer(serializers.Serializer):
             grouped_sections[sect_i]["attributes"] = grouped_attributes
         return grouped_sections
 
+    def get_sections(self, phase):
+        project = self.context.get("project", None)
+        return self._get_sections(
+            self.context.get("privilege"),
+            self.context.get("owner"),
+            phase,
+            project,
+        )
+
     def get_grouped_sections(self, phase):
-        try:
-            context = self.context
-        except AttributeError:
-            context = {}
-
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.prefetch_related("deadlines").get(pk=int(query_params.get("project")))
-        except (ValueError, TypeError, Project.DoesNotExist):
-            project = None
-
+        project = self.context.get("project", None)
         return self._get_grouped_sections(
-            context.get("privilege"),
-            context.get("owner"),
+            self.context.get("privilege"),
+            self.context.get("owner"),
             phase,
             project,
         )
@@ -876,19 +843,17 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
     filters = serializers.SerializerMethodField()
 
     def get_phases(self, instance):
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.get(pk=int(query_params.get("project")))
-        except (ValueError, TypeError, Project.DoesNotExist):
+        project = self.context.get("project", None)
+        if not project:
             return ProjectPhaseSchemaSerializer(
                 instance.phases.all(),
                 many=True,
                 context=self.context,
             ).data
 
-        privilege = self.context['privilege']
-        owner = self.context['owner']
-        cache_key = f'phase_schema:{privilege}:{owner}:{project.pk if project else None}'
+        privilege = self.context["privilege"]
+        owner = self.context["owner"]
+        cache_key = f"phase_schema:{privilege}:{owner}:{project.pk}"
         phase_schema_serializer = cache.get(cache_key)
 
         if not phase_schema_serializer:
@@ -902,19 +867,17 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
         return phase_schema_serializer
 
     def get_deadline_sections(self, instance):
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.get(pk=int(query_params.get("project")))
-        except (ValueError, TypeError, Project.DoesNotExist):
+        project = self.context.get("project", None)
+        if not project:
             return ProjectPhaseDeadlineSectionsSerializer(
                 instance.phases.all(),
                 many=True,
                 context=self.context,
             ).data
 
-        privilege = self.context['privilege']
-        owner = self.context['owner']
-        cache_key = f'deadline_sections:{privilege}:{owner}:{project.pk if project else None}'
+        privilege = self.context["privilege"]
+        owner = self.context["owner"]
+        cache_key = f"deadline_sections:{privilege}:{owner}:{project.pk}"
         phase_deadline_sections_serializer = cache.get(cache_key)
 
         if not phase_deadline_sections_serializer:
@@ -937,11 +900,9 @@ class ProjectSubTypeSchemaSerializer(serializers.Serializer):
         return fields
 
     def get_filters(self, instance):
-        query_params = getattr(self.context["request"], "GET", {})
-        try:
-            project = Project.objects.get(pk=int(query_params.get("project")))
-        except (ValueError, TypeError, Project.DoesNotExist):
-            project = None
+        project = self.context.get("project", None)
+        if not project:
+            return {"roles": set(), "subroles": set()}
 
         filters_cache = cache.get("project_phase_section_filters", {})
 
@@ -996,7 +957,7 @@ def create_project_type_schema_serializer(privilege, owner):
         context["privilege"] = privilege
         context["owner"] = owner
         serializer = ProjectSubTypeSchemaSerializer(
-            ProjectSubtype.objects.all(),
+            obj.subtypes.all(),
             many=True,
             context=context,
         )

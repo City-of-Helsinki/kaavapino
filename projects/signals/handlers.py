@@ -85,6 +85,8 @@ def save_attribute_data_subtype(sender, instance, *args, **kwargs):
 
         # make this a model field if more options are needed
         if attr.value_type == Attribute.TYPE_USER:
+            users_cache = cache.get("users_cache", {})
+            users_cache.pop(instance.pk, None)
             value = value.uuid
 
         instance.attribute_data[attr.identifier] = value

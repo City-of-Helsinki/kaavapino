@@ -72,8 +72,23 @@ class User(AbstractUser):
 
     @cached_property
     def all_groups(self):
-        return self.groups.all().select_related("groupprivilege") \
-            .union(self.additional_groups.all().select_related("groupprivilege"))
+        """
+        Prefer prefetched relation caches to avoid N+1 queries in list endpoints.
+        Falls back to QuerySets when not prefetched.
+        """
+        cache = getattr(self, "_prefetched_objects_cache", None) or {}
+
+        groups = cache.get("groups")
+        additional = cache.get("additional_groups")
+
+        if groups is not None and additional is not None:
+            return list(groups) + list(additional)
+
+        return list(
+            self.groups.all().select_related("groupprivilege")
+        ) + list(
+            self.additional_groups.all().select_related("groupprivilege")
+        )
 
     @cached_property
     def privilege(self):

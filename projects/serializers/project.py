@@ -634,6 +634,16 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     _metadata = serializers.SerializerMethodField()
 
+    def to_representation(self, instance):
+        cache_key = f"project_repr:{instance.pk}:{instance.modified_at.timestamp()}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+        representation = super().to_representation(instance)
+        cache.set(cache_key, representation, None)
+        return representation
+
     class Meta:
         model = Project
         fields = [
@@ -757,7 +767,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_data = {
                 k: v["new_value"]
                 for k, v in self._get_updates(project, Attribute.objects.all(),
-                                              cutoff=snapshot, request=self.context.get('request', None)).items()
+                                              cutoff=snapshot, request=self.context.get('request', None), include_schema=False).items()
             }
         else:
             attribute_data = getattr(project, "attribute_data", {})
@@ -767,9 +777,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         if snapshot:
             try:
                 subtype = ProjectPhaseLog.objects.filter(
-                    created_at__lte=self._get_snapshot_date(project),
+                    created_at__lte=snapshot,
                     project=project
-                ).order_by("-created_at").first().phase.project_subtype
+                ).select_related("phase__project_subtype").order_by("-created_at").first().phase.project_subtype
             except AttributeError:
                 subtype = project.phase.project_subtype
             attribute_data['kaavaprosessin_kokoluokka'] = subtype.name
@@ -787,20 +797,20 @@ class ProjectSerializer(serializers.ModelSerializer):
             set_ad_data_in_attribute_data(attribute_data)
             set_automatic_attributes(attribute_data)
 
-        static_properties = [
-            "user",
-            "name",
-            "public",
-            "pino_number",
-            "create_principles",
-            "create_draft",
-        ]
-
         if not snapshot:
-            # Prevent making database calls within for-loop by getting attributes from database here
+            static_properties = [
+                "user",
+                "name",
+                "public",
+                "pino_number",
+                "create_principles",
+                "create_draft",
+            ]
             attributes = Attribute.objects.filter(static_property__in=static_properties)
+            attr_by_static_property = {attr.static_property: attr for attr in attributes}
+
             for static_property in static_properties:
-                attribute = next(filter(lambda attr: attr.static_property == static_property, attributes), None)
+                attribute = attr_by_static_property.get(static_property)
                 if attribute:
                     value = getattr(project, static_property)
 
@@ -890,6 +900,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             attribute_files = ProjectAttributeFile.objects \
                 .filter(project=project, created_at__lte=snapshot) \
                 .exclude(archived_at__lte=snapshot) \
+                .select_related("attribute") \
+                .prefetch_related("fieldset_path_locations__parent_fieldset") \
                 .order_by(
                     "fieldset_path_str",
                     "attribute__pk",
@@ -900,7 +912,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         else:
             attribute_files = ProjectAttributeFile.objects \
                 .filter(project=project, archived_at=None) \
-                .prefetch_related("attribute", "fieldset_path_locations") \
+                .select_related("attribute") \
+                .prefetch_related("fieldset_path_locations__parent_fieldset") \
                 .order_by(
                     "fieldset_path_str",
                     "attribute__pk",
@@ -912,39 +925,41 @@ class ProjectSerializer(serializers.ModelSerializer):
         # Add file attributes to the attribute data
         # File values are represented as absolute URLs
         file_attributes = {}
+        instance_attribute_data = self.instance.attribute_data  # Cache attribute access
+
         for attribute_file in attribute_files:
             if has_project_attribute_file_permissions(attribute_file, request):
+                file_url = request.build_absolute_uri(attribute_file.file.url)
+                file_data = {
+                    "link": file_url,
+                    "description": attribute_file.description,
+                }
+
                 if not attribute_file.fieldset_path:
-                    file_attributes[attribute_file.attribute.identifier] = {
-                        "link": request.build_absolute_uri(attribute_file.file.url),
-                        "description": attribute_file.description,
-                    }
+                    file_attributes[attribute_file.attribute.identifier] = file_data
                 else:
                     file_fs_index = attribute_file.fieldset_path[0]["index"]
-                    file_fs_parent_identifier = \
-                        attribute_file.fieldset_path[0]["parent"].identifier
-                    indices_set = len(file_attributes.get(
-                        file_fs_parent_identifier, [],
-                    ))
-                    # include in-between fieldset children with no files
-                    # that otherwise get removed in this step
-                    if not file_attributes.get(file_fs_parent_identifier):
+                    file_fs_parent_identifier = attribute_file.fieldset_path[0]["parent"].identifier
+
+                    if file_fs_parent_identifier not in file_attributes:
                         file_attributes[file_fs_parent_identifier] = []
 
+                    parent_list = file_attributes[file_fs_parent_identifier]
+                    indices_set = len(parent_list)
+
+                    # include in-between fieldset children with no files
+                    # that otherwise get removed in this step
+                    attr_data_parent = attribute_data.get(file_fs_parent_identifier, [])
                     for i in range(indices_set, file_fs_index):
                         try:
-                            file_attributes[file_fs_parent_identifier].append(
-                                attribute_data.get(
-                                    file_fs_parent_identifier, [],
-                                )[i]
-                            )
+                            parent_list.append(attr_data_parent[i])
                         except IndexError:
-                            file_attributes[file_fs_parent_identifier].append({})
+                            parent_list.append({})
 
                     try:
-                        fieldset_content = self.instance.attribute_data.get(
-                            attribute_file.fieldset_path[0]["parent"].identifier, []
-                        )[attribute_file.fieldset_path[0]["index"]]
+                        fieldset_content = instance_attribute_data.get(
+                            file_fs_parent_identifier, []
+                        )[file_fs_index]
                     except (KeyError, IndexError, TypeError):
                         fieldset_content = {}
 
@@ -954,24 +969,14 @@ class ProjectSerializer(serializers.ModelSerializer):
                         file_attributes,
                         0,
                         attribute_file.attribute.identifier,
-                        {
-                            "link": request.build_absolute_uri(attribute_file.file.url),
-                            "description": attribute_file.description,
-                        }
+                        file_data
                     )
 
-                    current_fs_len = len(file_attributes.get(
-                        file_fs_parent_identifier
-                    ) or [])
-                    total_fs_len = len(attribute_data.get(
-                        file_fs_parent_identifier
-                    ) or [])
+                    current_fs_len = len(parent_list)
+                    total_fs_len = len(attr_data_parent)
 
                     if current_fs_len < total_fs_len:
-                        file_attributes[file_fs_parent_identifier] += \
-                            attribute_data[file_fs_parent_identifier][
-                                current_fs_len:total_fs_len
-                            ]
+                        parent_list.extend(attr_data_parent[current_fs_len:total_fs_len])
 
         attribute_data.update(file_attributes)
 
@@ -1014,6 +1019,11 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _get_users(project, attributes, list_view=False):
+        project_user_cache = cache.get("project_users", {})
+
+        if project.pk in project_user_cache:
+            return project_user_cache[project.pk]
+
         users = [project.user]
 
         if not list_view:
@@ -1043,12 +1053,19 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "groups", "additional_groups", "additional_groups__permissions"
             ))
 
-        return UserSerializer(users, many=True).data
+        result = UserSerializer(users, many=True).data
+        project_user_cache[project.pk] = result
+        cache.set("project_users", project_user_cache, 1800)
+        return result
 
     @staticmethod
     def _get_personnel(project, attributes, list_view=False):
         if list_view:
             return []
+
+        personnel_cache = cache.get("project_personnel", {})
+        if project.pk in personnel_cache:
+            return personnel_cache[project.pk]
 
         flat_data = get_flat_attribute_data(project.attribute_data, {})
 
@@ -1088,7 +1105,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
             data = PersonnelSerializer(personnel_data).data
             return_values.append({"id": id, "name": data["name"]})
-
+        personnel_cache[project.pk] = return_values
+        cache.set("project_personnel", personnel_cache, 1800)
         return return_values
 
     @staticmethod
@@ -1425,63 +1443,78 @@ class ProjectSerializer(serializers.ModelSerializer):
                 "create_principles",
                 "create_draft",
             ]
-            for static_property in static_properties:
-                try:
-                    try:
-                        attr = validate_attributes[static_property]
-                    except KeyError:
-                        continue
+            # Batch fetch all static property attributes at once
+            static_attrs = Attribute.objects.filter(static_property__in=static_properties)
+            static_attr_by_property = {attr.static_property: attr for attr in static_attrs}
 
-                    static_property_attributes[
-                        Attribute.objects.get(static_property=static_property).identifier
-                    ] = attr
-                except Attribute.DoesNotExist:
-                    continue
+            for static_property in static_properties:
+                if static_property in validate_attributes:
+                    attribute = static_attr_by_property.get(static_property)
+                    if attribute:
+                        static_property_attributes[attribute.identifier] = validate_attributes[static_property]
 
         if not attribute_data:
             return static_property_attributes
 
         tmp_attribute_data = {}
-        attribute_objects = { attribute.identifier: attribute for attribute in Attribute.objects.filter(
+        attribute_objects = {attribute.identifier: attribute for attribute in Attribute.objects.filter(
             identifier__in=attribute_data.keys())}
+
+        instance_attribute_data = self.instance.attribute_data if self.instance else {}
+        now = timezone.now()
+
+        files_to_update = []
+        deadlines_to_delete = []
+
         for attribute_identifier, value in attribute_data.items():
-            try:
-                attribute = attribute_objects.get(attribute_identifier)
-                if not attribute:
-                    continue
-                if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
-                    if value is None:
-                        tmp_attribute_data[attribute_identifier] = []
-                elif attribute.value_type == Attribute.TYPE_FIELDSET and value:
+            attribute = attribute_objects.get(attribute_identifier)
+            if not attribute:
+                continue
+
+            if attribute.multiple_choice and attribute.value_type == Attribute.TYPE_CHOICE:
+                if value is None:
+                    tmp_attribute_data[attribute_identifier] = []
+            elif attribute.value_type == Attribute.TYPE_FIELDSET and value:
+                old_value = instance_attribute_data.get(attribute_identifier)
+                if old_value:
                     for index, entry in enumerate(value):
                         if entry.get("_deleted", False) is not True:
                             continue
-                        old_value = self.instance.attribute_data.get(attribute_identifier, None)
-                        if not old_value or not old_value[index] or old_value[index]["_deleted"]:
+                        if index >= len(old_value) or not old_value[index] or old_value[index].get("_deleted"):
                             continue
-                        fieldset_attributes = FieldSetAttribute.objects.filter(
-                            attribute_source=attribute,
-                            attribute_target__value_type=Attribute.TYPE_IMAGE
-                        )
-                        for f_attr in fieldset_attributes:
-                            fieldset_path_str = f'{attribute_identifier}[{index}].{f_attr.attribute_target.identifier}'
-                            ProjectAttributeFile.objects.filter(
-                                project=self.instance,
-                                attribute=f_attr.attribute_target,
-                                fieldset_path_str=fieldset_path_str
-                            ).update(archived_at=timezone.now())
 
-                if value is None:
-                    try:
-                        deadline = Deadline.objects.get(attribute=attribute, subtype=self.instance.subtype)
-                        ProjectDeadline.objects.get(deadline=deadline, project=self.instance).delete()
-                    except Exception:
-                        pass
+                        files_to_update.append((attribute, attribute_identifier, index))
 
+            if value is None:
+                try:
+                    deadline = Deadline.objects.get(attribute=attribute, subtype=self.instance.subtype)
+                    deadlines_to_delete.append((deadline, self.instance))
+                except Exception:
+                    pass
 
+        if files_to_update:
+            fieldset_attrs_cache = {}
+            for attribute, attribute_identifier, index in files_to_update:
+                if attribute.id not in fieldset_attrs_cache:
+                    fieldset_attrs_cache[attribute.id] = list(FieldSetAttribute.objects.filter(
+                        attribute_source=attribute,
+                        attribute_target__value_type=Attribute.TYPE_IMAGE
+                    ).select_related("attribute_target"))
 
-            except Attribute.DoesNotExist:
-                pass  # Attribute not found by attribute_identifier
+                for f_attr in fieldset_attrs_cache[attribute.id]:
+                    fieldset_path_str = f'{attribute_identifier}[{index}].{f_attr.attribute_target.identifier}'
+                    ProjectAttributeFile.objects.filter(
+                        project=self.instance,
+                        attribute=f_attr.attribute_target,
+                        fieldset_path_str=fieldset_path_str
+                    ).update(archived_at=now)
+
+        for deadline, project in deadlines_to_delete:
+            try:
+                ProjectDeadline.objects.get(deadline=deadline, project=project).delete()
+            except Exception:
+                pass
+
         attribute_data.update(tmp_attribute_data)
 
         # Get serializers for all sections in all phases
@@ -1571,66 +1604,73 @@ class ProjectSerializer(serializers.ModelSerializer):
             return new_confirm_val
 
         # Confirmed deadlines can't be edited
-        confirmed_deadlines = [
-            dl.deadline.attribute.identifier for dl
-            in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
-            if not dl.editable or (is_confirmed(dl) and dl.deadline.attribute)
-        ] if self.instance else []
-
-        if confirmed_deadlines:
-            valid_attributes = {
-                k: v for k, v in valid_attributes.items()
-                if k not in confirmed_deadlines
-            }
-        # mostly invalid identifiers, but could be fieldset file fields
-        unusual_identifiers = list(np.setdiff1d(
-            list(attribute_data.keys()),
-            list(valid_attributes.keys()),
-        ))
-
-        invalid_identifiers = []
-        files_to_archive = []
-        for identifier in unusual_identifiers:
-            try:
-                attribute_file = ProjectAttributeFile.objects.get(
-                    archived_at=None,
-                    fieldset_path_str=identifier,
-                    project=self.instance,
-                )
-                files_to_archive.append((identifier, attribute_file))
-
-            except (ProjectAttributeFile.DoesNotExist, Attribute.DoesNotExist) as e:
-                invalid_identifiers.append(identifier)
-
-
-        if len(invalid_identifiers):
-            invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
-            log.warning(", ".join(invalids))
-
-
-        for identifier, attribute_file in files_to_archive:
-            entry = action.send(
-                user,
-                verb=verbs.UPDATED_ATTRIBUTE,
-                action_object=attribute_file.attribute,
-                target=self.instance,
-                attribute_identifier=identifier,
-                new_value=None,
-                old_value=attribute_file.description,
+        if self.instance:
+            confirmed_deadline_set = set()
+            deadlines = self.instance.deadlines.select_related(
+                "deadline__attribute",
+                "deadline__confirmation_attribute"
             )
-            timestamp = entry[0][1].timestamp
+            for dl in deadlines:
+                if (not dl.editable or (is_confirmed(dl) and dl.deadline.attribute)):
+                    confirmed_deadline_set.add(dl.deadline.attribute.identifier)
 
-            attribute_file.archived_at = timestamp
-            attribute_file.save()
+            if confirmed_deadline_set:
+                valid_attributes = {
+                    k: v for k, v in valid_attributes.items()
+                    if k not in confirmed_deadline_set
+                }
+
+        # mostly invalid identifiers, but could be fieldset file fields
+        unusual_identifiers = set(attribute_data.keys()) - set(valid_attributes.keys())
+
+        if unusual_identifiers:
+            file_attrs_by_path = {
+                af.fieldset_path_str: af
+                for af in ProjectAttributeFile.objects.filter(
+                    archived_at=None,
+                    fieldset_path_str__in=unusual_identifiers,
+                    project=self.instance,
+                ).select_related("attribute")
+            }
+
+            files_to_archive = []
+            invalid_identifiers = []
+
+            for identifier in unusual_identifiers:
+                if identifier in file_attrs_by_path:
+                    files_to_archive.append((identifier, file_attrs_by_path[identifier]))
+                else:
+                    invalid_identifiers.append(identifier)
+
+            if invalid_identifiers:
+                invalids = [f"{key}: {_('Cannot edit field.')}" for key in invalid_identifiers]
+                log.warning(", ".join(invalids))
+
+            for identifier, attribute_file in files_to_archive:
+                entry = action.send(
+                    user,
+                    verb=verbs.UPDATED_ATTRIBUTE,
+                    action_object=attribute_file.attribute,
+                    target=self.instance,
+                    attribute_identifier=identifier,
+                    new_value=None,
+                    old_value=attribute_file.description,
+                )
+                timestamp = entry[0][1].timestamp
+                attribute_file.archived_at = timestamp
+                attribute_file.save()
 
         if self.instance:
-            updated_dls = ProjectDeadline.objects.filter(
-                project=self.instance,
-                deadline__attribute__identifier__in=valid_attributes.keys()
-            )
-            for dl in updated_dls:
-                dl.generated = False
-            ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
+            valid_attr_keys = list(valid_attributes.keys())
+            if valid_attr_keys:
+                updated_dls = list(ProjectDeadline.objects.filter(
+                    project=self.instance,
+                    deadline__attribute__identifier__in=valid_attr_keys
+                ))
+                if updated_dls:
+                    for dl in updated_dls:
+                        dl.generated = False
+                    ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
 
         return {**static_property_attributes, **valid_attributes}
 
