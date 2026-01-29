@@ -1,16 +1,82 @@
-"""
-Tests for deadline lifecycle scenarios.
+"""tests for deadline lifecycle
 
 These tests verify that distance enforcement works correctly across
-the full lifecycle of deadline operations:
-- Adding new deadline slots (esillaolo_2, lautakunta_2)
-- Deleting deadline slots
-- Re-adding after deletion
-- Saving and reloading
-
-This catches consistency issues that the frontend tests can't catch,
-such as backend validation gaps after frontend-calculated cascades.
+various deadline groups and that calculated deadlines respect the
+distance_from_previous constraints. Keep this module-level text as a
+docstring (not plain un-commented text).
 """
+
+import pytest
+from datetime import date, timedelta
+
+# other imports that your tests use, e.g.:
+# from django.urls import reverse
+# from projects.models import Project, Deadline, DeadlineGroup
+# from factories import ProjectFactory, DeadlineFactory
+@pytest.mark.parametrize(
+    "prev_date, distance_days, expected_date, description",
+    [
+        # P7 lautakunta (periaatteet)
+        ("2026-03-01", 21, "2026-03-22", "P7 lautakunta: +21 days from material deadline"),
+        # L7 lautakunta (luonnos)
+        ("2026-04-01", 21, "2026-04-22", "L7 lautakunta: +21 days from material deadline"),
+        # E8 lautakunta (ehdotus)
+        ("2026-05-01", 21, "2026-05-22", "E8 lautakunta: +21 days from material deadline"),
+        # T3 lautakunta (tarkistettu ehdotus)
+        ("2026-06-01", 21, "2026-06-22", "T3 lautakunta: +21 days from material deadline"),
+    ]
+)
+def test_lautakunta_material_deadline_minimum_distance(prev_date, distance_days, expected_date, description):
+    """
+    Explicitly test +21 day rule from material deadline to lautakunta as per database_deadline_rules.md.
+    """
+    import datetime
+    from projects.models import Project
+    mock_project = type("MockProject", (), {})()
+    mock_project._min_distance_target_date = Project._min_distance_target_date.__get__(mock_project, Project)
+    prev_date_dt = datetime.datetime.strptime(prev_date, "%Y-%m-%d").date()
+    mock_distance = type("MockDistance", (), {"date_type": None, "distance_from_previous": distance_days})()
+    mock_deadline = type("MockDeadline", (), {"date_type": None})()
+    result = mock_project._min_distance_target_date(prev_date_dt, mock_distance, mock_deadline)
+    expected_dt = datetime.datetime.strptime(expected_date, "%Y-%m-%d").date()
+    assert result == expected_dt, f"{description}: got {result}, expected {expected_dt}"
+import pytest
+@pytest.mark.parametrize(
+    "prev_date, distance_days, expected_date, description",
+    [
+        # P7 lautakunta slots (periaatteet)
+        ("2026-03-10", 1, "2026-03-11", "P7 lautakunta_2: +1 day"),
+        ("2026-03-11", 1, "2026-03-12", "P7 lautakunta_3: +1 day"),
+        ("2026-03-12", 1, "2026-03-13", "P7 lautakunta_4: +1 day"),
+        # L7 lautakunta slots (luonnos)
+        ("2026-04-01", 1, "2026-04-02", "L7 lautakunta_2: +1 day"),
+        ("2026-04-02", 1, "2026-04-03", "L7 lautakunta_3: +1 day"),
+        ("2026-04-03", 1, "2026-04-04", "L7 lautakunta_4: +1 day"),
+        # E8 lautakunta slots (ehdotus)
+        ("2026-05-10", 1, "2026-05-11", "E8 lautakunta_2: +1 day"),
+        ("2026-05-11", 1, "2026-05-12", "E8 lautakunta_3: +1 day"),
+        ("2026-05-12", 1, "2026-05-13", "E8 lautakunta_4: +1 day"),
+        # T3 lautakunta slots (tarkistettu ehdotus)
+        ("2026-06-01", 1, "2026-06-02", "T3 lautakunta_2: +1 day"),
+        ("2026-06-02", 1, "2026-06-03", "T3 lautakunta_3: +1 day"),
+        ("2026-06-03", 1, "2026-06-04", "T3 lautakunta_4: +1 day"),
+    ]
+)
+def test_lautakunta_minimum_distance_enforced(prev_date, distance_days, expected_date, description):
+    """
+    Explicitly test lautakunta slots (_2, _3, _4) minimum +1 day distance as per database_deadline_rules.md.
+    """
+    import datetime
+    from projects.models import Project
+    mock_project = type("MockProject", (), {})()
+    mock_project._min_distance_target_date = Project._min_distance_target_date.__get__(mock_project, Project)
+    prev_date_dt = datetime.datetime.strptime(prev_date, "%Y-%m-%d").date()
+    mock_distance = type("MockDistance", (), {"date_type": None, "distance_from_previous": distance_days})()
+    mock_deadline = type("MockDeadline", (), {"date_type": None})()
+    result = mock_project._min_distance_target_date(prev_date_dt, mock_distance, mock_deadline)
+    expected_dt = datetime.datetime.strptime(expected_date, "%Y-%m-%d").date()
+    assert result == expected_dt, f"{description}: got {result}, expected {expected_dt}"
+ # ...existing code...
 import datetime
 import pytest
 from unittest.mock import Mock, patch, MagicMock
@@ -282,7 +348,7 @@ class TestKAAV3492VisibilityBoolChangeTrigger:
         new_value = True
         
         # This is how the fix detects the change
-        is_re_enable = isinstance(new_value, bool) and new_value is True and old_value is not True
+        is_re_enable = isinstance(new_value, bool) and new_value and not old_value
         assert is_re_enable is True
 
     def test_vis_bool_already_true_not_detected(self):
@@ -356,7 +422,7 @@ class TestDistanceEnforcementConsistency:
     def test_distance_values_match_excel(self):
         """Distance values in DB should match Excel specifications."""
         # Expected values based on business requirements:
-        expected_lautakunta_distance = 1  # 1 calendar day between lautakunta slots
+        # expected_lautakunta_distance = 1  # 1 calendar day between lautakunta slots (unused)
         
         # This is validated in test_deadline_data_completeness.py
-        pass
+
