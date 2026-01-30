@@ -867,7 +867,6 @@ class Project(models.Model):
             new_coerced = self._coerce_date_value(new_value) if new_value else None
             if old_coerced != new_coerced:
                 actually_changed.add(key)
-                log.info(f"[KAAV-3492 BACKEND] Detected change: {key} from {old_coerced} to {new_coerced}")
 
         # KAAV-3492 FIX: When a visibility bool changes from False to True (group re-add),
         # treat ALL associated deadline dates as "changed" even if the date values are the same.
@@ -878,7 +877,6 @@ class Project(models.Model):
             # Check if this is a visibility bool that changed from False/None to True
             if isinstance(new_value, bool) and new_value is True and old_value is not True:
                 vis_bools_enabled.add(key)
-                log.info(f"[KAAV-3492 BACKEND] Visibility bool enabled: {key}")
         
         # For each deadline, if its visibility bool was just enabled, mark its date as "changed"
         for dl in sorted(project_dls.keys(), key=lambda x: x.index):

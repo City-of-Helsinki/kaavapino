@@ -1767,14 +1767,6 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                     except AssertionError:
                         valid_date = attr_dl.date_type.get_closest_valid_date(date)
                         return validate_date(valid_date, initial_error_reason="invalid_date")
-                    log.info(
-                        "[DL-VALIDATE][DISTANCE-CHECK] deadline=%s prev_candidates=%s",
-                        attr_dl.abbreviation,
-                        [
-                            d.previous_deadline
-                            for d in attr_dl.distances_to_previous.all()
-                        ],
-                    )
                     for distance in attr_dl.distances_to_previous.all():
                         # Skip this distance rule if its conditions are not met
                         if not distance.check_conditions(project.attribute_data):
