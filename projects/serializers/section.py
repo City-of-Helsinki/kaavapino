@@ -106,15 +106,34 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
         # Skip validation for fake requests - preview values will be applied instead
         if is_fake_request:
             return
-
+        log.info(
+    "[DL-VALIDATE][START] attr=%s value=%s subtype=%s preview_keys=%s",
+    attribute.identifier,
+    value,
+    subtype.identifier if subtype else None,
+    sorted(preview.keys()) if isinstance(preview, dict) else None,
+)
         for attr_dl in attribute.deadline.filter(subtype=subtype) \
             .select_related("date_type"):
             # KAAV-3517: Skip validation for deadlines whose visibility is False
             # When a deadline group is "deleted" (visibility set to False),
             # we shouldn't validate its dates
+            log.info(
+                "[DL-VALIDATE][ATTR_DL] attr=%s deadline=%s phase=%s date_type=%s",
+                attribute.identifier,
+                attr_dl.abbreviation,
+                attr_dl.deadline.phase.identifier if attr_dl.deadline and attr_dl.deadline.phase else None,
+                attr_dl.date_type.identifier if attr_dl.date_type else None,
+            )
             if attr_dl.deadlinegroup:
                 vis_bool = get_dl_vis_bool_name(attr_dl.deadlinegroup)
                 if vis_bool and preview.get(vis_bool) is False:
+                    log.info(
+    "[DL-VALIDATE][SKIP-VIS] deadline=%s vis_bool=%s vis_value=%s",
+    attr_dl.abbreviation,
+    vis_bool,
+    preview.get(vis_bool),
+)
                     continue
             # validate datetype
             try:
@@ -135,9 +154,20 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
             .prefetch_related("condition_attributes", "condition_attributes__attribute"):
                 prev_dl = preview.get(distance.previous_deadline)
                 if not prev_dl:
+                    log.info(
+                        "[DL-VALIDATE][PREV-MISSING] deadline=%s prev_deadline=%s NOT IN preview",
+                        attr_dl.abbreviation,
+                        distance.previous_deadline,
+                    )
                     continue
 
                 if not distance.check_conditions(preview):
+                    log.info(
+                        "[DL-VALIDATE][COND-SKIP] deadline=%s prev=%s conditions=%s",
+                        attr_dl.abbreviation,
+                        distance.previous_deadline,
+                        list(distance.condition_attributes.values_list("identifier", flat=True)),
+                    )
                     continue
 
                 default_error = _("Minimum distance to {distance.previous_deadline.abbreviation} not met").format(distance=distance)
@@ -162,6 +192,14 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
                             distance.distance_from_previous,
                         )
                     if valid_date > value:
+                        log.info(
+                            "[DL-VALIDATE][MIN-DIST-FAIL] deadline=%s prev=%s prev_date=%s value=%s first_valid=%s",
+                            attr_dl.abbreviation,
+                            distance.previous_deadline,
+                            prev_dl,
+                            value,
+                            valid_date,
+                        )
                         raise ValidationError(
                             (attr_dl.error_min_distance_previous or default_error,
                             _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
@@ -173,7 +211,14 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
                         valid_date = distance.date_type.get_closest_valid_date(value)
                     else:
                         valid_date = prev_dl + datetime.timedelta(days=distance.distance_from_previous)
-
+                    log.info(
+                        "[DL-VALIDATE][MIN-DIST-FAIL] deadline=%s prev=%s prev_date=%s value=%s first_valid=%s",
+                        attr_dl.abbreviation,
+                        distance.previous_deadline,
+                        prev_dl,
+                        value,
+                        valid_date,
+                    )
                     raise ValidationError(
                         (attr_dl.error_min_distance_previous or default_error,
                         _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),

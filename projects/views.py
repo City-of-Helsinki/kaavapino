@@ -971,6 +971,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                             result_attribute_data[identifier] = value.isoformat()
                         else:
                             result_attribute_data[identifier] = value
+                # ALSO include non-deadline keys pushed by backend (visibility bools etc.)
+                elif isinstance(key, str):
+                    result_attribute_data[key] = value
         
         # For any payload keys not in result, keep original (for booleans etc)
         for key in original_attribute_data:
@@ -1764,7 +1767,14 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                     except AssertionError:
                         valid_date = attr_dl.date_type.get_closest_valid_date(date)
                         return validate_date(valid_date, initial_error_reason="invalid_date")
-
+                    log.info(
+                        "[DL-VALIDATE][DISTANCE-CHECK] deadline=%s prev_candidates=%s",
+                        attr_dl.abbreviation,
+                        [
+                            d.previous_deadline
+                            for d in attr_dl.distances_to_previous.all()
+                        ],
+                    )
                     for distance in attr_dl.distances_to_previous.all():
                         # Skip this distance rule if its conditions are not met
                         if not distance.check_conditions(project.attribute_data):

@@ -1303,6 +1303,7 @@ class Project(models.Model):
                                 new_cascade_changes.add(next_id)
                                 iteration_changes.add(next_id)
                                 updated_attribute_data[next_id] = min_target
+                                project_dls[next_dl] = min_target
 
                     if not new_cascade_changes:
                         break
