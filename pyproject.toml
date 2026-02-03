@@ -100,3 +100,4 @@ markers = [
     "unit: marks tests as unit tests (not requiring database)",
     "integration: marks tests as integration tests (requiring database)",
 ]
+addopts = "--reuse-db"

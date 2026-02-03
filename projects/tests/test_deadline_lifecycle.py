@@ -7,7 +7,6 @@ docstring (not plain un-commented text).
 """
 
 import pytest
-from datetime import date, timedelta
 
 # other imports that your tests use, e.g.:
 # from django.urls import reverse
@@ -36,7 +35,8 @@ def test_lautakunta_material_deadline_minimum_distance(prev_date, distance_days,
     mock_project._min_distance_target_date = Project._min_distance_target_date.__get__(mock_project, Project)
     prev_date_dt = datetime.datetime.strptime(prev_date, "%Y-%m-%d").date()
     mock_distance = type("MockDistance", (), {"date_type": None, "distance_from_previous": distance_days})()
-    mock_deadline = type("MockDeadline", (), {"date_type": None})()
+    mock_attribute = type("MockAttribute", (), {"identifier": "test_deadline"})()
+    mock_deadline = type("MockDeadline", (), {"date_type": None, "attribute": mock_attribute})()
     result = mock_project._min_distance_target_date(prev_date_dt, mock_distance, mock_deadline)
     expected_dt = datetime.datetime.strptime(expected_date, "%Y-%m-%d").date()
     assert result == expected_dt, f"{description}: got {result}, expected {expected_dt}"
@@ -72,14 +72,15 @@ def test_lautakunta_minimum_distance_enforced(prev_date, distance_days, expected
     mock_project._min_distance_target_date = Project._min_distance_target_date.__get__(mock_project, Project)
     prev_date_dt = datetime.datetime.strptime(prev_date, "%Y-%m-%d").date()
     mock_distance = type("MockDistance", (), {"date_type": None, "distance_from_previous": distance_days})()
-    mock_deadline = type("MockDeadline", (), {"date_type": None})()
+    mock_attribute = type("MockAttribute", (), {"identifier": "test_deadline"})()
+    mock_deadline = type("MockDeadline", (), {"date_type": None, "attribute": mock_attribute})()
     result = mock_project._min_distance_target_date(prev_date_dt, mock_distance, mock_deadline)
     expected_dt = datetime.datetime.strptime(expected_date, "%Y-%m-%d").date()
     assert result == expected_dt, f"{description}: got {result}, expected {expected_dt}"
  # ...existing code...
 import datetime
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 
 
 # Mark all tests in this module as not needing database

@@ -11,7 +11,6 @@ This catches data quality issues that would otherwise cause:
 
 If these tests fail, the Excel file needs to be updated and re-imported.
 """
-import pytest
 from django.test import TestCase
 
 from projects.models import (
@@ -239,7 +238,6 @@ class TestDeadlineDataCompleteness(TestCase):
         for abbrevs in abbreviations_by_subtype.values():
             all_abbreviations.update(abbrevs)
         
-        inconsistencies = []
         for abbrev in all_abbreviations:
             present_in = [
                 name for name, abbrevs in abbreviations_by_subtype.items()
