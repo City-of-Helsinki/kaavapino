@@ -5,7 +5,7 @@ KAAV-3492: When a visibility boolean is False (e.g., jarjestetaan_oas_esillaolo_
 the corresponding deadline group should be hidden and NOT appear in the response.
 """
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
 from projects.serializers.utils import VIS_BOOL_MAP, get_dl_vis_bool_name
 
 
