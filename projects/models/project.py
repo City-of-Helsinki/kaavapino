@@ -1024,6 +1024,67 @@ class Project(models.Model):
                 actually_changed.add(identifier)
                 log.info(f"[KAAV-3492 BACKEND] Marking {identifier} as changed due to vis_bool {vis_bool}")
 
+        # KAAV-3492 FIX: When a visibility bool changes, deadlines with CONDITIONAL PREDECESSORS
+        # referencing that boolean need to be recalculated. Example: kaavaluonnos_kylk_aineiston_maaraaika (L6)
+        # has conditional distance rules - when jarjestetaan_luonnos_esillaolo_2 becomes True,
+        # L6's active predecessor changes from L4 to L4.2, so L6 must be snapped to its new minimum.
+        if vis_bools_enabled:
+            from projects.models.deadline import DeadlineDistanceConditionAttribute, Attribute as DlAttribute
+            
+            # Find all condition attributes that reference the enabled visibility booleans
+            condition_attrs = DeadlineDistanceConditionAttribute.objects.filter(
+                attribute__identifier__in=vis_bools_enabled
+            ).select_related('attribute').prefetch_related(
+                'deadline_distances',
+                'deadline_distances__deadline',
+                'deadline_distances__deadline__attribute',
+                'deadline_distances__previous_deadline',
+                'deadline_distances__previous_deadline__attribute',
+            )
+            
+            # Collect all deadlines affected by these conditional distance rules
+            for cond_attr in condition_attrs:
+                for distance in cond_attr.deadline_distances.all():
+                    affected_dl = distance.deadline
+                    if not affected_dl or not affected_dl.attribute:
+                        continue
+                    if affected_dl not in project_dls:
+                        continue
+                    
+                    identifier = affected_dl.attribute.identifier
+                    current_val = updated_attribute_data.get(identifier)
+                    current_date = self._coerce_date_value(current_val)
+                    
+                    if not current_date:
+                        continue
+                    
+                    # Recalculate the minimum target date based on NEW active predecessors
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    max_target = None
+                    
+                    for dist in affected_dl.distances_to_previous.all():
+                        if not dist.check_conditions(combined):
+                            continue
+                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
+                        prev_date = self._coerce_date_value(prev_date)
+                        if not prev_date:
+                            continue
+                        target = self._min_distance_target_date(prev_date, dist, affected_dl)
+                        if target and (not max_target or target > max_target):
+                            max_target = target
+                    
+                    # If the current date is later than the new minimum, snap it back
+                    # This handles the "stale date" case where L6 was set when esillaolo-3 was active
+                    if max_target and current_date > max_target:
+                        log.info(f"[KAAV-3492 BACKEND] Conditional predecessor change: snapping {identifier} from {current_date} to {max_target}")
+                        updated_attribute_data[identifier] = max_target
+                        project_dls[affected_dl] = max_target
+                        actually_changed.add(identifier)
+                    elif max_target and identifier not in actually_changed:
+                        # Even if not snapping, mark as changed so cascade processes it
+                        log.info(f"[KAAV-3492 BACKEND] Marking {identifier} as changed due to conditional predecessor vis_bool")
+                        actually_changed.add(identifier)
+
         log.info(f"[KAAV-3492 BACKEND] actually_changed set: {actually_changed}")
 
         for dl in project_dls.keys():
