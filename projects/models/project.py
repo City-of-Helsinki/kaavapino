@@ -558,12 +558,18 @@ class Project(models.Model):
                     val = self.attribute_data.get(identifier)
                     return val
 
+                # KAAV-3492 FIX: For non-editable (automatically calculated) deadlines,
+                # always use the calculated value instead of the preview value.
+                # This ensures fields like viimeistaan_mielipiteet are recalculated to match esillaolo_paattyy.
+                is_auto_calculated = deadline.edit_privilege is None
+                
                 # KAAV-3492 FIX: If previewing and a value was already set in preview_attribute_data
                 # (either from the request or from prior enforcement), use THAT value for enforcement
                 # instead of the calculated value from the database. This prevents recalculation 
                 # from overwriting user-provided or already-enforced values.
-                log.info(f"[KAAV-3492 FIX CHECK] identifier={identifier}, preview={preview}, in_preview_data={identifier in preview_attribute_data if preview_attribute_data else 'N/A'}, date_param={date}")
-                if preview and preview_attribute_data and identifier in preview_attribute_data:
+                # BUT: For auto-calculated fields, always use the calculated value.
+                log.info(f"[KAAV-3492 FIX CHECK] identifier={identifier}, preview={preview}, in_preview_data={identifier in preview_attribute_data if preview_attribute_data else 'N/A'}, date_param={date}, is_auto_calculated={is_auto_calculated}")
+                if preview and preview_attribute_data and identifier in preview_attribute_data and not is_auto_calculated:
                     preview_val = preview_attribute_data.get(identifier)
                     log.info(f"[KAAV-3492 FIX] Using preview value for {identifier}: {preview_val} instead of calculated {date}")
                     if preview_val is not None:
