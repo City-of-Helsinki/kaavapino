@@ -558,9 +558,22 @@ class Project(models.Model):
                     val = self.attribute_data.get(identifier)
                     return val
 
-                # NOTE: Removed line that prioritized preview_attribute_data over calculated value
-                # This was preventing cascade updates (ehdotus -> tarkistettu_ehdotus)
-                # The calculated value should always win; confirmed_fields handles locked fields
+                # KAAV-3492 FIX: If previewing and a value was already set in preview_attribute_data
+                # (either from the request or from prior enforcement), use THAT value for enforcement
+                # instead of the calculated value from the database. This prevents recalculation 
+                # from overwriting user-provided or already-enforced values.
+                log.info(f"[KAAV-3492 FIX CHECK] identifier={identifier}, preview={preview}, in_preview_data={identifier in preview_attribute_data if preview_attribute_data else 'N/A'}, date_param={date}")
+                if preview and preview_attribute_data and identifier in preview_attribute_data:
+                    preview_val = preview_attribute_data.get(identifier)
+                    log.info(f"[KAAV-3492 FIX] Using preview value for {identifier}: {preview_val} instead of calculated {date}")
+                    if preview_val is not None:
+                        # Use the preview value, enforce it, and return
+                        enforced_date = self._enforce_distance_requirements(
+                            deadline,
+                            preview_val,
+                            preview_attribute_data,
+                        )
+                        return enforced_date
 
             enforced_date = self._enforce_distance_requirements(
                 deadline,
@@ -799,15 +812,29 @@ class Project(models.Model):
 
         confirmed_fields = confirmed_fields or []
 
+        # KAAV-3492: Debug logging for visibility booleans
+        vis_bool_keys = [k for k in self.attribute_data.keys() if 'lautakuntaan' in k]
+        logger.info(f"[PREVIEW DEADLINES] Stored visibility booleans: {[(k, self.attribute_data[k]) for k in vis_bool_keys]}")
+        vis_bool_in_request = [k for k in updated_attributes.keys() if 'lautakuntaan' in k]
+        logger.info(f"[PREVIEW DEADLINES] Request visibility booleans: {[(k, updated_attributes[k]) for k in vis_bool_in_request]}")
+
         # Filter out deadlines that would be deleted
-        project_dls = {
-            dl.deadline: dl.date
-            for dl in self.deadlines.filter(deadline__subtype=subtype)
+        # KAAV-3492 FIX: Use updated_attributes values instead of database values
+        # when the request contains a new value for that deadline. This ensures
+        # the validator uses current request data, not stale database data.
+        project_dls = {}
+        for dl in self.deadlines.filter(deadline__subtype=subtype) \
             .select_related(
                 "deadline", "deadline__phase", "deadline__phase__common_project_phase", "deadline__phase__project_subtype",
-                "deadline__subtype", "deadline__attribute", "deadline__date_type")
-            .prefetch_related("deadline__initial_calculations","deadline__update_calculations")
-        }
+                "deadline__subtype", "deadline__attribute", "deadline__date_type") \
+            .prefetch_related("deadline__initial_calculations","deadline__update_calculations"):
+            deadline = dl.deadline
+            # Use updated value from request if available, otherwise use database value
+            if deadline.attribute and deadline.attribute.identifier in updated_attributes:
+                project_dls[deadline] = updated_attributes[deadline.attribute.identifier]
+                logger.info(f"[PREVIEW DEADLINES] Using request value for {deadline.attribute.identifier}: {updated_attributes[deadline.attribute.identifier]}")
+            else:
+                project_dls[deadline] = dl.date
         logger.info(f"[PREVIEW DEADLINES] Loaded {len(project_dls)} existing project deadlines")
 
         # List deadlines that would be created
@@ -827,12 +854,17 @@ class Project(models.Model):
         # Update attribute-based deadlines
         updated_attribute_data = {**self.attribute_data, **updated_attributes}
         logger.info(f"[PREVIEW DEADLINES] Combined attribute data has {len(updated_attribute_data)} keys")
+        
+        # KAAV-3492: Debug log visibility booleans in combined data
+        vis_bool_combined = [(k, updated_attribute_data[k]) for k in updated_attribute_data.keys() if 'lautakuntaan' in k]
+        logger.info(f"[PREVIEW DEADLINES] Combined visibility booleans: {vis_bool_combined}")
 
         # KAAV-3492: For new deadlines, set their visibility booleans so distance conditions are met
         # This mirrors the logic in update_deadlines that sets vis_bool for generated deadlines
         for dl in new_dls.keys():
             if dl.deadlinegroup:
                 vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+                logger.info(f"[PREVIEW DEADLINES] New deadline {dl}: deadlinegroup={dl.deadlinegroup}, vis_bool={vis_bool}, in_combined={vis_bool in updated_attribute_data}, value={updated_attribute_data.get(vis_bool)}")
                 if vis_bool and vis_bool not in updated_attribute_data:
                     # New deadlines are always visible (True) - they're being added
                     logger.info(f"[PREVIEW DEADLINES] Auto-enabling visibility for new deadline: {vis_bool} = True")
@@ -1166,6 +1198,7 @@ class Project(models.Model):
             None,
             initial=True,
             preview=True,
+            preview_attribute_data=updated_attribute_data,
             confirmed_fields=confirmed_fields,
             calculation_cache=calculation_cache,
             timing_metrics=timing_metrics,
