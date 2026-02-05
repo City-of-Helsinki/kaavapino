@@ -1362,6 +1362,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def validate(self, attrs):
+        logger = logging.getLogger(__name__)
+        logger.info("="*80)
+        logger.info("[SERIALIZER VALIDATE] ProjectSerializer.validate called")
+        logger.info(f"[SERIALIZER VALIDATE] Instance: {self.instance.name if self.instance else 'NEW'}")
+        logger.info(f"[SERIALIZER VALIDATE] Attrs keys: {list(attrs.keys())}")
+        if 'attribute_data' in attrs:
+            logger.info(f"[SERIALIZER VALIDATE] attribute_data keys: {list(attrs['attribute_data'].keys())}")
+        
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
 
@@ -1402,12 +1410,16 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("create_draft") == False:
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
+        
+        logger.info("[SERIALIZER VALIDATE] Calling _validate_attribute_data...")
         attrs["attribute_data"] = self._validate_attribute_data(
             attrs.get("attribute_data", None),
             attrs,
             self.instance.user if self.instance else None,
             self.instance.owner_edit_override if self.instance else None,
         )
+        logger.info(f"[SERIALIZER VALIDATE] _validate_attribute_data completed, returned {len(attrs['attribute_data'])} attributes")
+        logger.info("="*80)
         return attrs
 
     def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
@@ -1448,6 +1460,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         return should_update_deadlines
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
+        logger = logging.getLogger(__name__)
+        logger.info("[ATTR VALIDATE] _validate_attribute_data started")
+        logger.info(f"[ATTR VALIDATE] Input attribute_data keys: {list(attribute_data.keys()) if attribute_data else 'None'}")
+        
         attribute_cache = self.context.setdefault("attribute_cache", {})
         static_property_attributes = {}
         if self.instance:
@@ -1549,14 +1565,23 @@ class ProjectSerializer(serializers.ModelSerializer):
         should_update_deadlines = self._get_should_update_deadlines(
             False, self.instance, attribute_data,
         )
+        logger.info(f"[ATTR VALIDATE] should_update_deadlines: {should_update_deadlines}")
+        
         preview = None
         if self.instance and should_update_deadlines:
+            logger.info("[ATTR VALIDATE] Calling get_preview_deadlines for deadline calculation...")
+            logger.info(f"[ATTR VALIDATE] Confirmed fields: {self.context['confirmed_fields']}")
             preview = self.instance.get_preview_deadlines(
                 attribute_data,
                 subtype,
                 self.context["confirmed_fields"],
                 timing_metrics=validation_metrics,
             )
+            logger.info(f"[ATTR VALIDATE] Preview returned {len(preview) if preview else 0} items")
+            if preview:
+                for key, value in list(preview.items())[:5]:  # Log first 5 items
+                    if hasattr(key, 'attribute') and key.attribute:
+                        logger.info(f"[ATTR VALIDATE] Preview: {key.attribute.identifier} = {value}")
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
         for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
@@ -1587,20 +1612,26 @@ class ProjectSerializer(serializers.ModelSerializer):
         #     # as it would mutate the dict while looping over it.
         #     valid_attributes = copy.deepcopy(self.instance.attribute_data)
 
+        logger.info(f"[ATTR VALIDATE] Validating {len(sections_data)} sections...")
         errors = {}
-        for section_data in sections_data:
+        for idx, section_data in enumerate(sections_data):
             # Get section serializer and validate input data against it
             serializer = section_data.serializer_class(data=attribute_data)
             if not serializer.is_valid(raise_exception=False):
+                logger.info(f"[ATTR VALIDATE] Section {idx} validation errors: {serializer.errors}")
                 errors.update(serializer.errors)
+            else:
+                logger.info(f"[ATTR VALIDATE] Section {idx} validated successfully, {len(serializer.validated_data)} attributes")
             valid_attributes.update(serializer.validated_data)
 
         # Check if this is a fake (preview) request
         is_fake_request = getattr(self.context.get("request"), "_fake", False)
+        logger.info(f"[ATTR VALIDATE] is_fake_request: {is_fake_request}")
 
         # For fake requests, merge preview values into valid_attributes
         # This applies backend-corrected dates silently instead of raising errors
         if is_fake_request and preview:
+            logger.info("[ATTR VALIDATE] Processing fake request with preview data")
             # Collect deadline attribute identifiers for filtering errors
             deadline_attribute_identifiers = set()
             for key, value in preview.items():
@@ -1611,17 +1642,21 @@ class ProjectSerializer(serializers.ModelSerializer):
                     deadline_attribute_identifiers.add(identifier)
                     # Apply corrected preview value to valid_attributes
                     if value is not None:
+                        logger.info(f"[ATTR VALIDATE] Applying preview value: {identifier} = {value}")
                         valid_attributes[identifier] = value
             # Filter out deadline date errors - they're auto-corrected via preview
             non_date_errors = {
                 k: v for k, v in errors.items()
                 if k not in deadline_attribute_identifiers
             }
+            logger.info(f"[ATTR VALIDATE] Filtered errors: {len(errors)} total, {len(non_date_errors)} non-deadline")
             if self.should_validate_attributes() and non_date_errors:
+                logger.info(f"[ATTR VALIDATE] Raising validation errors: {non_date_errors}")
                 raise ValidationError(non_date_errors)
         else:
             # If we should validate attribute data, then raise errors if they exist
             if self.should_validate_attributes() and errors:
+                logger.info(f"[ATTR VALIDATE] Raising validation errors (not fake): {errors}")
                 raise ValidationError(errors)
 
 
@@ -1643,17 +1678,21 @@ class ProjectSerializer(serializers.ModelSerializer):
             return new_confirm_val
 
         # Confirmed deadlines can't be edited
+        logger.info("[ATTR VALIDATE] Checking for confirmed deadlines...")
         confirmed_deadlines = [
             dl.deadline.attribute.identifier for dl
             in self.instance.deadlines.all().select_related("deadline", "project", "deadline__confirmation_attribute")
             if not dl.editable or (is_confirmed(dl) and dl.deadline.attribute)
         ] if self.instance else []
+        
+        logger.info(f"[ATTR VALIDATE] Found {len(confirmed_deadlines)} confirmed deadlines: {confirmed_deadlines}")
 
         if confirmed_deadlines:
             valid_attributes = {
                 k: v for k, v in valid_attributes.items()
                 if k not in confirmed_deadlines
             }
+            logger.info(f"[ATTR VALIDATE] Filtered out confirmed deadlines, {len(valid_attributes)} attributes remain")
         # mostly invalid identifiers, but could be fieldset file fields
         unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
@@ -1715,6 +1754,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             )
 
         result = {**static_property_attributes, **valid_attributes}
+        logger.info(f"[ATTR VALIDATE] _validate_attribute_data completed successfully")
+        logger.info(f"[ATTR VALIDATE] Returning {len(result)} validated attributes")
+        logger.info(f"[ATTR VALIDATE] Result keys: {list(result.keys())}")
+        logger.info("="*80)
         return result
 
     def _validate_public(self, attrs):

@@ -943,20 +943,35 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         confirmed_fields = request.data.get('confirmed_fields', [])
         original_attribute_data = request.data.get('attribute_data', {})
         
+        logger = logging.getLogger(__name__)
+        logger.info("="*80)
+        logger.info(f"[VALIDATION ENTRY] ProjectViewSet.update called")
+        logger.info(f"[VALIDATION ENTRY] fake={fake}, project_id={kwargs.get('pk')}")
+        logger.info(f"[VALIDATION ENTRY] confirmed_fields={confirmed_fields}")
+        logger.info(f"[VALIDATION ENTRY] attribute_data keys: {list(original_attribute_data.keys())}")
+        logger.info(f"[VALIDATION ENTRY] attribute_data values: {original_attribute_data}")
+        
         if not fake:
             # Actual update logic that saves to db
-            return super().update(request, *args, **kwargs)
+            logger.info("[VALIDATION ENTRY] Proceeding with real save (fake=false)")
+            response = super().update(request, *args, **kwargs)
+            logger.info(f"[VALIDATION ENTRY] Real save completed, response status: {response.status_code}")
+            return response
         
         # KAAV-3492: Simple fast-path for fake validation requests
         # Just calculate preview deadlines and return them directly
+        logger.info("[VALIDATION FAKE] Processing fake request (fast path)")
         project = self.get_object()
+        logger.info(f"[VALIDATION FAKE] Project: {project.name}, subtype: {project.subtype}")
         
         # Get preview deadlines (corrected dates)
+        logger.info("[VALIDATION FAKE] Calling get_preview_deadlines...")
         preview = project.get_preview_deadlines(
             original_attribute_data,
             project.subtype,
             confirmed_fields,
         )
+        logger.info(f"[VALIDATION FAKE] Preview returned {len(preview) if preview else 0} items")
         
         # Build result from preview values
         result_attribute_data = {}
@@ -969,17 +984,23 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                         # Format date as string
                         if hasattr(value, 'isoformat'):
                             result_attribute_data[identifier] = value.isoformat()
+                            logger.info(f"[VALIDATION FAKE] Preview deadline {identifier} = {value.isoformat()}")
                         else:
                             result_attribute_data[identifier] = value
+                            logger.info(f"[VALIDATION FAKE] Preview deadline {identifier} = {value}")
                 # ALSO include non-deadline keys pushed by backend (visibility bools etc.)
                 elif isinstance(key, str):
                     result_attribute_data[key] = value
+                    logger.info(f"[VALIDATION FAKE] Preview non-deadline {key} = {value}")
         
         # For any payload keys not in result, keep original (for booleans etc)
         for key in original_attribute_data:
             if key not in result_attribute_data:
                 result_attribute_data[key] = original_attribute_data[key]
+                logger.info(f"[VALIDATION FAKE] Keeping original value {key} = {original_attribute_data[key]}")
         
+        logger.info(f"[VALIDATION FAKE] Returning {len(result_attribute_data)} attributes")
+        logger.info("="*80)
         return Response({"attribute_data": result_attribute_data})
 
 
