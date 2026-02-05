@@ -956,6 +956,11 @@ class Project(models.Model):
             if vis_bool and vis_bool in vis_bools_enabled:
                 identifier = dl.attribute.identifier
                 
+                # UX80.5.3.7: Confirmed deadlines must never move automatically
+                if identifier in confirmed_fields:
+                    log.info(f"[KAAV-3492 BACKEND] Skipping confirmed deadline: {identifier}")
+                    continue
+                
                 # Check for stale date: Group enabled, but date matches stored value
                 current_val = updated_attribute_data.get(identifier)
                 stored_val = self.attribute_data.get(identifier)
@@ -964,61 +969,27 @@ class Project(models.Model):
                 stored_date = self._coerce_date_value(stored_val)
                 
                 if current_date and current_date == stored_date:
-                    # Calculate target date based on predecessors
-                    max_target = None
-                    for distance in dl.distances_to_previous.all():
-                        combined = {**self.attribute_data, **updated_attribute_data}
-                        if not distance.check_conditions(combined):
-                            continue
-                        prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
-                        prev_date = self._coerce_date_value(prev_date)
-                        if not prev_date:
-                            continue
-                        target = self._min_distance_target_date(prev_date, distance, dl)
-                        if target and (not max_target or target > max_target):
-                            max_target = target
+                    # UX80.4.2.3.3.2: Added element moves to initial distance (generoitu ehdotus)
+                    # from its predecessor. Use calculate_initial() for the ADDED element only.
+                    # The forward cascade will handle subsequent elements using distances_to_previous.
+                    initial_date = dl.calculate_initial(self, preview_attributes=updated_attribute_data)
                     
                     # SPECIAL CASE (AT1.5.3): Opinions deadline ("viimeistaan_mielipiteet")
-                    # defaults to matching "esillaolo_paattyy" if no distance rules exist
-                    if not max_target and "viimeistaan_mielipiteet" in identifier:
+                    # defaults to matching "esillaolo_paattyy" if no initial_calculations exist
+                    if not initial_date and "viimeistaan_mielipiteet" in identifier:
                         # Find sibling "esillaolo_paattyy" in same group
                         sibling = next((d for d in project_dls.keys() if d.deadlinegroup == dl.deadlinegroup and "esillaolo_paattyy" in (d.attribute.identifier if d.attribute else "")), None)
                         if sibling and sibling.attribute:
-                            # Use updated_attribute_data if present (already snapped), else stored
                             sib_id = sibling.attribute.identifier
                             sib_val = updated_attribute_data.get(sib_id) or self.attribute_data.get(sib_id)
                             if sib_val:
-                                max_target = self._coerce_date_value(sib_val)
-                                log.info(f"[KAAV-3492 BACKEND] Derived target for {identifier} from {sib_id}: {max_target}")
+                                initial_date = self._coerce_date_value(sib_val)
+                                log.info(f"[KAAV-3492 BACKEND] Derived initial for {identifier} from sibling {sib_id}: {initial_date}")
                     
-                    # If current date is BEFORE the minimum, enforce it forward (UX80.7.2.1)
-                    if max_target and current_date < max_target:
-                        log.info(f"[KAAV-3492 BACKEND] Enforcing minimum for {identifier} from {current_date} to {max_target}")
-                        updated_attribute_data[identifier] = max_target
-                        
-                        # UX80.4.2.3.7: When adding element row, update phase boundaries
-                        # so cascade calculates from the correct snapped position
-                        if "_paattyy" in identifier and dl.phase:
-                            # Derive phase boundary identifiers dynamically from phase name
-                            phase_name = dl.phase.common_project_phase.name.lower().replace(" ", "")
-                            phase_end_id = f"{phase_name}vaihe_paattyy_pvm"
-                            
-                            # Get next phase by index order
-                            next_phase = ProjectPhase.objects.filter(
-                                project_subtype=dl.phase.project_subtype,
-                                index__gt=dl.phase.index
-                            ).order_by('index').first()
-                            
-                            if next_phase:
-                                next_name = next_phase.common_project_phase.name.lower().replace(" ", "")
-                                next_phase_start_id = f"{next_name}vaihe_alkaa_pvm"
-                                
-                                current_phase_end = self._coerce_date_value(updated_attribute_data.get(phase_end_id))
-                                if current_phase_end and max_target != current_phase_end:
-                                    log.info(f"[KAAV-3492 BACKEND] Updating phase boundary {phase_end_id} to {max_target}")
-                                    updated_attribute_data[phase_end_id] = max_target
-                                    updated_attribute_data[next_phase_start_id] = max_target
-                                    actually_changed.update([phase_end_id, next_phase_start_id])
+                    if initial_date:
+                        log.info(f"[KAAV-3492 BACKEND] Added element {identifier}: stale={current_date}, initial={initial_date}")
+                        updated_attribute_data[identifier] = initial_date
+                        project_dls[dl] = initial_date
 
                 # This deadline's group was just re-enabled - treat its date as changed
                 actually_changed.add(identifier)
