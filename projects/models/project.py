@@ -991,9 +991,9 @@ class Project(models.Model):
                                 max_target = self._coerce_date_value(sib_val)
                                 log.info(f"[KAAV-3492 BACKEND] Derived target for {identifier} from {sib_id}: {max_target}")
                     
-                    # If current date creates a gap (is later than target), snap it back
-                    if max_target and current_date > max_target:
-                        log.info(f"[KAAV-3492 BACKEND] Snapping stale date {identifier} from {current_date} to {max_target}")
+                    # If current date is BEFORE the minimum, enforce it forward (UX80.7.2.1)
+                    if max_target and current_date < max_target:
+                        log.info(f"[KAAV-3492 BACKEND] Enforcing minimum for {identifier} from {current_date} to {max_target}")
                         updated_attribute_data[identifier] = max_target
                         
                         # UX80.4.2.3.7: When adding element row, update phase boundaries
@@ -1073,10 +1073,10 @@ class Project(models.Model):
                         if target and (not max_target or target > max_target):
                             max_target = target
                     
-                    # If the current date is later than the new minimum, snap it back
-                    # This handles the "stale date" case where L6 was set when esillaolo-3 was active
-                    if max_target and current_date > max_target:
-                        log.info(f"[KAAV-3492 BACKEND] Conditional predecessor change: snapping {identifier} from {current_date} to {max_target}")
+                    # If the current date is BEFORE the new minimum, enforce it forward
+                    # Minimum distances are a FLOOR not a ceiling (UX80.7.2.1)
+                    if max_target and current_date < max_target:
+                        log.info(f"[KAAV-3492 BACKEND] Conditional predecessor change: enforcing minimum for {identifier} from {current_date} to {max_target}")
                         updated_attribute_data[identifier] = max_target
                         project_dls[affected_dl] = max_target
                         actually_changed.add(identifier)
