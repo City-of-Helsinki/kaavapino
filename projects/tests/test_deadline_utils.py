@@ -96,9 +96,13 @@ class TestCleanStaleDeadlineFields:
         assert cleared_count == 3
         assert 'jarjestetaan_periaatteet_esillaolo_1' in attribute_data  # vis_bool stays
         assert attribute_data['jarjestetaan_periaatteet_esillaolo_1'] is False
-        assert 'milloin_periaatteet_esillaolo_alkaa' not in attribute_data  # dates removed
-        assert 'milloin_periaatteet_esillaolo_paattyy' not in attribute_data
-        assert 'periaatteet_esillaolo_aineiston_maaraaika' not in attribute_data
+        # KAAV-3492: Fields are set to None, not deleted, to prevent stale data leaking in get_preview_deadlines
+        assert 'milloin_periaatteet_esillaolo_alkaa' in attribute_data
+        assert attribute_data['milloin_periaatteet_esillaolo_alkaa'] is None
+        assert 'milloin_periaatteet_esillaolo_paattyy' in attribute_data
+        assert attribute_data['milloin_periaatteet_esillaolo_paattyy'] is None
+        assert 'periaatteet_esillaolo_aineiston_maaraaika' in attribute_data
+        assert attribute_data['periaatteet_esillaolo_aineiston_maaraaika'] is None
         assert attribute_data['other_field'] == 'should_not_be_touched'
     
     def test_preserves_fields_when_vis_bool_true(self):
@@ -135,8 +139,9 @@ class TestCleanStaleDeadlineFields:
         cleared_count = clean_stale_deadline_fields(attribute_data)
         
         assert cleared_count == 5
-        assert 'milloin_periaatteet_esillaolo_alkaa' not in attribute_data
-        assert 'milloin_oas_esillaolo_alkaa_2' not in attribute_data
+        # KAAV-3492: Fields are set to None, not deleted
+        assert attribute_data['milloin_periaatteet_esillaolo_alkaa'] is None
+        assert attribute_data['milloin_oas_esillaolo_alkaa_2'] is None
     
     def test_idempotent_cleaning(self):
         """Running cleanup twice should not cause issues."""
@@ -150,4 +155,5 @@ class TestCleanStaleDeadlineFields:
         
         assert first_count == 1
         assert second_count == 0  # Nothing left to clean
-        assert 'milloin_periaatteet_esillaolo_alkaa' not in attribute_data
+        # KAAV-3492: Field is set to None, not deleted
+        assert attribute_data['milloin_periaatteet_esillaolo_alkaa'] is None

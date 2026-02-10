@@ -1462,7 +1462,12 @@ class ProjectSerializer(serializers.ModelSerializer):
                 ).delete()
                 logger.info(f"[DEFERRED OP] Deleted ProjectDeadline for deadline: {deletion_info['deadline']}")
             except ProjectDeadline.DoesNotExist:
-                pass
+                # Already deleted or never existed - safe to ignore
+                logger.debug(
+                    "[DEFERRED OP] ProjectDeadline already gone for deadline %s, project %s",
+                    deletion_info.get('deadline'),
+                    deletion_info.get('project'),
+                )
         
         # 3. Archive attribute files (deferred from _validate_attribute_data)
         pending_files = self.context.pop('pending_files_to_archive', [])
