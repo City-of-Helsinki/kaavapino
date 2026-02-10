@@ -595,29 +595,41 @@ class Project(models.Model):
                 project_deadline.save()
 
             if deadline.attribute:
-                old_value = json.loads(json.dumps(
-                    self.attribute_data.get(deadline.attribute.identifier),
-                    default=str,
-                ))
-                new_value = json.loads(json.dumps(enforced_date, default=str))
+                # KAAV-3492: Check if deadline belongs to a disabled group
+                # Don't write dates to attribute_data if visibility bool is False
+                should_write_to_attribute_data = True
+                if deadline.deadlinegroup:
+                    vis_bool_name = get_dl_vis_bool_name(deadline.deadlinegroup)
+                    if vis_bool_name:
+                        # By the time we reach here, attribute_data has been updated with request values
+                        vis_bool_value = self.attribute_data.get(vis_bool_name)
+                        if vis_bool_value is False:
+                            should_write_to_attribute_data = False
+                
+                if should_write_to_attribute_data:
+                    old_value = json.loads(json.dumps(
+                        self.attribute_data.get(deadline.attribute.identifier),
+                        default=str,
+                    ))
+                    new_value = json.loads(json.dumps(enforced_date, default=str))
 
-                self.update_attribute_data(
-                    {deadline.attribute.identifier: enforced_date},
-                    attribute_cache={
-                        deadline.attribute.identifier: deadline.attribute
-                    },
-                )
-
-                if old_value != new_value:
-                    action.send(
-                        user or self.user,
-                        verb=verbs.UPDATED_ATTRIBUTE,
-                        action_object=deadline.attribute,
-                        target=self,
-                        attribute_identifier=deadline.attribute.identifier,
-                        old_value=old_value,
-                        new_value=new_value,
+                    self.update_attribute_data(
+                        {deadline.attribute.identifier: enforced_date},
+                        attribute_cache={
+                            deadline.attribute.identifier: deadline.attribute
+                        },
                     )
+
+                    if old_value != new_value:
+                        action.send(
+                            user or self.user,
+                            verb=verbs.UPDATED_ATTRIBUTE,
+                            action_object=deadline.attribute,
+                            target=self,
+                            attribute_identifier=deadline.attribute.identifier,
+                            old_value=old_value,
+                            new_value=new_value,
+                        )
             return enforced_date
 
         return None

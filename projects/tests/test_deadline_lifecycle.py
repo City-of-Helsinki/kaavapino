@@ -6,12 +6,37 @@ distance_from_previous constraints. Keep this module-level text as a
 docstring (not plain un-commented text).
 """
 
+import datetime
 import pytest
+from unittest.mock import Mock
 
 # other imports that your tests use, e.g.:
 # from django.urls import reverse
 # from projects.models import Project, Deadline, DeadlineGroup
 # from factories import ProjectFactory, DeadlineFactory
+
+
+def _test_distance_calculation(prev_date_str, distance_days, expected_date_str, description):
+    """
+    Helper function to test distance calculation logic.
+    Reduces duplication across parametrized tests.
+    """
+    from projects.models import Project
+    
+    mock_project = type("MockProject", (), {})()
+    mock_project._min_distance_target_date = Project._min_distance_target_date.__get__(mock_project, Project)
+    
+    prev_date_dt = datetime.datetime.strptime(prev_date_str, "%Y-%m-%d").date()
+    mock_distance = type("MockDistance", (), {"date_type": None, "distance_from_previous": distance_days})()
+    mock_attribute = type("MockAttribute", (), {"identifier": "test_deadline"})()
+    mock_deadline = type("MockDeadline", (), {"date_type": None, "attribute": mock_attribute})()
+    
+    result = mock_project._min_distance_target_date(prev_date_dt, mock_distance, mock_deadline)
+    expected_dt = datetime.datetime.strptime(expected_date_str, "%Y-%m-%d").date()
+    
+    assert result == expected_dt, f"{description}: got {result}, expected {expected_dt}"
+
+
 @pytest.mark.parametrize(
     "prev_date, distance_days, expected_date, description",
     [
@@ -29,17 +54,9 @@ def test_lautakunta_material_deadline_minimum_distance(prev_date, distance_days,
     """
     Explicitly test +21 day rule from material deadline to lautakunta as per database_deadline_rules.md.
     """
-    import datetime
-    from projects.models import Project
-    mock_project = type("MockProject", (), {})()
-    mock_project._min_distance_target_date = Project._min_distance_target_date.__get__(mock_project, Project)
-    prev_date_dt = datetime.datetime.strptime(prev_date, "%Y-%m-%d").date()
-    mock_distance = type("MockDistance", (), {"date_type": None, "distance_from_previous": distance_days})()
-    mock_attribute = type("MockAttribute", (), {"identifier": "test_deadline"})()
-    mock_deadline = type("MockDeadline", (), {"date_type": None, "attribute": mock_attribute})()
-    result = mock_project._min_distance_target_date(prev_date_dt, mock_distance, mock_deadline)
-    expected_dt = datetime.datetime.strptime(expected_date, "%Y-%m-%d").date()
-    assert result == expected_dt, f"{description}: got {result}, expected {expected_dt}"
+    _test_distance_calculation(prev_date, distance_days, expected_date, description)
+
+
 import pytest
 @pytest.mark.parametrize(
     "prev_date, distance_days, expected_date, description",
@@ -66,17 +83,7 @@ def test_lautakunta_minimum_distance_enforced(prev_date, distance_days, expected
     """
     Explicitly test lautakunta slots (_2, _3, _4) minimum +1 day distance as per database_deadline_rules.md.
     """
-    import datetime
-    from projects.models import Project
-    mock_project = type("MockProject", (), {})()
-    mock_project._min_distance_target_date = Project._min_distance_target_date.__get__(mock_project, Project)
-    prev_date_dt = datetime.datetime.strptime(prev_date, "%Y-%m-%d").date()
-    mock_distance = type("MockDistance", (), {"date_type": None, "distance_from_previous": distance_days})()
-    mock_attribute = type("MockAttribute", (), {"identifier": "test_deadline"})()
-    mock_deadline = type("MockDeadline", (), {"date_type": None, "attribute": mock_attribute})()
-    result = mock_project._min_distance_target_date(prev_date_dt, mock_distance, mock_deadline)
-    expected_dt = datetime.datetime.strptime(expected_date, "%Y-%m-%d").date()
-    assert result == expected_dt, f"{description}: got {result}, expected {expected_dt}"
+    _test_distance_calculation(prev_date, distance_days, expected_date, description)
  # ...existing code...
 import datetime
 import pytest

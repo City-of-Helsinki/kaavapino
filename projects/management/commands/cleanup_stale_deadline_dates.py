@@ -21,152 +21,9 @@ import logging
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from projects.models import Project
-from projects.serializers.utils import VIS_BOOL_MAP
+from projects.deadline_utils import find_stale_deadline_fields
 
 logger = logging.getLogger(__name__)
-
-
-# Map each deadline group to its associated date fields
-# These are the fields that should be cleared when the group is deleted
-DEADLINE_GROUP_DATE_FIELDS = {
-    # Periaatteet esilläolo
-    'periaatteet_esillaolokerta_1': [
-        'milloin_periaatteet_esillaolo_alkaa',
-        'milloin_periaatteet_esillaolo_paattyy',
-        'periaatteet_esillaolo_aineiston_maaraaika',
-    ],
-    'periaatteet_esillaolokerta_2': [
-        'milloin_periaatteet_esillaolo_alkaa_2',
-        'milloin_periaatteet_esillaolo_paattyy_2',
-        'periaatteet_esillaolo_aineiston_maaraaika_2',
-    ],
-    'periaatteet_esillaolokerta_3': [
-        'milloin_periaatteet_esillaolo_alkaa_3',
-        'milloin_periaatteet_esillaolo_paattyy_3',
-        'periaatteet_esillaolo_aineiston_maaraaika_3',
-    ],
-    # Periaatteet lautakunta
-    'periaatteet_lautakuntakerta_1': [
-        'milloin_periaatteet_lautakunnassa',
-        'periaatteet_lautakunta_aineiston_maaraaika',
-    ],
-    'periaatteet_lautakuntakerta_2': [
-        'milloin_periaatteet_lautakunnassa_2',
-        'periaatteet_lautakunta_aineiston_maaraaika_2',
-    ],
-    'periaatteet_lautakuntakerta_3': [
-        'milloin_periaatteet_lautakunnassa_3',
-        'periaatteet_lautakunta_aineiston_maaraaika_3',
-    ],
-    'periaatteet_lautakuntakerta_4': [
-        'milloin_periaatteet_lautakunnassa_4',
-        'periaatteet_lautakunta_aineiston_maaraaika_4',
-    ],
-    # OAS esilläolo
-    'oas_esillaolokerta_1': [
-        'milloin_oas_esillaolo_alkaa',
-        'milloin_oas_esillaolo_paattyy',
-        'oas_esillaolo_aineiston_maaraaika',
-    ],
-    'oas_esillaolokerta_2': [
-        'milloin_oas_esillaolo_alkaa_2',
-        'milloin_oas_esillaolo_paattyy_2',
-        'oas_esillaolo_aineiston_maaraaika_2',
-    ],
-    'oas_esillaolokerta_3': [
-        'milloin_oas_esillaolo_alkaa_3',
-        'milloin_oas_esillaolo_paattyy_3',
-        'oas_esillaolo_aineiston_maaraaika_3',
-    ],
-    # Luonnos esilläolo
-    'luonnos_esillaolokerta_1': [
-        'milloin_luonnos_esillaolo_alkaa',
-        'milloin_luonnos_esillaolo_paattyy',
-        'kaavaluonnos_esillaolo_aineiston_maaraaika',
-    ],
-    'luonnos_esillaolokerta_2': [
-        'milloin_luonnos_esillaolo_alkaa_2',
-        'milloin_luonnos_esillaolo_paattyy_2',
-        'kaavaluonnos_esillaolo_aineiston_maaraaika_2',
-    ],
-    'luonnos_esillaolokerta_3': [
-        'milloin_luonnos_esillaolo_alkaa_3',
-        'milloin_luonnos_esillaolo_paattyy_3',
-        'kaavaluonnos_esillaolo_aineiston_maaraaika_3',
-    ],
-    # Luonnos lautakunta
-    'luonnos_lautakuntakerta_1': [
-        'milloin_kaavaluonnos_lautakunnassa',
-        'kaavaluonnos_kylk_aineiston_maaraaika',
-    ],
-    'luonnos_lautakuntakerta_2': [
-        'milloin_kaavaluonnos_lautakunnassa_2',
-        'kaavaluonnos_kylk_aineiston_maaraaika_2',
-    ],
-    'luonnos_lautakuntakerta_3': [
-        'milloin_kaavaluonnos_lautakunnassa_3',
-        'kaavaluonnos_kylk_aineiston_maaraaika_3',
-    ],
-    'luonnos_lautakuntakerta_4': [
-        'milloin_kaavaluonnos_lautakunnassa_4',
-        'kaavaluonnos_kylk_aineiston_maaraaika_4',
-    ],
-    # Ehdotus nähtävilläolo
-    'ehdotus_nahtavillaolokerta_1': [
-        'milloin_ehdotuksen_nahtavilla_alkaa',
-        'milloin_ehdotuksen_nahtavilla_paattyy',
-        'ehdotus_nahtaville_aineiston_maaraaika',
-    ],
-    'ehdotus_nahtavillaolokerta_2': [
-        'milloin_ehdotuksen_nahtavilla_alkaa_2',
-        'milloin_ehdotuksen_nahtavilla_paattyy_2',
-        'ehdotus_nahtaville_aineiston_maaraaika_2',
-    ],
-    'ehdotus_nahtavillaolokerta_3': [
-        'milloin_ehdotuksen_nahtavilla_alkaa_3',
-        'milloin_ehdotuksen_nahtavilla_paattyy_3',
-        'ehdotus_nahtaville_aineiston_maaraaika_3',
-    ],
-    'ehdotus_nahtavillaolokerta_4': [
-        'milloin_ehdotuksen_nahtavilla_alkaa_4',
-        'milloin_ehdotuksen_nahtavilla_paattyy_4',
-        'ehdotus_nahtaville_aineiston_maaraaika_4',
-    ],
-    # Ehdotus lautakunta
-    'ehdotus_lautakuntakerta_1': [
-        'milloin_kaavaehdotus_lautakunnassa',
-        'ehdotus_lautakunta_aineiston_maaraaika',
-    ],
-    'ehdotus_lautakuntakerta_2': [
-        'milloin_kaavaehdotus_lautakunnassa_2',
-        'ehdotus_lautakunta_aineiston_maaraaika_2',
-    ],
-    'ehdotus_lautakuntakerta_3': [
-        'milloin_kaavaehdotus_lautakunnassa_3',
-        'ehdotus_lautakunta_aineiston_maaraaika_3',
-    ],
-    'ehdotus_lautakuntakerta_4': [
-        'milloin_kaavaehdotus_lautakunnassa_4',
-        'ehdotus_lautakunta_aineiston_maaraaika_4',
-    ],
-    # Tarkistettu ehdotus lautakunta
-    'tarkistettu_ehdotus_lautakuntakerta_1': [
-        'milloin_tarkistettu_ehdotus_lautakunnassa',
-        'tarkistettu_ehdotus_kylk_aineiston_maaraaika',
-    ],
-    'tarkistettu_ehdotus_lautakuntakerta_2': [
-        'milloin_tarkistettu_ehdotus_lautakunnassa_2',
-        'tarkistettu_ehdotus_kylk_aineiston_maaraaika_2',
-    ],
-    'tarkistettu_ehdotus_lautakuntakerta_3': [
-        'milloin_tarkistettu_ehdotus_lautakunnassa_3',
-        'tarkistettu_ehdotus_kylk_aineiston_maaraaika_3',
-    ],
-    'tarkistettu_ehdotus_lautakuntakerta_4': [
-        'milloin_tarkistettu_ehdotus_lautakunnassa_4',
-        'tarkistettu_ehdotus_kylk_aineiston_maaraaika_4',
-    ],
-}
 
 
 class Command(BaseCommand):
@@ -265,34 +122,19 @@ class Command(BaseCommand):
         
         Returns dict with 'cleaned_fields' list and 'cleaned_count'.
         """
+        # Find stale fields using shared utility
+        stale_data = find_stale_deadline_fields(project.attribute_data)
+        
+        # Convert to the format needed for cleanup
         cleaned_fields = []
-        attr_data = project.attribute_data or {}
-
-        for deadline_group, vis_bool_name in VIS_BOOL_MAP.items():
-            # Skip groups without visibility bools
-            if vis_bool_name is None:
-                continue
-
-            # Get the visibility bool value
-            vis_bool_value = attr_data.get(vis_bool_name)
-
-            # Only clean if vis_bool is explicitly False
-            if vis_bool_value is not False:
-                continue
-
-            # Get date fields for this group
-            date_fields = DEADLINE_GROUP_DATE_FIELDS.get(deadline_group, [])
-            
-            # Find and clear stale dates
-            for field in date_fields:
-                value = attr_data.get(field)
-                if value is not None:
-                    cleaned_fields.append({
-                        'group': deadline_group,
-                        'vis_bool': vis_bool_name,
-                        'field': field,
-                        'old_value': value,
-                    })
+        for deadline_group, vis_bool_name, stale_fields in stale_data:
+            for field_info in stale_fields:
+                cleaned_fields.append({
+                    'group': deadline_group,
+                    'vis_bool': vis_bool_name,
+                    'field': field_info['field'],
+                    'old_value': field_info['value'],
+                })
 
         if cleaned_fields:
             self._print_cleanup_info(project, cleaned_fields, dry_run)

@@ -2023,12 +2023,17 @@ class ProjectSerializer(serializers.ModelSerializer):
             return project
 
     def update_initial_data(self, validated_data):
+        from projects.deadline_utils import clean_stale_deadline_fields
+        
         attribute_data = self.instance.attribute_data
 
         try:
             kokoluokka = validated_data["phase"].project_subtype.name
             create_draft = validated_data.get("create_draft", None)
             create_principles = validated_data.get("create_principles", None)
+            
+            # KAAV-3492: Only cleanup is needed when toggles are turned OFF
+            needs_cleanup = False
 
             if create_draft is not None:
                 if kokoluokka == "XL" and create_draft == True:
@@ -2037,8 +2042,10 @@ class ProjectSerializer(serializers.ModelSerializer):
                     if attribute_data.get("jarjestetaan_luonnos_esillaolo_1", None) is None:
                         attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
                 else:
+                    # Turning OFF toggle - remove visibility bools and mark for cleanup
                     attribute_data.pop("kaavaluonnos_lautakuntaan_1", None)
                     attribute_data.pop("jarjestetaan_luonnos_esillaolo_1", None)
+                    needs_cleanup = True
 
             if create_principles is not None:
                 if kokoluokka == "XL" and create_principles == True:
@@ -2047,8 +2054,15 @@ class ProjectSerializer(serializers.ModelSerializer):
                     if attribute_data.get("jarjestetaan_periaatteet_esillaolo_1", None) is None:
                         attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
                 else:
+                    # Turning OFF toggle - remove visibility bools and mark for cleanup
                     attribute_data.pop("periaatteet_lautakuntaan_1", None)
                     attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
+                    needs_cleanup = True
+            
+            # KAAV-3492: Only clean stale deadline fields when toggles were turned OFF
+            if needs_cleanup:
+                clean_stale_deadline_fields(attribute_data)
+            
         except KeyError as exc:
             pass
 
