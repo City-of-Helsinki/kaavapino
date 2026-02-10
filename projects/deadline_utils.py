@@ -15,16 +15,19 @@ DEADLINE_GROUP_DATE_FIELDS = {
         'milloin_periaatteet_esillaolo_alkaa',
         'milloin_periaatteet_esillaolo_paattyy',
         'periaatteet_esillaolo_aineiston_maaraaika',
+        'viimeistaan_mielipiteet_periaatteista',
     ],
     'periaatteet_esillaolokerta_2': [
         'milloin_periaatteet_esillaolo_alkaa_2',
         'milloin_periaatteet_esillaolo_paattyy_2',
         'periaatteet_esillaolo_aineiston_maaraaika_2',
+        'viimeistaan_mielipiteet_periaatteista_2',
     ],
     'periaatteet_esillaolokerta_3': [
         'milloin_periaatteet_esillaolo_alkaa_3',
         'milloin_periaatteet_esillaolo_paattyy_3',
         'periaatteet_esillaolo_aineiston_maaraaika_3',
+        'viimeistaan_mielipiteet_periaatteista_3',
     ],
     # Periaatteet lautakunta
     'periaatteet_lautakuntakerta_1': [
@@ -48,32 +51,38 @@ DEADLINE_GROUP_DATE_FIELDS = {
         'milloin_oas_esillaolo_alkaa',
         'milloin_oas_esillaolo_paattyy',
         'oas_esillaolo_aineiston_maaraaika',
+        'viimeistaan_mielipiteet_oas',
     ],
     'oas_esillaolokerta_2': [
         'milloin_oas_esillaolo_alkaa_2',
         'milloin_oas_esillaolo_paattyy_2',
         'oas_esillaolo_aineiston_maaraaika_2',
+        'viimeistaan_mielipiteet_oas_2',
     ],
     'oas_esillaolokerta_3': [
         'milloin_oas_esillaolo_alkaa_3',
         'milloin_oas_esillaolo_paattyy_3',
         'oas_esillaolo_aineiston_maaraaika_3',
+        'viimeistaan_mielipiteet_oas_3',
     ],
     # Luonnos esilläolo
     'luonnos_esillaolokerta_1': [
         'milloin_luonnos_esillaolo_alkaa',
         'milloin_luonnos_esillaolo_paattyy',
         'kaavaluonnos_esillaolo_aineiston_maaraaika',
+        'viimeistaan_mielipiteet_luonnos',
     ],
     'luonnos_esillaolokerta_2': [
         'milloin_luonnos_esillaolo_alkaa_2',
         'milloin_luonnos_esillaolo_paattyy_2',
         'kaavaluonnos_esillaolo_aineiston_maaraaika_2',
+        'viimeistaan_mielipiteet_luonnos_2',
     ],
     'luonnos_esillaolokerta_3': [
         'milloin_luonnos_esillaolo_alkaa_3',
         'milloin_luonnos_esillaolo_paattyy_3',
         'kaavaluonnos_esillaolo_aineiston_maaraaika_3',
+        'viimeistaan_mielipiteet_luonnos_3',
     ],
     # Luonnos lautakunta
     'luonnos_lautakuntakerta_1': [
@@ -94,41 +103,46 @@ DEADLINE_GROUP_DATE_FIELDS = {
     ],
     # Ehdotus nähtävilläolo
     'ehdotus_nahtavillaolokerta_1': [
-        'milloin_ehdotuksen_nahtavilla_alkaa',
+        'milloin_ehdotuksen_nahtavilla_alkaa_pieni',
+        'milloin_ehdotuksen_nahtavilla_alkaa_iso',
         'milloin_ehdotuksen_nahtavilla_paattyy',
         'ehdotus_nahtaville_aineiston_maaraaika',
+        'viimeistaan_lausunnot_ehdotuksesta',
     ],
     'ehdotus_nahtavillaolokerta_2': [
-        'milloin_ehdotuksen_nahtavilla_alkaa_2',
+        'milloin_ehdotuksen_nahtavilla_alkaa_pieni_2',
+        'milloin_ehdotuksen_nahtavilla_alkaa_iso_2',
         'milloin_ehdotuksen_nahtavilla_paattyy_2',
         'ehdotus_nahtaville_aineiston_maaraaika_2',
+        'viimeistaan_lausunnot_ehdotuksesta_2',
     ],
     'ehdotus_nahtavillaolokerta_3': [
-        'milloin_ehdotuksen_nahtavilla_alkaa_3',
+        'milloin_ehdotuksen_nahtavilla_alkaa_pieni_3',
+        'milloin_ehdotuksen_nahtavilla_alkaa_iso_3',
         'milloin_ehdotuksen_nahtavilla_paattyy_3',
         'ehdotus_nahtaville_aineiston_maaraaika_3',
+        'viimeistaan_lausunnot_ehdotuksesta_3',
     ],
     'ehdotus_nahtavillaolokerta_4': [
-        'milloin_ehdotuksen_nahtavilla_alkaa_4',
+        'milloin_ehdotuksen_nahtavilla_alkaa_pieni_4',
+        'milloin_ehdotuksen_nahtavilla_alkaa_iso_4',
         'milloin_ehdotuksen_nahtavilla_paattyy_4',
         'ehdotus_nahtaville_aineiston_maaraaika_4',
+        'viimeistaan_lausunnot_ehdotuksesta_4',
     ],
     # Ehdotus lautakunta
     'ehdotus_lautakuntakerta_1': [
         'milloin_kaavaehdotus_lautakunnassa',
-        'ehdotus_lautakunta_aineiston_maaraaika',
+        'ehdotus_kylk_aineiston_maaraaika',
     ],
     'ehdotus_lautakuntakerta_2': [
         'milloin_kaavaehdotus_lautakunnassa_2',
-        'ehdotus_lautakunta_aineiston_maaraaika_2',
     ],
     'ehdotus_lautakuntakerta_3': [
         'milloin_kaavaehdotus_lautakunnassa_3',
-        'ehdotus_lautakunta_aineiston_maaraaika_3',
     ],
     'ehdotus_lautakuntakerta_4': [
         'milloin_kaavaehdotus_lautakunnassa_4',
-        'ehdotus_lautakunta_aineiston_maaraaika_4',
     ],
     # Tarkistettu ehdotus lautakunta
     'tarkistettu_ehdotus_lautakuntakerta_1': [
@@ -236,7 +250,11 @@ def clean_stale_deadline_fields(attribute_data):
         # Clear stale date fields
         for field in date_fields:
             if field in attribute_data and attribute_data[field] is not None:
-                del attribute_data[field]
+                # Set to None instead of deleting to ensure proper merge in get_preview_deadlines
+                # KAAV-3492 FIX: Deleting the key causes stale dates to leak through when
+                # updated_attribute_data = {**self.attribute_data, **updated_attributes}
+                # merges database values with request values
+                attribute_data[field] = None
                 cleared_count += 1
     
     return cleared_count

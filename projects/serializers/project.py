@@ -62,6 +62,7 @@ from projects.serializers.fields import AttributeDataField
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
+from projects.deadline_utils import clean_stale_deadline_fields
 from sitecontent.models import ListViewAttributeColumn
 from users.models import User, PRIVILEGE_LEVELS
 from users.serializers import PersonnelSerializer, UserSerializer
@@ -1370,6 +1371,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         if 'attribute_data' in attrs:
             logger.info(f"[SERIALIZER VALIDATE] attribute_data keys: {list(attrs['attribute_data'].keys())}")
         
+        # KAAV-3492: Clean stale deadline fields before validation
+        # When a deadline group's visibility bool is set to False, clear associated date fields
+        if 'attribute_data' in attrs and attrs['attribute_data']:
+            logger.info("[SERIALIZER VALIDATE] Cleaning stale deadline fields...")
+            clean_stale_deadline_fields(attrs['attribute_data'])
+            logger.info("[SERIALIZER VALIDATE] Stale deadline fields cleaned")
+        
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
 
@@ -1421,6 +1429,70 @@ class ProjectSerializer(serializers.ModelSerializer):
         logger.info(f"[SERIALIZER VALIDATE] _validate_attribute_data completed, returned {len(attrs['attribute_data'])} attributes")
         logger.info("="*80)
         return attrs
+
+    def _execute_pending_validation_operations(self, user):
+        """
+        KAAV-3492 FIX: Execute database operations that were deferred from validation.
+        
+        This method is called inside transaction.atomic() in update(), ensuring that
+        if the save fails, all these operations are rolled back.
+        
+        Previously, these operations happened during validate() BEFORE the transaction,
+        meaning if validation or save failed afterwards, DB was left in inconsistent state.
+        """
+        logger = logging.getLogger(__name__)
+        
+        # 1. Archive fieldset attribute files (deferred from _validate_attribute_data)
+        pending_fieldset_files = self.context.pop('pending_fieldset_files_to_archive', [])
+        for file_info in pending_fieldset_files:
+            ProjectAttributeFile.objects.filter(
+                project=file_info['project'],
+                attribute=file_info['attribute'],
+                fieldset_path_str=file_info['fieldset_path_str']
+            ).update(archived_at=timezone.now())
+            logger.info(f"[DEFERRED OP] Archived fieldset file: {file_info['fieldset_path_str']}")
+        
+        # 2. Delete project deadlines (deferred from _validate_attribute_data)
+        pending_deletions = self.context.pop('pending_deadline_deletions', [])
+        for deletion_info in pending_deletions:
+            try:
+                ProjectDeadline.objects.get(
+                    deadline=deletion_info['deadline'],
+                    project=deletion_info['project']
+                ).delete()
+                logger.info(f"[DEFERRED OP] Deleted ProjectDeadline for deadline: {deletion_info['deadline']}")
+            except ProjectDeadline.DoesNotExist:
+                pass
+        
+        # 3. Archive attribute files (deferred from _validate_attribute_data)
+        pending_files = self.context.pop('pending_files_to_archive', [])
+        for identifier, attribute_file in pending_files:
+            entry = action.send(
+                user,
+                verb=verbs.UPDATED_ATTRIBUTE,
+                action_object=attribute_file.attribute,
+                target=self.instance,
+                attribute_identifier=identifier,
+                new_value=None,
+                old_value=attribute_file.description,
+            )
+            timestamp = entry[0][1].timestamp
+            attribute_file.archived_at = timestamp
+            attribute_file.save()
+            logger.info(f"[DEFERRED OP] Archived attribute file: {identifier}")
+        
+        # 4. Update deadline generated flags (deferred from _validate_attribute_data)
+        pending_keys = self.context.pop('pending_deadline_generated_update_keys', [])
+        if pending_keys and self.instance:
+            updated_dls = ProjectDeadline.objects.filter(
+                project=self.instance,
+                deadline__attribute__identifier__in=pending_keys
+            )
+            for dl in updated_dls:
+                dl.generated = False
+            if updated_dls:
+                ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
+                logger.info(f"[DEFERRED OP] Updated generated=False for {len(list(updated_dls))} deadlines")
 
     def _get_should_update_deadlines(self, subtype_changed, instance, attribute_data):
         if subtype_changed:
@@ -1526,16 +1598,21 @@ class ProjectSerializer(serializers.ModelSerializer):
                         )
                         for f_attr in fieldset_attributes:
                             fieldset_path_str = f'{attribute_identifier}[{index}].{f_attr.attribute_target.identifier}'
-                            ProjectAttributeFile.objects.filter(
-                                project=self.instance,
-                                attribute=f_attr.attribute_target,
-                                fieldset_path_str=fieldset_path_str
-                            ).update(archived_at=timezone.now())
+                            # KAAV-3492 FIX: Defer DB write until save() - don't modify DB during validation
+                            fieldset_files_to_archive = self.context.setdefault('pending_fieldset_files_to_archive', [])
+                            fieldset_files_to_archive.append({
+                                'project': self.instance,
+                                'attribute': f_attr.attribute_target,
+                                'fieldset_path_str': fieldset_path_str,
+                            })
 
                 if value is None:
+                    # KAAV-3492 FIX: Defer deadline deletion until save() - don't modify DB during validation
                     try:
                         deadline = Deadline.objects.get(attribute=attribute, subtype=self.instance.subtype)
-                        ProjectDeadline.objects.get(deadline=deadline, project=self.instance).delete()
+                        # Store for deletion during update(), not during validation
+                        pending_deadline_deletions = self.context.setdefault('pending_deadline_deletions', [])
+                        pending_deadline_deletions.append({'deadline': deadline, 'project': self.instance})
                     except Exception:
                         pass
 
@@ -1719,29 +1796,14 @@ class ProjectSerializer(serializers.ModelSerializer):
             log.warning(", ".join(invalids))
 
 
-        for identifier, attribute_file in files_to_archive:
-            entry = action.send(
-                user,
-                verb=verbs.UPDATED_ATTRIBUTE,
-                action_object=attribute_file.attribute,
-                target=self.instance,
-                attribute_identifier=identifier,
-                new_value=None,
-                old_value=attribute_file.description,
-            )
-            timestamp = entry[0][1].timestamp
+        # KAAV-3492 FIX: Defer file archiving until save() - don't modify DB during validation
+        if files_to_archive:
+            self.context['pending_files_to_archive'] = files_to_archive
 
-            attribute_file.archived_at = timestamp
-            attribute_file.save()
-
+        # KAAV-3492 FIX: Defer deadline generated flag update until save() - don't modify DB during validation
         if self.instance:
-            updated_dls = ProjectDeadline.objects.filter(
-                project=self.instance,
-                deadline__attribute__identifier__in=valid_attributes.keys()
-            )
-            for dl in updated_dls:
-                dl.generated = False
-            ProjectDeadline.objects.bulk_update(updated_dls, ["generated"])
+            # Store the identifiers to update during save() instead of updating now
+            self.context['pending_deadline_generated_update_keys'] = list(valid_attributes.keys())
 
         if validation_metrics.get("start") is not None:
             total_duration = time.monotonic() - validation_metrics["start"]
@@ -1933,12 +1995,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         if onhold_changed:
             instance.onhold_at = timezone.now() if onhold else None
 
-        if phase_changed:
-            ProjectPhaseLog.objects.create(
-                project=instance,
-                phase=phase,
-                user=user,
-            )
+        # KAAV-3492 FIX: Phase log creation moved INSIDE transaction.atomic() below
+        # Previously this was here and would persist even if save failed
 
         if subtype_changed or draft_principles_changed:
             #  Clear project from cache
@@ -1960,6 +2018,17 @@ class ProjectSerializer(serializers.ModelSerializer):
                 attribute_data["projektityyppi"] = AttributeValueChoice.objects.get(value="Asemakaava")
             except:
                 pass
+
+            # KAAV-3492 FIX: Execute deferred DB operations from validation (now inside transaction)
+            self._execute_pending_validation_operations(user)
+
+            # KAAV-3492 FIX: Phase log creation moved inside transaction (was outside before)
+            if phase_changed:
+                ProjectPhaseLog.objects.create(
+                    project=instance,
+                    phase=phase,
+                    user=user,
+                )
 
             self.update_initial_data(validated_data)
             if attribute_data:
@@ -2023,8 +2092,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             return project
 
     def update_initial_data(self, validated_data):
-        from projects.deadline_utils import clean_stale_deadline_fields
-        
         attribute_data = self.instance.attribute_data
 
         try:

@@ -634,13 +634,15 @@ class Project(models.Model):
 
         return None
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data=None, is_recursing=False, confirmed_fields=None, calculation_cache=None, timing_metrics=None):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data=None, is_recursing=False, confirmed_fields=None, calculation_cache=None, timing_metrics=None, user_changed_fields=None):
         if preview_attribute_data is None:
             preview_attribute_data = {}
         if confirmed_fields is None:
             confirmed_fields = {}
         if ignore is None:
             ignore = []
+        if user_changed_fields is None:
+            user_changed_fields = set()
         calc_start = time.monotonic() if timing_metrics is not None else None
         results = {}
         fillers = []
@@ -657,6 +659,22 @@ class Project(models.Model):
                 cached_value = calculation_cache[cache_key]
                 if cached_value is not None:
                     return cached_value
+
+            # KAAV-3492 FIX: If user explicitly changed this deadline, don't recalculate it.
+            # Use their value (from preview_attribute_data) and just enforce minimum distances.
+            identifier = deadline_obj.attribute.identifier if deadline_obj.attribute else None
+            if identifier and identifier in user_changed_fields:
+                user_value = preview_attribute_data.get(identifier)
+                if user_value is not None:
+                    log.info(f"[KAAV-3492 FIX] Skipping recalculation for user-changed {identifier}, using value: {user_value}")
+                    enforced = self._enforce_distance_requirements(
+                        deadline_obj,
+                        user_value,
+                        preview_attribute_data,
+                    )
+                    if cache_key and enforced is not None:
+                        calculation_cache[cache_key] = enforced
+                    return enforced
 
             computed_date = calculate_deadline_fn(self, preview_attributes=preview_attribute_data)
             
@@ -701,6 +719,7 @@ class Project(models.Model):
                         confirmed_fields=confirmed_fields,
                         calculation_cache=calculation_cache,
                         timing_metrics=timing_metrics,
+                        user_changed_fields=user_changed_fields,
                     )
                 }
 
@@ -980,11 +999,28 @@ class Project(models.Model):
                 current_date = self._coerce_date_value(current_val)
                 stored_date = self._coerce_date_value(stored_val)
                 
-                if current_date and current_date == stored_date:
+                # KAAV-3492 DEBUG: Log stale-date detection 
+                log.info(f"[STALE DATE BUG DEBUG] Checking {identifier}: vis_bool={vis_bool}, current_date={current_date}, stored_date={stored_date}, equal={current_date == stored_date if current_date else 'N/A'}, in_new_dls={dl in new_dls}")
+                
+                # KAAV-3492 FIX: Only apply calculate_initial() to TRULY NEW deadlines (in new_dls).
+                # According to docs: "initial_calculations is used ONLY when adding a new element 
+                # and ONLY for that specific element being added - distances_to_previous is used
+                # for ALL other situations: cascade validation, moving elements, enforcing minimum
+                # distances on subsequent elements after add."
+                # 
+                # For RE-ENABLED groups (deadline exists but visibility was False), the deadline
+                # already has an existing date. We should NOT use calculate_initial() because that
+                # would jump the date to an initial distance (e.g., +65 work days from predecessor),
+                # completely overriding the user's existing data. Instead, we just mark it as 
+                # "changed" and let the cascade logic handle it with distances_to_previous.
+                if dl in new_dls and current_date and current_date == stored_date:
+                    log.info(f"[KAAV-3492 BACKEND] NEW deadline {identifier}: applying calculate_initial")
+                    
                     # UX80.4.2.3.3.2: Added element moves to initial distance (generoitu ehdotus)
                     # from its predecessor. Use calculate_initial() for the ADDED element only.
                     # The forward cascade will handle subsequent elements using distances_to_previous.
                     initial_date = dl.calculate_initial(self, preview_attributes=updated_attribute_data)
+                    log.warning(f"[STALE DATE BUG DEBUG] *** {identifier}: calculate_initial returned {initial_date} ***")
                     
                     # SPECIAL CASE (AT1.5.3): Opinions deadline ("viimeistaan_mielipiteet")
                     # defaults to matching "esillaolo_paattyy" if no initial_calculations exist
@@ -1242,8 +1278,17 @@ class Project(models.Model):
             dl for dl in new_dls.keys()
             if dl.initial_calculations.exists() or dl.default_to_created_at
         ]
+        
+        # KAAV-3492 DEBUG: Log which deadlines are being calculated with initial=True
+        log.info(f"[INITIAL_CALC BUG DEBUG] new_dls_to_calc count: {len(new_dls_to_calc)}")
+        for dl in new_dls_to_calc:
+            dl_id = dl.attribute.identifier if dl.attribute else dl.abbreviation
+            log.info(f"[INITIAL_CALC BUG DEBUG] Deadline in new_dls_to_calc: {dl_id}, has_initial_calc={dl.initial_calculations.exists()}")
+            # Log the values BEFORE initial_calculations are applied
+            current_val = updated_attribute_data.get(dl_id)
+            log.info(f"[INITIAL_CALC BUG DEBUG] {dl_id}: current value BEFORE initial_calc = {current_val}")
 
-        project_dls = {**project_dls, **self._set_calculated_deadlines(
+        initial_calc_results = self._set_calculated_deadlines(
             new_dls_to_calc,
             None,
             initial=True,
@@ -1252,14 +1297,37 @@ class Project(models.Model):
             confirmed_fields=confirmed_fields,
             calculation_cache=calculation_cache,
             timing_metrics=timing_metrics,
-        )}
+            user_changed_fields=actually_changed,
+        )
+        
+        # KAAV-3492 DEBUG: Log the results from initial_calculations  
+        for dl, result in initial_calc_results.items():
+            dl_id = dl.attribute.identifier if dl.attribute else dl.abbreviation
+            log.info(f"[INITIAL_CALC BUG DEBUG] {dl_id}: result AFTER initial_calc = {result}")
+        
+        project_dls = {**project_dls, **initial_calc_results}
         
         # KAAV-3428: Only recalculate deadlines that have update_calculations or default_to_created_at.
+        # KAAV-3492 FIX: BUT exclude deadlines the user explicitly changed in this request -
+        # those should use the user's value, just enforced for minimum distances.
+        # If we recalculate user-changed deadlines, we would overwrite their intended value
+        # with calculated values (e.g., jumping ehdotus dates 3 months forward).
         update_dls_to_calc = [
             dl for dl in project_dls
-            if dl.update_calculations.exists() \
-                or dl.default_to_created_at
+            if (dl.update_calculations.exists() or dl.default_to_created_at)
+            and not (dl.attribute and dl.attribute.identifier in actually_changed)
         ]
+        
+        # KAAV-3492 DEBUG: Log which deadlines have update_calculations
+        log.info(f"[UPDATE_CALC BUG DEBUG] update_dls_to_calc count: {len(update_dls_to_calc)}")
+        for dl in update_dls_to_calc:
+            dl_id = dl.attribute.identifier if dl.attribute else dl.abbreviation
+            log.info(f"[UPDATE_CALC BUG DEBUG] Deadline in update_dls_to_calc: {dl_id}, has_update_calc={dl.update_calculations.exists()}, default_to_created_at={dl.default_to_created_at}")
+        
+        # Also log ehdotus_nahtaville_aineiston_maaraaika specifically if it exists
+        target_dl = next((dl for dl in project_dls.keys() if dl.attribute and 'ehdotus_nahtaville_aineiston_maaraaika' in dl.attribute.identifier), None)
+        if target_dl:
+            log.info(f"[UPDATE_CALC BUG DEBUG] ehdotus_nahtaville_aineiston_maaraaika: in_update_dls={target_dl in update_dls_to_calc}, update_calc_exists={target_dl.update_calculations.exists()}, in_new_dls={target_dl in new_dls}")
 
         # KAAV-3492 FIX: Unified convergence loop that alternates between:
         # 1. Recalculating phases (clearing cache!)
@@ -1290,6 +1358,7 @@ class Project(models.Model):
                 confirmed_fields=confirmed_fields,
                 calculation_cache=calculation_cache,
                 timing_metrics=timing_metrics,
+                user_changed_fields=actually_changed,
             )
             project_dls = {**project_dls, **recalc_results}
             
