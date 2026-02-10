@@ -1368,10 +1368,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         logger.info("[SERIALIZER VALIDATE] ProjectSerializer.validate called")
         logger.info(f"[SERIALIZER VALIDATE] Instance: {self.instance.name if self.instance else 'NEW'}")
         logger.info(f"[SERIALIZER VALIDATE] Attrs keys: {list(attrs.keys())}")
-        if 'attribute_data' in attrs:
-            logger.info(f"[SERIALIZER VALIDATE] attribute_data keys: {list(attrs['attribute_data'].keys())}")
-        
-        # KAAV-3492: Clean stale deadline fields before validation
         # When a deadline group's visibility bool is set to False, clear associated date fields
         if 'attribute_data' in attrs and attrs['attribute_data']:
             logger.info("[SERIALIZER VALIDATE] Cleaning stale deadline fields...")
@@ -1418,6 +1414,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             attrs.get("create_draft") == False:
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
+        
+        # KAAV-3492: Set stale date fields to None in request data (in-memory only).
+        # get_preview_deadlines() merges {**db_data, **request_data}, so None overrides stale DB values.
+        if attrs.get('attribute_data'):
+            clean_stale_deadline_fields(attrs['attribute_data'])
         
         logger.info("[SERIALIZER VALIDATE] Calling _validate_attribute_data...")
         attrs["attribute_data"] = self._validate_attribute_data(
