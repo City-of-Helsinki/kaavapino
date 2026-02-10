@@ -11,6 +11,7 @@ RULES FOLLOWED (per TESTING.md):
 - Test at integration boundaries (model ↔ database)
 """
 import datetime
+import secrets
 import pytest
 from unittest.mock import Mock
 from django.contrib.auth import get_user_model
@@ -144,7 +145,7 @@ class TestMinDistanceTargetDateMethod:
         if not subtype:
             pytest.skip(f"No {subtype_name} subtype in test database")
         
-        user = User.objects.create_user(username=f"test_{subtype_name}", password="test")
+        user = User.objects.create_user(username=f"test_{subtype_name}", password=secrets.token_urlsafe(16))
         project = Project.objects.create(
             user=user,
             name=f"test-distance-{subtype_name}",
@@ -358,7 +359,7 @@ class TestPreviewDeadlinesWithRealProject:
         if not subtype:
             pytest.skip("No subtype with deadline templates in test database")
         
-        user = User.objects.create_user(username="test_preview", password="test")
+        user = User.objects.create_user(username="test_preview", password=secrets.token_urlsafe(16))
         project = Project.objects.create(
             user=user,
             name="test-preview",

@@ -212,7 +212,7 @@ class TestStaleDeadlineAdversarialCases:
         # 0 is falsy in Python, but not `is False`
         # The implementation should handle this gracefully
         try:
-            stale_data = find_stale_deadline_fields(attribute_data)
+            find_stale_deadline_fields(attribute_data)
             # Test passed - no exception
         except Exception as e:
             pytest.fail(f"Integer 0 caused exception: {e}")
@@ -291,7 +291,7 @@ class TestStaleDeadlineAdversarialCases:
             'milloin_oas_esillaolo_alkaa_2': '2026-03-01',
         }
         
-        cleared_count = clean_stale_deadline_fields(attribute_data)
+        clean_stale_deadline_fields(attribute_data)
         
         # Only OAS date should be cleaned, not periaatteet
         assert attribute_data['milloin_periaatteet_esillaolo_alkaa'] == '2026-01-15', (

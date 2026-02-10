@@ -7,6 +7,7 @@ RULES FOLLOWED (per TESTING.md):
 - Tests would FAIL if visibility logic is broken
 - Include adversarial cases
 """
+import secrets
 import pytest
 from django.contrib.auth import get_user_model
 from django.db.models.signals import pre_save
@@ -171,7 +172,7 @@ class TestVisibilityFilteringInPreview:
         if not subtype:
             pytest.skip("No subtype with deadlines in test database")
         
-        user = User.objects.create_user(username="test_vis", password="test")
+        user = User.objects.create_user(username="test_vis", password=secrets.token_urlsafe(16))
         project = Project.objects.create(
             user=user,
             name="test-visibility",
