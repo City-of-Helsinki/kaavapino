@@ -7,7 +7,6 @@ import pytest
 from projects.deadline_utils import (
     find_stale_deadline_fields,
     clean_stale_deadline_fields,
-    DEADLINE_GROUP_DATE_FIELDS,
 )
 
 
