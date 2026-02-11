@@ -458,7 +458,6 @@ class Project(models.Model):
             return None
 
     def _min_distance_target_date(self, prev_date, distance, deadline):
-        logger = logging.getLogger(__name__)
         if not prev_date:
             return None
 
@@ -1140,7 +1139,6 @@ class Project(models.Model):
                     
                     # Find maximum minimum target across ALL predecessors
                     max_min_target = None
-                    constraining_predecessor = None
                     for dist in next_dl.distances_to_previous.all():
                         if not dist.check_conditions(combined):
                             continue
@@ -1151,7 +1149,6 @@ class Project(models.Model):
                         target = self._min_distance_target_date(prev_date, dist, next_dl)
                         if target and (not max_min_target or target > max_min_target):
                             max_min_target = target
-                            constraining_predecessor = dist.previous_deadline.attribute.identifier if dist.previous_deadline and dist.previous_deadline.attribute else 'unknown'
                     
                     if not max_min_target:
                         continue
