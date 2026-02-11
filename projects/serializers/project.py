@@ -62,7 +62,6 @@ from projects.serializers.fields import AttributeDataField
 from projects.serializers.document import DocumentTemplateSerializer
 from projects.serializers.section import create_section_serializer
 from projects.serializers.deadline import DeadlineSerializer
-from projects.deadline_utils import clean_stale_deadline_fields
 from sitecontent.models import ListViewAttributeColumn
 from users.models import User, PRIVILEGE_LEVELS
 from users.serializers import PersonnelSerializer, UserSerializer
@@ -1368,11 +1367,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         logger.info("[SERIALIZER VALIDATE] ProjectSerializer.validate called")
         logger.info(f"[SERIALIZER VALIDATE] Instance: {self.instance.name if self.instance else 'NEW'}")
         logger.info(f"[SERIALIZER VALIDATE] Attrs keys: {list(attrs.keys())}")
-        # When a deadline group's visibility bool is set to False, clear associated date fields
-        if 'attribute_data' in attrs and attrs['attribute_data']:
-            logger.info("[SERIALIZER VALIDATE] Cleaning stale deadline fields...")
-            clean_stale_deadline_fields(attrs['attribute_data'])
-            logger.info("[SERIALIZER VALIDATE] Stale deadline fields cleaned")
+        # DEADLINE_INTEGRITY_RULES: Do NOT clear date fields when vis_bool=False.
+        # Visibility controls UI display only, not data existence.
+        # Dates must ALWAYS exist for cascade calculation.
         
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
@@ -1415,10 +1412,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             if subtype and subtype.name == "XL":
                 raise ValidationError({"subtype": _("Principles and/or draft needs to be created for XL projects.")})
         
-        # KAAV-3492: Set stale date fields to None in request data (in-memory only).
-        # get_preview_deadlines() merges {**db_data, **request_data}, so None overrides stale DB values.
-        if attrs.get('attribute_data'):
-            clean_stale_deadline_fields(attrs['attribute_data'])
+        # DEADLINE_INTEGRITY_RULES: Do NOT clear date fields. Dates must ALWAYS exist.
         
         logger.info("[SERIALIZER VALIDATE] Calling _validate_attribute_data...")
         attrs["attribute_data"] = self._validate_attribute_data(
@@ -2104,9 +2098,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             kokoluokka = validated_data["phase"].project_subtype.name
             create_draft = validated_data.get("create_draft", None)
             create_principles = validated_data.get("create_principles", None)
-            
-            # KAAV-3492: Only cleanup is needed when toggles are turned OFF
-            needs_cleanup = False
 
             if create_draft is not None:
                 if kokoluokka == "XL" and create_draft == True:
@@ -2115,10 +2106,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                     if attribute_data.get("jarjestetaan_luonnos_esillaolo_1", None) is None:
                         attribute_data["jarjestetaan_luonnos_esillaolo_1"] = True
                 else:
-                    # Turning OFF toggle - remove visibility bools and mark for cleanup
+                    # Turning OFF toggle - remove visibility bools only.
+                    # DEADLINE_INTEGRITY_RULES: Do NOT clear date fields.
+                    # Dates must ALWAYS exist for cascade calculation.
                     attribute_data.pop("kaavaluonnos_lautakuntaan_1", None)
                     attribute_data.pop("jarjestetaan_luonnos_esillaolo_1", None)
-                    needs_cleanup = True
 
             if create_principles is not None:
                 if kokoluokka == "XL" and create_principles == True:
@@ -2127,14 +2119,11 @@ class ProjectSerializer(serializers.ModelSerializer):
                     if attribute_data.get("jarjestetaan_periaatteet_esillaolo_1", None) is None:
                         attribute_data["jarjestetaan_periaatteet_esillaolo_1"] = True
                 else:
-                    # Turning OFF toggle - remove visibility bools and mark for cleanup
+                    # Turning OFF toggle - remove visibility bools only.
+                    # DEADLINE_INTEGRITY_RULES: Do NOT clear date fields.
+                    # Dates must ALWAYS exist for cascade calculation.
                     attribute_data.pop("periaatteet_lautakuntaan_1", None)
                     attribute_data.pop("jarjestetaan_periaatteet_esillaolo_1", None)
-                    needs_cleanup = True
-            
-            # KAAV-3492: Only clean stale deadline fields when toggles were turned OFF
-            if needs_cleanup:
-                clean_stale_deadline_fields(attribute_data)
             
         except KeyError as exc:
             pass

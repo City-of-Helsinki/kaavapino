@@ -371,7 +371,18 @@ class Project(models.Model):
 
         return False
 
-    def get_applicable_deadlines(self, subtype=None, preview_attributes={}, initial=False):
+    def get_applicable_deadlines(self, subtype=None, preview_attributes={}, initial=False, for_record_existence=False):
+        """Get deadlines applicable to this project.
+        
+        Args:
+            subtype: Override project subtype
+            preview_attributes: Attributes for preview calculation
+            initial: If True, include all deadlines (initial project creation)
+            for_record_existence: If True, return ALL deadlines for subtype, ignoring
+                condition_attributes. Used by update_deadlines() to ensure ProjectDeadline
+                records are never deleted just because a visibility bool is False.
+                Per docs: E2.2 must ALWAYS exist so it can appear when vis_bool becomes True.
+        """
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -389,10 +400,16 @@ class Project(models.Model):
                 .prefetch_related('initial_calculations') \
                 .prefetch_related('update_calculations') \
 
+        # for_record_existence=True: return ALL deadlines (for creating/keeping ProjectDeadline records)
+        # initial=True: same behavior (initial project creation)
+        # Otherwise: filter by condition_attributes (for visibility/calculation checks)
+        if for_record_existence or initial:
+            return list(deadlines)
+        
         return [
             deadline
             for deadline in deadlines
-            if initial or self._check_condition(deadline, preview_attributes)
+            if self._check_condition(deadline, preview_attributes)
         ]
 
     def is_deadline_applicable(self, deadline, preview_attributes={}):
@@ -595,41 +612,32 @@ class Project(models.Model):
                 project_deadline.save()
 
             if deadline.attribute:
-                # KAAV-3492: Check if deadline belongs to a disabled group
-                # Don't write dates to attribute_data if visibility bool is False
-                should_write_to_attribute_data = True
-                if deadline.deadlinegroup:
-                    vis_bool_name = get_dl_vis_bool_name(deadline.deadlinegroup)
-                    if vis_bool_name:
-                        # By the time we reach here, attribute_data has been updated with request values
-                        vis_bool_value = self.attribute_data.get(vis_bool_name)
-                        if vis_bool_value is False:
-                            should_write_to_attribute_data = False
-                
-                if should_write_to_attribute_data:
-                    old_value = json.loads(json.dumps(
-                        self.attribute_data.get(deadline.attribute.identifier),
-                        default=str,
-                    ))
-                    new_value = json.loads(json.dumps(enforced_date, default=str))
+                # DEADLINE_INTEGRITY_RULES: Dates must ALWAYS exist in attribute_data
+                # for cascade calculation. Visibility bool controls UI display only,
+                # not data existence. Never skip writing dates based on vis_bool.
+                old_value = json.loads(json.dumps(
+                    self.attribute_data.get(deadline.attribute.identifier),
+                    default=str,
+                ))
+                new_value = json.loads(json.dumps(enforced_date, default=str))
 
-                    self.update_attribute_data(
-                        {deadline.attribute.identifier: enforced_date},
-                        attribute_cache={
-                            deadline.attribute.identifier: deadline.attribute
-                        },
+                self.update_attribute_data(
+                    {deadline.attribute.identifier: enforced_date},
+                    attribute_cache={
+                        deadline.attribute.identifier: deadline.attribute
+                    },
+                )
+
+                if old_value != new_value:
+                    action.send(
+                        user or self.user,
+                        verb=verbs.UPDATED_ATTRIBUTE,
+                        action_object=deadline.attribute,
+                        target=self,
+                        attribute_identifier=deadline.attribute.identifier,
+                        old_value=old_value,
+                        new_value=new_value,
                     )
-
-                    if old_value != new_value:
-                        action.send(
-                            user or self.user,
-                            verb=verbs.UPDATED_ATTRIBUTE,
-                            action_object=deadline.attribute,
-                            target=self,
-                            attribute_identifier=deadline.attribute.identifier,
-                            old_value=old_value,
-                            new_value=new_value,
-                        )
             return enforced_date
 
         return None
@@ -749,9 +757,15 @@ class Project(models.Model):
 
     # Generate or update schedule for project
     def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None):
-        deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
+        # CRITICAL: Use for_record_existence=True to get ALL deadlines for this subtype.
+        # This ensures ProjectDeadline records are NEVER deleted just because a visibility
+        # bool (condition_attribute) is False. Per docs/database_deadline_rules.md and
+        # docs/validation.md: E2.2 must ALWAYS exist so it can appear when nähtävilläolo-2
+        # is enabled. Deleting records would break the "add back" functionality.
+        deadlines = self.get_applicable_deadlines(for_record_existence=True, preview_attributes=preview_attributes)
 
-        # Delete no longer relevant deadlines and create missing
+        # Delete only deadlines that are truly inapplicable (wrong subtype or excluded phase)
+        # NOT deadlines that are just hidden due to condition_attributes (vis_bool=False)
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
 
         for dl in to_be_deleted:
@@ -1238,20 +1252,36 @@ class Project(models.Model):
                         log.info(f"[KAAV-3492 BACKEND]     {next_id} has no date, skipping")
                         continue
                     
-                    # Calculate minimum target date for the next deadline
-                    min_target = self._min_distance_target_date(changed_date, distance, next_dl)
-                    if not min_target:
+                    # KAAV-3492 FIX: Check ALL of next_dl's predecessors (distances_to_previous)
+                    # to find the maximum minimum target (most constraining predecessor).
+                    # Previously we only checked the one distance from changed_dl, but another
+                    # predecessor might require an even later date!
+                    max_min_target = None
+                    constraining_predecessor = None
+                    for dist in next_dl.distances_to_previous.all():
+                        if not dist.check_conditions(combined):
+                            continue
+                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
+                        prev_date = self._coerce_date_value(prev_date)
+                        if not prev_date:
+                            continue
+                        target = self._min_distance_target_date(prev_date, dist, next_dl)
+                        if target and (not max_min_target or target > max_min_target):
+                            max_min_target = target
+                            constraining_predecessor = dist.previous_deadline.attribute.identifier if dist.previous_deadline and dist.previous_deadline.attribute else 'unknown'
+                    
+                    if not max_min_target:
                         continue
                     
-                    log.info(f"[KAAV-3492 BACKEND]     {next_id}: next_date={next_date}, min_target={min_target}, needs_push={next_date < min_target}")
+                    log.info(f"[KAAV-3492 BACKEND]     {next_id}: next_date={next_date}, max_min_target={max_min_target} (from {constraining_predecessor}), needs_push={next_date < max_min_target}")
                     
-                    # If next deadline violates the distance, push it forward
-                    if next_date < min_target:
-                        log.info(f"[CASCADE] Pushing {next_id} from {next_date} to {min_target} (distance from {changed_id})")
+                    # If next deadline violates ANY predecessor distance, push it forward
+                    if next_date < max_min_target:
+                        log.info(f"[CASCADE] Pushing {next_id} from {next_date} to {max_min_target} (constrained by {constraining_predecessor})")
                         # Enforce the distance (this also snaps to valid dates like lautakunta Tuesdays)
                         enforced_date = self._enforce_distance_requirements(
                             next_dl,
-                            min_target,
+                            max_min_target,
                             preview_attribute_data=updated_attribute_data,
                         )
                         if enforced_date and enforced_date != next_date:
@@ -1306,6 +1336,22 @@ class Project(models.Model):
             log.info(f"[INITIAL_CALC BUG DEBUG] {dl_id}: result AFTER initial_calc = {result}")
         
         project_dls = {**project_dls, **initial_calc_results}
+        
+        # KAAV-3492 PHASE BOUNDARY FIX: Propagate initial_calc_results to updated_attribute_data
+        # so that phase boundary calculations in the convergence loop use the new inner deadline
+        # values. Without this, phase boundaries are calculated using stale request values,
+        # resulting in phase end dates (e.g., ehdotusvaihe_paattyy_pvm = 2026-10-20) that are
+        # earlier than their inner deadlines (e.g., viimeistaan_lausunnot_ehdotuksesta_2 = 2027-03-04).
+        for dl, result in initial_calc_results.items():
+            if hasattr(dl, 'attribute') and dl.attribute:
+                identifier = dl.attribute.identifier
+                result_coerced = self._coerce_date_value(result)
+                if result_coerced:
+                    old_val = updated_attribute_data.get(identifier)
+                    old_val_coerced = self._coerce_date_value(old_val)
+                    if old_val_coerced != result_coerced:
+                        log.info(f"[PHASE BOUNDARY FIX] Propagating initial_calc {identifier}: {old_val} -> {result_coerced}")
+                        updated_attribute_data[identifier] = result_coerced
         
         # KAAV-3428: Only recalculate deadlines that have update_calculations or default_to_created_at.
         # KAAV-3492 FIX: BUT exclude deadlines the user explicitly changed in this request -
