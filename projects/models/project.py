@@ -670,8 +670,11 @@ class Project(models.Model):
 
             # KAAV-3492 FIX: If user explicitly changed this deadline, don't recalculate it.
             # Use their value (from preview_attribute_data) and just enforce minimum distances.
+            # KAAV-3492 PHASE BOUNDARY FIX: BUT auto-calculated deadlines (edit_privilege=None)
+            # like phase boundaries should ALWAYS be recalculated regardless of actually_changed.
             identifier = deadline_obj.attribute.identifier if deadline_obj.attribute else None
-            if identifier and identifier in user_changed_fields:
+            is_auto_calculated = deadline_obj.edit_privilege is None
+            if identifier and identifier in user_changed_fields and not is_auto_calculated:
                 user_value = preview_attribute_data.get(identifier)
                 if user_value is not None:
                     log.info(f"[KAAV-3492 FIX] Skipping recalculation for user-changed {identifier}, using value: {user_value}")
@@ -973,9 +976,23 @@ class Project(models.Model):
         # KAAV-3517: Determine which deadlines actually CHANGED value (not just sent by frontend)
         # The frontend sends all deadline values, but we only want to enforce distances
         # on deadlines where the user actually moved them (value differs from current)
+        #
+        # PHASE BOUNDARY FIX: Auto-calculated deadlines (edit_privilege is None) should NEVER
+        # be added to actually_changed. Per AT1.2.1/AT1.2.3, users cannot edit phase start/end
+        # dates - they move automatically. The frontend sends stale values for these, but we
+        # must always recalculate them, not treat them as user changes.
+        auto_calculated_identifiers = {
+            dl.attribute.identifier for dl in project_dls.keys()
+            if dl.attribute and dl.edit_privilege is None
+        }
+        
         actually_changed = set()
         logger.info("[PREVIEW DEADLINES] Detecting actually changed attributes...")
         for key, new_value in updated_attributes.items():
+            # Skip auto-calculated deadlines - they should always be recalculated
+            if key in auto_calculated_identifiers:
+                logger.info(f"[PREVIEW DEADLINES] Skipping auto-calculated: {key}")
+                continue
             old_value = self.attribute_data.get(key)
             old_coerced = self._coerce_date_value(old_value) if old_value else None
             new_coerced = self._coerce_date_value(new_value) if new_value else None
