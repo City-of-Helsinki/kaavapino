@@ -374,7 +374,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def pino_numbers(self, request):
-        pino_numbers = Project.objects.values_list('pino_number', flat=True)
+        pino_numbers = Project.objects.filter(public=True).values_list('pino_number', flat=True)
         return Response(pino_numbers)
 
     @extend_schema(
