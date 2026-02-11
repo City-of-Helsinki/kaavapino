@@ -754,7 +754,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     def get_attribute_data(self, project):
         snapshot = self._get_snapshot_date(project)
         
-        # KAAV-3492: Check if this is a fake request - skip expensive operations
+        # Skip expensive operations for validation-only (fake) requests
         request = self.context.get('request', None)
         is_fake_request = getattr(request, "_fake", False) if request else False
 
@@ -782,8 +782,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 subtype = project.phase.project_subtype
             attribute_data['kaavaprosessin_kokoluokka'] = subtype.name
 
-        # Old versions not available for data from external APIs
-        # KAAV-3492: Skip expensive external API calls for fake validation requests
+        # Skip external API calls for validation-only requests
         if not snapshot and not is_fake_request:
             # Because it's user-configurable, this integration is
             # extremely prone to failure. Better fail this step
@@ -1427,13 +1426,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def _execute_pending_validation_operations(self, user):
         """
-        KAAV-3492 FIX: Execute database operations that were deferred from validation.
+        Execute database operations that were deferred from validation.
         
-        This method is called inside transaction.atomic() in update(), ensuring that
-        if the save fails, all these operations are rolled back.
-        
-        Previously, these operations happened during validate() BEFORE the transaction,
-        meaning if validation or save failed afterwards, DB was left in inconsistent state.
+        Called inside transaction.atomic() in update(), ensuring rollback on failure.
         """
         logger = logging.getLogger(__name__)
         
@@ -1598,7 +1593,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                         )
                         for f_attr in fieldset_attributes:
                             fieldset_path_str = f'{attribute_identifier}[{index}].{f_attr.attribute_target.identifier}'
-                            # KAAV-3492 FIX: Defer DB write until save() - don't modify DB during validation
+                            # Defer DB write until save()
                             fieldset_files_to_archive = self.context.setdefault('pending_fieldset_files_to_archive', [])
                             fieldset_files_to_archive.append({
                                 'project': self.instance,
@@ -1607,7 +1602,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                             })
 
                 if value is None:
-                    # KAAV-3492 FIX: Defer deadline deletion until save() - don't modify DB during validation
+                    # Defer deadline deletion until save()
                     try:
                         deadline = Deadline.objects.get(attribute=attribute, subtype=self.instance.subtype)
                         # Store for deletion during update(), not during validation
@@ -1796,11 +1791,11 @@ class ProjectSerializer(serializers.ModelSerializer):
             log.warning(", ".join(invalids))
 
 
-        # KAAV-3492 FIX: Defer file archiving until save() - don't modify DB during validation
+        # Defer file archiving until save()
         if files_to_archive:
             self.context['pending_files_to_archive'] = files_to_archive
 
-        # KAAV-3492 FIX: Defer deadline generated flag update until save() - don't modify DB during validation
+        # Defer deadline generated flag update until save()
         if self.instance:
             # Store the identifiers to update during save() instead of updating now
             self.context['pending_deadline_generated_update_keys'] = list(valid_attributes.keys())
@@ -1995,8 +1990,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         if onhold_changed:
             instance.onhold_at = timezone.now() if onhold else None
 
-        # KAAV-3492 FIX: Phase log creation moved INSIDE transaction.atomic() below
-        # Previously this was here and would persist even if save failed
+        # Phase log created inside transaction.atomic() below
 
         if subtype_changed or draft_principles_changed:
             #  Clear project from cache
@@ -2019,10 +2013,10 @@ class ProjectSerializer(serializers.ModelSerializer):
             except:
                 pass
 
-            # KAAV-3492 FIX: Execute deferred DB operations from validation (now inside transaction)
+            # Execute deferred DB operations from validation
             self._execute_pending_validation_operations(user)
 
-            # KAAV-3492 FIX: Phase log creation moved inside transaction (was outside before)
+            # Phase log creation (inside transaction for atomicity)
             if phase_changed:
                 ProjectPhaseLog.objects.create(
                     project=instance,

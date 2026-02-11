@@ -215,16 +215,13 @@ def find_stale_deadline_fields(attribute_data):
 
 def clean_stale_deadline_fields(attribute_data):
     """
-    Remove stale deadline date fields from attribute_data.
+    Clear deadline date fields when their visibility bool is False.
     
-    This function should be called during project save to prevent stale data
-    from being persisted when a deadline group is disabled.
-    
-    KAAV-3492: When a visibility bool is set to False, we should automatically
-    clear the associated deadline date fields to prevent stale data issues.
+    When a visibility bool is explicitly False, sets associated date fields to None
+    to prevent stale data from leaking through during dict merge.
     
     Args:
-        attribute_data (dict): The project's attribute_data dictionary (will be modified in-place)
+        attribute_data (dict): The project's attribute_data (modified in-place)
         
     Returns:
         int: Number of fields that were cleared
@@ -247,11 +244,7 @@ def clean_stale_deadline_fields(attribute_data):
         # Get date fields for this group
         date_fields = DEADLINE_GROUP_DATE_FIELDS.get(deadline_group, [])
         
-        # Clear stale date fields - ALWAYS add None values, even if field not in request
-        # KAAV-3492 FIX: We must ADD None values to request data so they override DB values
-        # during the later merge in get_preview_deadlines:
-        #   updated_attribute_data = {**self.attribute_data, **updated_attributes}
-        # If we only set None when field exists, dates not sent by frontend leak from DB
+        # Set None to override DB values during merge: {**db_data, **request_data}
         for field in date_fields:
             # Only count as cleared if value was non-None (for idempotency)
             if attribute_data.get(field) is not None:

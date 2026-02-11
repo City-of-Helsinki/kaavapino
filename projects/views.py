@@ -958,8 +958,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             logger.info(f"[VALIDATION ENTRY] Real save completed, response status: {response.status_code}")
             return response
         
-        # KAAV-3492: Simple fast-path for fake validation requests
-        # Just calculate preview deadlines and return them directly
+        # Fast path for validation-only (fake) requests
         logger.info("[VALIDATION FAKE] Processing fake request (fast path)")
         project = self.get_object()
         logger.info(f"[VALIDATION FAKE] Project: {project.name}, subtype: {project.subtype}")
