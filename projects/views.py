@@ -362,10 +362,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def attribute_data_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
         project = self.get_object()
         attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+        generated_attributes = Attribute.objects.filter(calculations__isnull=False)
         ignored = FieldSetAttribute.objects.all().values_list('attribute_target', flat=True)
         if not project.attribute_data:
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response(get_attribute_data_filtered_response(attributes, ignored, project))
+        return Response(get_attribute_data_filtered_response(attributes, generated_attributes, ignored, project))
 
     @action(
         methods=['get'],
@@ -373,7 +374,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def pino_numbers(self, request):
-        pino_numbers = Project.objects.values_list('pino_number', flat=True)
+        pino_numbers = Project.objects.filter(public=True).values_list('pino_number', flat=True)
         return Response(pino_numbers)
 
     @extend_schema(
@@ -868,7 +869,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def overview_on_map(self, request):
         valid_filters = self._get_valid_filters("filters_on_map")
         query = self._get_query(valid_filters)
-        queryset = Project.objects.filter(query, public=True, onhold=False)\
+        queryset = Project.objects.filter(query, public=True, onhold=False, archived=False)\
             .prefetch_related("phase", "phase__common_project_phase", "phase__project_subtype",
                               "subtype", "subtype__project_type",
                               "user",

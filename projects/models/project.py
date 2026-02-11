@@ -345,7 +345,8 @@ class Project(models.Model):
                 # Value errors are thrown for
                 calculated_value = 0
 
-            attribute_data[attribute.identifier] = calculated_value
+            if attribute_data.get(attribute.identifier, None) is None:
+                attribute_data[attribute.identifier] = calculated_value
 
     def _check_condition(self, deadline, preview_attributes={}):
         if not deadline.condition_attributes.exists():

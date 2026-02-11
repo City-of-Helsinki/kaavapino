@@ -774,7 +774,7 @@ def safe_float(value):
         return float(0)
 
 
-def get_attribute_data_filtered_response(attributes, ignored, project, use_cached=True):
+def get_attribute_data_filtered_response(attributes, generated_attributes, ignored, project, use_cached=True):
     cache_key = f'attribute_data_filtered_{project.pk}'
     response = cache.get(cache_key) if use_cached else None
 
@@ -783,6 +783,7 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
         attribute_data = project.attribute_data
         set_ad_data_in_attribute_data(attribute_data)
         set_geoserver_data_in_attribute_data(attribute_data)
+        project.update_generated_values(generated_attributes, attribute_data)
 
         for attribute in attributes.values():
             if not attribute.api_visibility or attribute.id in ignored:

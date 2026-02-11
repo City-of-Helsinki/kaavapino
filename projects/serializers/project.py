@@ -764,6 +764,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
         self._set_file_attributes(attribute_data, project, snapshot)
 
+        generated_attributes = Attribute.objects.filter(calculations__isnull=False)
+        project.update_generated_values(generated_attributes, attribute_data)
+
         if snapshot:
             try:
                 subtype = ProjectPhaseLog.objects.filter(
