@@ -467,14 +467,8 @@ class Project(models.Model):
                 prev_date,
                 distance.distance_from_previous,
             )
-            logger.info(f"[MIN DISTANCE] {deadline.attribute.identifier if deadline.attribute else 'unknown'}: "
-                        f"prev_date={prev_date}, distance={distance.distance_from_previous}, "
-                        f"date_type={distance.date_type}, min_target={min_candidate}")
         else:
             min_candidate = prev_date + datetime.timedelta(days=distance.distance_from_previous)
-            logger.info(f"[MIN DISTANCE] {deadline.attribute.identifier if deadline.attribute else 'unknown'}: "
-                        f"prev_date={prev_date}, distance={distance.distance_from_previous}, "
-                        f"no date_type, min_target={min_candidate}")
 
         if not min_candidate:
             return None
@@ -484,13 +478,8 @@ class Project(models.Model):
         return min_candidate
 
     def _enforce_distance_requirements(self, deadline, date, preview_attribute_data=None):
-        logger = logging.getLogger(__name__)
-        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
-        logger.info(f"[ENFORCE DISTANCE] Starting for {identifier}, input date={date}")
-        
         current_date = self._coerce_date_value(date)
         if not current_date:
-            logger.info(f"[ENFORCE DISTANCE] {identifier}: no current_date after coercion")
             return date
 
         combined_attributes = dict(self.attribute_data or {})
@@ -499,15 +488,11 @@ class Project(models.Model):
 
         for distance in deadline.distances_to_previous.all():
             conditions_ok = distance.check_conditions(combined_attributes)
-            logger.info(f"[ENFORCE DISTANCE] {identifier}: checking distance from {distance.previous_deadline.attribute.identifier if distance.previous_deadline and distance.previous_deadline.attribute else 'unknown'}, conditions_ok={conditions_ok}")
-            
             if not conditions_ok:
                 continue
 
             prev_date = self._resolve_deadline_date(distance.previous_deadline, preview_attribute_data)
             prev_date = self._coerce_date_value(prev_date)
-            logger.info(f"[ENFORCE DISTANCE] {identifier}: prev_date={prev_date}")
-            
             if not prev_date:
                 continue
 
@@ -517,10 +502,7 @@ class Project(models.Model):
                 continue
 
             if current_date < min_target:
-                logger.info(f"[ENFORCE DISTANCE] {identifier}: VIOLATION detected, moving from {current_date} to {min_target}")
                 current_date = min_target
-            else:
-                logger.info(f"[ENFORCE DISTANCE] {identifier}: distance OK, current={current_date} >= min_target={min_target}")
 
         # After distance checks, also snap to the deadline's date_type if one exists
         # This ensures lautakunta dates are always valid Tuesdays, even if the user
@@ -528,13 +510,12 @@ class Project(models.Model):
         if deadline.date_type and current_date:
             valid_date = deadline.date_type.get_closest_valid_date(current_date)
             if valid_date and valid_date != current_date:
-                logger.info(f"[ENFORCE DISTANCE] {identifier}: snapping to date_type from {current_date} to {valid_date}")
                 current_date = valid_date
 
+        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
         if preview_attribute_data is not None and identifier and current_date:
             preview_attribute_data[identifier] = current_date
         
-        logger.info(f"[ENFORCE DISTANCE] {identifier}: final enforced date={current_date}")
         return current_date
 
     def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data=None, confirmed_fields=None):
@@ -840,14 +821,6 @@ class Project(models.Model):
 
     # Calculate a preview schedule without saving anything
     def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
-        logger = logging.getLogger(__name__)
-        logger.info("="*80)
-        logger.info(f"[PREVIEW DEADLINES] get_preview_deadlines started for project: {self.name}")
-        logger.info(f"[PREVIEW DEADLINES] Subtype: {subtype}")
-        logger.info(f"[PREVIEW DEADLINES] Updated attributes keys: {list(updated_attributes.keys())}")
-        logger.info(f"[PREVIEW DEADLINES] Updated attributes: {updated_attributes}")
-        logger.info(f"[PREVIEW DEADLINES] Confirmed fields: {confirmed_fields}")
-        
         confirmed_fields = confirmed_fields or []
 
         # Use request values over DB values to avoid stale data
@@ -861,10 +834,8 @@ class Project(models.Model):
             # Use updated value from request if available, otherwise use database value
             if deadline.attribute and deadline.attribute.identifier in updated_attributes:
                 project_dls[deadline] = updated_attributes[deadline.attribute.identifier]
-                logger.info(f"[PREVIEW DEADLINES] Using request value for {deadline.attribute.identifier}: {updated_attributes[deadline.attribute.identifier]}")
             else:
                 project_dls[deadline] = dl.date
-        logger.info(f"[PREVIEW DEADLINES] Loaded {len(project_dls)} existing project deadlines")
 
         # List deadlines that would be created
         new_dls = {
@@ -875,14 +846,11 @@ class Project(models.Model):
             )
             if dl not in project_dls
         }
-        logger.info(f"[PREVIEW DEADLINES] Found {len(new_dls)} new deadlines to create")
 
         project_dls = {**new_dls, **project_dls}
-        logger.info(f"[PREVIEW DEADLINES] Total deadlines to process: {len(project_dls)}")
 
         # Update attribute-based deadlines
         updated_attribute_data = {**self.attribute_data, **updated_attributes}
-        logger.info(f"[PREVIEW DEADLINES] Combined attribute data has {len(updated_attribute_data)} keys")
 
         # Auto-enable visibility for new deadlines
         for dl in new_dls.keys():
@@ -948,18 +916,15 @@ class Project(models.Model):
         }
         
         actually_changed = set()
-        logger.info("[PREVIEW DEADLINES] Detecting actually changed attributes...")
         for key, new_value in updated_attributes.items():
             # Skip auto-calculated deadlines - they should always be recalculated
             if key in auto_calculated_identifiers:
-                logger.info(f"[PREVIEW DEADLINES] Skipping auto-calculated: {key}")
                 continue
             old_value = self.attribute_data.get(key)
             old_coerced = self._coerce_date_value(old_value) if old_value else None
             new_coerced = self._coerce_date_value(new_value) if new_value else None
             if old_coerced != new_coerced:
                 actually_changed.add(key)
-                logger.info(f"[PREVIEW DEADLINES] Changed: {key} from {old_coerced} to {new_coerced}")
 
         # When visibility bool changes False→True (group re-add), treat dates as "changed"
         # to ensure distance enforcement happens for re-added groups
@@ -1261,7 +1226,6 @@ class Project(models.Model):
         }
 
         for convergence_iteration in range(1, max_convergence_iterations + 1):
-            log.info(f"[CONVERGENCE] Iteration {convergence_iteration} starting")
             iteration_changes = set()
             
             # Step 1: Recalculate phase boundaries
@@ -1292,7 +1256,6 @@ class Project(models.Model):
                 # Update if different or if new value is set for the first time
                 if (new_date_coerced and old_date != new_date_coerced) or \
                    (new_date_coerced and not old_date):
-                    log.info(f"[CONVERGENCE] {identifier} recalculated: {old_date} -> {new_date_coerced}")
                     updated_attribute_data[identifier] = new_date_coerced
                     iteration_changes.add(identifier)
             
@@ -1331,12 +1294,10 @@ class Project(models.Model):
                         if confirmed_fields and identifier in confirmed_fields:
                             continue
 
-                        log.info(f"[CONVERGENCE CHECK] {identifier} violates distance rule (prev={prev_date}, min={min_target})")
                         cascade_queue.add(identifier)
                         break
 
             if cascade_queue:
-                log.info(f"[CONVERGENCE] Processing cascade queue: {len(cascade_queue)} items")
                 for cascade_iter in range(1, 11):
                     new_cascade_changes = set()
                     
@@ -1362,9 +1323,7 @@ class Project(models.Model):
                                 min_target = self._min_distance_target_date(prev_date, distance, changed_dl)
                                 if min_target and current_date < min_target:
                                     if confirmed_fields and changed_id in confirmed_fields:
-                                        log.info(f"[CONVERGENCE ENFORCE] Skipping confirmed {changed_id}")
                                         continue
-                                    log.info(f"[CONVERGENCE ENFORCE] {changed_id} from {current_date} to {min_target}")
                                     enforced = self._enforce_distance_requirements(changed_dl, min_target, updated_attribute_data)
                                     if enforced and enforced != current_date:
                                         updated_attribute_data[changed_id] = enforced
@@ -1399,9 +1358,7 @@ class Project(models.Model):
                             min_target = self._min_distance_target_date(current_date, distance, next_dl)
                             if min_target and next_date < min_target:
                                 if confirmed_fields and next_id in confirmed_fields:
-                                    log.info(f"[CONVERGENCE PUSH] Skipping confirmed {next_id}")
                                     continue
-                                log.info(f"[CONVERGENCE PUSH] Pushing {next_id} from {next_date} to {min_target} (because {changed_id} moved)")
                                 new_cascade_changes.add(next_id)
                                 iteration_changes.add(next_id)
                                 updated_attribute_data[next_id] = min_target
@@ -1413,7 +1370,6 @@ class Project(models.Model):
 
             # Check if converged
             if not iteration_changes:
-                log.info(f"[CONVERGENCE] Converged after {convergence_iteration} iteration(s)")
                 break
         
         if convergence_iteration >= max_convergence_iterations:
@@ -1423,22 +1379,6 @@ class Project(models.Model):
         for identifier, value in updated_attribute_data.items():
             if type(value) == bool:
                 project_dls[identifier] = value
-        
-        logger.info("="*80)
-        logger.info(f"[PREVIEW DEADLINES] get_preview_deadlines completed")
-        logger.info(f"[PREVIEW DEADLINES] Returning {len(project_dls)} items")
-        # Log first 10 deadline results for debugging
-        deadline_count = 0
-        for key, value in project_dls.items():
-            if hasattr(key, 'attribute') and key.attribute:
-                logger.info(f"[PREVIEW DEADLINES] Result: {key.attribute.identifier} = {value}")
-                deadline_count += 1
-                if deadline_count >= 10:
-                    logger.info(f"[PREVIEW DEADLINES] ... and {len(project_dls) - 10} more items")
-                    break
-            elif isinstance(key, str):
-                logger.info(f"[PREVIEW DEADLINES] Result (bool): {key} = {value}")
-        logger.info("="*80)
         
         return project_dls
 

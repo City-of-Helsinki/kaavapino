@@ -280,36 +280,52 @@ class Deadline(models.Model):
         return result
 
     def calculate_initial(self, project, preview_attributes={}, raw=False):
+        # Cache queryset to avoid repeated DB queries in convergence loops
+        if not hasattr(self, '_cached_initial_calculations'):
+            self._cached_initial_calculations = list(
+                self.initial_calculations.all().order_by('-index').select_related(
+                    "datecalculation",
+                    "datecalculation__base_date_attribute",
+                    "datecalculation__base_date_deadline",
+                    "datecalculation__base_date_deadline__attribute",
+                    "datecalculation__base_date_deadline__subtype",
+                    "datecalculation__base_date_deadline__phase",
+                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                    "datecalculation__base_date_deadline__phase__project_subtype"
+                ).prefetch_related("conditions", "not_conditions")
+            )
+        
         return self._calculate(
             project,
-            self.initial_calculations.all().order_by('-index').select_related("datecalculation",
-                                    "datecalculation__base_date_attribute",
-                                    "datecalculation__base_date_deadline",
-                                    "datecalculation__base_date_deadline__attribute",
-                                    "datecalculation__base_date_deadline__subtype",
-                                    "datecalculation__base_date_deadline__phase",
-                                    "datecalculation__base_date_deadline__phase__common_project_phase",
-                                    "datecalculation__base_date_deadline__phase__project_subtype")
-                    .prefetch_related("conditions", "not_conditions"),
+            self._cached_initial_calculations,
             self.date_type,
             preview_attributes,
             raw,
         )
 
     def calculate_updated(self, project, preview_attributes={}):
-        if self.update_calculations.exists():
+        # Cache queryset to avoid repeated DB queries in convergence loops
+        if not hasattr(self, '_cached_update_calculations'):
+            if self.update_calculations.exists():
+                self._cached_update_calculations = list(
+                    self.update_calculations.all().order_by('-index').select_related(
+                        "datecalculation",
+                        "datecalculation__base_date_attribute",
+                        "datecalculation__base_date_deadline",
+                        "datecalculation__base_date_deadline__attribute",
+                        "datecalculation__base_date_deadline__subtype",
+                        "datecalculation__base_date_deadline__phase",
+                        "datecalculation__base_date_deadline__phase__common_project_phase",
+                        "datecalculation__base_date_deadline__date_type"
+                    ).prefetch_related("conditions", "not_conditions")
+                )
+            else:
+                self._cached_update_calculations = None
+        
+        if self._cached_update_calculations:
             return self._calculate(
                 project,
-                self.update_calculations.all().order_by('-index')
-                    .select_related("datecalculation",
-                                    "datecalculation__base_date_attribute",
-                                    "datecalculation__base_date_deadline",
-                                    "datecalculation__base_date_deadline__attribute",
-                                    "datecalculation__base_date_deadline__subtype",
-                                    "datecalculation__base_date_deadline__phase",
-                                    "datecalculation__base_date_deadline__phase__common_project_phase",
-                                    "datecalculation__base_date_deadline__date_type")
-                    .prefetch_related("conditions", "not_conditions"),
+                self._cached_update_calculations,
                 self.date_type,
                 preview_attributes,
             )

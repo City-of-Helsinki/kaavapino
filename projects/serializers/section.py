@@ -290,12 +290,8 @@ def create_section_serializer(
     also on the input data field values and their relationship with
     other fields values.
     """
-    logger = logging.getLogger(__name__)
-    logger.info(f"[SECTION SERIALIZER] create_section_serializer called for {type(section).__name__}")
-
     request = context.get("request", None)
     is_fake_request = getattr(request, "_fake", False) if request else False
-    logger.info(f"[SECTION SERIALIZER] is_fake_request: {is_fake_request}")
     attribute_data = get_attribute_data(request, project)
 
     if not request:
@@ -322,7 +318,6 @@ def create_section_serializer(
             if is_relevant_attribute(section_attribute, attribute_data)
             and (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
-        logger.info(f"[SECTION SERIALIZER] ProjectPhaseSection: {len(section_attributes)} relevant attributes")
     elif isinstance(section, ProjectFloorAreaSection):
         section_attributes = [
             section_attribute.attribute
@@ -331,7 +326,6 @@ def create_section_serializer(
             if is_relevant_attribute(section_attribute, attribute_data)
             and (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
-        logger.info(f"[SECTION SERIALIZER] ProjectFloorAreaSection: {len(section_attributes)} relevant attributes")
     elif isinstance(section, ProjectPhaseDeadlineSection):
         section_attributes = [
             section_attribute.attribute
@@ -340,15 +334,11 @@ def create_section_serializer(
             .select_related("attribute").prefetch_related("attribute__deadline")
             if (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
-        logger.info(f"[SECTION SERIALIZER] ProjectPhaseDeadlineSection: {len(section_attributes)} relevant attributes")
     else:
-        logger.info(f"[SECTION SERIALIZER] Unknown section type: {type(section)}")
         return None
 
     serializer_fields = {}
-    logger.info(f"[SECTION SERIALIZER] Creating fields for {len(section_attributes)} attributes")
     for attribute in section_attributes:
-        logger.info(f"[SECTION SERIALIZER] Processing attribute: {attribute.identifier}, type: {attribute.value_type}")
         if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             field_data = create_fieldset_field_data(
                 attribute, validation, project, preview, is_fake_request=is_fake_request,
@@ -360,16 +350,13 @@ def create_section_serializer(
 
             if not field_data.field_class:
                 # TODO: Handle this by failing instead of continuing
-                logger.info(f"[SECTION SERIALIZER] No field_class for {attribute.identifier}, skipping")
                 continue
 
         serializer_field = field_data.field_class(**field_data.field_arguments)
         serializer_fields[attribute.identifier] = serializer_field
-        logger.info(f"[SECTION SERIALIZER] Created field for {attribute.identifier}: {field_data.field_class.__name__}")
 
     serializer = type("SectionSerializer", (serializers.Serializer,), {})
     serializer._declared_fields = serializer_fields
-    logger.info(f"[SECTION SERIALIZER] Created serializer with {len(serializer_fields)} fields")
 
     return serializer
 
