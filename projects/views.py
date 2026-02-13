@@ -939,10 +939,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
+        timeline_save = request.query_params.get('timeline_save', False)
         # Store the original confirmed_fields before calling update
         # should prevent confirmed fields from moving when updating or validating 
         confirmed_fields = request.data.get('confirmed_fields', [])
         original_attribute_data = request.data.get('attribute_data', {})
+        
+        log.warning(f"[DEBUG VIEWS] update() called. fake={fake}, timeline_save={timeline_save}")
+        log.warning(f"[DEBUG VIEWS] confirmed_fields={confirmed_fields}")
+        log.warning(f"[DEBUG VIEWS] attribute_data keys: {list(original_attribute_data.keys()) if original_attribute_data else 'EMPTY'}")
         
         if not fake:
             # Actual update logic that saves to db
@@ -950,6 +955,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         
         # Fast path for validation-only (fake) requests
         project = self.get_object()
+        log.warning("[DEBUG VIEWS] fake=true path: calling get_preview_deadlines for project %s", project.pk)
         
         # Get preview deadlines (corrected dates)
         preview = project.get_preview_deadlines(

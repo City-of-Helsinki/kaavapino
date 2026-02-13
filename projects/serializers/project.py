@@ -1350,14 +1350,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         # For timeline_save, include ALL deadline sections regardless of create_draft/create_principles
         # because the timeline view shows all phases
         timeline_save = self.context.get("timeline_save", False)
-        log.info(f"[DEBUG SCHEDULE_SECTIONS] phase={phase.name}, timeline_save={timeline_save}, deadline_sections_count={deadline_sections.count()}")
+        log.warning(f"[DEBUG SCHEDULE_SECTIONS] phase={phase.name}, timeline_save={timeline_save}, deadline_sections_count={deadline_sections.count()}")
         for section in deadline_sections:
-            log.info(f"[DEBUG SCHEDULE_SECTIONS] Processing section: {section.name}, phase={section.phase.name}")
+            log.warning(f"[DEBUG SCHEDULE_SECTIONS] Processing section: {section.name}, phase={section.phase.name}")
             if not timeline_save:
                 # Normal save: skip sections based on project settings
                 if section.phase.name == "Luonnos" and not self.instance.create_draft or (
                 section.phase.name == "Periaatteet" and not self.instance.create_principles):
-                    log.info(f"[DEBUG SCHEDULE_SECTIONS] SKIPPING section {section.name} due to create_draft/create_principles")
+                    log.warning(f"[DEBUG SCHEDULE_SECTIONS] SKIPPING section {section.name} due to create_draft/create_principles")
                     continue
             serializer_class = create_section_serializer(
                 section,
@@ -1374,6 +1374,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         # DEADLINE_INTEGRITY_RULES: Do NOT clear date fields when vis_bool=False.
         # Visibility controls UI display only, not data existence.
         # Dates must ALWAYS exist for cascade calculation.
+        
+        log.warning("[DEBUG VALIDATE] ProjectSerializer.validate() called")
+        log.warning(f"[DEBUG VALIDATE] attrs keys: {list(attrs.keys())}")
+        if 'attribute_data' in attrs:
+            log.warning(f"[DEBUG VALIDATE] attribute_data keys: {list(attrs['attribute_data'].keys()) if attrs.get('attribute_data') else 'NONE'}")
         
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
@@ -1519,6 +1524,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         return should_update_deadlines
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
+        log.warning("[DEBUG VALIDATE_DATA] _validate_attribute_data() called")
+        log.warning(f"[DEBUG VALIDATE_DATA] attribute_data keys: {list(attribute_data.keys()) if attribute_data else 'NONE'}")
+        log.warning(f"[DEBUG VALIDATE_DATA] validate_attributes keys: {list(validate_attributes.keys()) if validate_attributes else 'NONE'}")
+        
         attribute_cache = self.context.setdefault("attribute_cache", {})
         static_property_attributes = {}
         if self.instance:
@@ -1628,17 +1637,17 @@ class ProjectSerializer(serializers.ModelSerializer):
         
         preview = None
         timeline_save = self.context.get("timeline_save", False)
-        log.info(f"[DEBUG TIMELINE_SAVE] timeline_save={timeline_save}, type={type(timeline_save)}, should_update_deadlines={should_update_deadlines}")
+        log.warning(f"[DEBUG TIMELINE_SAVE] timeline_save={timeline_save}, type={type(timeline_save)}, should_update_deadlines={should_update_deadlines}")
         if self.instance and should_update_deadlines:
             if timeline_save:
                 # Timeline save: use RAW request values for validation (no cascade)
                 # This ensures validation catches actual distance violations
-                log.info(f"[DEBUG TIMELINE_SAVE] Using get_raw_deadline_preview for validation")
+                log.warning("[DEBUG TIMELINE_SAVE] Using get_raw_deadline_preview for validation")
                 preview = self.instance.get_raw_deadline_preview(
                     attribute_data,
                     subtype,
                 )
-                log.info(f"[DEBUG TIMELINE_SAVE] Raw preview has {len(preview) if preview else 0} keys")
+                log.warning(f"[DEBUG TIMELINE_SAVE] Raw preview has {len(preview) if preview else 0} keys")
             else:
                 # Normal save: use cascaded preview (existing behavior)
                 preview = self.instance.get_preview_deadlines(
@@ -1651,9 +1660,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         # Otherwise only current phase and upcoming phases are editable
         if timeline_save:
             # Timeline save: validate ALL phases (no exclusion)
-            log.info(f"[DEBUG TIMELINE_SAVE] Processing ALL phases for timeline validation")
+            log.warning("[DEBUG TIMELINE_SAVE] Processing ALL phases for timeline validation")
             for phase in ProjectPhase.objects.filter(project_subtype=subtype):
-                log.info(f"[DEBUG TIMELINE_SAVE] Processing phase: {phase.name} (index={phase.index})")
+                log.warning(f"[DEBUG TIMELINE_SAVE] Processing phase: {phase.name} (index={phase.index})")
                 sections_data += self.generate_sections_data(
                     phase=phase,
                     preview=preview,

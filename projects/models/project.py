@@ -444,17 +444,23 @@ class Project(models.Model):
 
         identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
         if identifier and preview_attribute_data and identifier in preview_attribute_data:
-            return self._coerce_date_value(preview_attribute_data[identifier])
+            val = preview_attribute_data[identifier]
+            log.warning("[DEBUG RESOLVE] '%s' from preview_attribute_data = %s", identifier, val)
+            return self._coerce_date_value(val)
 
         if identifier:
             attr_value = self.attribute_data.get(identifier)
             coerced_value = self._coerce_date_value(attr_value)
             if coerced_value:
+                log.warning("[DEBUG RESOLVE] '%s' from self.attribute_data = %s", identifier, coerced_value)
                 return coerced_value
 
         try:
-            return self.deadlines.get(deadline=deadline).date
+            dl_date = self.deadlines.get(deadline=deadline).date
+            log.warning("[DEBUG RESOLVE] '%s' from ProjectDeadline = %s", identifier, dl_date)
+            return dl_date
         except ProjectDeadline.DoesNotExist:
+            log.warning("[DEBUG RESOLVE] '%s' NOT FOUND in any source", identifier)
             return None
 
     def _min_distance_target_date(self, prev_date, distance, deadline):
@@ -501,10 +507,6 @@ class Project(models.Model):
                 continue
 
             if current_date < min_target:
-                # DEBUG: Log when target dates are being moved
-                if identifier in DEBUG_DATES:
-                    prev_id = getattr(getattr(distance.previous_deadline, "attribute", None), "identifier", None)
-                    log.warning(f"[DEBUG SAVE] _enforce_distance MOVING {identifier}: {current_date} -> {min_target} because prev={prev_id}:{prev_date}, distance={distance.distance_from_previous}")
                 current_date = min_target
 
         # Snap to the deadline's date_type if one exists
@@ -845,6 +847,11 @@ class Project(models.Model):
         return project_dls
 
     def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
+        log.warning("[DEBUG PREVIEW] get_preview_deadlines() called")
+        log.warning(f"[DEBUG PREVIEW] updated_attributes keys: {list(updated_attributes.keys()) if updated_attributes else 'NONE'}")
+        log.warning(f"[DEBUG PREVIEW] confirmed_fields: {confirmed_fields}")
+        log.warning(f"[DEBUG PREVIEW] subtype: {subtype}")
+        
         confirmed_fields = confirmed_fields or []
 
         # Use request values over DB values to avoid stale data
@@ -998,14 +1005,42 @@ class Project(models.Model):
                                 initial_date = self._coerce_date_value(sib_val)
                     
                     if initial_date:
+                        log.warning("[DEBUG RE-ENABLE] NEW deadline '%s': calculate_initial -> %s (was %s)", 
+                                    identifier, initial_date, current_date)
                         updated_attribute_data[identifier] = initial_date
                         project_dls[dl] = initial_date
+                
+                # RE-ENABLED deadlines (not new, but visibility just enabled): recalculate from predecessor
+                # using distances_to_previous. This fixes stale dates from previous disable.
+                elif dl not in new_dls and stored_date:
+                    # Recalculate this deadline from its predecessor(s) using distances_to_previous
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    recalc_target = None
+                    for dist in dl.distances_to_previous.all():
+                        if not dist.check_conditions(combined):
+                            continue
+                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
+                        prev_date = self._coerce_date_value(prev_date)
+                        if not prev_date:
+                            continue
+                        target = self._min_distance_target_date(prev_date, dist, dl)
+                        # Use FIRST matching predecessor (not MAX) for the deadline's own recalculation
+                        if target:
+                            recalc_target = target
+                            break
+                    
+                    if recalc_target and recalc_target != stored_date:
+                        log.warning("[DEBUG RE-ENABLE] RE-ENABLED deadline '%s': recalculated %s -> %s (from predecessor)", 
+                                    identifier, stored_date, recalc_target)
+                        updated_attribute_data[identifier] = recalc_target
+                        project_dls[dl] = recalc_target
 
                 # Re-enabled groups: treat dates as changed to trigger distance enforcement
                 actually_changed.add(identifier)
 
         # Recalculate deadlines with conditional predecessors referencing enabled vis_bools
         if vis_bools_enabled:
+            log.warning("[DEBUG CASCADE] vis_bools_enabled = %s", vis_bools_enabled)
             from projects.models.deadline import DeadlineDistanceConditionAttribute, Attribute as DlAttribute
             
             # Find all condition attributes that reference the enabled visibility booleans
@@ -1037,25 +1072,36 @@ class Project(models.Model):
                     
                     # Recalculate the minimum target date based on NEW active predecessors
                     combined = {**self.attribute_data, **updated_attribute_data}
+                    log.warning("[DEBUG CASCADE] Processing affected deadline '%s' BEFORE = %s", identifier, current_date)
                     max_target = None
                     
                     for dist in affected_dl.distances_to_previous.all():
-                        if not dist.check_conditions(combined):
+                        prev_id = dist.previous_deadline.attribute.identifier if dist.previous_deadline and dist.previous_deadline.attribute else "NO_ID"
+                        cond_result = dist.check_conditions(combined)
+                        log.warning("[DEBUG CASCADE]   -> predecessor '%s' check_conditions = %s (distance_id=%s)", prev_id, cond_result, dist.id)
+                        if not cond_result:
                             continue
                         prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
                         prev_date = self._coerce_date_value(prev_date)
+                        log.warning("[DEBUG CASCADE]      prev_date = %s, distance_days = %s", prev_date, getattr(dist, 'distance_from_previous', 'N/A'))
                         if not prev_date:
                             continue
                         target = self._min_distance_target_date(prev_date, dist, affected_dl)
+                        log.warning("[DEBUG CASCADE]      calculated target = %s (current max_target = %s)", target, max_target)
                         if target and (not max_target or target > max_target):
+                            log.warning("[DEBUG CASCADE]      ** UPDATING max_target from %s to %s **", max_target, target)
                             max_target = target
                     
                     # If current date is BEFORE new minimum, enforce forward
                     if max_target and current_date < max_target:
+                        log.warning("[DEBUG CASCADE] RESULT '%s': ENFORCED forward %s -> %s (delta = %s days)", 
+                                    identifier, current_date, max_target, (max_target - current_date).days)
                         updated_attribute_data[identifier] = max_target
                         project_dls[affected_dl] = max_target
                         actually_changed.add(identifier)
                     elif max_target and identifier not in actually_changed:
+                        log.warning("[DEBUG CASCADE] RESULT '%s': no enforcement needed (current %s >= max_target %s)", 
+                                    identifier, current_date, max_target)
                         actually_changed.add(identifier)
 
         for dl in project_dls.keys():
