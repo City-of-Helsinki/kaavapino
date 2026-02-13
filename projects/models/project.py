@@ -735,10 +735,10 @@ class Project(models.Model):
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None):
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None, timeline_save=False):
         # DEBUG LOGGING FOR SAVE
         DEBUG_DATES = ['kaavaluonnos_esillaolo_aineiston_maaraaika', 'ehdotus_nahtaville_aineiston_maaraaika']
-        log.warning(f"[DEBUG SAVE] update_deadlines called. preview_attributes keys: {list(preview_attributes.keys()) if preview_attributes else 'NONE'}")
+        log.warning(f"[DEBUG SAVE] update_deadlines called. timeline_save={timeline_save}, preview_attributes keys: {list(preview_attributes.keys()) if preview_attributes else 'NONE'}")
         for d in DEBUG_DATES:
             if d in preview_attributes:
                 log.warning(f"[DEBUG SAVE] {d} in preview_attributes = {preview_attributes.get(d)}")
@@ -797,7 +797,11 @@ class Project(models.Model):
         self.deadlines.bulk_update(dls_to_update, ['date'])
         
         # Calculate initial values for newly added deadlines
-        if generated_deadlines:
+        # BUT: Per docs/validation.md - during timeline_save, NO RECALCULATION.
+        # The frontend already received calculated dates from preview and is sending them.
+        # We just sync the values AS-IS without recalculating.
+        if generated_deadlines and not timeline_save:
+            log.warning(f"[DEBUG SAVE] Calculating {len(generated_deadlines)} generated deadlines (NOT timeline_save)")
             self._set_calculated_deadlines(
                 [
                     dl.deadline for dl in generated_deadlines
@@ -810,6 +814,8 @@ class Project(models.Model):
                 confirmed_fields=confirmed_fields,
                 timing_metrics=timing_metrics,
             )
+        elif generated_deadlines and timeline_save:
+            log.warning(f"[DEBUG SAVE] Skipping calculation for {len(generated_deadlines)} generated deadlines (timeline_save=True)")
 
         # Per docs/validation.md: During save (fake=false), NO RECALCULATION.
         # Validation already happened in get_deadline_validator().

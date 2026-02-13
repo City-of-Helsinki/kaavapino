@@ -1768,6 +1768,27 @@ class ProjectSerializer(serializers.ModelSerializer):
                 k: v for k, v in valid_attributes.items()
                 if k not in confirmed_deadlines
             }
+        
+        # For timeline_save: Accept ALL deadline attribute fields from the request.
+        # Phase boundary fields (e.g., ehdotusvaihe_paattyy_pvm) are Deadline.attribute entries
+        # but NOT included in deadline_sections. Without this, they'd be filtered out as invalid.
+        timeline_save = self.context.get("timeline_save", False)
+        if timeline_save and self.instance:
+            from projects.models import Deadline
+            # Get all deadline attribute identifiers for this project's subtype
+            deadline_attr_ids = set(
+                Deadline.objects.filter(
+                    attribute__isnull=False,
+                    subtype=self.instance.subtype,
+                ).values_list('attribute__identifier', flat=True)
+            )
+            # Add deadline fields from request to valid_attributes if not already there
+            for key, value in attribute_data.items():
+                if key in deadline_attr_ids and key not in valid_attributes:
+                    # Direct pass-through: no validation, just accept the value
+                    valid_attributes[key] = value
+                    log.warning(f"[DEBUG TIMELINE_SAVE] Added deadline attr to valid_attributes: {key}={value}")
+        
         # mostly invalid identifiers, but could be fieldset file fields
         unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
@@ -2068,11 +2089,15 @@ class ProjectSerializer(serializers.ModelSerializer):
                     timing_metrics=self.context.get("validation_metrics"),
                 )
             elif should_update_deadlines:
+                # Per docs/timeline_workflow.md and validation.md:
+                # For timeline_save, NO RECALCULATION - just sync frontend values AS-IS
+                timeline_save = self.context.get("timeline_save", False)
                 project.update_deadlines(
                     user=user,
                     preview_attributes=attribute_data,
                     confirmed_fields=confirmed_fields,
                     timing_metrics=self.context.get("validation_metrics"),
+                    timeline_save=timeline_save,
                 )
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
