@@ -837,8 +837,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ]
 
         if start_date or end_date:
-            start_date, end_date = self._parse_date_range(start_date, end_date)
-            print(start_date, end_date)
+            start_date, end_date, end_date_year = self._parse_date_range(start_date, end_date)
             start_query = Q()
             end_query = Q()
             for attr in date_range_attrs:
