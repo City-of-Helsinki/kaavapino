@@ -501,11 +501,13 @@ class Project(models.Model):
                 continue
 
             if current_date < min_target:
+                # DEBUG: Log when target dates are being moved
+                if identifier in DEBUG_DATES:
+                    prev_id = getattr(getattr(distance.previous_deadline, "attribute", None), "identifier", None)
+                    log.warning(f"[DEBUG SAVE] _enforce_distance MOVING {identifier}: {current_date} -> {min_target} because prev={prev_id}:{prev_date}, distance={distance.distance_from_previous}")
                 current_date = min_target
 
-        # After distance checks, also snap to the deadline's date_type if one exists
-        # This ensures lautakunta dates are always valid Tuesdays, even if the user
-        # selected a date that satisfies distance requirements but isn't a valid day
+        # Snap to the deadline's date_type if one exists
         if deadline.date_type and current_date:
             valid_date = deadline.date_type.get_closest_valid_date(current_date)
             if valid_date and valid_date != current_date:
@@ -589,6 +591,12 @@ class Project(models.Model):
                     default=str,
                 ))
                 new_value = json.loads(json.dumps(enforced_date, default=str))
+
+                # DEBUG: Log changes to problematic dates
+                if deadline.attribute.identifier in ['kaavaluonnos_esillaolo_aineiston_maaraaika', 'ehdotus_nahtaville_aineiston_maaraaika']:
+                    log.warning(f"[DEBUG SAVE] _set_calculated_deadline MODIFYING {deadline.attribute.identifier}: old={old_value} -> new={new_value}, preview={preview}")
+                    import traceback
+                    log.warning(f"[DEBUG SAVE] Traceback: {''.join(traceback.format_stack()[-6:-1])}")
 
                 self.update_attribute_data(
                     {deadline.attribute.identifier: enforced_date},
@@ -726,6 +734,14 @@ class Project(models.Model):
 
     # Generate or update schedule for project
     def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None):
+        # DEBUG LOGGING FOR SAVE
+        DEBUG_DATES = ['kaavaluonnos_esillaolo_aineiston_maaraaika', 'ehdotus_nahtaville_aineiston_maaraaika']
+        log.warning(f"[DEBUG SAVE] update_deadlines called. preview_attributes keys: {list(preview_attributes.keys()) if preview_attributes else 'NONE'}")
+        for d in DEBUG_DATES:
+            if d in preview_attributes:
+                log.warning(f"[DEBUG SAVE] {d} in preview_attributes = {preview_attributes.get(d)}")
+            if d in self.attribute_data:
+                log.warning(f"[DEBUG SAVE] {d} in attribute_data = {self.attribute_data.get(d)}")
         # CRITICAL: Use for_record_existence=True to get ALL deadlines for this subtype.
         # This ensures ProjectDeadline records are NEVER deleted just because a visibility
         # bool (condition_attribute) is False. Per docs/database_deadline_rules.md and
@@ -793,32 +809,41 @@ class Project(models.Model):
                 timing_metrics=timing_metrics,
             )
 
-        # Update automatic deadlines (phase boundaries, etc.)
-        # confirmed_fields protection in _set_calculated_deadline prevents confirmed dates from changing
-        self._set_calculated_deadlines(
-            [
-                dl.deadline for dl in self.deadlines.all()
-                    .select_related(
-                        "deadline", "deadline__attribute", "deadline__phase", 
-                        "deadline__phase__common_project_phase","deadline__phase__project_subtype", "deadline__subtype",
-                        "deadline__attribute", "deadline__date_type")
-                    .prefetch_related(
-                        "deadline__update_calculations"
-                    )
-                if any([
-                    dl.deadline.update_calculations.exists(),
-                    dl.deadline.default_to_created_at,
-                    dl.deadline.attribute
-                ])
-            ],
-            user,
-            initial=False,
-            preview_attribute_data=preview_attributes,
-            confirmed_fields=confirmed_fields,
-            timing_metrics=timing_metrics,
-        )
+        # Per docs/validation.md: During save (fake=false), NO RECALCULATION.
+        # Validation already happened in get_deadline_validator().
+        # Lines above synced frontend values to ProjectDeadline.date AS-IS.
+        # Save the project to persist the changes.
+        self.save()
 
     # Calculate a preview schedule without saving anything
+    def get_raw_deadline_preview(self, updated_attributes, subtype):
+        """
+        Build a preview dict with RAW request values - no cascade, no enforcement.
+        Used for timeline_save validation where we want to validate user's exact input.
+        
+        Returns dict with:
+        - Deadline objects as keys
+        - Raw date values from request (or DB for unchanged deadlines)
+        - String keys for visibility booleans
+        """
+        project_dls = {}
+        for dl in self.deadlines.filter(deadline__subtype=subtype) \
+            .select_related("deadline", "deadline__attribute"):
+            deadline = dl.deadline
+            # Use updated value from request if available, otherwise use database value
+            if deadline.attribute and deadline.attribute.identifier in updated_attributes:
+                project_dls[deadline] = updated_attributes[deadline.attribute.identifier]
+            else:
+                project_dls[deadline] = dl.date
+        
+        # Include visibility booleans and other attribute data
+        combined = {**self.attribute_data, **updated_attributes}
+        for key, value in combined.items():
+            if isinstance(key, str):
+                project_dls[key] = value
+        
+        return project_dls
+
     def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
         confirmed_fields = confirmed_fields or []
 
@@ -956,7 +981,6 @@ class Project(models.Model):
                 # Only apply calculate_initial() to truly NEW deadlines.
                 # Re-enabled deadlines use distances_to_previous, not initial_calculations.
                 if dl in new_dls and current_date and current_date == stored_date:
-                    
                     # UX80.4.2.3.3.2: Added element moves to initial distance (generoitu ehdotus)
                     # from its predecessor. Use calculate_initial() for the ADDED element only.
                     # The forward cascade will handle subsequent elements using distances_to_previous.
@@ -1295,7 +1319,7 @@ class Project(models.Model):
                         break
 
             if cascade_queue:
-                for cascade_iter in range(1, 11):
+                for _ in range(1, 11):
                     new_cascade_changes = set()
                     
                     for changed_id in cascade_queue:

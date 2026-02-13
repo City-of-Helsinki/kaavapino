@@ -324,6 +324,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["action"] = self.action
         context["confirmed_fields"] = self.request.data.get('confirmed_fields', [])
+        context["timeline_save"] = self.request.query_params.get('timeline_save', False)
 
         if self.action == "list":
             context["project_schedule_cache"] = \

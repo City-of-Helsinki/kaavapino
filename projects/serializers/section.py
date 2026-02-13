@@ -100,11 +100,17 @@ def get_regex_validator(attribute):
 
 def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
     def validate(value):
+        import logging
+        log = logging.getLogger(__name__)
+        log.info(f"[DEBUG VALIDATOR] Called for {attribute.identifier}, value={value}, preview={bool(preview)}, is_fake={is_fake_request}")
+        
         if not preview:
+            log.info(f"[DEBUG VALIDATOR] Skipping - no preview")
             return
 
         # Skip validation for fake requests - preview values will be applied instead
         if is_fake_request:
+            log.info(f"[DEBUG VALIDATOR] Skipping - fake request")
             return
         
         for attr_dl in attribute.deadline.filter(subtype=subtype) \
@@ -134,10 +140,13 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
             .select_related("previous_deadline", "date_type") \
             .prefetch_related("condition_attributes", "condition_attributes__attribute"):
                 prev_dl = preview.get(distance.previous_deadline)
+                log.info(f"[DEBUG VALIDATOR] Distance check: {attribute.identifier} -> prev={distance.previous_deadline}, prev_dl={prev_dl}, distance_req={distance.distance_from_previous}")
                 if not prev_dl:
+                    log.info(f"[DEBUG VALIDATOR] Skipping - no prev_dl found in preview. Preview keys: {[str(k) for k in list(preview.keys())[:10]]}")
                     continue
 
                 if not distance.check_conditions(preview):
+                    log.info(f"[DEBUG VALIDATOR] Skipping - conditions not met")
                     continue
 
                 default_error = _("Minimum distance to {distance.previous_deadline.abbreviation} not met").format(distance=distance)
@@ -161,7 +170,9 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
                             prev_dl,
                             distance.distance_from_previous,
                         )
+                    log.info(f"[DEBUG VALIDATOR] Comparing: value={value} vs valid_date={valid_date} (prev_dl={prev_dl}, distance={distance.distance_from_previous})")
                     if valid_date > value:
+                        log.info(f"[DEBUG VALIDATOR] VIOLATION DETECTED! Raising error")
                         raise ValidationError(
                             (attr_dl.error_min_distance_previous or default_error,
                             _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
@@ -169,6 +180,7 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
                 elif prev_dl + datetime.timedelta(
                     days=distance.distance_from_previous,
                 ) > value:
+                    log.info(f"[DEBUG VALIDATOR] VIOLATION DETECTED (no date_type)! prev_dl={prev_dl}, distance={distance.distance_from_previous}, value={value}")
                     if distance.date_type:
                         valid_date = distance.date_type.get_closest_valid_date(value)
                     else:

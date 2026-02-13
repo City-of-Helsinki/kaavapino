@@ -1341,14 +1341,24 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def generate_schedule_sections_data(self, phase, preview, validation=True):
+        import logging
+        log = logging.getLogger(__name__)
         sections = []
         deadline_sections = phase.deadline_sections.filter(
             attributes__identifier__in=self._get_keys()
         )
+        # For timeline_save, include ALL deadline sections regardless of create_draft/create_principles
+        # because the timeline view shows all phases
+        timeline_save = self.context.get("timeline_save", False)
+        log.info(f"[DEBUG SCHEDULE_SECTIONS] phase={phase.name}, timeline_save={timeline_save}, deadline_sections_count={deadline_sections.count()}")
         for section in deadline_sections:
-            if section.phase.name == "Luonnos" and not self.instance.create_draft or (
-            section.phase.name == "Periaatteet" and not self.instance.create_principles):
-                continue
+            log.info(f"[DEBUG SCHEDULE_SECTIONS] Processing section: {section.name}, phase={section.phase.name}")
+            if not timeline_save:
+                # Normal save: skip sections based on project settings
+                if section.phase.name == "Luonnos" and not self.instance.create_draft or (
+                section.phase.name == "Periaatteet" and not self.instance.create_principles):
+                    log.info(f"[DEBUG SCHEDULE_SECTIONS] SKIPPING section {section.name} due to create_draft/create_principles")
+                    continue
             serializer_class = create_section_serializer(
                 section,
                 context=self.context,
@@ -1617,27 +1627,57 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
         
         preview = None
+        timeline_save = self.context.get("timeline_save", False)
+        log.info(f"[DEBUG TIMELINE_SAVE] timeline_save={timeline_save}, type={type(timeline_save)}, should_update_deadlines={should_update_deadlines}")
         if self.instance and should_update_deadlines:
-            preview = self.instance.get_preview_deadlines(
-                attribute_data,
-                subtype,
-                self.context["confirmed_fields"],
-                timing_metrics=validation_metrics,
-            )
+            if timeline_save:
+                # Timeline save: use RAW request values for validation (no cascade)
+                # This ensures validation catches actual distance violations
+                log.info(f"[DEBUG TIMELINE_SAVE] Using get_raw_deadline_preview for validation")
+                preview = self.instance.get_raw_deadline_preview(
+                    attribute_data,
+                    subtype,
+                )
+                log.info(f"[DEBUG TIMELINE_SAVE] Raw preview has {len(preview) if preview else 0} keys")
+            else:
+                # Normal save: use cascaded preview (existing behavior)
+                preview = self.instance.get_preview_deadlines(
+                    attribute_data,
+                    subtype,
+                    self.context["confirmed_fields"],
+                    timing_metrics=validation_metrics,
+                )
         # Phase index 1 is always editable
         # Otherwise only current phase and upcoming phases are editable
-        for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
-            .exclude(index__range=[2, min_phase_index-1]):
-            sections_data += self.generate_sections_data(
-                phase=phase,
-                preview=preview,
-                validation=should_validate,
-            ) or []
-            sections_data += self.generate_schedule_sections_data(
-                phase=phase,
-                validation=should_validate,
-                preview=preview,
-            ) or []
+        if timeline_save:
+            # Timeline save: validate ALL phases (no exclusion)
+            log.info(f"[DEBUG TIMELINE_SAVE] Processing ALL phases for timeline validation")
+            for phase in ProjectPhase.objects.filter(project_subtype=subtype):
+                log.info(f"[DEBUG TIMELINE_SAVE] Processing phase: {phase.name} (index={phase.index})")
+                sections_data += self.generate_sections_data(
+                    phase=phase,
+                    preview=preview,
+                    validation=should_validate,
+                ) or []
+                sections_data += self.generate_schedule_sections_data(
+                    phase=phase,
+                    validation=should_validate,
+                    preview=preview,
+                ) or []
+        else:
+            # Normal save: only current phase and upcoming phases
+            for phase in ProjectPhase.objects.filter(project_subtype=subtype) \
+                .exclude(index__range=[2, min_phase_index-1]):
+                sections_data += self.generate_sections_data(
+                    phase=phase,
+                    preview=preview,
+                    validation=should_validate,
+                ) or []
+                sections_data += self.generate_schedule_sections_data(
+                    phase=phase,
+                    validation=should_validate,
+                    preview=preview,
+                ) or []
         sections_data += self.generate_floor_area_sections_data(
             floor_area_sections=ProjectFloorAreaSection.objects.filter(project_subtype=subtype),
             validation=should_validate,
@@ -1926,6 +1966,16 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
+        
+        # DEBUG: Log what attribute_data is being sent during save
+        DEBUG_DATES = ['kaavaluonnos_esillaolo_aineiston_maaraaika', 'ehdotus_nahtaville_aineiston_maaraaika']
+        log.warning(f"[DEBUG SAVE] ProjectSerializer.update called. attribute_data keys count: {len(attribute_data)}\"")
+        for d in DEBUG_DATES:
+            if d in attribute_data:
+                log.warning(f"[DEBUG SAVE] Saving {d} = {attribute_data.get(d)}\"")
+            else:
+                log.warning(f"[DEBUG SAVE] {d} NOT in attribute_data. Current in DB: {instance.attribute_data.get(d)}\"")
+        
         confirmed_fields = self.context["confirmed_fields"]
         onhold = validated_data.get("onhold")
         onhold_changed = onhold is not None and onhold != instance.onhold
