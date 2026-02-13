@@ -100,8 +100,6 @@ def get_regex_validator(attribute):
 
 def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
     def validate(value):
-        import logging
-        log = logging.getLogger(__name__)
         log.warning(f"[DEBUG VALIDATOR] Called for {attribute.identifier}, value={value}, preview={bool(preview)}, is_fake={is_fake_request}")
         
         if not preview:

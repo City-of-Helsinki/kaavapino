@@ -21,7 +21,6 @@ RULES FOLLOWED (per TESTING.md):
 - Include adversarial cases (empty conditions, no matches, multiple matches)
 - Integration boundary test: serializer ↔ database models
 """
-import datetime
 import pytest
 
 from projects.models import (
@@ -30,7 +29,6 @@ from projects.models import (
     Deadline,
     DeadlineDistance,
     DeadlineDistanceConditionAttribute,
-    Project,
     ProjectPhase,
     ProjectSubtype,
     ProjectType,

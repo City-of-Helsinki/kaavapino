@@ -1341,8 +1341,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         return sections
 
     def generate_schedule_sections_data(self, phase, preview, validation=True):
-        import logging
-        log = logging.getLogger(__name__)
         sections = []
         deadline_sections = phase.deadline_sections.filter(
             attributes__identifier__in=self._get_keys()
