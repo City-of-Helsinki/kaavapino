@@ -1012,7 +1012,8 @@ class Project(models.Model):
                 
                 # RE-ENABLED deadlines (not new, but visibility just enabled): recalculate from predecessor
                 # using distances_to_previous. This fixes stale dates from previous disable.
-                elif dl not in new_dls and stored_date:
+                # Only recalculate if current_date == stored_date (user hasn't moved it yet).
+                elif dl not in new_dls and stored_date and current_date == stored_date:
                     # Recalculate this deadline from its predecessor(s) using distances_to_previous
                     combined = {**self.attribute_data, **updated_attribute_data}
                     recalc_target = None
