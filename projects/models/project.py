@@ -783,6 +783,17 @@ class Project(models.Model):
                 project_deadlines.append(new_project_deadline)
         self.deadlines.set(project_deadlines)
 
+        # K1 = U1 sync: kaynnistysvaihe_alkaa_pvm always equals projektin_kaynnistys_pvm
+        # Per timeline_requirements.md line 899: K1's "Generoitu ehdotus" = U1
+        if self.attribute_data.get('projektin_kaynnistys_pvm'):
+            u1_value = self.attribute_data['projektin_kaynnistys_pvm']
+            self.attribute_data['kaynnistysvaihe_alkaa_pvm'] = u1_value
+            # Directly update K1's ProjectDeadline record (bypasses for loop that may skip it)
+            ProjectDeadline.objects.filter(
+                project=self,
+                deadline__abbreviation='K1'
+            ).update(date=u1_value)
+
         # Update attribute-based deadlines
         dls_to_update = []
         for dl in self.deadlines.all().select_related("deadline__attribute"):
@@ -888,6 +899,11 @@ class Project(models.Model):
 
         # Update attribute-based deadlines
         updated_attribute_data = {**self.attribute_data, **updated_attributes}
+
+        # K1 = U1 sync: kaynnistysvaihe_alkaa_pvm always equals projektin_kaynnistys_pvm
+        # Per timeline_requirements.md line 899: K1's "Generoitu ehdotus" = U1
+        if updated_attribute_data.get('projektin_kaynnistys_pvm'):
+            updated_attribute_data['kaynnistysvaihe_alkaa_pvm'] = updated_attribute_data['projektin_kaynnistys_pvm']
 
         # Auto-enable visibility for new deadlines
         for dl in new_dls.keys():
