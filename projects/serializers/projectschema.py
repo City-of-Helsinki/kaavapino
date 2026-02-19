@@ -382,12 +382,36 @@ class DeadlineAttributeSchemaSerializer(AttributeSchemaSerializer):
     initial_distance = serializers.SerializerMethodField()
 
     def _get_previous_deadline_distance(self, attribute):
-        subtype = self.context['project'].subtype
-        return DeadlineDistance.objects.filter(deadline__subtype=subtype, deadline__attribute=attribute).first()
+        """Get applicable previous deadline distance, checking conditions."""
+        project = self.context['project']
+        subtype = project.subtype
+        attribute_data = project.attribute_data or {}
+        
+        distances = DeadlineDistance.objects.filter(
+            deadline__subtype=subtype, 
+            deadline__attribute=attribute
+        ).order_by('index')
+        
+        for distance in distances:
+            if distance.check_conditions(attribute_data):
+                return distance
+        return None
 
     def _get_next_deadline_distance(self, attribute):
-        subtype = self.context['project'].subtype
-        return DeadlineDistance.objects.filter(deadline__subtype=subtype, previous_deadline__attribute=attribute).first()
+        """Get applicable next deadline distance, checking conditions."""
+        project = self.context['project']
+        subtype = project.subtype
+        attribute_data = project.attribute_data or {}
+        
+        distances = DeadlineDistance.objects.filter(
+            deadline__subtype=subtype, 
+            previous_deadline__attribute=attribute
+        ).order_by('index')
+        
+        for distance in distances:
+            if distance.check_conditions(attribute_data):
+                return distance
+        return None
 
     def get_date_type(self, attribute):
         subtype = self.context['project'].subtype

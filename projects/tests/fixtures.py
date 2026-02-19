@@ -376,3 +376,45 @@ def f_report(f_project_type):
     report_filter.reports.set([report])
 
     return report
+
+
+@pytest.fixture()
+def f_mock_project_with_methods():
+    """
+    Factory fixture for creating mock projects with Project methods bound.
+    
+    Usage:
+        def test_something(f_mock_project_with_methods):
+            mock_project = f_mock_project_with_methods(['_min_distance_target_date'])
+            # mock_project now has the actual _min_distance_target_date method from Project
+    """
+    from unittest.mock import Mock
+    from projects.models import Project
+    
+    def factory(methods=None, **kwargs):
+        """
+        Create a mock project with specified methods bound from the real Project class.
+        
+        Args:
+            methods: List of method names to bind from Project class
+            **kwargs: Additional attributes to set on the mock
+            
+        Returns:
+            Mock project with specified methods bound
+        """
+        mock_project = Mock(spec=Project)
+        
+        # Bind requested methods from Project class
+        if methods:
+            for method_name in methods:
+                if hasattr(Project, method_name):
+                    method = getattr(Project, method_name)
+                    setattr(mock_project, method_name, method.__get__(mock_project, Project))
+        
+        # Set any additional attributes
+        for key, value in kwargs.items():
+            setattr(mock_project, key, value)
+        
+        return mock_project
+    
+    return factory

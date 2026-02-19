@@ -83,3 +83,21 @@ pytest-factoryboy = "2.1.0"
 
 [tool.coverage.run]
 omit = ["*/migrations/*", "schema.py", "wsgi.py", "louhi.py", "manage.py", "*/tests/*"]
+
+[tool.coverage.report]
+# Coverage thresholds - fail CI if coverage drops below these
+fail_under = 30
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.pytest.ini_options]
+# Register custom markers
+markers = [
+    "unit: marks tests as unit tests (not requiring database)",
+    "integration: marks tests as integration tests (requiring database)",
+]
+addopts = "--reuse-db"
