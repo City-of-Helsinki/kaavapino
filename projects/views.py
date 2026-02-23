@@ -1575,6 +1575,14 @@ class ReportViewSet(ReadOnlyModelViewSet):
                     params.get(report_filter.identifier),
                     queryset=projects or Project.objects.all(),
                 ))
+        elif report.name == "Keskeytyneet projektit":
+            projects = Project.objects.filter(onhold=True, public=True)
+            for report_filter in filters:
+                projects = report_filter.filter_projects(
+                    params.get(report_filter.identifier),
+                    queryset=projects,
+                )
+            return projects
         else:
             projects = Project.objects.filter(onhold=False, public=True)
             for report_filter in filters:
