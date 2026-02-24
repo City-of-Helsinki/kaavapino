@@ -774,6 +774,32 @@ def safe_float(value):
         return float(0)
 
 
+def check_visibility(project, attribute):
+    visibility_conditions = attribute.visibility_conditions
+    if visibility_conditions is None:
+        return True
+
+    for condition in visibility_conditions:
+        try:
+            operator = condition["operator"]
+            variable = condition["variable"]
+            comparison_value = condition["comparison_value"]
+
+            attribute_data_value = project.attribute_data.get(variable, None)
+            if attribute_data_value is not None:
+                if operator == "==":
+                    if attribute_data_value == comparison_value:
+                        return True
+                elif operator == "!=":
+                    if attribute_data_value != comparison_value:
+                        return True
+        except Exception as ex:
+            log.error(f"Error on visibility check for attribute: {attribute.identifier}", ex)
+            return True
+
+    return False
+
+
 def get_attribute_data_filtered_response(attributes, generated_attributes, ignored, project, use_cached=True):
     cache_key = f'attribute_data_filtered_{project.pk}'
     response = cache.get(cache_key) if use_cached else None
@@ -794,6 +820,9 @@ def get_attribute_data_filtered_response(attributes, generated_attributes, ignor
 
             if not value:
                 response[identifier] = ""
+                continue
+
+            if not check_visibility(project, attribute):
                 continue
 
             if attribute.value_type == "fieldset":
