@@ -822,8 +822,9 @@ def get_attribute_data_filtered_response(attributes, generated_attributes, ignor
                 response[identifier] = ""
                 continue
 
-            if not check_visibility(project, attribute):
-                continue
+            # Temporarily disabled 04.03.2026 due to not all necessary fields showing
+            #if not check_visibility(project, attribute):
+            #    continue
 
             if attribute.value_type == "fieldset":
                 fieldset = []
@@ -864,8 +865,8 @@ def get_attribute_data_filtered_response(attributes, generated_attributes, ignor
 
         # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
         url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
-        response["projektin_nimi"] = project.name
-        response["pinonumero"] = project.pino_number
+        #response["projektin_nimi"] = project.name
+        #response["pinonumero"] = project.pino_number
         response["projektin_osoite"] = url
         response["onhold"] = project.onhold
         response["onhold_at"] = project.onhold_at.strftime("%d.%m.%Y %H:%M:%S") if project.onhold_at else ""
