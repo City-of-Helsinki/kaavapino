@@ -79,55 +79,30 @@ def get_attribute_subtitle(target_identifier, target_phase_id, project):
     except ProjectPhaseSectionAttribute.DoesNotExist:
         return None
 
-def get_first_editable_phase(project, attribute, target_attribute):
-    def is_editable_in_phase(phase, attribute):
-        if not attribute:
-            return False
-        categorization = attribute.categorizations.filter(
-                        common_project_phase=phase.common_project_phase,
-                        includes_principles=project.create_principles,
-                        includes_draft=project.create_draft
-                    ).first()
-        return categorization and not (
-            "katsottava tieto" in categorization.value.lower() or 
-            "päivitettävä tieto in " in categorization.value.lower())
-    target_identifier = target_attribute.identifier if target_attribute else None
-    use_target_attribute = False
 
-    if is_editable_in_phase(project.phase, attribute) or is_editable_in_phase(project.phase, target_attribute):
-        return get_closest_phase(project, attribute.identifier, target_identifier)
-    # If field appears in multiple sections, find the first occurance where it is editable
-    phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=attribute.identifier,
-        project_subtype=project.subtype,).order_by("index")
-    if not phase_queryset:
-        # use target_attribute if regular not found (likely inside fieldset)
-        phase_queryset = ProjectPhase.objects.filter(sections__attributes__identifier=target_identifier,
-        project_subtype=project.subtype,).order_by("index")
-        use_target_attribute = True
-    for phase in phase_queryset:
-        if is_editable_in_phase(phase, target_attribute if use_target_attribute else attribute):
-            return phase
-    return get_closest_phase(project, attribute.identifier, target_identifier)
-
-
-def get_closest_phase(project, identifier, parent_identifier=None):
-    if parent_identifier == "vastuuhenkilo_nimi":
-        parent_identifier = "vastuuhenkilo_nimi_readonly"
-    phases = ProjectPhase.objects.filter(
-        sections__attributes__identifier=identifier,
-        project_subtype=project.subtype,
-    ).order_by("index")
-    #If not found in the current identifier, check the parent
-    if not phases and parent_identifier is not None:
-        phases = ProjectPhase.objects.filter(
-            sections__attributes__identifier=parent_identifier,
-            project_subtype=project.subtype,
-        ).order_by("index")
-    # Returning the closest open phase if found,
-    # otherwise return the last phase when the attribute
-    # was editable
-    phase = phases.filter(index__gte=project.phase.index).first()
-    return phase or phases.reverse().first()
+'''
+Returns the phase id and section name in the following priority order:
+1. Current phase if attribute exists
+2. Käynnistys-phase if attribute exists there (always editable)
+3. First future phase where attribute exists, if current phase doesn't include the attribute
+4. First past phase where attribute exists, if no future phase includes the attribute (non-editable)
+'''
+def get_phase_id_and_section_name(project, attribute, phase_attributes):
+    candidates = []
+    for phase_id, sections in phase_attributes.items():
+        for section_name, attributes in sections.items():
+            if attribute and attribute.identifier in attributes:
+                candidates.append((phase_id, section_name))
+    first_phase_id = list(phase_attributes.keys())[0]
+    first_phase_candidate = (None, None)
+    for candidate in candidates:
+        if candidate[0] == first_phase_id:
+            first_phase_candidate = candidate
+        if candidate[0] == project.phase.id:
+            return candidate
+        if candidate[0] > project.phase.id:
+            return first_phase_candidate if (first_phase_candidate[0] != None) else candidate
+    return candidates[0] if candidates else (None, None)
 
 
 def get_rich_text_display_value(value, preview=False, **text_args):
@@ -252,18 +227,18 @@ def render_template(project, document_template, preview):
             cache.set(f"document_template_variables:{doc.template_file.path}", variables, 3600*24*7)
 
         base_qs = Attribute.objects.filter(identifier__in=variables).prefetch_related(
-            'fieldsets', 'categorizations', 'fieldset_attributes',
-            'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+            'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets',
+            'projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
         )
         # Collect identifiers for nested fieldset attributes
         fieldset_attrs = [a for a in base_qs if a.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]]
         nested_ids = set()
         for attr in fieldset_attrs:
-            nested_ids.update(attr.fieldset_attributes.values_list('identifier', flat=True))
+            nested_ids.update(a.identifier for a in attr.fieldset_attributes.all())
         if nested_ids:
             nested_qs = Attribute.objects.filter(identifier__in=nested_ids).prefetch_related(
-                'fieldsets', 'categorizations', 'fieldset_attributes',
-                'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+                'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets',
+                'projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
             )
             return list(base_qs) + list(nested_qs)
         else:
@@ -281,6 +256,14 @@ def render_template(project, document_template, preview):
     attribute_element_data = {}
     relevant_attributes = {a.identifier: a for a in 
                            (fetch_relevant_attributes(doc) if doc else Attribute.objects.all())}
+    phases_sections_dict = {}
+    for phase in ProjectPhase.objects.filter(project_subtype=project.subtype)\
+        .order_by("index").all().prefetch_related("sections__attributes"):
+        section_object = {}
+        for section in phase.sections.all():
+            section_object[section.name] = [attr.identifier for attr in section.attributes.all()]
+        phases_sections_dict[phase.id] = section_object
+
     def get_display_and_raw_value(attribute, value, ignore_multiple_choice=False):
         empty = False
         text_args = None
@@ -359,9 +342,9 @@ def render_template(project, document_template, preview):
         else:
             if preview:
                 target_property = None
+                target_attribute = None
 
                 if attribute.static_property and not attribute.static_property == "pino_number":
-                    target_attribute = None
                     target_property = attribute.static_property
                 else:
                     target_attribute = get_top_level_attribute(attribute)
@@ -371,8 +354,9 @@ def render_template(project, document_template, preview):
                 target_identifier = target_attribute.identifier if target_attribute else None
                 if target_identifier:
                     try:
-                        target_phase_id = get_first_editable_phase(project, attribute, target_attribute).id
-                        target_section_name = get_attribute_subtitle(target_identifier, target_phase_id, project)
+                        target_phase_id, target_section_name = get_phase_id_and_section_name(
+                            project, target_attribute, phases_sections_dict
+                        )
                     except AttributeError:
                         pass
 
