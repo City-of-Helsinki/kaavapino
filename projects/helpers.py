@@ -770,7 +770,6 @@ def safe_float(value):
     try:
         return float(value)
     except Exception as exc:
-        log.error(f"Error on safe_float for value: {value}", exc)
         return float(0)
 
 
