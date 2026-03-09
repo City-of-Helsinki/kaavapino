@@ -235,18 +235,16 @@ def render_template(project, document_template, preview):
             cache.set(f"document_template_variables:{doc.template_file.path}", variables, 3600*24*7)
 
         base_qs = Attribute.objects.filter(identifier__in=variables).prefetch_related(
-            'fieldsets', 'categorizations', 'fieldset_attributes',
-            'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+            'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets', 'projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
         )
         # Collect identifiers for nested fieldset attributes
         fieldset_attrs = [a for a in base_qs if a.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]]
         nested_ids = set()
         for attr in fieldset_attrs:
-            nested_ids.update(attr.fieldset_attributes.values_list('identifier', flat=True))
+            nested_ids.update(a.identifier for a in attr.fieldset_attributes.all())
         if nested_ids:
             nested_qs = Attribute.objects.filter(identifier__in=nested_ids).prefetch_related(
-                'fieldsets', 'categorizations', 'fieldset_attributes',
-                'fieldset_attributes__fieldsets', 'fieldset_attributes__categorizations',
+                'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets','projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
             )
             return list(base_qs) + list(nested_qs)
         else:
