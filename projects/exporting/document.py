@@ -88,19 +88,11 @@ Returns the phase id and section name in the following priority order:
 4. First past phase where attribute exists, if no future phase includes the attribute (non-editable)
 '''
 def get_phase_id_and_section_name(project, attribute, phase_attributes):
-    
-    if not attribute:
-        return None, None
-
     candidates = []
     for phase_id, sections in phase_attributes.items():
         for section_name, attributes in sections.items():
-            if attribute.identifier in attributes:
+            if attribute and attribute.identifier in attributes:
                 candidates.append((phase_id, section_name))
-
-    if not candidates:
-        return None, None
-
     first_phase_id = list(phase_attributes.keys())[0]
     first_phase_candidate = (None, None)
     for candidate in candidates:
@@ -110,7 +102,7 @@ def get_phase_id_and_section_name(project, attribute, phase_attributes):
             return candidate
         if candidate[0] > project.phase.id:
             return first_phase_candidate if (first_phase_candidate[0] != None) else candidate
-    return candidates[0]
+    return candidates[0] if candidates else (None, None)
 
 
 def get_rich_text_display_value(value, preview=False, **text_args):
@@ -235,7 +227,8 @@ def render_template(project, document_template, preview):
             cache.set(f"document_template_variables:{doc.template_file.path}", variables, 3600*24*7)
 
         base_qs = Attribute.objects.filter(identifier__in=variables).prefetch_related(
-            'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets', 'projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
+            'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets',
+            'projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
         )
         # Collect identifiers for nested fieldset attributes
         fieldset_attrs = [a for a in base_qs if a.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]]
@@ -244,7 +237,8 @@ def render_template(project, document_template, preview):
             nested_ids.update(a.identifier for a in attr.fieldset_attributes.all())
         if nested_ids:
             nested_qs = Attribute.objects.filter(identifier__in=nested_ids).prefetch_related(
-                'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets','projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
+                'fieldsets', 'fieldset_attributes', 'fieldset_attributes__fieldsets',
+                'projectfloorareasectionattribute_set', 'projectphasedeadlinesectionattribute_set',
             )
             return list(base_qs) + list(nested_qs)
         else:
@@ -263,7 +257,8 @@ def render_template(project, document_template, preview):
     relevant_attributes = {a.identifier: a for a in 
                            (fetch_relevant_attributes(doc) if doc else Attribute.objects.all())}
     phases_sections_dict = {}
-    for phase in ProjectPhase.objects.filter(project_subtype=project.subtype).order_by("index").all().prefetch_related("sections__attributes"):
+    for phase in ProjectPhase.objects.filter(project_subtype=project.subtype)\
+        .order_by("index").all().prefetch_related("sections__attributes"):
         section_object = {}
         for section in phase.sections.all():
             section_object[section.name] = [attr.identifier for attr in section.attributes.all()]
@@ -359,7 +354,9 @@ def render_template(project, document_template, preview):
                 target_identifier = target_attribute.identifier if target_attribute else None
                 if target_identifier:
                     try:
-                        target_phase_id, target_section_name = get_phase_id_and_section_name(project, target_attribute, phases_sections_dict)
+                        target_phase_id, target_section_name = get_phase_id_and_section_name(
+                            project, target_attribute, phases_sections_dict
+                        )
                     except AttributeError:
                         pass
 
