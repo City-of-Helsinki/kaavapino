@@ -1,5 +1,7 @@
+import datetime
 import itertools
 import logging
+import time
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
@@ -272,8 +274,9 @@ class Project(models.Model):
         self.attribute_data = {}
         self.update_attribute_data(data)
 
-    def update_attribute_data(self, data, confirmed_fields=None, fake=False):
+    def update_attribute_data(self, data, confirmed_fields=None, fake=False, attribute_cache=None):
         confirmed_fields = confirmed_fields or []
+        attribute_cache = attribute_cache or {}
 
         if not isinstance(self.attribute_data, dict):
             self.attribute_data = {}
@@ -281,15 +284,24 @@ class Project(models.Model):
         if not data:
             return False
 
+        identifiers_to_fetch = [
+            identifier
+            for identifier in data.keys()
+            if isinstance(identifier, str) and identifier not in attribute_cache
+        ]
+        if identifiers_to_fetch:
+            fetched_attributes = Attribute.objects.filter(
+                identifier__in=identifiers_to_fetch
+            ).prefetch_related("value_choices")
+            attribute_cache.update({attr.identifier: attr for attr in fetched_attributes})
+
         for identifier, value in data.items():
-            try:
-                attribute = Attribute.objects.get(identifier=identifier)
-            except Attribute.DoesNotExist:
+            attribute = attribute_cache.get(identifier)
+            if not attribute:
                 log.warning(f"Attribute {identifier} not found")
                 continue
 
-            if identifier in confirmed_fields:
-                continue  # Skip silently a value that is in confirmed_fields they should not move because already confirmed
+
 
             self.attribute_data[identifier] = value
             if attribute.value_type == Attribute.TYPE_GEOMETRY:
@@ -359,7 +371,18 @@ class Project(models.Model):
 
         return False
 
-    def get_applicable_deadlines(self, subtype=None, preview_attributes={}, initial=False):
+    def get_applicable_deadlines(self, subtype=None, preview_attributes={}, initial=False, for_record_existence=False):
+        """Get deadlines applicable to this project.
+        
+        Args:
+            subtype: Override project subtype
+            preview_attributes: Attributes for preview calculation
+            initial: If True, include all deadlines (initial project creation)
+            for_record_existence: If True, return ALL deadlines for subtype, ignoring
+                condition_attributes. Used by update_deadlines() to ensure ProjectDeadline
+                records are never deleted just because a visibility bool is False.
+                Per docs: E2.2 must ALWAYS exist so it can appear when vis_bool becomes True.
+        """
         excluded_phases = []
 
         # TODO hard-coded, maybe change later
@@ -377,10 +400,16 @@ class Project(models.Model):
                 .prefetch_related('initial_calculations') \
                 .prefetch_related('update_calculations') \
 
+        # for_record_existence=True: return ALL deadlines (for creating/keeping ProjectDeadline records)
+        # initial=True: same behavior (initial project creation)
+        # Otherwise: filter by condition_attributes (for visibility/calculation checks)
+        if for_record_existence or initial:
+            return list(deadlines)
+        
         return [
             deadline
             for deadline in deadlines
-            if initial or self._check_condition(deadline, preview_attributes)
+            if self._check_condition(deadline, preview_attributes)
         ]
 
     def is_deadline_applicable(self, deadline, preview_attributes={}):
@@ -392,7 +421,112 @@ class Project(models.Model):
             return False
         return self._check_condition(deadline, preview_attributes)
 
-    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data={}, confirmed_fields={}):
+    def _coerce_date_value(self, value):
+        if value is None:
+            return None
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        if isinstance(value, datetime.date):
+            return value
+        if isinstance(value, str):
+            try:
+                return datetime.date.fromisoformat(value)
+            except ValueError:
+                try:
+                    return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+                except ValueError:
+                    return None
+        return None
+
+    def _resolve_deadline_date(self, deadline, preview_attribute_data=None):
+        if not deadline:
+            return None
+
+        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
+        if identifier and preview_attribute_data and identifier in preview_attribute_data:
+            val = preview_attribute_data[identifier]
+            log.warning("[DEBUG RESOLVE] '%s' from preview_attribute_data = %s", identifier, val)
+            return self._coerce_date_value(val)
+
+        if identifier:
+            attr_value = self.attribute_data.get(identifier)
+            coerced_value = self._coerce_date_value(attr_value)
+            if coerced_value:
+                log.warning("[DEBUG RESOLVE] '%s' from self.attribute_data = %s", identifier, coerced_value)
+                return coerced_value
+
+        try:
+            dl_date = self.deadlines.get(deadline=deadline).date
+            log.warning("[DEBUG RESOLVE] '%s' from ProjectDeadline = %s", identifier, dl_date)
+            return dl_date
+        except ProjectDeadline.DoesNotExist:
+            log.warning("[DEBUG RESOLVE] '%s' NOT FOUND in any source", identifier)
+            return None
+
+    def _min_distance_target_date(self, prev_date, distance, deadline):
+        if not prev_date:
+            return None
+
+        if distance.date_type:
+            min_candidate = distance.date_type.valid_days_from(
+                prev_date,
+                distance.distance_from_previous,
+            )
+        else:
+            min_candidate = prev_date + datetime.timedelta(days=distance.distance_from_previous)
+
+        if not min_candidate:
+            return None
+
+        if deadline.date_type:
+            return deadline.date_type.get_closest_valid_date(min_candidate)
+        return min_candidate
+
+    def _enforce_distance_requirements(self, deadline, date, preview_attribute_data=None):
+        current_date = self._coerce_date_value(date)
+        if not current_date:
+            return date
+
+        combined_attributes = dict(self.attribute_data or {})
+        if preview_attribute_data:
+            combined_attributes.update(preview_attribute_data)
+
+        for distance in deadline.distances_to_previous.all():
+            conditions_ok = distance.check_conditions(combined_attributes)
+            if not conditions_ok:
+                continue
+
+            prev_date = self._resolve_deadline_date(distance.previous_deadline, preview_attribute_data)
+            prev_date = self._coerce_date_value(prev_date)
+            if not prev_date:
+                continue
+
+            min_target = self._min_distance_target_date(prev_date, distance, deadline)
+            
+            if not min_target:
+                continue
+
+            if current_date < min_target:
+                current_date = min_target
+
+        # Snap to the deadline's date_type if one exists
+        if deadline.date_type and current_date:
+            valid_date = deadline.date_type.get_closest_valid_date(current_date)
+            if valid_date and valid_date != current_date:
+                current_date = valid_date
+
+        identifier = getattr(getattr(deadline, "attribute", None), "identifier", None)
+        if preview_attribute_data is not None and identifier and current_date:
+            preview_attribute_data[identifier] = current_date
+        
+        return current_date
+
+    def _set_calculated_deadline(self, deadline, date, user, preview, preview_attribute_data=None, confirmed_fields=None):
+        if preview_attribute_data is None:
+            preview_attribute_data = {}
+        if confirmed_fields is None:
+            confirmed_fields = {}
+        
         if not date:
             return None
         try:
@@ -406,34 +540,72 @@ class Project(models.Model):
             else:
                 project_deadline = ProjectDeadline.objects.get(project=self, deadline=deadline)
         except ProjectDeadline.DoesNotExist:
-            return
+            return None
 
         if project_deadline:
             if deadline.attribute and deadline.attribute.identifier:
-                # Check if the attribute is in confirmed_fields - if so, use the value from preview_attribute_data instead
+                # Check if the attribute is in confirmed_fields - if so, keep the original value
+                identifier = deadline.attribute.identifier
+                # Check if the attribute is in confirmed_fields - if so, keep the original value
                 identifier = deadline.attribute.identifier
                 if identifier in confirmed_fields:
-                    return date # Don't allow editing confirmed fields
+                    # Confirmed fields: prefer request value (may be fresher than DB)
+                    if preview and preview_attribute_data and identifier in preview_attribute_data:
+                        val = preview_attribute_data.get(identifier)
+                        return val
+                    
+                    val = self.attribute_data.get(identifier)
+                    return val
 
-                # Prioritize value from preview_attribute_data over calculated value
-                date = preview_attribute_data[identifier] if identifier in preview_attribute_data else date
+                # Auto-calculated fields (edit_privilege=None) always recalculate.
+                # User-editable fields use preview value to avoid overwriting user input.
+                is_auto_calculated = deadline.edit_privilege is None
+                if preview and preview_attribute_data and identifier in preview_attribute_data and not is_auto_calculated:
+                    preview_val = preview_attribute_data.get(identifier)
+                    if preview_val is not None:
+                        # Use the preview value, enforce it, and return
+                        enforced_date = self._enforce_distance_requirements(
+                            deadline,
+                            preview_val,
+                            preview_attribute_data,
+                        )
+                        return enforced_date
+
+            enforced_date = self._enforce_distance_requirements(
+                deadline,
+                date,
+                preview_attribute_data if preview else None,
+            )
 
             if preview or not project_deadline.editable:
-                return date
+                return enforced_date
 
-            if not project_deadline.date == date:
-                project_deadline.date = date
+            if project_deadline.date != enforced_date:
+                project_deadline.date = enforced_date
                 project_deadline.save()
 
             if deadline.attribute:
+                # DEADLINE_INTEGRITY_RULES: Dates must ALWAYS exist in attribute_data
+                # for cascade calculation. Visibility bool controls UI display only,
+                # not data existence. Never skip writing dates based on vis_bool.
                 old_value = json.loads(json.dumps(
                     self.attribute_data.get(deadline.attribute.identifier),
                     default=str,
                 ))
-                new_value = json.loads(json.dumps(date, default=str))
+                new_value = json.loads(json.dumps(enforced_date, default=str))
 
-                self.update_attribute_data( \
-                    {deadline.attribute.identifier: date})
+                # DEBUG: Log changes to problematic dates
+                if deadline.attribute.identifier in ['kaavaluonnos_esillaolo_aineiston_maaraaika', 'ehdotus_nahtaville_aineiston_maaraaika']:
+                    log.warning(f"[DEBUG SAVE] _set_calculated_deadline MODIFYING {deadline.attribute.identifier}: old={old_value} -> new={new_value}, preview={preview}")
+                    import traceback
+                    log.warning(f"[DEBUG SAVE] Traceback: {''.join(traceback.format_stack()[-6:-1])}")
+
+                self.update_attribute_data(
+                    {deadline.attribute.identifier: enforced_date},
+                    attribute_cache={
+                        deadline.attribute.identifier: deadline.attribute
+                    },
+                )
 
                 if old_value != new_value:
                     action.send(
@@ -445,14 +617,67 @@ class Project(models.Model):
                         old_value=old_value,
                         new_value=new_value,
                     )
+            return enforced_date
 
-            return date
+        return None
 
-    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data={}, is_recursing=False, confirmed_fields={}):
+    def _set_calculated_deadlines(self, deadlines, user, ignore=None, initial=False, preview=False, preview_attribute_data=None, is_recursing=False, confirmed_fields=None, calculation_cache=None, timing_metrics=None, user_changed_fields=None):
+        if preview_attribute_data is None:
+            preview_attribute_data = {}
+        if confirmed_fields is None:
+            confirmed_fields = {}
         if ignore is None:
             ignore = []
+        if user_changed_fields is None:
+            user_changed_fields = set()
+        calc_start = time.monotonic() if timing_metrics is not None else None
         results = {}
         fillers = []
+        
+        def _cache_key_for(deadline_obj):
+            if not (preview and calculation_cache is not None):
+                return None
+            preview_scope = id(preview_attribute_data) if preview_attribute_data else 0
+            return (deadline_obj.pk, initial, preview_scope)
+
+        def _process_deadline(deadline_obj, calculate_deadline_fn):
+            cache_key = _cache_key_for(deadline_obj)
+            if cache_key and cache_key in calculation_cache:
+                cached_value = calculation_cache[cache_key]
+                if cached_value is not None:
+                    return cached_value
+
+            # User-changed deadlines: enforce distances only, don't recalculate.
+            # Auto-calculated deadlines (phase boundaries): always recalculate.
+            identifier = deadline_obj.attribute.identifier if deadline_obj.attribute else None
+            is_auto_calculated = deadline_obj.edit_privilege is None
+            if identifier and identifier in user_changed_fields and not is_auto_calculated:
+                user_value = preview_attribute_data.get(identifier)
+                if user_value is not None:
+                    enforced = self._enforce_distance_requirements(
+                        deadline_obj,
+                        user_value,
+                        preview_attribute_data,
+                    )
+                    if cache_key and enforced is not None:
+                        calculation_cache[cache_key] = enforced
+                    return enforced
+
+            computed_date = calculate_deadline_fn(self, preview_attributes=preview_attribute_data)
+            
+            result = self._set_calculated_deadline(
+                deadline_obj,
+                computed_date,
+                user,
+                preview,
+                preview_attribute_data,
+                confirmed_fields=confirmed_fields,
+            )
+
+            if cache_key and result is not None:
+                calculation_cache[cache_key] = result
+
+            return result
 
         for deadline in deadlines:
             if initial:
@@ -478,18 +703,14 @@ class Project(models.Model):
                         preview=preview,
                         preview_attribute_data=preview_attribute_data,
                         is_recursing=True,
-                        confirmed_fields=confirmed_fields
+                        confirmed_fields=confirmed_fields,
+                        calculation_cache=calculation_cache,
+                        timing_metrics=timing_metrics,
+                        user_changed_fields=user_changed_fields,
                     )
                 }
 
-            result = self._set_calculated_deadline(
-                deadline,
-                calculate_deadline(self, preview_attributes=preview_attribute_data),
-                user,
-                preview,
-                preview_attribute_data,
-                confirmed_fields=confirmed_fields
-            )
+            result = _process_deadline(deadline, calculate_deadline)
             if not result:
                 fillers += [deadline]
 
@@ -502,25 +723,36 @@ class Project(models.Model):
             else:
                 calculate_deadline = deadline.calculate_updated
 
-            self._set_calculated_deadline(
-                deadline,
-                calculate_deadline(self, preview_attributes=preview_attribute_data),
-                user,
-                preview,
-                preview_attribute_data,
-                confirmed_fields=confirmed_fields
-            )
+            _process_deadline(deadline, calculate_deadline)
 
-        if not is_recursing:
+        if not is_recursing and not preview:
             self.save()
+
+        if calc_start is not None:
+            elapsed = time.monotonic() - calc_start
+            timing_metrics["deadline_calc"] = timing_metrics.get("deadline_calc", 0.0) + elapsed
 
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}):
-        deadlines = self.get_applicable_deadlines(initial=initial, preview_attributes=preview_attributes)
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None, timeline_save=False):
+        # DEBUG LOGGING FOR SAVE
+        DEBUG_DATES = ['kaavaluonnos_esillaolo_aineiston_maaraaika', 'ehdotus_nahtaville_aineiston_maaraaika']
+        log.warning(f"[DEBUG SAVE] update_deadlines called. timeline_save={timeline_save}, preview_attributes keys: {list(preview_attributes.keys()) if preview_attributes else 'NONE'}")
+        for d in DEBUG_DATES:
+            if d in preview_attributes:
+                log.warning(f"[DEBUG SAVE] {d} in preview_attributes = {preview_attributes.get(d)}")
+            if d in self.attribute_data:
+                log.warning(f"[DEBUG SAVE] {d} in attribute_data = {self.attribute_data.get(d)}")
+        # CRITICAL: Use for_record_existence=True to get ALL deadlines for this subtype.
+        # This ensures ProjectDeadline records are NEVER deleted just because a visibility
+        # bool (condition_attribute) is False. Per docs/database_deadline_rules.md and
+        # docs/validation.md: E2.2 must ALWAYS exist so it can appear when nähtävilläolo-2
+        # is enabled. Deleting records would break the "add back" functionality.
+        deadlines = self.get_applicable_deadlines(for_record_existence=True, preview_attributes=preview_attributes)
 
-        # Delete no longer relevant deadlines and create missing
+        # Delete only deadlines that are truly inapplicable (wrong subtype or excluded phase)
+        # NOT deadlines that are just hidden due to condition_attributes (vis_bool=False)
         to_be_deleted = self.deadlines.exclude(deadline__in=deadlines)
 
         for dl in to_be_deleted:
@@ -551,6 +783,17 @@ class Project(models.Model):
                 project_deadlines.append(new_project_deadline)
         self.deadlines.set(project_deadlines)
 
+        # K1 = U1 sync: kaynnistysvaihe_alkaa_pvm always equals projektin_kaynnistys_pvm
+        # Per timeline_requirements.md line 899: K1's "Generoitu ehdotus" = U1
+        if self.attribute_data.get('projektin_kaynnistys_pvm'):
+            u1_value = self.attribute_data['projektin_kaynnistys_pvm']
+            self.attribute_data['kaynnistysvaihe_alkaa_pvm'] = u1_value
+            # Directly update K1's ProjectDeadline record (bypasses for loop that may skip it)
+            ProjectDeadline.objects.filter(
+                project=self,
+                deadline__abbreviation='K1'
+            ).update(date=u1_value)
+
         # Update attribute-based deadlines
         dls_to_update = []
         for dl in self.deadlines.all().select_related("deadline__attribute"):
@@ -563,55 +806,84 @@ class Project(models.Model):
                 dl.date = value
                 dls_to_update.append(dl)
         self.deadlines.bulk_update(dls_to_update, ['date'])
-        # Calculate automatic values for newly added deadlines
-        self._set_calculated_deadlines(
-            [
-                dl.deadline for dl in generated_deadlines
-                if dl.deadline.initial_calculations.exists() \
-                    or dl.deadline.default_to_created_at
-            ],
-            user,
-            initial=True,
-            preview_attribute_data=preview_attributes,
-            confirmed_fields=confirmed_fields
-        )
+        
+        # Calculate initial values for newly added deadlines
+        # BUT: Per docs/validation.md - during timeline_save, NO RECALCULATION.
+        # The frontend already received calculated dates from preview and is sending them.
+        # We just sync the values AS-IS without recalculating.
+        if generated_deadlines and not timeline_save:
+            log.warning(f"[DEBUG SAVE] Calculating {len(generated_deadlines)} generated deadlines (NOT timeline_save)")
+            self._set_calculated_deadlines(
+                [
+                    dl.deadline for dl in generated_deadlines
+                    if dl.deadline.initial_calculations.exists() \
+                        or dl.deadline.default_to_created_at
+                ],
+                user,
+                initial=True,
+                preview_attribute_data=preview_attributes,
+                confirmed_fields=confirmed_fields,
+                timing_metrics=timing_metrics,
+            )
+        elif generated_deadlines and timeline_save:
+            log.warning(f"[DEBUG SAVE] Skipping calculation for {len(generated_deadlines)} generated deadlines (timeline_save=True)")
 
-        # Update automatic deadlines
-        self._set_calculated_deadlines(
-            [
-                dl.deadline for dl in self.deadlines.all()
-                    .select_related(
-                        "deadline", "deadline__attribute", "deadline__phase", 
-                        "deadline__phase__common_project_phase","deadline__phase__project_subtype", "deadline__subtype",
-                        "deadline__attribute", "deadline__date_type")
-                    .prefetch_related(
-                        "deadline__update_calculations"
-                    )
-                if any([
-                    dl.deadline.update_calculations.exists(),
-                    dl.deadline.default_to_created_at,
-                    dl.deadline.attribute
-                ])
-            ],
-            user,
-            initial=False,
-            preview_attribute_data=preview_attributes,
-            confirmed_fields=confirmed_fields
-        )
+        # Per docs/validation.md: During save (fake=false), NO RECALCULATION.
+        # Validation already happened in get_deadline_validator().
+        # Lines above synced frontend values to ProjectDeadline.date AS-IS.
+        # Save the project to persist the changes.
+        self.save()
 
     # Calculate a preview schedule without saving anything
-    def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None):
+    def get_raw_deadline_preview(self, updated_attributes, subtype):
+        """
+        Build a preview dict with RAW request values - no cascade, no enforcement.
+        Used for timeline_save validation where we want to validate user's exact input.
+        
+        Returns dict with:
+        - Deadline objects as keys
+        - Raw date values from request (or DB for unchanged deadlines)
+        - String keys for visibility booleans
+        """
+        project_dls = {}
+        for dl in self.deadlines.filter(deadline__subtype=subtype) \
+            .select_related("deadline", "deadline__attribute"):
+            deadline = dl.deadline
+            # Use updated value from request if available, otherwise use database value
+            if deadline.attribute and deadline.attribute.identifier in updated_attributes:
+                project_dls[deadline] = updated_attributes[deadline.attribute.identifier]
+            else:
+                project_dls[deadline] = dl.date
+        
+        # Include visibility booleans and other attribute data
+        combined = {**self.attribute_data, **updated_attributes}
+        for key, value in combined.items():
+            if isinstance(key, str):
+                project_dls[key] = value
+        
+        return project_dls
+
+    def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
+        log.warning("[DEBUG PREVIEW] get_preview_deadlines() called")
+        log.warning(f"[DEBUG PREVIEW] updated_attributes keys: {list(updated_attributes.keys()) if updated_attributes else 'NONE'}")
+        log.warning(f"[DEBUG PREVIEW] confirmed_fields: {confirmed_fields}")
+        log.warning(f"[DEBUG PREVIEW] subtype: {subtype}")
+        
         confirmed_fields = confirmed_fields or []
 
-        # Filter out deadlines that would be deleted
-        project_dls = {
-            dl.deadline: dl.date
-            for dl in self.deadlines.filter(deadline__subtype=subtype)
+        # Use request values over DB values to avoid stale data
+        project_dls = {}
+        for dl in self.deadlines.filter(deadline__subtype=subtype) \
             .select_related(
                 "deadline", "deadline__phase", "deadline__phase__common_project_phase", "deadline__phase__project_subtype",
-                "deadline__subtype", "deadline__attribute", "deadline__date_type")
-            .prefetch_related("deadline__initial_calculations","deadline__update_calculations")
-        }
+                "deadline__subtype", "deadline__attribute", "deadline__date_type") \
+            .prefetch_related("deadline__initial_calculations","deadline__update_calculations"):
+            deadline = dl.deadline
+            # Use updated value from request if available, otherwise use database value
+            if deadline.attribute and deadline.attribute.identifier in updated_attributes:
+                project_dls[deadline] = updated_attributes[deadline.attribute.identifier]
+            else:
+                project_dls[deadline] = dl.date
 
         # List deadlines that would be created
         new_dls = {
@@ -627,44 +899,577 @@ class Project(models.Model):
 
         # Update attribute-based deadlines
         updated_attribute_data = {**self.attribute_data, **updated_attributes}
+
+        # K1 = U1 sync: kaynnistysvaihe_alkaa_pvm always equals projektin_kaynnistys_pvm
+        # Per timeline_requirements.md line 899: K1's "Generoitu ehdotus" = U1
+        if updated_attribute_data.get('projektin_kaynnistys_pvm'):
+            updated_attribute_data['kaynnistysvaihe_alkaa_pvm'] = updated_attribute_data['projektin_kaynnistys_pvm']
+
+        # Auto-enable visibility for new deadlines
+        for dl in new_dls.keys():
+            if dl.deadlinegroup:
+                vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+                if vis_bool and vis_bool not in updated_attribute_data:
+                    updated_attribute_data[vis_bool] = True
+        
+        # Respect explicit visibility booleans from frontend (False=deletion).
+        # Don't auto-enable secondary slots (_2,_3,_4) when primary (_1) is disabled.
+        # First, collect which primary vis_bools are explicitly disabled
+        explicitly_disabled_primary = set()
+        for key, value in updated_attributes.items():
+            if key.endswith('_1') and value is False:
+                # Extract base name (e.g. "periaatteet_lautakuntaan" from "periaatteet_lautakuntaan_1")
+                base_name = key[:-2]  # Remove "_1"
+                explicitly_disabled_primary.add(base_name)
+        
+        for dl in project_dls.keys():
+            if not dl.deadlinegroup:
+                continue
+            vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+            if not vis_bool:
+                continue
+            
+            # If frontend explicitly sent this visibility boolean, respect it - don't override
+            if vis_bool in updated_attributes:
+                continue
+            
+            # Check if this is a secondary slot (_2, _3, _4) whose primary (_1) was explicitly disabled
+            if len(vis_bool) >= 2 and vis_bool[-2] == '_' and vis_bool[-1] in '234':
+                base_name = vis_bool[:-2]  # Remove "_2", "_3", or "_4"
+                if base_name in explicitly_disabled_primary:
+                    continue
+            
+            # Check if date is being provided for this deadline in updated_attributes
+            # BUT: Only auto-enable if the visibility was PREVIOUSLY True in the project.
+            # If it was False, don't auto-enable just because the date exists.
+            if dl.attribute:
+                date_value = updated_attributes.get(dl.attribute.identifier)
+                current_vis = updated_attribute_data.get(vis_bool)
+                # Check what the STORED visibility was before this request
+                stored_vis = self.attribute_data.get(vis_bool)
+                if date_value and not current_vis:
+                    # Only auto-enable if it was previously visible (True) or not yet set (None)
+                    # If it was explicitly False in the database, keep it False
+                    if stored_vis is False:
+                        continue
+                    # Date is being set for a disabled group - enable it
+                    updated_attribute_data[vis_bool] = True
+
+        # KAAV-3517: Determine which deadlines actually CHANGED value (not just sent by frontend)
+        # The frontend sends all deadline values, but we only want to enforce distances
+        # on deadlines where the user actually moved them (value differs from current)
+        #
+        # PHASE BOUNDARY FIX: Auto-calculated deadlines (edit_privilege is None) should NEVER
+        # be added to actually_changed. Per AT1.2.1/AT1.2.3, users cannot edit phase start/end
+        # dates - they move automatically. The frontend sends stale values for these, but we
+        # must always recalculate them, not treat them as user changes.
+        auto_calculated_identifiers = {
+            dl.attribute.identifier for dl in project_dls.keys()
+            if dl.attribute and dl.edit_privilege is None
+        }
+        
+        actually_changed = set()
+        for key, new_value in updated_attributes.items():
+            # Skip auto-calculated deadlines - they should always be recalculated
+            if key in auto_calculated_identifiers:
+                continue
+            old_value = self.attribute_data.get(key)
+            old_coerced = self._coerce_date_value(old_value) if old_value else None
+            new_coerced = self._coerce_date_value(new_value) if new_value else None
+            if old_coerced != new_coerced:
+                actually_changed.add(key)
+
+        # When visibility bool changes False→True (group re-add), treat dates as "changed"
+        # to ensure distance enforcement happens for re-added groups
+        vis_bools_enabled = set()
+        for key, new_value in updated_attributes.items():
+            old_value = self.attribute_data.get(key)
+            # Check if this is a visibility bool that changed from False/None to True
+            if isinstance(new_value, bool) and new_value is True and old_value is not True:
+                vis_bools_enabled.add(key)
+        
+        # For each deadline, if its visibility bool was just enabled, mark its date as "changed"
+        for dl in sorted(project_dls.keys(), key=lambda x: x.index):
+            if not dl.deadlinegroup or not dl.attribute:
+                continue
+            vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+            if vis_bool and vis_bool in vis_bools_enabled:
+                identifier = dl.attribute.identifier
+                
+                # UX80.5.3.7: Confirmed deadlines must never move automatically
+                if identifier in confirmed_fields:
+                    continue
+                
+                # Check for stale date: Group enabled, but date matches stored value
+                current_val = updated_attribute_data.get(identifier)
+                stored_val = self.attribute_data.get(identifier)
+                
+                current_date = self._coerce_date_value(current_val)
+                stored_date = self._coerce_date_value(stored_val)
+                
+                # Only apply calculate_initial() to truly NEW deadlines.
+                # Re-enabled deadlines use distances_to_previous, not initial_calculations.
+                if dl in new_dls and current_date and current_date == stored_date:
+                    # UX80.4.2.3.3.2: Added element moves to initial distance (generoitu ehdotus)
+                    # from its predecessor. Use calculate_initial() for the ADDED element only.
+                    # The forward cascade will handle subsequent elements using distances_to_previous.
+                    initial_date = dl.calculate_initial(self, preview_attributes=updated_attribute_data)
+                    
+                    # SPECIAL CASE (AT1.5.3): Opinions deadline ("viimeistaan_mielipiteet")
+                    # defaults to matching "esillaolo_paattyy" if no initial_calculations exist
+                    if not initial_date and "viimeistaan_mielipiteet" in identifier:
+                        # Find sibling "esillaolo_paattyy" in same group
+                        sibling = next((d for d in project_dls.keys() if d.deadlinegroup == dl.deadlinegroup and "esillaolo_paattyy" in (d.attribute.identifier if d.attribute else "")), None)
+                        if sibling and sibling.attribute:
+                            sib_id = sibling.attribute.identifier
+                            sib_val = updated_attribute_data.get(sib_id) or self.attribute_data.get(sib_id)
+                            if sib_val:
+                                initial_date = self._coerce_date_value(sib_val)
+                    
+                    if initial_date:
+                        log.warning("[DEBUG RE-ENABLE] NEW deadline '%s': calculate_initial -> %s (was %s)", 
+                                    identifier, initial_date, current_date)
+                        updated_attribute_data[identifier] = initial_date
+                        project_dls[dl] = initial_date
+                
+                # RE-ENABLED deadlines (not new, but visibility just enabled): recalculate from predecessor
+                # using distances_to_previous. This fixes stale dates from previous disable.
+                # Only recalculate if current_date == stored_date (user hasn't moved it yet).
+                elif dl not in new_dls and stored_date and current_date == stored_date:
+                    # Recalculate this deadline from its predecessor(s) using distances_to_previous
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    recalc_target = None
+                    for dist in dl.distances_to_previous.all():
+                        if not dist.check_conditions(combined):
+                            continue
+                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
+                        prev_date = self._coerce_date_value(prev_date)
+                        if not prev_date:
+                            continue
+                        target = self._min_distance_target_date(prev_date, dist, dl)
+                        # Use FIRST matching predecessor (not MAX) for the deadline's own recalculation
+                        if target:
+                            recalc_target = target
+                            break
+                    
+                    if recalc_target and recalc_target != stored_date:
+                        log.warning("[DEBUG RE-ENABLE] RE-ENABLED deadline '%s': recalculated %s -> %s (from predecessor)", 
+                                    identifier, stored_date, recalc_target)
+                        updated_attribute_data[identifier] = recalc_target
+                        project_dls[dl] = recalc_target
+
+                # Re-enabled groups: treat dates as changed to trigger distance enforcement
+                actually_changed.add(identifier)
+
+        # Recalculate deadlines with conditional predecessors referencing enabled vis_bools
+        if vis_bools_enabled:
+            log.warning("[DEBUG CASCADE] vis_bools_enabled = %s", vis_bools_enabled)
+            from projects.models.deadline import DeadlineDistanceConditionAttribute, Attribute as DlAttribute
+            
+            # Find all condition attributes that reference the enabled visibility booleans
+            condition_attrs = DeadlineDistanceConditionAttribute.objects.filter(
+                attribute__identifier__in=vis_bools_enabled
+            ).select_related('attribute').prefetch_related(
+                'deadline_distances',
+                'deadline_distances__deadline',
+                'deadline_distances__deadline__attribute',
+                'deadline_distances__previous_deadline',
+                'deadline_distances__previous_deadline__attribute',
+            )
+            
+            # Collect all deadlines affected by these conditional distance rules
+            for cond_attr in condition_attrs:
+                for distance in cond_attr.deadline_distances.all():
+                    affected_dl = distance.deadline
+                    if not affected_dl or not affected_dl.attribute:
+                        continue
+                    if affected_dl not in project_dls:
+                        continue
+                    
+                    identifier = affected_dl.attribute.identifier
+                    current_val = updated_attribute_data.get(identifier)
+                    current_date = self._coerce_date_value(current_val)
+                    
+                    if not current_date:
+                        continue
+                    
+                    # Recalculate the minimum target date based on NEW active predecessors
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    log.warning("[DEBUG CASCADE] Processing affected deadline '%s' BEFORE = %s", identifier, current_date)
+                    max_target = None
+                    
+                    for dist in affected_dl.distances_to_previous.all():
+                        prev_id = dist.previous_deadline.attribute.identifier if dist.previous_deadline and dist.previous_deadline.attribute else "NO_ID"
+                        cond_result = dist.check_conditions(combined)
+                        log.warning("[DEBUG CASCADE]   -> predecessor '%s' check_conditions = %s (distance_id=%s)", prev_id, cond_result, dist.id)
+                        if not cond_result:
+                            continue
+                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
+                        prev_date = self._coerce_date_value(prev_date)
+                        log.warning("[DEBUG CASCADE]      prev_date = %s, distance_days = %s", prev_date, getattr(dist, 'distance_from_previous', 'N/A'))
+                        if not prev_date:
+                            continue
+                        target = self._min_distance_target_date(prev_date, dist, affected_dl)
+                        log.warning("[DEBUG CASCADE]      calculated target = %s (current max_target = %s)", target, max_target)
+                        if target and (not max_target or target > max_target):
+                            log.warning("[DEBUG CASCADE]      ** UPDATING max_target from %s to %s **", max_target, target)
+                            max_target = target
+                    
+                    # If current date is BEFORE new minimum, enforce forward
+                    if max_target and current_date < max_target:
+                        log.warning("[DEBUG CASCADE] RESULT '%s': ENFORCED forward %s -> %s (delta = %s days)", 
+                                    identifier, current_date, max_target, (max_target - current_date).days)
+                        updated_attribute_data[identifier] = max_target
+                        project_dls[affected_dl] = max_target
+                        actually_changed.add(identifier)
+                    elif max_target and identifier not in actually_changed:
+                        log.warning("[DEBUG CASCADE] RESULT '%s': no enforcement needed (current %s >= max_target %s)", 
+                                    identifier, current_date, max_target)
+                        actually_changed.add(identifier)
+
         for dl in project_dls.keys():
             if not dl.attribute:
                 continue
 
             value = updated_attribute_data.get(dl.attribute.identifier)
+            identifier = dl.attribute.identifier
 
             if value:
-                project_dls[dl] = value
+                # Only enforce distances on deadlines that actually changed AND violate minimum
+                if identifier in actually_changed:
+                    current_date = self._coerce_date_value(value)
+                    needs_enforcement = False
+
+                    if current_date:
+                        for distance in dl.distances_to_previous.all():
+                            combined = {**self.attribute_data, **updated_attribute_data}
+                            if not distance.check_conditions(combined):
+                                continue
+                            prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                            prev_date = self._coerce_date_value(prev_date)
+                            if not prev_date:
+                                continue
+                            min_target = self._min_distance_target_date(prev_date, distance, dl)
+                            if min_target and current_date < min_target:
+                                needs_enforcement = True
+                                break
+
+                    if needs_enforcement:
+                        enforced_value = self._enforce_distance_requirements(
+                            dl,
+                            value,
+                            preview_attribute_data=updated_attribute_data,
+                        )
+                        project_dls[dl] = enforced_value
+                        if enforced_value and enforced_value != value:
+                            updated_attribute_data[dl.attribute.identifier] = enforced_value
+                    else:
+                        # Snap to valid date_type even when distance is satisfied
+                        snapped_value = value
+                        if dl.date_type:
+                            coerced = self._coerce_date_value(value)
+                            if coerced:
+                                valid_date = dl.date_type.get_closest_valid_date(coerced)
+                                if valid_date and valid_date != coerced:
+                                    snapped_value = valid_date
+                                    updated_attribute_data[dl.attribute.identifier] = valid_date
+                        project_dls[dl] = snapped_value
+                else:
+                    # Snap unchanged deadlines to valid date_type
+                    snapped_value = value
+                    if dl.date_type:
+                        coerced = self._coerce_date_value(value)
+                        if coerced:
+                            valid_date = dl.date_type.get_closest_valid_date(coerced)
+                            if valid_date and valid_date != coerced:
+                                snapped_value = valid_date
+                                updated_attribute_data[dl.attribute.identifier] = valid_date
+                    project_dls[dl] = snapped_value
+
+        # Forward cascade: push subsequent deadlines if they violate distance rules
+        dl_to_identifier = {dl: dl.attribute.identifier for dl in project_dls.keys() if dl.attribute}
+        identifier_to_dl = {v: k for k, v in dl_to_identifier.items()}
+        
+        # Track which deadlines were changed (either by user or by enforcement)
+        changed_identifiers = set(actually_changed)
+        
+        # Iterate until no more changes (cascade propagation)
+        # Max iterations = number of deadlines (worst case: linear dependency chain)
+        max_iterations = len(project_dls)
+        iteration = 0
+        for iteration in range(1, max_iterations + 1):
+            new_changes = set()
+            
+            for changed_id in changed_identifiers:
+                if changed_id not in identifier_to_dl:
+                    continue
+                changed_dl = identifier_to_dl[changed_id]
+                changed_date = self._coerce_date_value(updated_attribute_data.get(changed_id))
+                if not changed_date:
+                    continue
+                
+                # Check all deadlines that have a distance rule FROM this deadline
+                for distance in changed_dl.distances_to_next.all():
+                    next_dl = distance.deadline
+                    if not next_dl.attribute:
+                        continue
+                    next_id = next_dl.attribute.identifier
+                    
+                    # Skip if next deadline is not in our working set (not visible/applicable)
+                    if next_dl not in project_dls:
+                        continue
+                    
+                    # Check if distance conditions are met
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    if not distance.check_conditions(combined):
+                        continue
+                    
+                    next_date = self._coerce_date_value(updated_attribute_data.get(next_id))
+                    if not next_date:
+                        next_date = self._coerce_date_value(project_dls.get(next_dl))
+                    if not next_date:
+                        continue
+                    
+                    # Find maximum minimum target across ALL predecessors
+                    max_min_target = None
+                    for dist in next_dl.distances_to_previous.all():
+                        if not dist.check_conditions(combined):
+                            continue
+                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
+                        prev_date = self._coerce_date_value(prev_date)
+                        if not prev_date:
+                            continue
+                        target = self._min_distance_target_date(prev_date, dist, next_dl)
+                        if target and (not max_min_target or target > max_min_target):
+                            max_min_target = target
+                    
+                    if not max_min_target:
+                        continue
+                    
+                    # Push forward if violating any predecessor distance
+                    if next_date < max_min_target:
+                        enforced_date = self._enforce_distance_requirements(
+                            next_dl,
+                            max_min_target,
+                            preview_attribute_data=updated_attribute_data,
+                        )
+                        if enforced_date and enforced_date != next_date:
+                            updated_attribute_data[next_id] = enforced_date
+                            project_dls[next_dl] = enforced_date
+                            new_changes.add(next_id)
+            
+            if not new_changes:
+                break
+            
+            changed_identifiers = new_changes
+        
+        if max_iterations > 0 and iteration >= max_iterations:
+            log.warning(f"Cascade hit max iterations ({max_iterations}), possible cycle")
 
         # Generate newly added deadlines
-        project_dls = {**project_dls, **self._set_calculated_deadlines(
-            [
-                dl for dl in new_dls.keys()
-                if dl.initial_calculations.exists() or dl.default_to_created_at
-            ],
+        calculation_cache = {}
+
+        new_dls_to_calc = [
+            dl for dl in new_dls.keys()
+            if dl.initial_calculations.exists() or dl.default_to_created_at
+        ]
+
+        initial_calc_results = self._set_calculated_deadlines(
+            new_dls_to_calc,
             None,
             initial=True,
             preview=True,
+            preview_attribute_data=updated_attribute_data,
             confirmed_fields=confirmed_fields,
-        )}
-        # Update all deadlines
-        project_dls = {**project_dls, **self._set_calculated_deadlines(
-            [
-                dl for dl in project_dls
-                if dl.update_calculations.exists() \
-                    or dl.default_to_created_at \
-                    or dl.attribute
-            ],
-            None,
-            initial=False,
-            preview=True,
-            preview_attribute_data=updated_attributes,
-            confirmed_fields=confirmed_fields,
-        )}
+            calculation_cache=calculation_cache,
+            timing_metrics=timing_metrics,
+            user_changed_fields=actually_changed,
+        )
+        
+        project_dls = {**project_dls, **initial_calc_results}
+        
+        # Propagate initial_calc results so phase boundaries use new inner deadline values
+        for dl, result in initial_calc_results.items():
+            if hasattr(dl, 'attribute') and dl.attribute:
+                identifier = dl.attribute.identifier
+                result_coerced = self._coerce_date_value(result)
+                if result_coerced:
+                    old_val = updated_attribute_data.get(identifier)
+                    old_val_coerced = self._coerce_date_value(old_val)
+                    if old_val_coerced != result_coerced:
+                        updated_attribute_data[identifier] = result_coerced
+        
+        # Recalculate deadlines with update_calculations (exclude user-changed ones)
+        update_dls_to_calc = [
+            dl for dl in project_dls
+            if (dl.update_calculations.exists() or dl.default_to_created_at)
+            and not (dl.attribute and dl.attribute.identifier in actually_changed)
+        ]
+
+        # Unified convergence loop: recalculate phases, enforce distances, cascade
+        max_convergence_iterations = 10
+        
+        # Deadlines processed by update_calculations are "calculated deadlines"
+        calculated_dl_identifiers = {
+            dl.attribute.identifier for dl in update_dls_to_calc 
+            if hasattr(dl, 'attribute') and dl.attribute
+        }
+
+        for convergence_iteration in range(1, max_convergence_iterations + 1):
+            iteration_changes = set()
+            
+            # Step 1: Recalculate phase boundaries
+            # We MUST clear the cache to ensure new values are used
+            calculation_cache = {}
+            
+            recalc_results = self._set_calculated_deadlines(
+                update_dls_to_calc,
+                None,
+                initial=False,
+                preview=True,
+                preview_attribute_data=updated_attribute_data,
+                confirmed_fields=confirmed_fields,
+                calculation_cache=calculation_cache,
+                timing_metrics=timing_metrics,
+                user_changed_fields=actually_changed,
+            )
+            project_dls = {**project_dls, **recalc_results}
+            
+            # Detect changes from recalculation
+            for dl, new_date in recalc_results.items():
+                if not hasattr(dl, 'attribute') or not dl.attribute:
+                    continue
+                identifier = dl.attribute.identifier
+                old_date = self._coerce_date_value(updated_attribute_data.get(identifier))
+                new_date_coerced = self._coerce_date_value(new_date)
+                
+                # Update if different or if new value is set for the first time
+                if (new_date_coerced and old_date != new_date_coerced) or \
+                   (new_date_coerced and not old_date):
+                    updated_attribute_data[identifier] = new_date_coerced
+                    iteration_changes.add(identifier)
+            
+            # Step 2 & 3: Enforce attribute-only deadlines AND Cascade
+            # We mix these because a push might trigger an enforcement, which triggers a recalc
+            
+            # Start queue with changes from Step 1
+            cascade_queue = iteration_changes.copy()
+            
+            # Also check ALL attribute-only deadlines for violations in every iteration
+            # This catches cases like T3 (attribute-only) needing to move because T2 moved
+            for dl in project_dls.keys():
+                if not hasattr(dl, 'attribute') or not dl.attribute:
+                    continue
+                identifier = dl.attribute.identifier
+                if identifier in calculated_dl_identifiers:
+                    continue # Handled by recalc
+                if identifier in cascade_queue:
+                    continue # Already in queue
+                
+                current_date = self._coerce_date_value(updated_attribute_data.get(identifier))
+                if not current_date:
+                    continue
+                    
+                for distance in dl.distances_to_previous.all():
+                    combined = {**self.attribute_data, **updated_attribute_data}
+                    if not distance.check_conditions(combined):
+                        continue
+                    prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                    prev_date = self._coerce_date_value(prev_date)
+                    if not prev_date:
+                        continue
+                    min_target = self._min_distance_target_date(prev_date, distance, dl)
+                    if min_target and current_date < min_target:
+                        # Skip confirmed fields
+                        if confirmed_fields and identifier in confirmed_fields:
+                            continue
+
+                        cascade_queue.add(identifier)
+                        break
+
+            if cascade_queue:
+                for _ in range(1, 11):
+                    new_cascade_changes = set()
+                    
+                    for changed_id in cascade_queue:
+                        # 1. Enforce self (if not calculated)
+                        changed_dl = identifier_to_dl.get(changed_id)
+                        if not changed_dl:
+                            continue
+                            
+                        current_val = updated_attribute_data.get(changed_id)
+                        current_date = self._coerce_date_value(current_val)
+                        
+                        if changed_id not in calculated_dl_identifiers and current_date:
+
+                            for distance in changed_dl.distances_to_previous.all():
+                                combined = {**self.attribute_data, **updated_attribute_data}
+                                if not distance.check_conditions(combined):
+                                    continue
+                                prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                                prev_date = self._coerce_date_value(prev_date)
+                                if not prev_date:
+                                    continue
+                                min_target = self._min_distance_target_date(prev_date, distance, changed_dl)
+                                if min_target and current_date < min_target:
+                                    if confirmed_fields and changed_id in confirmed_fields:
+                                        continue
+                                    enforced = self._enforce_distance_requirements(changed_dl, min_target, updated_attribute_data)
+                                    if enforced and enforced != current_date:
+                                        updated_attribute_data[changed_id] = enforced
+                                        project_dls[changed_dl] = enforced
+                                        iteration_changes.add(changed_id)
+                                        current_date = enforced 
+                        
+                        # 2. Push dependents (Forward Cascade)
+                        if not current_date:
+                            continue
+
+                        for distance in changed_dl.distances_to_next.all():
+                            next_dl = distance.deadline
+                            if not next_dl.attribute:
+                                continue
+                            next_id = next_dl.attribute.identifier
+                            if next_dl not in project_dls:
+                                continue
+                            
+                            combined = {**self.attribute_data, **updated_attribute_data}
+                            if not distance.check_conditions(combined):
+                                continue
+                                
+                            next_val = updated_attribute_data.get(next_id)
+                            if not next_val:
+                                next_val = project_dls.get(next_dl)
+                                
+                            next_date = self._coerce_date_value(next_val)
+                            if not next_date:
+                                continue
+                                
+                            min_target = self._min_distance_target_date(current_date, distance, next_dl)
+                            if min_target and next_date < min_target:
+                                if confirmed_fields and next_id in confirmed_fields:
+                                    continue
+                                new_cascade_changes.add(next_id)
+                                iteration_changes.add(next_id)
+                                updated_attribute_data[next_id] = min_target
+                                project_dls[next_dl] = min_target
+
+                    if not new_cascade_changes:
+                        break
+                    cascade_queue = new_cascade_changes
+
+            # Check if converged
+            if not iteration_changes:
+                break
+        
+        if convergence_iteration >= max_convergence_iterations:
+            log.warning(f"Convergence hit max iterations ({max_convergence_iterations})")
+
         # Add visibility booleans
         for identifier, value in updated_attribute_data.items():
             if type(value) == bool:
                 project_dls[identifier] = value
+        
         return project_dls
 
     @property
@@ -709,11 +1514,9 @@ class Project(models.Model):
                 self.attribute_data[attribute.identifier] = None
                 updated = True
         if updated:
-            log.info(f"Clearing data by data_retention_plan '{data_retention_plan}' from project '{self}'")
             self.save()
 
     def clear_audit_log_data(self):
-        log.info(f"Clearing audit log data from project '{self}'")
         LogEntry.objects.filter(object_id=str(self.pk)).delete()  # Clears django-admin logs from django_admin_log table
         ActStreamAction.objects.filter(target_object_id=str(self.pk)).delete()  # Clear audit logs from actstream_action table
 

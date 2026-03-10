@@ -147,7 +147,7 @@ def cache_attribute_data_filtered():
     projects = Project.objects.all()
     logger.info(f"Caching {len(projects)} projects for attribute_data_filtered request")
 
-    attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+    attributes = {attr.identifier: attr for attr in Attribute.objects.order_by('pk').all()}
     generated_attributes = Attribute.objects.filter(calculations__isnull=False)
     ignored = FieldSetAttribute.objects.all().values_list('attribute_target', flat=True)
 
