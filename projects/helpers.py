@@ -770,11 +770,55 @@ def safe_float(value):
     try:
         return float(value)
     except Exception as exc:
-        log.error(f"Error on safe_float for value: {value}", exc)
         return float(0)
 
 
-def get_attribute_data_filtered_response(attributes, ignored, project, use_cached=True):
+def check_visibility(project, attribute):
+
+    hide_conditions = attribute.hide_conditions
+    if hide_conditions is not None and len(hide_conditions) > 0:
+        for hide_condition in hide_conditions:
+            try:
+                operator = hide_condition["operator"]
+                variable = hide_condition["variable"]
+                comparison_value = hide_condition["comparison_value"]
+
+                attribute_data_value = project.attribute_data.get(variable, None)
+                if attribute_data_value is not None:
+                    if operator == "==":
+                        if attribute_data_value == comparison_value:
+                            return False
+                    elif operator == "!=":
+                        if attribute_data_value != comparison_value:
+                            return False
+            except Exception as ex:
+                log.error(f"Error on visibility check for attribute: {attribute.identifier}", ex)
+
+    visibility_conditions = attribute.visibility_conditions
+    if visibility_conditions is None or len(visibility_conditions) == 0:
+        return True
+    for condition in visibility_conditions:
+        try:
+            operator = condition["operator"]
+            variable = condition["variable"]
+            comparison_value = condition["comparison_value"]
+
+            attribute_data_value = project.attribute_data.get(variable, None)
+            if attribute_data_value is not None:
+                if operator == "==":
+                    if attribute_data_value == comparison_value:
+                        return True
+                elif operator == "!=":
+                    if attribute_data_value != comparison_value:
+                        return True
+        except Exception as ex:
+            log.error(f"Error on visibility check for attribute: {attribute.identifier}", ex)
+            return True
+
+    return False
+
+
+def get_attribute_data_filtered_response(attributes, generated_attributes, ignored, project, use_cached=True):
     cache_key = f'attribute_data_filtered_{project.pk}'
     response = cache.get(cache_key) if use_cached else None
 
@@ -783,6 +827,7 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
         attribute_data = project.attribute_data
         set_ad_data_in_attribute_data(attribute_data)
         set_geoserver_data_in_attribute_data(attribute_data)
+        project.update_generated_values(generated_attributes, attribute_data)
 
         for attribute in attributes.values():
             if not attribute.api_visibility or attribute.id in ignored:
@@ -793,6 +838,9 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
 
             if not value:
                 response[identifier] = ""
+                continue
+
+            if not check_visibility(project, attribute):
                 continue
 
             if attribute.value_type == "fieldset":
@@ -834,6 +882,8 @@ def get_attribute_data_filtered_response(attributes, ignored, project, use_cache
 
         # TODO: Rename DOCUMENT_EDIT_URL_FORMAT to be generic url base
         url = settings.DOCUMENT_EDIT_URL_FORMAT.replace("<pk>", str(project.pk)).removesuffix("/edit")
+        #response["projektin_nimi"] = project.name
+        #response["pinonumero"] = project.pino_number
         response["projektin_osoite"] = url
         response["onhold"] = project.onhold
         response["onhold_at"] = project.onhold_at.strftime("%d.%m.%Y %H:%M:%S") if project.onhold_at else ""

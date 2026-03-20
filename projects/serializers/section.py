@@ -18,7 +18,7 @@ from projects.models import (
     ProjectPhaseDeadlineSection,
     ProjectSubtype,
 )
-from projects.serializers.utils import _is_attribute_required
+from projects.serializers.utils import get_dl_vis_bool_name
 
 from collections.abc import Mapping
 from collections import namedtuple
@@ -98,13 +98,28 @@ def get_regex_validator(attribute):
     return validate
 
 
-def get_deadline_validator(attribute, subtype, preview):
+def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
     def validate(value):
+        log.warning(f"[DEBUG VALIDATOR] Called for {attribute.identifier}, value={value}, preview={bool(preview)}, is_fake={is_fake_request}")
+        
         if not preview:
+            log.warning(f"[DEBUG VALIDATOR] Skipping - no preview")
             return
 
+        # Skip validation for fake requests - preview values will be applied instead
+        if is_fake_request:
+            log.warning(f"[DEBUG VALIDATOR] Skipping - fake request")
+            return
+        
         for attr_dl in attribute.deadline.filter(subtype=subtype) \
             .select_related("date_type"):
+            # KAAV-3517: Skip validation for deadlines whose visibility is False
+            # When a deadline group is "deleted" (visibility set to False),
+            # we shouldn't validate its dates
+            if attr_dl.deadlinegroup:
+                vis_bool = get_dl_vis_bool_name(attr_dl.deadlinegroup)
+                if vis_bool and preview.get(vis_bool) is False:
+                    continue
             # validate datetype
             try:
                 assert attr_dl.date_type.is_valid_date(value)
@@ -123,10 +138,13 @@ def get_deadline_validator(attribute, subtype, preview):
             .select_related("previous_deadline", "date_type") \
             .prefetch_related("condition_attributes", "condition_attributes__attribute"):
                 prev_dl = preview.get(distance.previous_deadline)
+                log.warning(f"[DEBUG VALIDATOR] Distance check: {attribute.identifier} -> prev={distance.previous_deadline}, prev_dl={prev_dl}, distance_req={distance.distance_from_previous}")
                 if not prev_dl:
+                    log.warning(f"[DEBUG VALIDATOR] Skipping - no prev_dl found in preview. Preview keys: {[str(k) for k in list(preview.keys())[:10]]}")
                     continue
 
                 if not distance.check_conditions(preview):
+                    log.warning(f"[DEBUG VALIDATOR] Skipping - conditions not met")
                     continue
 
                 default_error = _("Minimum distance to {distance.previous_deadline.abbreviation} not met").format(distance=distance)
@@ -150,7 +168,9 @@ def get_deadline_validator(attribute, subtype, preview):
                             prev_dl,
                             distance.distance_from_previous,
                         )
+                    log.warning(f"[DEBUG VALIDATOR] Comparing: value={value} vs valid_date={valid_date} (prev_dl={prev_dl}, distance={distance.distance_from_previous})")
                     if valid_date > value:
+                        log.warning(f"[DEBUG VALIDATOR] VIOLATION DETECTED! Raising error")
                         raise ValidationError(
                             (attr_dl.error_min_distance_previous or default_error,
                             _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
@@ -158,11 +178,11 @@ def get_deadline_validator(attribute, subtype, preview):
                 elif prev_dl + datetime.timedelta(
                     days=distance.distance_from_previous,
                 ) > value:
+                    log.warning(f"[DEBUG VALIDATOR] VIOLATION DETECTED (no date_type)! prev_dl={prev_dl}, distance={distance.distance_from_previous}, value={value}")
                     if distance.date_type:
                         valid_date = distance.date_type.get_closest_valid_date(value)
                     else:
                         valid_date = prev_dl + datetime.timedelta(days=distance.distance_from_previous)
-
                     raise ValidationError(
                         (attr_dl.error_min_distance_previous or default_error,
                         _("The first possible date is {date}.").format(date=formats.date_format(valid_date, format_code))),
@@ -170,7 +190,7 @@ def get_deadline_validator(attribute, subtype, preview):
 
     return validate
 
-def create_attribute_field_data(attribute, validation, project, preview):
+def create_attribute_field_data(attribute, validation, project, preview, is_fake_request=False):
     """Create data for initializing attribute field serializer."""
     field_arguments = {}
     field_class = FIELD_TYPES.get(attribute.value_type, None)
@@ -191,6 +211,7 @@ def create_attribute_field_data(attribute, validation, project, preview):
             attribute,
             project.phase.project_subtype,
             preview,
+            is_fake_request=is_fake_request,
         )]
 
     if attribute.value_type == Attribute.TYPE_CHOICE:
@@ -229,7 +250,7 @@ def create_attribute_field_data(attribute, validation, project, preview):
     return FieldData(field_class, field_arguments)
 
 
-def create_fieldset_field_data(attribute, validation, project, preview):
+def create_fieldset_field_data(attribute, validation, project, preview, is_fake_request=False):
     """Dynamically create a serializer for a fieldset type Attribute instance."""
     serializer_fields = {}
     field_arguments = {}
@@ -242,7 +263,7 @@ def create_fieldset_field_data(attribute, validation, project, preview):
         .order_by("fieldset_attribute_source")
         .prefetch_related("deadline")
     ):
-        field_data = create_attribute_field_data(attr, validation, project, preview)
+        field_data = create_attribute_field_data(attr, validation, project, preview, is_fake_request=is_fake_request)
         if not field_data.field_class:
             # TODO: Handle this by failing instead of continuing
             continue
@@ -279,12 +300,20 @@ def create_section_serializer(
     also on the input data field values and their relationship with
     other fields values.
     """
-
     request = context.get("request", None)
+    is_fake_request = getattr(request, "_fake", False) if request else False
     attribute_data = get_attribute_data(request, project)
 
     if not request:
         return None
+
+    # For fake requests only, filter to attributes in the REQUEST payload
+    # For normal requests, process all relevant attributes (original behavior)
+    payload_keys = None
+    if is_fake_request:
+        request_attribute_data = request.data.get("attribute_data", {}) if request else {}
+        if isinstance(request_attribute_data, Mapping) and request_attribute_data:
+            payload_keys = set(request_attribute_data.keys())
 
     if isinstance(section, ProjectPhaseSection):
         section_attributes = [
@@ -297,6 +326,7 @@ def create_section_serializer(
                 .prefetch_related("attribute__deadline")
             )
             if is_relevant_attribute(section_attribute, attribute_data)
+            and (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
     elif isinstance(section, ProjectFloorAreaSection):
         section_attributes = [
@@ -304,6 +334,7 @@ def create_section_serializer(
             for section_attribute
             in section.projectfloorareasectionattribute_set.order_by("index")
             if is_relevant_attribute(section_attribute, attribute_data)
+            and (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
     elif isinstance(section, ProjectPhaseDeadlineSection):
         section_attributes = [
@@ -311,6 +342,7 @@ def create_section_serializer(
             for section_attribute
             in section.projectphasedeadlinesectionattribute_set.all()
             .select_related("attribute").prefetch_related("attribute__deadline")
+            if (payload_keys is None or section_attribute.attribute.identifier in payload_keys)
         ]
     else:
         return None
@@ -319,11 +351,11 @@ def create_section_serializer(
     for attribute in section_attributes:
         if attribute.value_type in [Attribute.TYPE_FIELDSET, Attribute.TYPE_INFO_FIELDSET]:
             field_data = create_fieldset_field_data(
-                attribute, validation, project, preview,
+                attribute, validation, project, preview, is_fake_request=is_fake_request,
             )
         else:
             field_data = create_attribute_field_data(
-                attribute, validation, project, preview,
+                attribute, validation, project, preview, is_fake_request=is_fake_request,
             )
 
             if not field_data.field_class:

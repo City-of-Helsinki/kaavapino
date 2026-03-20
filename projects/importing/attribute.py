@@ -51,7 +51,7 @@ from ..models.utils import create_identifier, truncate_identifier, check_identif
 
 logger = logging.getLogger(__name__)
 
-IDENTIFIER_MAX_LENGTH = 50
+IDENTIFIER_MAX_LENGTH = 512
 VALID_ATTRIBUTE_CALCULATION_TYPES = [Attribute.TYPE_DECIMAL, Attribute.TYPE_INTEGER]
 
 PROJECT_SIZE = "prosessin kokoluokka, joissa kenttä näkyy"

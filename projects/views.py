@@ -324,6 +324,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         context = super().get_serializer_context()
         context["action"] = self.action
         context["confirmed_fields"] = self.request.data.get('confirmed_fields', [])
+        context["timeline_save"] = self.request.query_params.get('timeline_save', False)
 
         if self.action == "list":
             context["project_schedule_cache"] = \
@@ -361,11 +362,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     )
     def attribute_data_filtered(self, request, pk):  # Filter returned Attributes by Attribute.api_visibility
         project = self.get_object()
-        attributes = {attr.identifier: attr for attr in Attribute.objects.all()}
+        attributes = {attr.identifier: attr for attr in Attribute.objects.order_by('pk').all()}
+        generated_attributes = Attribute.objects.filter(calculations__isnull=False)
         ignored = FieldSetAttribute.objects.all().values_list('attribute_target', flat=True)
         if not project.attribute_data:
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        return Response(get_attribute_data_filtered_response(attributes, ignored, project))
+        return Response(get_attribute_data_filtered_response(attributes, generated_attributes, ignored, project))
 
     @action(
         methods=['get'],
@@ -373,7 +375,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated],
     )
     def pino_numbers(self, request):
-        pino_numbers = Project.objects.values_list('pino_number', flat=True)
+        pino_numbers = Project.objects.filter(public=True).values_list('pino_number', flat=True)
         return Response(pino_numbers)
 
     @extend_schema(
@@ -836,8 +838,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         ]
 
         if start_date or end_date:
-            start_date, end_date = self._parse_date_range(start_date, end_date)
-            print(start_date, end_date)
+            start_date, end_date, end_date_year = self._parse_date_range(start_date, end_date)
             start_query = Q()
             end_query = Q()
             for attr in date_range_attrs:
@@ -937,34 +938,54 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
+        timeline_save = request.query_params.get('timeline_save', False)
         # Store the original confirmed_fields before calling update
         # should prevent confirmed fields from moving when updating or validating 
         confirmed_fields = request.data.get('confirmed_fields', [])
         original_attribute_data = request.data.get('attribute_data', {})
         
-        if not fake:
-        # Actual update logic that saves to db
-            result = super().update(request, *args, **kwargs)
-            
-            return result
+        log.warning(f"[DEBUG VIEWS] update() called. fake={fake}, timeline_save={timeline_save}")
+        log.warning(f"[DEBUG VIEWS] confirmed_fields={confirmed_fields}")
+        log.warning(f"[DEBUG VIEWS] attribute_data keys: {list(original_attribute_data.keys()) if original_attribute_data else 'EMPTY'}")
         
-        # When using fake mode, we need to pass the fake=True parameter to the serializer
-        # This will ensure Project.update_attribute_data respects confirmed_fields
-        request._fake = True  # Add a private attribute to indicate this is a fake call
-        # Validation logic ?fake
-        # Run update in 'ghost' mode where no changes are applied to database but result is returned
-        with transaction.atomic():
-            result = super().update(request, *args, **kwargs)
-            
-            # Before returning, check if we need to restore original values for confirmed fields
-            if hasattr(result, 'data') and confirmed_fields and 'attribute_data' in result.data:
-                # Restore original values for confirmed fields
-                for field in confirmed_fields:
-                    if field in original_attribute_data and field in result.data['attribute_data']:
-                        result.data['attribute_data'][field] = original_attribute_data[field]
-            #Prevents saving anything to database but returns values that have been changed by validation to frontend
-            transaction.set_rollback(True)
-            return result
+        if not fake:
+            # Actual update logic that saves to db
+            return super().update(request, *args, **kwargs)
+        
+        # Fast path for validation-only (fake) requests
+        project = self.get_object()
+        log.warning("[DEBUG VIEWS] fake=true path: calling get_preview_deadlines for project %s", project.pk)
+        
+        # Get preview deadlines (corrected dates)
+        preview = project.get_preview_deadlines(
+            original_attribute_data,
+            project.subtype,
+            confirmed_fields,
+        )
+        
+        # Build result from preview values
+        result_attribute_data = {}
+        if preview:
+            for key, value in preview.items():
+                # preview dict has Deadline objects as keys
+                if hasattr(key, 'attribute') and key.attribute:
+                    identifier = key.attribute.identifier
+                    if value is not None:
+                        # Format date as string
+                        if hasattr(value, 'isoformat'):
+                            result_attribute_data[identifier] = value.isoformat()
+                        else:
+                            result_attribute_data[identifier] = value
+                # ALSO include non-deadline keys pushed by backend (visibility bools etc.)
+                elif isinstance(key, str):
+                    result_attribute_data[key] = value
+        
+        # For any payload keys not in result, keep original (for booleans etc)
+        for key in original_attribute_data:
+            if key not in result_attribute_data:
+                result_attribute_data[key] = original_attribute_data[key]
+        
+        return Response({"attribute_data": result_attribute_data})
 
 
 class ProjectPhaseViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1554,6 +1575,14 @@ class ReportViewSet(ReadOnlyModelViewSet):
                     params.get(report_filter.identifier),
                     queryset=projects or Project.objects.all(),
                 ))
+        elif report.name == "Keskeytyneet projektit":
+            projects = Project.objects.filter(onhold=True, public=True)
+            for report_filter in filters:
+                projects = report_filter.filter_projects(
+                    params.get(report_filter.identifier),
+                    queryset=projects,
+                )
+            return projects
         else:
             projects = Project.objects.filter(onhold=False, public=True)
             for report_filter in filters:
@@ -1751,8 +1780,10 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                     except AssertionError:
                         valid_date = attr_dl.date_type.get_closest_valid_date(date)
                         return validate_date(valid_date, initial_error_reason="invalid_date")
-
                     for distance in attr_dl.distances_to_previous.all():
+                        # Skip this distance rule if its conditions are not met
+                        if not distance.check_conditions(project.attribute_data):
+                            continue
                         try:
                             prev_dl = project.deadlines.get(deadline=distance.previous_deadline)
                             if distance.date_type:
@@ -1776,6 +1807,9 @@ class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
                             pass
 
                     for distance in attr_dl.distances_to_next.all():
+                        # Skip this distance rule if its conditions are not met
+                        if not distance.check_conditions(project.attribute_data):
+                            continue
                         try:
                             next_dl = project.deadlines.get(deadline=distance.deadline)
                             if distance.date_type:

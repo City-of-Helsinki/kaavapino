@@ -17,7 +17,9 @@ from projects.models import (
     ProjectSubtype,
     AttributeValueChoice,
     FieldSetAttribute,
+    Deadline
 )
+from projects.serializers.utils import get_dl_vis_bool_name
 
 
 class Report(models.Model):
@@ -482,11 +484,17 @@ class ReportFilter(models.Model):
                             pass
 
                 if not attr.fieldsets.count():
-                    query |= self._get_query(
+                    new_query = self._get_query(
                         q_value,
                         f"attribute_data__{attr.identifier}",
                         value_type_mapping[attr.value_type],
                     )
+                    if attr.value_type == Attribute.TYPE_DATE:
+                        deadline = Deadline.objects.filter(attribute=attr).first()
+                        vis_bool_name = get_dl_vis_bool_name(deadline.deadlinegroup) if deadline and deadline.deadlinegroup else None
+                        if vis_bool_name:
+                            new_query &= Q(**{f"attribute_data__{vis_bool_name}": True})
+                    query |= new_query
                 else:
                     if not isinstance(q_value, list):
                         q_value = [q_value]

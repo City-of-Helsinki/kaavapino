@@ -763,7 +763,7 @@ class AttributeValueChoice(models.Model):
     )
     value = models.TextField(verbose_name=_("value"))
     identifier = models.CharField(
-        max_length=150,
+        max_length=512,
         verbose_name=_("identifier"),
         db_index=True,
         validators=[validate_identifier],

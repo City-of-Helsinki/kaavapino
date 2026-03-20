@@ -257,17 +257,21 @@ class Deadline(models.Model):
                             date_calc.base_date_deadline.abbreviation,
                             date_calc.constant
                             )
-                return calculation.datecalculation.calculate(project, datetype, preview_attributes)
+                calc_result = calculation.datecalculation.calculate(project, datetype, preview_attributes)
+                return calc_result
             return None
 
         attribute_data = {**project.attribute_data, **preview_attributes}
+        
+        identifier = getattr(self.attribute, "identifier", None) if self.attribute else None
+        is_phase_boundary = identifier and ("vaihe_alkaa_pvm" in identifier or "vaihe_paattyy_pvm" in identifier)
 
         result = None
         for calculation in calculations:
             tmp = _calculate_condition_result(attribute_data, calculation)
             if tmp is None:
                 continue
-            if self.attribute and ("vaihe_alkaa_pvm" in self.attribute.identifier or "vaihe_paattyy_pvm" in self.attribute.identifier):  # Calculate latest date
+            if is_phase_boundary:
                 result = tmp if (not result or tmp > result) else result
             else:  # Return first calculation of whose condition is met
                 result = tmp
@@ -276,36 +280,52 @@ class Deadline(models.Model):
         return result
 
     def calculate_initial(self, project, preview_attributes={}, raw=False):
+        # Cache queryset to avoid repeated DB queries in convergence loops
+        if not hasattr(self, '_cached_initial_calculations'):
+            self._cached_initial_calculations = list(
+                self.initial_calculations.all().order_by('-index').select_related(
+                    "datecalculation",
+                    "datecalculation__base_date_attribute",
+                    "datecalculation__base_date_deadline",
+                    "datecalculation__base_date_deadline__attribute",
+                    "datecalculation__base_date_deadline__subtype",
+                    "datecalculation__base_date_deadline__phase",
+                    "datecalculation__base_date_deadline__phase__common_project_phase",
+                    "datecalculation__base_date_deadline__phase__project_subtype"
+                ).prefetch_related("conditions", "not_conditions")
+            )
+        
         return self._calculate(
             project,
-            self.initial_calculations.all().order_by('-index').select_related("datecalculation",
-                                    "datecalculation__base_date_attribute",
-                                    "datecalculation__base_date_deadline",
-                                    "datecalculation__base_date_deadline__attribute",
-                                    "datecalculation__base_date_deadline__subtype",
-                                    "datecalculation__base_date_deadline__phase",
-                                    "datecalculation__base_date_deadline__phase__common_project_phase",
-                                    "datecalculation__base_date_deadline__phase__project_subtype")
-                    .prefetch_related("conditions", "not_conditions"),
+            self._cached_initial_calculations,
             self.date_type,
             preview_attributes,
             raw,
         )
 
     def calculate_updated(self, project, preview_attributes={}):
-        if self.update_calculations.exists():
+        # Cache queryset to avoid repeated DB queries in convergence loops
+        if not hasattr(self, '_cached_update_calculations'):
+            if self.update_calculations.exists():
+                self._cached_update_calculations = list(
+                    self.update_calculations.all().order_by('-index').select_related(
+                        "datecalculation",
+                        "datecalculation__base_date_attribute",
+                        "datecalculation__base_date_deadline",
+                        "datecalculation__base_date_deadline__attribute",
+                        "datecalculation__base_date_deadline__subtype",
+                        "datecalculation__base_date_deadline__phase",
+                        "datecalculation__base_date_deadline__phase__common_project_phase",
+                        "datecalculation__base_date_deadline__date_type"
+                    ).prefetch_related("conditions", "not_conditions")
+                )
+            else:
+                self._cached_update_calculations = None
+        
+        if self._cached_update_calculations:
             return self._calculate(
                 project,
-                self.update_calculations.all().order_by('-index')
-                    .select_related("datecalculation",
-                                    "datecalculation__base_date_attribute",
-                                    "datecalculation__base_date_deadline",
-                                    "datecalculation__base_date_deadline__attribute",
-                                    "datecalculation__base_date_deadline__subtype",
-                                    "datecalculation__base_date_deadline__phase",
-                                    "datecalculation__base_date_deadline__phase__common_project_phase",
-                                    "datecalculation__base_date_deadline__date_type")
-                    .prefetch_related("conditions", "not_conditions"),
+                self._cached_update_calculations,
                 self.date_type,
                 preview_attributes,
             )

@@ -533,6 +533,10 @@ class DeadlineImporter:
             for index, (conds, calc) in enumerate(conditions_parsed):
                 condition_attributes = []
                 not_condition_attributes = []
+
+                if len(conds) == 1 and " and " in conds[0]:
+                    conds = conds[0].split(" and ")
+
                 subtype_conds = [
                     cond for cond in conds
                     if cond[:25] == "kaavaprosessin_kokoluokka"
