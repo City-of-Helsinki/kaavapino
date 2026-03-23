@@ -23,7 +23,7 @@ exclude = '''
 name = "kaavapino-api"
 version = "0.0.1"
 description = "Project management system for city planning projects."
-package-mode = false
+package-mode = true
 
 authors = [
     "Helsingin Kaupunki"
