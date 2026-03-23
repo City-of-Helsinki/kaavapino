@@ -789,6 +789,25 @@ files = [
 ]
 
 [[package]]
+name = "django-logger-extra"
+version = "1.1.1"
+description = "A module that provides extras for logger."
+optional = false
+python-versions = "*"
+files = [
+    {file = "django_logger_extra-1.1.1-py2.py3-none-any.whl", hash = "sha256:8404f1f4d5aaf84af05fdaef6dc1094c1181347c90f3245075e47e001e72de71"},
+    {file = "django_logger_extra-1.1.1.tar.gz", hash = "sha256:111532cc8d9f57175e2ba36ef4c303f5ef95f80200290472619de65809063ccf"},
+]
+
+[package.dependencies]
+django = ">=4.2"
+
+[package.extras]
+all = ["coverage-enable-subprocess", "coverage[toml]", "django-auditlog", "freezegun", "pytest", "pytest-cov", "pytest-django", "pytest-randomly", "pytest-rerunfailures", "pytest-xdist[psutil]"]
+auditlog = ["django-auditlog"]
+test = ["coverage-enable-subprocess", "coverage[toml]", "freezegun", "pytest", "pytest-cov", "pytest-django", "pytest-randomly", "pytest-rerunfailures", "pytest-xdist[psutil]"]
+
+[[package]]
 name = "django-picklefield"
 version = "3.3"
 description = "Pickled object field for Django"
@@ -3243,4 +3262,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9.0,<3.11"
-content-hash = "58757b717e90d4c8e0229e8156b63e687530d42315b97102a70179eebd61eff8"
+content-hash = "b156b78f897e0c6993dcbed657ce0f8b7fc7de50177e9bd49c53dc76f4672389"
