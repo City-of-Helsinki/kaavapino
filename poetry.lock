@@ -656,6 +656,21 @@ socialaccount = ["oauthlib (>=3.3.0,<4)", "pyjwt[crypto] (>=2.0,<3)", "requests 
 steam = ["python3-openid (>=3.0.8,<4)"]
 
 [[package]]
+name = "django-auditlog"
+version = "3.4.1"
+description = "Audit log app for Django"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "django_auditlog-3.4.1-py3-none-any.whl", hash = "sha256:29958ecacfee00144127214f3ccef3f0c203c3659bcb6dd404a0f3d5551a10a5"},
+    {file = "django_auditlog-3.4.1.tar.gz", hash = "sha256:ad07b9db452d5fa8303822cccd78cd3fcb2c2863aeb6abe039ec45739b4d7e33"},
+]
+
+[package.dependencies]
+Django = ">=4.2"
+python-dateutil = ">=2.7.0"
+
+[[package]]
 name = "django-cors-headers"
 version = "3.14.0"
 description = "django-cors-headers is a Django application for handling the server headers required for Cross-Origin Resource Sharing (CORS)."
@@ -3132,4 +3147,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<=3.14"
-content-hash = "eabd0fdd5f37b9dfdb635e0def140ab997d0701fda3399e60771767478a39240"
+content-hash = "10e150b526c01d6fc10b21d53aa6b4f9b40f5b56ae64be78c119434415df4180"
