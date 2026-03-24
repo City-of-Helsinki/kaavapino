@@ -876,13 +876,13 @@ hiredis = ["redis[hiredis] (>=3,!=4.0.0,!=4.0.1)"]
 
 [[package]]
 name = "django-resilient-logger"
-version = "1.2.0"
+version = "2.1.0"
 description = "A module that provides django-specific resilient logger module."
 optional = false
 python-versions = "*"
 files = [
-    {file = "django_resilient_logger-1.2.0-py2.py3-none-any.whl", hash = "sha256:76eb93d30219139cfe0e3d29013b6199f6a0f50642ba15e481b69ca20f4ee0d6"},
-    {file = "django_resilient_logger-1.2.0.tar.gz", hash = "sha256:a7307af5523ffb6deb432c1310f6d97b1a40551ae2ae2cde652eb5b1c265e457"},
+    {file = "django_resilient_logger-2.1.0-py2.py3-none-any.whl", hash = "sha256:c9a76aa2f1056117ba6a44f62e2c6836144da76a3d6322ac4af109fbb50d12c1"},
+    {file = "django_resilient_logger-2.1.0.tar.gz", hash = "sha256:765560f135c1e38c27bab829d5675d4d6840f8ca9db05c4ab947472d74d6a88d"},
 ]
 
 [package.dependencies]
@@ -3262,4 +3262,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9.0,<3.11"
-content-hash = "b156b78f897e0c6993dcbed657ce0f8b7fc7de50177e9bd49c53dc76f4672389"
+content-hash = "ed7935e93bec1aaefa958fa66e13a8de3db198bdb732543a169e97b062f42134"
