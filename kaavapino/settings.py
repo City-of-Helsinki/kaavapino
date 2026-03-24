@@ -194,7 +194,6 @@ INSTALLED_APPS = [
     "users",
     "django_q",
     "drf_spectacular",
-    "logger_extra",
     "auditlog",
     "resilient_logger"
 ]
@@ -211,7 +210,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "logger_extra.middleware.XRequestIdMiddleware",
     "auditlog.middleware.AuditlogMiddleware",
 ]
 

@@ -12,6 +12,33 @@ files = [
 ]
 
 [[package]]
+name = "apscheduler"
+version = "3.11.2"
+description = "In-process task scheduler with Cron-like capabilities"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "apscheduler-3.11.2-py3-none-any.whl", hash = "sha256:ce005177f741409db4e4dd40a7431b76feb856b9dd69d57e0da49d6715bfd26d"},
+    {file = "apscheduler-3.11.2.tar.gz", hash = "sha256:2a9966b052ec805f020c8c4c3ae6e6a06e24b1bf19f2e11d91d8cca0473eef41"},
+]
+
+[package.dependencies]
+tzlocal = ">=3.0"
+
+[package.extras]
+doc = ["packaging", "sphinx", "sphinx-rtd-theme (>=1.3.0)"]
+etcd = ["etcd3", "protobuf (<=3.21.0)"]
+gevent = ["gevent"]
+mongodb = ["pymongo (>=3.0)"]
+redis = ["redis (>=3.0)"]
+rethinkdb = ["rethinkdb (>=2.4.0)"]
+sqlalchemy = ["sqlalchemy (>=1.4)"]
+test = ["APScheduler[etcd,mongodb,redis,rethinkdb,sqlalchemy,tornado,zookeeper]", "PySide6", "anyio (>=4.5.2)", "gevent", "pytest", "pytest-timeout", "pytz", "twisted"]
+tornado = ["tornado (>=4.3)"]
+twisted = ["twisted"]
+zookeeper = ["kazoo"]
+
+[[package]]
 name = "asgiref"
 version = "3.11.0"
 description = "ASGI specs, helper code, and adapters"
@@ -789,25 +816,6 @@ files = [
 ]
 
 [[package]]
-name = "django-logger-extra"
-version = "1.1.1"
-description = "A module that provides extras for logger."
-optional = false
-python-versions = "*"
-files = [
-    {file = "django_logger_extra-1.1.1-py2.py3-none-any.whl", hash = "sha256:8404f1f4d5aaf84af05fdaef6dc1094c1181347c90f3245075e47e001e72de71"},
-    {file = "django_logger_extra-1.1.1.tar.gz", hash = "sha256:111532cc8d9f57175e2ba36ef4c303f5ef95f80200290472619de65809063ccf"},
-]
-
-[package.dependencies]
-django = ">=4.2"
-
-[package.extras]
-all = ["coverage-enable-subprocess", "coverage[toml]", "django-auditlog", "freezegun", "pytest", "pytest-cov", "pytest-django", "pytest-randomly", "pytest-rerunfailures", "pytest-xdist[psutil]"]
-auditlog = ["django-auditlog"]
-test = ["coverage-enable-subprocess", "coverage[toml]", "freezegun", "pytest", "pytest-cov", "pytest-django", "pytest-randomly", "pytest-rerunfailures", "pytest-xdist[psutil]"]
-
-[[package]]
 name = "django-picklefield"
 version = "3.3"
 description = "Pickled object field for Django"
@@ -876,23 +884,19 @@ hiredis = ["redis[hiredis] (>=3,!=4.0.0,!=4.0.1)"]
 
 [[package]]
 name = "django-resilient-logger"
-version = "2.1.0"
+version = "0.1.2"
 description = "A module that provides django-specific resilient logger module."
 optional = false
 python-versions = "*"
 files = [
-    {file = "django_resilient_logger-2.1.0-py2.py3-none-any.whl", hash = "sha256:c9a76aa2f1056117ba6a44f62e2c6836144da76a3d6322ac4af109fbb50d12c1"},
-    {file = "django_resilient_logger-2.1.0.tar.gz", hash = "sha256:765560f135c1e38c27bab829d5675d4d6840f8ca9db05c4ab947472d74d6a88d"},
+    {file = "django_resilient_logger-0.1.2-py3-none-any.whl", hash = "sha256:a16b0437df684bc525724aca79ae6d6b88b7903a31f9538153e2d7f0c7a1e87e"},
+    {file = "django_resilient_logger-0.1.2.tar.gz", hash = "sha256:f75f6f68160533c2c16e3281557ce982156b40a25d85d0e7b3b8d0bb1597c2c2"},
 ]
 
 [package.dependencies]
+apscheduler = ">=3.0.0"
 django = ">=4.2"
-elasticsearch8 = "*"
-
-[package.extras]
-all = ["coverage-enable-subprocess", "coverage[toml]", "django-auditlog", "pytest", "pytest-django", "pytest-randomly", "pytest-rerunfailures", "pytest-xdist[psutil]"]
-auditlog = ["django-auditlog"]
-test = ["coverage-enable-subprocess", "coverage[toml]", "pytest", "pytest-django", "pytest-randomly", "pytest-rerunfailures", "pytest-xdist[psutil]"]
+elasticsearch = ">=8.0.0"
 
 [[package]]
 name = "djangorestframework"
@@ -1068,13 +1072,13 @@ tornado = ["tornado"]
 
 [[package]]
 name = "elastic-transport"
-version = "8.17.1"
+version = "9.1.0"
 description = "Transport classes and utilities shared among Python Elastic client libraries"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "elastic_transport-8.17.1-py3-none-any.whl", hash = "sha256:192718f498f1d10c5e9aa8b9cf32aed405e469a7f0e9d6a8923431dbb2c59fb8"},
-    {file = "elastic_transport-8.17.1.tar.gz", hash = "sha256:5edef32ac864dca8e2f0a613ef63491ee8d6b8cfb52881fa7313ba9290cac6d2"},
+    {file = "elastic_transport-9.1.0-py3-none-any.whl", hash = "sha256:369fa56874c74daae4ea10cbf40636d139f38f42bec0e006b9cd45a168ee7fce"},
+    {file = "elastic_transport-9.1.0.tar.gz", hash = "sha256:1590e44a25b0fe208107d5e8d7dea15c070525f3ac9baafbe4cb659cd14f073d"},
 ]
 
 [package.dependencies]
@@ -1082,21 +1086,21 @@ certifi = "*"
 urllib3 = ">=1.26.2,<3"
 
 [package.extras]
-develop = ["aiohttp", "furo", "httpx", "opentelemetry-api", "opentelemetry-sdk", "orjson", "pytest", "pytest-asyncio", "pytest-cov", "pytest-httpserver", "pytest-mock", "requests", "respx", "sphinx (>2)", "sphinx-autodoc-typehints", "trustme"]
+develop = ["aiohttp", "furo", "httpx", "opentelemetry-api", "opentelemetry-sdk", "orjson", "pytest", "pytest-asyncio", "pytest-cov", "pytest-httpbin", "pytest-httpserver", "pytest-mock", "requests", "respx", "sphinx (>2)", "sphinx-autodoc-typehints", "trustme"]
 
 [[package]]
-name = "elasticsearch8"
-version = "8.19.3"
+name = "elasticsearch"
+version = "9.1.3"
 description = "Python client for Elasticsearch"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "elasticsearch8-8.19.3-py3-none-any.whl", hash = "sha256:4b52e59e68aea6f59bf37c28f6f4512333302dd8a52e26c17d0f10c076d833a1"},
-    {file = "elasticsearch8-8.19.3.tar.gz", hash = "sha256:7effe95b360241b6d56ef68219037a90ad0f56723614db54bbe57d33058402f4"},
+    {file = "elasticsearch-9.1.3-py3-none-any.whl", hash = "sha256:963197abd1f57656f6fbd49091b681436d7e7bc100c70c60a1887ab564a22f08"},
+    {file = "elasticsearch-9.1.3.tar.gz", hash = "sha256:bf3c064b5003c393a21722b74b483b9e078ce97c9cc40bc43ea8474025b8e9b7"},
 ]
 
 [package.dependencies]
-elastic-transport = ">=8.15.1,<9"
+elastic-transport = ">=9.1.0,<10"
 python-dateutil = "*"
 typing-extensions = "*"
 
@@ -3052,6 +3056,23 @@ files = [
 ]
 
 [[package]]
+name = "tzlocal"
+version = "5.3.1"
+description = "tzinfo object for the local timezone"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "tzlocal-5.3.1-py3-none-any.whl", hash = "sha256:eb1a66c3ef5847adf7a834f1be0800581b683b5608e74f86ecbcef8ab91bb85d"},
+    {file = "tzlocal-5.3.1.tar.gz", hash = "sha256:cceffc7edecefea1f595541dbd6e990cb1ea3d19bf01b2809f362a03dd7921fd"},
+]
+
+[package.dependencies]
+tzdata = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+devenv = ["check-manifest", "pytest (>=4.3)", "pytest-cov", "pytest-mock (>=3.3)", "zest.releaser"]
+
+[[package]]
 name = "uritemplate"
 version = "4.2.0"
 description = "Implementation of RFC 6570 URI Templates"
@@ -3262,4 +3283,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9.0,<3.11"
-content-hash = "ed7935e93bec1aaefa958fa66e13a8de3db198bdb732543a169e97b062f42134"
+content-hash = "2e00ddfb78c7df5c02501e991c0f8969a1ea51b3cff90eca3caf51e6e04c7d96"
