@@ -767,15 +767,21 @@ class AutomaticDate(models.Model):
         return_dates = []
 
         if self.week:
-            start_date = datetime.datetime.strptime( \
-                f"{year}-W{self.week}-1", "%G-W%V-%u").date()
-            end_date = datetime.datetime.strptime( \
-                f"{year}-W{self.week}-7", "%G-W%V-%u").date()
-            return_dates = self._get_weekdays_in_range(
-                start_date,
-                end_date,
-                business_days_only,
-            )
+            last_day = datetime.date(year, 12, 31)
+            max_week = last_day.isocalendar()[1]
+
+            if self.week > max_week:
+                return_dates = []
+            else:
+                start_date = datetime.datetime.strptime( \
+                    f"{year}-W{self.week}-1", "%G-W%V-%u").date()
+                end_date = datetime.datetime.strptime( \
+                    f"{year}-W{self.week}-7", "%G-W%V-%u").date()
+                return_dates = self._get_weekdays_in_range(
+                    start_date,
+                    end_date,
+                    business_days_only,
+                )
         elif self.start_date and self.end_date:
             start = self._parse_date(self.start_date, year)
             end = self._parse_date(self.end_date, year)
