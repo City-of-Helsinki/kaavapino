@@ -117,6 +117,11 @@ def get_deadline_validator(attribute, subtype, preview, is_fake_request=False):
                 vis_bool = get_dl_vis_bool_name(attr_dl.deadlinegroup)
                 if vis_bool and preview.get(vis_bool) is False:
                     continue
+
+            # Skip validation for deadlines that are not editable
+            if attr_dl.editable is False:
+                continue
+
             # validate datetype
             try:
                 assert attr_dl.date_type.is_valid_date(value)

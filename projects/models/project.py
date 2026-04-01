@@ -520,9 +520,10 @@ class Project(models.Model):
             preview_attribute_data = {}
         if confirmed_fields is None:
             confirmed_fields = {}
-        
+
         if not date:
             return None
+
         try:
             if preview:
                 try:
@@ -571,8 +572,11 @@ class Project(models.Model):
                 preview_attribute_data if preview else None,
             )
 
-            if preview or not project_deadline.editable:
+            if preview:
                 return enforced_date
+
+            if not project_deadline.editable:
+                return None
 
             if project_deadline.date != enforced_date:
                 project_deadline.date = enforced_date
