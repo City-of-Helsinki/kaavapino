@@ -2041,7 +2041,26 @@ class ProjectSerializer(serializers.ModelSerializer):
             if should_update_deadlines or should_generate_deadlines:
                 old_deadlines = project.deadlines.all().select_related("deadline")
 
-            if should_generate_deadlines:
+            if draft_principles_changed:
+                cleared_attributes = {
+                    project_dl.deadline.attribute.identifier: None
+                    for project_dl in project.deadlines.all().select_related("deadline", "deadline__attribute")
+                    if not project_dl.edited and project_dl.deadline.attribute
+                }
+                cleared_cache = self._get_attribute_cache(cleared_attributes.keys())
+                project.update_attribute_data(
+                    cleared_attributes,
+                    attribute_cache=cleared_cache,
+                )
+                self.log_updates_attribute_data(cleared_attributes)
+                project.deadlines.filter(edited__isnull=True).delete()
+                project.update_deadlines(
+                    user=user,
+                    preview_attributes=attribute_data,
+                    confirmed_fields=confirmed_fields,
+                    timing_metrics=self.context.get("validation_metrics"),
+                )
+            elif should_generate_deadlines:
                 cleared_attributes = {
                     project_dl.deadline.attribute.identifier: None
                     for project_dl in project.deadlines.all().select_related("deadline", "deadline__attribute")
