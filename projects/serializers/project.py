@@ -2088,6 +2088,8 @@ class ProjectSerializer(serializers.ModelSerializer):
                     confirmed_fields=confirmed_fields,
                     timing_metrics=self.context.get("validation_metrics"),
                 )
+            elif subtype_changed or draft_principles_changed:
+                project.update_deadlines_on_subtype_change() 
             elif should_update_deadlines:
                 # Per docs/timeline_workflow.md and validation.md:
                 # For timeline_save, NO RECALCULATION - just sync frontend values AS-IS

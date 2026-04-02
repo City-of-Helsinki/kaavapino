@@ -834,6 +834,56 @@ class Project(models.Model):
         # Save the project to persist the changes.
         self.save()
 
+    def update_deadlines_on_subtype_change(self):
+        # When subtype changes, we need to update deadlines to match the new subtype's requirements.
+        # This means adding new deadlines, and removing inapplicable deadlines.
+        # However, we should NOT recalculate deadlines here - just add/remove based on new subtype's applicable deadlines.
+        # This may lead to deadlines with invalid states, and it will be the user's responsibility to update them.
+        applicable_deadlines = self.get_applicable_deadlines(for_record_existence=True)
+        old_pdls = {p_dl.deadline.attribute.identifier: p_dl for p_dl in self.deadlines.all().select_related("deadline") if p_dl.deadline.attribute}
+        old_dls = [p_dl.deadline for p_dl in self.deadlines.all()]
+        updated_project_deadlines = []
+        for deadline in applicable_deadlines:
+            # If subtype changed, the dl should always be new. If draft/principles changed, it may exist so dont update it
+            if not deadline in old_dls:
+                old_date = None
+                is_newly_added = False
+                if deadline.attribute and deadline.attribute.identifier in old_pdls:
+                    old_date = old_pdls[deadline.attribute.identifier].date
+                elif deadline.attribute:
+                    is_newly_added = True
+                new_project_deadline = ProjectDeadline.objects.create(
+                    project=self,
+                    deadline=deadline,
+                    generated=is_newly_added,
+                    date=old_date,
+                )
+                updated_project_deadlines.append(new_project_deadline)
+
+        if self.attribute_data.get('projektin_kaynnistys_pvm'):
+            u1_value = self.attribute_data['projektin_kaynnistys_pvm']
+            self.attribute_data['kaynnistysvaihe_alkaa_pvm'] = u1_value
+            # Directly update K1's ProjectDeadline record (bypasses for loop that may skip it)
+            ProjectDeadline.objects.filter(
+                project=self,
+                deadline__abbreviation='K1'
+            ).update(date=u1_value)
+
+        # Delete only deadlines that are truly inapplicable (wrong subtype or excluded phase)
+        # NOT deadlines that are just hidden due to condition_attributes (vis_bool=False)
+        to_be_deleted = self.deadlines.exclude(deadline__in=applicable_deadlines)
+
+        for dl in to_be_deleted:
+            self.deadlines.remove(dl)
+            dl.delete()
+            # Remove from attribute data if the dl is not applicable to the new subtype
+            if dl.deadline.attribute and dl.deadline.attribute.identifier in self.attribute_data:
+                if not dl.deadline.attribute.identifier in [deadline.attribute.identifier for deadline in applicable_deadlines if deadline.attribute]:
+                    self.attribute_data.pop(dl.deadline.attribute.identifier)
+
+        self.deadlines.set(updated_project_deadlines)
+        self.save()
+
     # Calculate a preview schedule without saving anything
     def get_raw_deadline_preview(self, updated_attributes, subtype):
         """
