@@ -999,7 +999,8 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
 
 DOCUMENT_CONTENT_TYPES = {
     'docx': "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    'pptx': "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+    'pptx': "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+    'xlsx': "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 }
 
 

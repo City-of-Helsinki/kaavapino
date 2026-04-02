@@ -20,6 +20,7 @@ from django.utils import timezone
 from django.core.cache import cache
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
+from xlsxtpl.writerx import BookWriter
 from PIL import Image as PImage, UnidentifiedImageError
 from ..models import Attribute, ProjectPhase, ProjectAttributeFile, ProjectPhaseSectionAttribute
 from ..models.utils import create_identifier
@@ -262,10 +263,12 @@ def render_template(project, document_template, preview):
 
     doc_type = get_file_type(document_template.file.path)
 
+    doc = None
+    writer = None
     if doc_type == 'docx':
         doc = DocxTemplate(document_template.file)
-    else:
-        doc = None
+    elif doc_type == 'xlsx':
+        writer = BookWriter(document_template.file)
 
     attribute_data_display = {}
     attribute_element_data = {}
@@ -517,6 +520,14 @@ def render_template(project, document_template, preview):
             doc.render(attribute_data_display, jinja_env)
             output = io.BytesIO()
             doc.save(output)
+        except Exception as exc:
+            log.error('Error while rendering document', exc)
+    elif doc_type == 'xlsx':
+        try:
+            writer.add_filter('distinct', distinct)
+            writer.render_book([attribute_data_display])
+            output = io.BytesIO()
+            writer.save(output)
         except Exception as exc:
             log.error('Error while rendering document', exc)
     else:
