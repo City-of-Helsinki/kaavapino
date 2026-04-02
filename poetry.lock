@@ -3134,6 +3134,22 @@ files = [
 dev = ["pytest", "setuptools"]
 
 [[package]]
+name = "xlrd"
+version = "2.0.2"
+description = "Library for developers to extract data from Microsoft Excel (tm) .xls spreadsheet files"
+optional = false
+python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
+files = [
+    {file = "xlrd-2.0.2-py2.py3-none-any.whl", hash = "sha256:ea762c3d29f4cca48d82df517b6d89fbce4db3107f9d78713e48cd321d5c9aa9"},
+    {file = "xlrd-2.0.2.tar.gz", hash = "sha256:08b5e25de58f21ce71dc7db3b3b8106c1fa776f3024c54e45b45b374e89234c9"},
+]
+
+[package.extras]
+build = ["twine", "wheel"]
+docs = ["sphinx"]
+test = ["pytest", "pytest-cov"]
+
+[[package]]
 name = "xlsxwriter"
 version = "3.2.9"
 description = "A Python module for creating Excel XLSX files."
@@ -3144,7 +3160,37 @@ files = [
     {file = "xlsxwriter-3.2.9.tar.gz", hash = "sha256:254b1c37a368c444eac6e2f867405cc9e461b0ed97a3233b2ac1e574efb4140c"},
 ]
 
+[[package]]
+name = "xltpl"
+version = "0.21"
+description = "A python module to generate xls/x files from a xls/x template"
+optional = false
+python-versions = "*"
+files = [
+    {file = "xltpl-0.21-py3-none-any.whl", hash = "sha256:422a84235f25df389815788eb4f4bcf33414fcf4f665cf5545c0186ba6896c2c"},
+    {file = "xltpl-0.21.tar.gz", hash = "sha256:b1970cd64f64ef18cf8deeedd9cbf6ad13de92d71ddffbff4cc70eaad20d61d0"},
+]
+
+[package.dependencies]
+jinja2 = "*"
+lxml = "*"
+openpyxl = ">=3.1.0"
+six = "*"
+xlrd = ">=1.2.0"
+xlwt = ">=1.3.0"
+
+[[package]]
+name = "xlwt"
+version = "1.3.0"
+description = "Library to create spreadsheet files compatible with MS Excel 97/2000/XP/2003 XLS files, on any platform, with Python 2.6, 2.7, 3.3+"
+optional = false
+python-versions = "*"
+files = [
+    {file = "xlwt-1.3.0-py2.py3-none-any.whl", hash = "sha256:a082260524678ba48a297d922cc385f58278b8aa68741596a87de01a9c628b2e"},
+    {file = "xlwt-1.3.0.tar.gz", hash = "sha256:c59912717a9b28f1a3c2a98fd60741014b06b043936dcecbc113eaaada156c88"},
+]
+
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<=3.14"
-content-hash = "10e150b526c01d6fc10b21d53aa6b4f9b40f5b56ae64be78c119434415df4180"
+content-hash = "20c02971d1f5c6e9ee890d3e151d23f386524b7bc6038178d5c9621725a2f6a1"
