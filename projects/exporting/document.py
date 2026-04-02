@@ -20,7 +20,7 @@ from django.utils import timezone
 from django.core.cache import cache
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
-from PIL import UnidentifiedImageError
+from PIL import Image as PImage, UnidentifiedImageError
 from ..models import Attribute, ProjectPhase, ProjectAttributeFile, ProjectPhaseSectionAttribute
 from ..models.utils import create_identifier
 from projects.helpers import (
@@ -211,6 +211,21 @@ def get_super(_script):
         return True
     else:
         return False
+
+
+def validate_image(value):
+    try:
+        with PImage.open(value) as image:
+            if image.format == "JPEG" and image.mode == "CMYK":
+                log.info(f"Converting CMYK image to RGB: {value}")
+                image = image.convert("RGB")
+                image.save(value)
+        return value
+    except Exception as exc:
+        log.error(f"Error validating image: {value}", exc)
+        return None
+
+
 def render_template(project, document_template, preview):
 
     def fetch_relevant_attributes(doc):
@@ -314,19 +329,20 @@ def render_template(project, document_template, preview):
             return (display_list, raw_list, element_data, raw_to_display_mapped)
 
         if attribute.value_type == Attribute.TYPE_IMAGE and value:
+            image = validate_image(value)
             if doc_type == 'docx':
                 try:
                     if "kansikuva" in attribute.identifier:
-                        display_value = InlineImage(doc, value, width=Mm(212), height=Mm(172))
+                        display_value = InlineImage(doc, image, width=Mm(212), height=Mm(172))
                     elif attribute.identifier in ["sijaintikartta", "kaavakartta_a4", "havainnekuva", "kuvaliite_suojelukohteet", "ilmakuva"]:
-                        display_value = InlineImage(doc, value, width=Mm(170))
+                        display_value = InlineImage(doc, image, width=Mm(170))
                     else:
-                        display_value = InlineImage(doc, value, width=Mm(150))
+                        display_value = InlineImage(doc, image, width=Mm(150))
                 except (FileNotFoundError, UnidentifiedImageError):
                     log.error(f'Image not found or is corrupted at {value}')
                     display_value = None
             else:
-                display_value = value
+                display_value = image
         else:
             display_value = attribute.get_attribute_display(value)
 
