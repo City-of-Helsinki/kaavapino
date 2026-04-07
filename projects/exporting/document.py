@@ -20,7 +20,7 @@ from django.utils import timezone
 from django.core.cache import cache
 from docx.shared import Mm
 from docxtpl import DocxTemplate, InlineImage, Listing, RichText
-from xlsxtpl.writerx import BookWriter
+from xltpl.writerx import BookWriter
 from PIL import Image as PImage, UnidentifiedImageError
 from ..models import Attribute, ProjectPhase, ProjectAttributeFile, ProjectPhaseSectionAttribute
 from ..models.utils import create_identifier
