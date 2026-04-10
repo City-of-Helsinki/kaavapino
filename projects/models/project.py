@@ -835,30 +835,70 @@ class Project(models.Model):
         self.save()
 
     def update_deadlines_on_subtype_change(self):
-        # When subtype changes, we need to update deadlines to match the new subtype's requirements.
-        # This means adding new deadlines, and removing inapplicable deadlines.
-        # However, we should NOT recalculate deadlines here - just add/remove based on new subtype's applicable deadlines.
-        # This may lead to deadlines with invalid states, and it will be the user's responsibility to update them.
-        applicable_deadlines = self.get_applicable_deadlines(for_record_existence=True)
-        old_pdls = {p_dl.deadline.attribute.identifier: p_dl for p_dl in self.deadlines.all().select_related("deadline") if p_dl.deadline.attribute}
-        old_dls = [p_dl.deadline for p_dl in self.deadlines.all()]
+        applicable_deadlines = list(self.get_applicable_deadlines(initial=True))
+        existing_project_deadlines = list(
+            self.deadlines.all().select_related(
+                "deadline",
+                "deadline__attribute",
+                "deadline__phase",
+                "deadline__confirmation_attribute",
+            )
+        )
+
+        project_deadlines_by_deadline = {
+            project_deadline.deadline: project_deadline
+            for project_deadline in existing_project_deadlines
+        }
+        project_deadlines_by_identifier = {
+            project_deadline.deadline.attribute.identifier: project_deadline
+            for project_deadline in existing_project_deadlines
+            if project_deadline.deadline.attribute
+        }
+
+        applicable_identifiers = {
+            deadline.attribute.identifier
+            for deadline in applicable_deadlines
+            if deadline.attribute
+        }
         updated_project_deadlines = []
+        completely_new_deadlines = []
+
         for deadline in applicable_deadlines:
-            # If subtype changed, the dl should always be new. If draft/principles changed, it may exist so dont update it
-            if not deadline in old_dls:
-                old_date = None
-                is_newly_added = False
-                if deadline.attribute and deadline.attribute.identifier in old_pdls:
-                    old_date = old_pdls[deadline.attribute.identifier].date
-                elif deadline.attribute:
-                    is_newly_added = True
-                new_project_deadline = ProjectDeadline.objects.create(
-                    project=self,
-                    deadline=deadline,
-                    generated=is_newly_added,
-                    date=old_date,
+            existing_project_deadline = project_deadlines_by_deadline.get(deadline)
+            if existing_project_deadline:
+                updated_project_deadlines.append(existing_project_deadline)
+                continue
+
+            source_project_deadline = None
+            if deadline.attribute:
+                source_project_deadline = project_deadlines_by_identifier.get(
+                    deadline.attribute.identifier
                 )
-                updated_project_deadlines.append(new_project_deadline)
+
+            new_project_deadline = ProjectDeadline.objects.create(
+                project=self,
+                deadline=deadline,
+                generated=(
+                    source_project_deadline.generated if source_project_deadline else True
+                ),
+                date=source_project_deadline.date if source_project_deadline else None,
+                edited=(
+                    source_project_deadline.edited if source_project_deadline else None
+                ),
+                editable=(
+                    source_project_deadline.editable if source_project_deadline else True
+                ),
+            )
+            if deadline.deadlinegroup:
+                vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
+                if vis_bool and vis_bool not in self.attribute_data:
+                    self.attribute_data[vis_bool] = (
+                        True if deadline.deadlinegroup.endswith("1") else False
+                    )
+
+            updated_project_deadlines.append(new_project_deadline)
+            if not source_project_deadline:
+                completely_new_deadlines.append(deadline)
 
         if self.attribute_data.get('projektin_kaynnistys_pvm'):
             u1_value = self.attribute_data['projektin_kaynnistys_pvm']
@@ -871,17 +911,105 @@ class Project(models.Model):
 
         # Delete only deadlines that are truly inapplicable (wrong subtype or excluded phase)
         # NOT deadlines that are just hidden due to condition_attributes (vis_bool=False)
-        to_be_deleted = self.deadlines.exclude(deadline__in=applicable_deadlines)
+        to_be_deleted = [
+            project_deadline
+            for project_deadline in existing_project_deadlines
+            if project_deadline.deadline not in applicable_deadlines
+        ]
 
         for dl in to_be_deleted:
             self.deadlines.remove(dl)
             dl.delete()
             # Remove from attribute data if the dl is not applicable to the new subtype
             if dl.deadline.attribute and dl.deadline.attribute.identifier in self.attribute_data:
-                if not dl.deadline.attribute.identifier in [deadline.attribute.identifier for deadline in applicable_deadlines if deadline.attribute]:
+                if dl.deadline.attribute.identifier not in applicable_identifiers:
                     self.attribute_data.pop(dl.deadline.attribute.identifier)
 
         self.deadlines.set(updated_project_deadlines)
+
+        locked_deadlines = {
+            project_deadline.deadline
+            for project_deadline in self.deadlines.all().select_related(
+                "deadline",
+                "deadline__attribute",
+                "deadline__confirmation_attribute",
+            )
+            if project_deadline.confirmed
+        }
+        confirmed_fields = {
+            deadline.attribute.identifier: True
+            for deadline in locked_deadlines
+            if deadline.attribute
+        }
+
+        initial_deadlines_to_calculate = [
+            deadline
+            for deadline in completely_new_deadlines
+            if deadline not in locked_deadlines
+            and (deadline.initial_calculations.exists() or deadline.default_to_created_at)
+        ]
+        if initial_deadlines_to_calculate:
+            self._set_calculated_deadlines(
+                initial_deadlines_to_calculate,
+                None,
+                initial=True,
+                ignore=[
+                    deadline
+                    for deadline in applicable_deadlines
+                    if deadline not in initial_deadlines_to_calculate
+                ],
+                confirmed_fields=confirmed_fields,
+            )
+
+        current_phase_index = self.phase.index if self.phase else None
+        current_or_future_new_deadlines = [
+            deadline
+            for deadline in completely_new_deadlines
+            if current_phase_index is None or deadline.phase.index >= current_phase_index
+        ]
+        if current_or_future_new_deadlines:
+            first_new_deadline = min(
+                current_or_future_new_deadlines,
+                key=lambda deadline: (deadline.phase.index, deadline.index),
+            )
+            deadlines_to_recalculate = [
+                deadline
+                for deadline in applicable_deadlines
+                if (current_phase_index is None or deadline.phase.index >= current_phase_index)
+                and (
+                    deadline.phase.index > first_new_deadline.phase.index
+                    or (
+                        deadline.phase.index == first_new_deadline.phase.index
+                        and deadline.index >= first_new_deadline.index
+                    )
+                )
+                and deadline not in locked_deadlines
+            ]
+            if deadlines_to_recalculate:
+                self._set_calculated_deadlines(
+                    deadlines_to_recalculate,
+                    None,
+                    initial=False,
+                    ignore=[
+                        deadline
+                        for deadline in applicable_deadlines
+                        if deadline not in deadlines_to_recalculate
+                    ],
+                    confirmed_fields=confirmed_fields,
+                )
+
+        dls_to_update = []
+        for dl in self.deadlines.all().select_related("deadline__attribute"):
+            if not dl.deadline.attribute:
+                continue
+
+            value = self.attribute_data.get(dl.deadline.attribute.identifier)
+            value = value if value != 'null' else None
+            if dl.date != value:
+                dl.date = value
+                dls_to_update.append(dl)
+        self.deadlines.bulk_update(dls_to_update, ['date'])
+
         self.save()
 
     # Calculate a preview schedule without saving anything
