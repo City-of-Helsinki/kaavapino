@@ -1983,7 +1983,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         subtype_changed = subtype is not None and subtype != instance.subtype
         phase = validated_data.get("phase")
         phase_changed = phase is not None and phase != instance.phase
-        draft_principles_changed = 'create_draft' in validated_data or 'create_principles' in validated_data
+        draft_principles_changed = (
+            ('create_draft' in validated_data and 
+             self.instance.create_draft != validated_data['create_draft']) or
+            ('create_principles' in validated_data and 
+             self.instance.create_principles != validated_data['create_principles'])
+        )
+
         should_generate_deadlines = getattr(
             self.context["request"], "GET", {}
         ).get("generate_schedule") in ["1", "true", "True"]
@@ -2079,8 +2085,20 @@ class ProjectSerializer(serializers.ModelSerializer):
                     confirmed_fields=confirmed_fields,
                     timing_metrics=self.context.get("validation_metrics"),
                 )
-            elif subtype_changed or draft_principles_changed:
-                project.update_deadlines_on_subtype_change() 
+            elif subtype_changed:
+                log.info("Attempting soft update")
+                if not project.update_deadlines_on_subtype_change():
+                    log.info("Soft update of deadlines failed on subtype change, performing hard update.")
+                    # Soft update failed, recalculate everything
+                    project.update_deadlines(
+                        user=user,
+                        preview_attributes=attribute_data,
+                        confirmed_fields=confirmed_fields,
+                        timing_metrics=self.context.get("validation_metrics"),
+                        timeline_save=False,
+                    )
+                    project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
+                        .update(edited=timezone.now())
             elif should_update_deadlines:
                 # Per docs/timeline_workflow.md and validation.md:
                 # For timeline_save, NO RECALCULATION - just sync frontend values AS-IS
