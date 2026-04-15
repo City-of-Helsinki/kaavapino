@@ -48,6 +48,7 @@ MatrixSectionAttribute = namedtuple("MatrixSectionAttribute", ["matrix"])
 class AttributeChoiceSchemaSerializer(serializers.Serializer):
     label = serializers.CharField()
     value = serializers.CharField()
+    index = serializers.IntegerField()
 
 
 class ConditionSerializer(serializers.Serializer):
@@ -355,11 +356,12 @@ class AttributeSchemaSerializer(serializers.Serializer):
             choice_data["value_field"] if choice_data.get("value_field", None) else "pk"
         )
         choice_instances = model.objects.filter(**filters)
-        for choice in choice_instances:
+        for index, choice in enumerate(choice_instances):
             choices.append(
                 {
                     "label": label_format.format(instance=choice),
                     "value": getattr(choice, value_field),
+                    "index": index,
                 }
             )
         return choices
@@ -369,7 +371,7 @@ class AttributeSchemaSerializer(serializers.Serializer):
         choices = []
         choice_instances = attribute.value_choices.all()
         for choice in choice_instances:
-            choices.append({"label": choice.value, "value": choice.identifier})
+            choices.append({"label": choice.value, "value": choice.identifier, "index": choice.index})
         return choices
 
 

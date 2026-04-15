@@ -768,7 +768,14 @@ class AttributeValueChoice(models.Model):
         db_index=True,
         validators=[validate_identifier],
     )
-    index = models.PositiveIntegerField(verbose_name=_("index"), default=0)
+    # Added as a temporary field to store legacy identifiers to be able to migrate old project attribute_data
+    # to use new identifiers from Excel sheet "Pudotusvalinnat" see KAAV-2365
+    legacy_identifier = models.CharField(
+        max_length=512,
+        null=True,
+        blank=True
+    )
+    index = models.PositiveIntegerField(verbose_name=_("index"), default=0, null=True)
 
     class Meta:
         verbose_name = _("attribute value choice")
