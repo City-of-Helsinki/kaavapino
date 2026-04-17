@@ -24,6 +24,7 @@ env = environ.Env(
     ALLOWED_HOSTS=(list, []),
     CORS_ALLOWED_ORIGINS=(list, []),
     DATABASE_URL=(str, "postgis://kaavapino:kaavapino@localhost/kaavapino"),
+    DATABASE_PASSWORD=(str, ""),
     REDIS_URL=(str, "redis://localhost:6379/0"),
     REDIS_PASSWORD=(str, None),
     CACHE_URL=(str, "locmemcache://"),
@@ -118,6 +119,9 @@ JWT_AUTH = {
 DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
 DATABASES = {"default": env.db(engine='kaavapino.db_wrapper')}
+
+if env("DATABASE_PASSWORD"):
+    DATABASES["default"]["PASSWORD"] = env("DATABASE_PASSWORD")
 
 SENTINELS = []
 
