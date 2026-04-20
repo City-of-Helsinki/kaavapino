@@ -1348,14 +1348,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         # For timeline_save, include ALL deadline sections regardless of create_draft/create_principles
         # because the timeline view shows all phases
         timeline_save = self.context.get("timeline_save", False)
-        log.warning(f"[DEBUG SCHEDULE_SECTIONS] phase={phase.name}, timeline_save={timeline_save}, deadline_sections_count={deadline_sections.count()}")
         for section in deadline_sections:
-            log.warning(f"[DEBUG SCHEDULE_SECTIONS] Processing section: {section.name}, phase={section.phase.name}")
             if not timeline_save:
                 # Normal save: skip sections based on project settings
                 if section.phase.name == "Luonnos" and not self.instance.create_draft or (
                 section.phase.name == "Periaatteet" and not self.instance.create_principles):
-                    log.warning(f"[DEBUG SCHEDULE_SECTIONS] SKIPPING section {section.name} due to create_draft/create_principles")
                     continue
             serializer_class = create_section_serializer(
                 section,
@@ -1372,12 +1369,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         # DEADLINE_INTEGRITY_RULES: Do NOT clear date fields when vis_bool=False.
         # Visibility controls UI display only, not data existence.
         # Dates must ALWAYS exist for cascade calculation.
-        
-        log.warning("[DEBUG VALIDATE] ProjectSerializer.validate() called")
-        log.warning(f"[DEBUG VALIDATE] attrs keys: {list(attrs.keys())}")
-        if 'attribute_data' in attrs:
-            log.warning(f"[DEBUG VALIDATE] attribute_data keys: {list(attrs['attribute_data'].keys()) if attrs.get('attribute_data') else 'NONE'}")
-        
+
         archived = attrs.get('archived')
         was_archived = self.instance and self.instance.archived
 
@@ -1522,10 +1514,6 @@ class ProjectSerializer(serializers.ModelSerializer):
         return should_update_deadlines
 
     def _validate_attribute_data(self, attribute_data, validate_attributes, user, owner_edit_override):
-        log.warning("[DEBUG VALIDATE_DATA] _validate_attribute_data() called")
-        log.warning(f"[DEBUG VALIDATE_DATA] attribute_data keys: {list(attribute_data.keys()) if attribute_data else 'NONE'}")
-        log.warning(f"[DEBUG VALIDATE_DATA] validate_attributes keys: {list(validate_attributes.keys()) if validate_attributes else 'NONE'}")
-        
         attribute_cache = self.context.setdefault("attribute_cache", {})
         static_property_attributes = {}
         if self.instance:
@@ -1635,17 +1623,14 @@ class ProjectSerializer(serializers.ModelSerializer):
         
         preview = None
         timeline_save = self.context.get("timeline_save", False)
-        log.warning(f"[DEBUG TIMELINE_SAVE] timeline_save={timeline_save}, type={type(timeline_save)}, should_update_deadlines={should_update_deadlines}")
         if self.instance and should_update_deadlines:
             if timeline_save:
                 # Timeline save: use RAW request values for validation (no cascade)
                 # This ensures validation catches actual distance violations
-                log.warning("[DEBUG TIMELINE_SAVE] Using get_raw_deadline_preview for validation")
                 preview = self.instance.get_raw_deadline_preview(
                     attribute_data,
                     subtype,
                 )
-                log.warning(f"[DEBUG TIMELINE_SAVE] Raw preview has {len(preview) if preview else 0} keys")
             else:
                 # Normal save: use cascaded preview (existing behavior)
                 preview = self.instance.get_preview_deadlines(
@@ -1658,9 +1643,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         # Otherwise only current phase and upcoming phases are editable
         if timeline_save:
             # Timeline save: validate ALL phases (no exclusion)
-            log.warning("[DEBUG TIMELINE_SAVE] Processing ALL phases for timeline validation")
             for phase in ProjectPhase.objects.filter(project_subtype=subtype):
-                log.warning(f"[DEBUG TIMELINE_SAVE] Processing phase: {phase.name} (index={phase.index})")
                 sections_data += self.generate_sections_data(
                     phase=phase,
                     preview=preview,
@@ -1787,8 +1770,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                 if key in deadline_attr_ids and key not in valid_attributes:
                     # Direct pass-through: no validation, just accept the value
                     valid_attributes[key] = value
-                    log.warning(f"[DEBUG TIMELINE_SAVE] Added deadline attr to valid_attributes: {key}={value}")
-        
+
         # mostly invalid identifiers, but could be fieldset file fields
         unusual_identifiers = list(np.setdiff1d(
             list(attribute_data.keys()),
@@ -1994,16 +1976,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Project, validated_data: dict) -> Project:
         attribute_data = validated_data.pop("attribute_data", {})
-        
-        # DEBUG: Log what attribute_data is being sent during save
-        DEBUG_DATES = ['kaavaluonnos_esillaolo_aineiston_maaraaika', 'ehdotus_nahtaville_aineiston_maaraaika']
-        log.warning(f"[DEBUG SAVE] ProjectSerializer.update called. attribute_data keys count: {len(attribute_data)}\"")
-        for d in DEBUG_DATES:
-            if d in attribute_data:
-                log.warning(f"[DEBUG SAVE] Saving {d} = {attribute_data.get(d)}\"")
-            else:
-                log.warning(f"[DEBUG SAVE] {d} NOT in attribute_data. Current in DB: {instance.attribute_data.get(d)}\"")
-        
         confirmed_fields = self.context["confirmed_fields"]
         onhold = validated_data.get("onhold")
         onhold_changed = onhold is not None and onhold != instance.onhold
@@ -2069,7 +2041,26 @@ class ProjectSerializer(serializers.ModelSerializer):
             if should_update_deadlines or should_generate_deadlines:
                 old_deadlines = project.deadlines.all().select_related("deadline")
 
-            if should_generate_deadlines:
+            if draft_principles_changed:
+                cleared_attributes = {
+                    project_dl.deadline.attribute.identifier: None
+                    for project_dl in project.deadlines.all().select_related("deadline", "deadline__attribute")
+                    if not project_dl.edited and project_dl.deadline.attribute
+                }
+                cleared_cache = self._get_attribute_cache(cleared_attributes.keys())
+                project.update_attribute_data(
+                    cleared_attributes,
+                    attribute_cache=cleared_cache,
+                )
+                self.log_updates_attribute_data(cleared_attributes)
+                project.deadlines.filter(edited__isnull=True).delete()
+                project.update_deadlines(
+                    user=user,
+                    preview_attributes=attribute_data,
+                    confirmed_fields=confirmed_fields,
+                    timing_metrics=self.context.get("validation_metrics"),
+                )
+            elif should_generate_deadlines:
                 cleared_attributes = {
                     project_dl.deadline.attribute.identifier: None
                     for project_dl in project.deadlines.all().select_related("deadline", "deadline__attribute")

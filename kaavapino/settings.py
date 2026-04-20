@@ -58,6 +58,11 @@ env = environ.Env(
     ELASTIC_APM_SERVER_URL=(str, ""),
     ELASTIC_APM_SERVICE_NAME=(str, ""),
     ELASTIC_APM_SECRET_TOKEN=(str, ""),
+    AUDIT_LOG_ENV=(str, ""),
+    AUDIT_LOG_ES_URL=(str, ""),
+    AUDIT_LOG_ES_USERNAME=(str, ""),
+    AUDIT_LOG_ES_PASSWORD=(str, ""),
+    AUDIT_LOG_ES_INDEX=(str, ""),
 )
 
 env_file = project_root(".env")
@@ -190,6 +195,7 @@ INSTALLED_APPS = [
     "django_q",
     "drf_spectacular",
     "auditlog",
+    "resilient_logger"
 ]
 
 if env.str("ELASTIC_APM_SERVER_URL") and env.str("ELASTIC_APM_SECRET_TOKEN"):
@@ -259,6 +265,9 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
+        'resilient': {
+            "class": "resilient_logger.handlers.ResilientLogHandler",
+        },
         'stdout': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
@@ -353,3 +362,26 @@ SPECTACULAR_SETTINGS = {
 # Auditlog
 AUDITLOG_DISABLE_REMOTE_ADDR = False
 AUDITLOG_DISABLE_ON_RAW_SAVE = True
+
+# Resilient logger
+if env.str("AUDIT_LOG_ES_URL") and env.str("AUDIT_LOG_ES_USERNAME") and env.str("AUDIT_LOG_ES_PASSWORD") and env.str("AUDIT_LOG_ES_INDEX"):
+    RESILIENT_LOGGER = {
+        "origin": "Kaavapino",
+        "environment": env("AUDIT_LOG_ENV"),
+        "sources": [
+            { "class": "resilient_logger.sources.ResilientLogSource" },
+            { "class": "resilient_logger.sources.DjangoAuditLogSource" },
+        ],
+        "targets": [{
+            "class": "resilient_logger.targets.ElasticsearchLogTarget",
+            "es_url": env("AUDIT_LOG_ES_URL"),
+            "es_username": env("AUDIT_LOG_ES_USERNAME"),
+            "es_password": env("AUDIT_LOG_ES_PASSWORD"),
+            "es_index": env("AUDIT_LOG_ES_INDEX"),
+            "required": True
+        }],
+        "batch_limit": 5000,
+        "chunk_size": 500,
+        "submit_unsent_entries": True,
+        "clear_sent_entries": True,
+    }

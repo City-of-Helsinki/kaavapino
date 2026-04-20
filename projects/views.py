@@ -944,17 +944,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         confirmed_fields = request.data.get('confirmed_fields', [])
         original_attribute_data = request.data.get('attribute_data', {})
 
-        log.debug(f"[DEBUG VIEWS] update() called. fake={fake}, timeline_save={timeline_save}")
-        log.debug(f"[DEBUG VIEWS] confirmed_fields={confirmed_fields}")
-        log.debug(f"[DEBUG VIEWS] attribute_data keys: {list(original_attribute_data.keys()) if original_attribute_data else 'EMPTY'}")
-
         if not fake:
             # Actual update logic that saves to db
             return super().update(request, *args, **kwargs)
 
         # Fast path for validation-only (fake) requests
         project = self.get_object()
-        log.debug("[DEBUG VIEWS] fake=true path: calling get_preview_deadlines for project %s", project.pk)
 
         # Get preview deadlines (corrected dates)
         preview = project.get_preview_deadlines(
