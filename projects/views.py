@@ -1569,12 +1569,21 @@ class ReportViewSet(ReadOnlyModelViewSet):
             identifier__in=params.keys()
         )
         if report.name == "Tietopyyntö":
-            projects = set()
+            projects = None
             for report_filter in filters:
-                projects.update(report_filter.filter_data_request(
-                    params.get(report_filter.identifier),
-                    queryset=projects or Project.objects.all(),
-                ))
+                filter_value = params.get(report_filter.identifier)
+                if isinstance(filter_value, str):
+                    filter_value = filter_value.strip()
+
+                if not filter_value:
+                    continue
+
+                projects = report_filter.filter_data_request(
+                    filter_value,
+                    queryset=projects if projects is not None else Project.objects.all(),
+                )
+
+            return projects if projects is not None else Project.objects.all()
         elif report.name == "Keskeytyneet projektit":
             projects = Project.objects.filter(onhold=True, public=True)
             for report_filter in filters:
@@ -1591,10 +1600,6 @@ class ReportViewSet(ReadOnlyModelViewSet):
                     queryset=projects,
                 )
         return projects
-
-    def _remove_from_queue(self, *args, **kwargs):
-        pass
-
 
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
