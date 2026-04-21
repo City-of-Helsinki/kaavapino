@@ -38,6 +38,7 @@ resources:
     # Azure DevOps repository
     - repository: kaavapino-pipelines
       type: git
+      ref: ansible_automation_update
       # Azure DevOps project/repository
       name: kaavapino/kaavapino-pipelines
 
