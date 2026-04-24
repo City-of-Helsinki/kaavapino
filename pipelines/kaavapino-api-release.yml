@@ -2,10 +2,20 @@
 # an update to the specified branches or you push specified tags.
 trigger:
   batch: true
-  tags:
+  # tags:
+  #   include:
+  #     - kaavapino-v*
+  branches:
     include:
-      - kaavapino-v*
-
+      - master
+  paths:
+    exclude:
+    - '*release-please*'
+    - '*.md'
+    - '.github/'
+    - 'pipelines/kaavapino-api-dev.yml'
+    - 'pipelines/kaavapino-api-review.yml'
+    - '*compose*'
 # Pull request (PR) triggers cause a pipeline to run whenever a pull request is
 # opened with one of the specified target branches, or when updates are made to
 # such a pull request.
