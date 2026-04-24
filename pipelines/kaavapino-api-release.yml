@@ -13,7 +13,7 @@ trigger:
     - '*release-please*'
     - '*.md'
     - '.github/'
-    - 'pipelines/kaavapino-api-dev.yml'
+    - 'pipelines/kaavapino-api-devtest.yml'
     - 'pipelines/kaavapino-api-review.yml'
     - '*compose*'
 # Pull request (PR) triggers cause a pipeline to run whenever a pull request is

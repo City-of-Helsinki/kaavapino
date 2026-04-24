@@ -27,7 +27,7 @@ pr:
     - '*.md'
     - '.github/'
     - 'pipelines/kaavapino-api-release.yml'
-    - 'pipelines/kaavapino-api-dev.yml'
+    - 'pipelines/kaavapino-api-devtest.yml'
     - '*compose*'
 
 # By default, use self-hosted agents

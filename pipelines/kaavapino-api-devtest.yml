@@ -38,7 +38,7 @@ resources:
 
 extends:
   # Filename in Azure DevOps Repository
-  template: components/kaavapino-api/pipelines/kaavapino-api-dev.yml@kaavapino-pipelines
+  template: components/kaavapino-api/pipelines/kaavapino-api-devtest.yml@kaavapino-pipelines
   # parameters:
     # Application build arguments and config map values as key value pairs.
     # Does not contain all buildArguments or configMap values, the rest located in kaavapino-pipelines
