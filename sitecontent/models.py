@@ -119,7 +119,7 @@ class ExcelFile(models.Model):
         verbose_name=_("update date"), null=True
     )
     options = models.CharField(
-        max_length=32, null=True, default='{"kv":"1.0"}'
+        max_length=32, null=True, default='{}'
     )
     task_id = models.CharField(
         max_length=64, null=True
