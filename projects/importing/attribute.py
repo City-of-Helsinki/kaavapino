@@ -1130,8 +1130,8 @@ class AttributeImporter:
         choice_options_rows = self._rows_for_sheet(self.workbook[CHOICE_OPTIONS_SHEET_NAME])
 
         for index, choice_option_row in enumerate(choice_options_rows):
-            identifier = choice_option_row[0]
-            value = choice_option_row[1]
+            identifier = choice_option_row[1]
+            value = choice_option_row[2]
 
             if not identifier or not value or identifier.startswith("#"):
                 continue
@@ -1142,7 +1142,6 @@ class AttributeImporter:
 
     def _create_attribute_choices(self, attribute, row, values_by_identifier) -> int:
         AttributeValueChoice.objects.filter(attribute=attribute).update(index=None)  # Reset indexes
-        existing_choices_by_id = {a.pk: a for a in AttributeValueChoice.objects.filter(attribute=attribute)}
 
         created_choices_count = 0
         choices_rows = self._rows_for_sheet(self.workbook[CHOICES_SHEET_NAME])
@@ -1176,7 +1175,6 @@ class AttributeImporter:
                     value_choice.value = value
                     value_choice.index = index
                     value_choice.save()
-                    existing_choices_by_id.pop(value_choice.pk, None)
                 else:
                     AttributeValueChoice.objects.create(
                         attribute=attribute,
@@ -1188,12 +1186,6 @@ class AttributeImporter:
                     created_choices_count += 1
             except IntegrityError:
                 logger.warning(f'Duplicate choice "{value} ({identifier})" for {attribute}, ignoring row')
-
-            # Set visibility to False for deleted value choices instead of deleting them
-            if existing_choices_by_id:
-                for choice in existing_choices_by_id.values():
-                    choice.index = None
-                    choice.save()
 
         return created_choices_count
 
