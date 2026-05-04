@@ -49,8 +49,6 @@ DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edellisee
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 DEADLINE_GROUP = "(v1.1) ryhmä"
 
-DEADLINE_V11 = "rivi koskee versiota 1.1"
-
 # Date type row indices
 DATETYPE_NAME_INDEX = 0
 DATETYPE_EXCLUDE_TYPE_INDEX = 1
@@ -137,14 +135,6 @@ class DeadlineImporter:
                 self.column_index[column.lower()] = index
 
     def _check_if_row_valid(self, row: Sequence) -> bool:
-        v11 = row[self.column_index[DEADLINE_V11]]
-
-        if self.options.get("kv") == "1.0" and v11 == "kyllä":
-            return False
-
-        if self.options.get("kv") == "1.1" and v11 == "ei":
-            return False
-
         """Check if the row has all required data."""
         try:
             assert(row[self.column_index[DEADLINE_ABBREVIATION]])
@@ -533,6 +523,10 @@ class DeadlineImporter:
             for index, (conds, calc) in enumerate(conditions_parsed):
                 condition_attributes = []
                 not_condition_attributes = []
+
+                if len(conds) == 1 and " and " in conds[0]:
+                    conds = conds[0].split(" and ")
+
                 subtype_conds = [
                     cond for cond in conds
                     if cond[:25] == "kaavaprosessin_kokoluokka"

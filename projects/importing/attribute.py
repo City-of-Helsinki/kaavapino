@@ -58,6 +58,7 @@ PROJECT_SIZE = "prosessin kokoluokka, joissa kenttä näkyy"
 
 DEFAULT_SHEET_NAME = "Kaavaprojektitiedot"
 CHOICES_SHEET_NAME = "Pudotusvalikot"
+CHOICE_OPTIONS_SHEET_NAME = "Pudotusvalinnat"
 
 ATTRIBUTE_NAME = "projektitieto"
 ATTRIBUTE_IDENTIFIER = "projektitieto tunniste"
@@ -98,8 +99,6 @@ ATTRIBUTE_ERROR_UNIQUE = [
 ]
 ATTRIBUTE_AUTO_VALUE_KEY_FIELD = "yhteystietojen automaattisen täytön lähdekenttä"
 ATTRIBUTE_AUTO_VALUE_MAPPING = "yhteystietojen automaattisen täytön avain-arvoparit"
-
-ATTRIBUTE_V11 = "rivi koskee versiota 1.1"
 
 # Attribute object mappings for static Project fields
 STATIC_ATTRIBUTES_MAPPING = {
@@ -609,14 +608,6 @@ class AttributeImporter:
         name = row[self.column_index[ATTRIBUTE_NAME]]
         attr_type = row[self.column_index[ATTRIBUTE_TYPE]]
 
-        v11 = row[self.column_index[ATTRIBUTE_V11]]
-
-        if self.options.get("kv") == "1.0" and v11 == "kyllä":
-            return False
-
-        if self.options.get("kv") == "1.1" and v11 == "ei":
-            return False
-
         if name and attr_type:
             return True
 
@@ -739,6 +730,8 @@ class AttributeImporter:
         existing_attribute_ids = set(
             Attribute.objects.all().values_list("identifier", flat=True)
         )
+
+        values_by_identifier = self._get_values_by_identifier()
 
         imported_attribute_ids = set()
         created_attribute_count = 0
@@ -989,7 +982,7 @@ class AttributeImporter:
 
             choices_ref = row[self.column_index[ATTRIBUTE_CHOICES_REF]]
             if choices_ref:
-                created_choices_count += self._create_attribute_choices(attribute, row)
+                created_choices_count += self._create_attribute_choices(attribute, row, values_by_identifier)
             else:
                 AttributeValueChoice.objects.filter(attribute=attribute).delete()
 
@@ -1090,7 +1083,7 @@ class AttributeImporter:
                     if auto_attr.key_attribute.value_choices.count():
                         try:
                             key = auto_attr.key_attribute.value_choices \
-                                .get(value=key).identifier
+                                .get(index__isnull=False, value=key).identifier
                         except AttributeValueChoice.DoesNotExist:
                             pass
 
@@ -1122,8 +1115,23 @@ class AttributeImporter:
 
         return True, calculations
 
-    def _create_attribute_choices(self, attribute, row) -> int:
-        AttributeValueChoice.objects.filter(attribute=attribute).delete()
+    def _get_values_by_identifier(self):
+        values_by_identifier = {}
+        choice_options_rows = self._rows_for_sheet(self.workbook[CHOICE_OPTIONS_SHEET_NAME])
+
+        for index, choice_option_row in enumerate(choice_options_rows):
+            identifier = choice_option_row[1]
+            value = choice_option_row[2]
+
+            if not identifier or not value or identifier.startswith("#"):
+                continue
+
+            values_by_identifier[identifier] = value
+
+        return values_by_identifier
+
+    def _create_attribute_choices(self, attribute, row, values_by_identifier) -> int:
+        AttributeValueChoice.objects.filter(attribute=attribute).update(index=None)  # Reset indexes
 
         created_choices_count = 0
         choices_rows = self._rows_for_sheet(self.workbook[CHOICES_SHEET_NAME])
@@ -1137,31 +1145,37 @@ class AttributeImporter:
 
         for index, choice_row in enumerate(choices_rows):
             if column_index < 0:
-                choice = choice_row
+                identifier = choice_row
             elif index == 0:
                 continue
             else:
-                choice = choice_row[column_index]
+                identifier = choice_row[column_index]
 
-            identifier = self._get_identifier_for_value(str(choice))
-            if not choice:
+            if not identifier:
                 break
 
+            value = values_by_identifier.get(identifier, identifier)
+            legacy_identifier = self._get_identifier_for_value(str(value))
+
             try:
-                _, created = AttributeValueChoice.objects.update_or_create(
-                    attribute=attribute,
-                    identifier=identifier,
-                    defaults={
-                        "index": index,
-                        "value": choice,
-                    }
-                )
+                value_choice = (AttributeValueChoice.objects.filter(attribute=attribute, identifier=identifier).first()
+                                or AttributeValueChoice.objects.filter(attribute=attribute, legacy_identifier=legacy_identifier).first())
+                if value_choice:
+                    value_choice.identifier = identifier
+                    value_choice.value = value
+                    value_choice.index = index
+                    value_choice.save()
+                else:
+                    AttributeValueChoice.objects.create(
+                        attribute=attribute,
+                        legacy_identifier=legacy_identifier,
+                        identifier=identifier,
+                        value=value,
+                        index=index,
+                    )
+                    created_choices_count += 1
             except IntegrityError:
-                logger.warning(f'Duplicate choice "{choice} ({identifier})" for {attribute}, ignoring row')
-
-            if created:
-                created_choices_count += 1
-
+                logger.warning(f'Duplicate choice "{value} ({identifier})" for {attribute}, ignoring row')
 
         return created_choices_count
 

@@ -144,7 +144,6 @@ class ExcelFileAdmin(admin.ModelAdmin):
         'status',
         'task_id',
         'updated',
-        'options',
     )
     readonly_fields = (
         'uploaded',
@@ -157,7 +156,6 @@ class ExcelFileAdmin(admin.ModelAdmin):
     fields = (
         *readonly_fields,
         'file',
-        'options',
     )
     actions = [activate]
 

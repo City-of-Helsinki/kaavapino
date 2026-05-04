@@ -115,7 +115,7 @@ from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateS
 from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
-
+from PIL import Image
 
 log = logging.getLogger(__name__)
 
@@ -407,7 +407,18 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             context = self.get_serializer_context()
             serializer = ProjectFileSerializer(data=request.data, context=context)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            instance = serializer.save()
+
+            if instance.attribute.value_type == Attribute.TYPE_IMAGE:
+                file_path = instance.file.path
+                try:
+                    with Image.open(file_path) as image:
+                        if image.format == "JPEG" and image.mode == "CMYK":
+                            log.info(f"Converting CMYK image to RGB: {file_path}")
+                            image = image.convert("RGB")
+                            image.save(file_path)
+                except Exception as exc:
+                    log.error(f"Error validating image: {file_path}", exc)
 
             return Response(serializer.data)
         except FileScanException as fse:
@@ -943,26 +954,21 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # should prevent confirmed fields from moving when updating or validating 
         confirmed_fields = request.data.get('confirmed_fields', [])
         original_attribute_data = request.data.get('attribute_data', {})
-        
-        log.warning(f"[DEBUG VIEWS] update() called. fake={fake}, timeline_save={timeline_save}")
-        log.warning(f"[DEBUG VIEWS] confirmed_fields={confirmed_fields}")
-        log.warning(f"[DEBUG VIEWS] attribute_data keys: {list(original_attribute_data.keys()) if original_attribute_data else 'EMPTY'}")
-        
+
         if not fake:
             # Actual update logic that saves to db
             return super().update(request, *args, **kwargs)
-        
+
         # Fast path for validation-only (fake) requests
         project = self.get_object()
-        log.warning("[DEBUG VIEWS] fake=true path: calling get_preview_deadlines for project %s", project.pk)
-        
+
         # Get preview deadlines (corrected dates)
         preview = project.get_preview_deadlines(
             original_attribute_data,
             project.subtype,
             confirmed_fields,
         )
-        
+
         # Build result from preview values
         result_attribute_data = {}
         if preview:
@@ -979,12 +985,12 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
                 # ALSO include non-deadline keys pushed by backend (visibility bools etc.)
                 elif isinstance(key, str):
                     result_attribute_data[key] = value
-        
+
         # For any payload keys not in result, keep original (for booleans etc)
         for key in original_attribute_data:
             if key not in result_attribute_data:
                 result_attribute_data[key] = original_attribute_data[key]
-        
+
         return Response({"attribute_data": result_attribute_data})
 
 
@@ -1569,12 +1575,7 @@ class ReportViewSet(ReadOnlyModelViewSet):
             identifier__in=params.keys()
         )
         if report.name == "Tietopyyntö":
-            projects = set()
-            for report_filter in filters:
-                projects.update(report_filter.filter_data_request(
-                    params.get(report_filter.identifier),
-                    queryset=projects or Project.objects.all(),
-                ))
+            return self._get_tietopyynto_project_queryset(filters, params)
         elif report.name == "Keskeytyneet projektit":
             projects = Project.objects.filter(onhold=True, public=True)
             for report_filter in filters:
@@ -1592,9 +1593,22 @@ class ReportViewSet(ReadOnlyModelViewSet):
                 )
         return projects
 
-    def _remove_from_queue(self, *args, **kwargs):
-        pass
+    def _get_tietopyynto_project_queryset(self, filters, params):
+        projects = None
+        for report_filter in filters:
+            filter_value = params.get(report_filter.identifier)
+            if isinstance(filter_value, str):
+                filter_value = filter_value.strip()
 
+            if not filter_value:
+                continue
+
+            projects = report_filter.filter_data_request(
+                filter_value,
+                queryset=projects if projects is not None else Project.objects.all(),
+            )
+
+        return projects if projects is not None else Project.objects.all()
 
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")

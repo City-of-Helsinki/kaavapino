@@ -305,6 +305,9 @@ class ProjectAdmin(OSMGeoAdmin):
         instances = formset.save(commit=False)
         for instance in instances:
             if isinstance(instance, ProjectDeadline) and instance.deadline.attribute:
+                instance.editable = False
+                instance.save()
+
                 project = instance.project
                 project.attribute_data[instance.deadline.attribute.identifier] = instance.date
                 project.save()

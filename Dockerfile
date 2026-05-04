@@ -1,5 +1,5 @@
 ##### Compile image #####
-FROM registry.access.redhat.com/ubi8/python-39 AS compile-image
+FROM registry.access.redhat.com/ubi8/python-312 AS compile-image
 
 USER root
 ENV APP_NAME kaavapino
