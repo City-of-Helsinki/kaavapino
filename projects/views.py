@@ -115,7 +115,7 @@ from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateS
 from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
-
+from PIL import Image
 
 log = logging.getLogger(__name__)
 
@@ -407,7 +407,18 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             context = self.get_serializer_context()
             serializer = ProjectFileSerializer(data=request.data, context=context)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            instance = serializer.save()
+
+            if instance.attribute.value_type == Attribute.TYPE_IMAGE:
+                file_path = instance.file.path
+                try:
+                    with Image.open(file_path) as image:
+                        if image.format == "JPEG" and image.mode == "CMYK":
+                            log.info(f"Converting CMYK image to RGB: {file_path}")
+                            image = image.convert("RGB")
+                            image.save(file_path)
+                except Exception as exc:
+                    log.error(f"Error validating image: {file_path}", exc)
 
             return Response(serializer.data)
         except FileScanException as fse:
