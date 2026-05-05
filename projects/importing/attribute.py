@@ -256,14 +256,14 @@ DEFAULT_DATA_RETENTION_PLAN = DATA_RETENTION_PLANS["tieto tallennetaan pysyväst
 PROJECT_PHASES = {
     Phases.START.value: {
         "name": Phases.START.value,
-        "color": "color-tram",
-        "color_code": "#02d7a7",
+        "color": "color-copper",
+        "color_code": "#00d7a7",
         "list_prefix": "1",
     },  # None
     Phases.PRINCIPLES.value: {
         "name": Phases.PRINCIPLES.value,
-        "color": 'color-green',
-        "color_code": '#009246',
+        "color": 'color-tram',
+        "color_code": '#008741',
         "list_prefix": "XL",
     },
     Phases.OAS.value: {
@@ -293,13 +293,13 @@ PROJECT_PHASES = {
     Phases.APPROVAL.value: {
         "name": Phases.APPROVAL.value,
         "color": "color-gold",
-        "color_code": "#bd9650",
+        "color_code": "#c2a251",
         "list_prefix": "5",
     },  # 06, 07 <- Kvsto
     Phases.GOING_INTO_EFFECT.value: {
         "name": Phases.GOING_INTO_EFFECT.value,
         "color": "color-fog",
-        "color_code": "#9ec8eb",
+        "color_code": "#9fc9eb",
         "list_prefix": "6",
     },
 }
