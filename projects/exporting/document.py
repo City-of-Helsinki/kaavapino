@@ -387,9 +387,15 @@ def render_template(project, document_template, preview):
 
                 with build_url_id_lock:
                     text_args = {
-                        "color": "#d0c873" if empty else "#79a6b5",
                         "url_id": doc.build_url_id(edit_url) if doc_type == 'docx' else edit_url,
                     }
+                    if empty:
+                        text_args["color"] = "#666666"
+                        text_args["underline"] = True
+                    else:
+                        # For templates made in Finnish version of Word ("Hyperlink" for English)
+                        # Implement language detection later if necessary
+                        text_args["style"] = "Hyperlinkki"
             else:
                 text_args = {}
 
