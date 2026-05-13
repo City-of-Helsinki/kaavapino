@@ -384,8 +384,8 @@ if env.str("AUDIT_LOG_ES_URL") and env.str("AUDIT_LOG_ES_USERNAME") and env.str(
             "es_index": env("AUDIT_LOG_ES_INDEX"),
             "required": True
         }],
-        "batch_limit": 5000,
-        "chunk_size": 500,
+        "batch_limit": 1000,
+        "chunk_size": 100,
         "submit_unsent_entries": True,
         "clear_sent_entries": True,
     }
