@@ -808,12 +808,12 @@ def check_visibility(project, attribute):
             if attribute_data_value is not None:
                 if operator == "==":
                     if comparison_value_type == "boolean":
-                        return attribute_data_value is not None
+                        return attribute_data_value == True if attribute_data_value is not None else False
                     else:
                         return attribute_data_value == comparison_value
                 elif operator == "!=":
                     if comparison_value_type == "boolean":
-                        return attribute_data_value is None
+                        return attribute_data_value == False if attribute_data_value is not None else False
                     else:
                         return attribute_data_value != comparison_value
         except Exception as ex:
