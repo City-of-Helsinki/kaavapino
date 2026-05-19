@@ -772,28 +772,26 @@ def safe_float(value):
     except Exception as exc:
         return float(0)
 
+# Used to format values into booleans in check_visibility
+def safe_bool(value):
+    try:
+        if isinstance(value, bool):
+            return value
+
+        str_value = str(value).lower()
+        if str_value == 'true':
+            return True
+        elif str_value == 'false':
+            return False
+        elif len(str_value) > 0:  # Used when comparing against e.g. dates whether they're empty or not
+            return True
+        else:
+            return False
+    except Exception as exc:
+        print(f'Error checking value {value} for boolean conversion')
+        return None
 
 def check_visibility(project, attribute):
-
-    hide_conditions = attribute.hide_conditions
-    if hide_conditions is not None and len(hide_conditions) > 0:
-        for hide_condition in hide_conditions:
-            try:
-                operator = hide_condition["operator"]
-                variable = hide_condition["variable"]
-                comparison_value = hide_condition["comparison_value"]
-
-                attribute_data_value = project.attribute_data.get(variable, None)
-                if attribute_data_value is not None:
-                    if operator == "==":
-                        if attribute_data_value == comparison_value:
-                            return False
-                    elif operator == "!=":
-                        if attribute_data_value != comparison_value:
-                            return False
-            except Exception as ex:
-                log.error(f"Error on visibility check for attribute: {attribute.identifier}", ex)
-
     visibility_conditions = attribute.visibility_conditions
     if visibility_conditions is None or len(visibility_conditions) == 0:
         return True
@@ -808,12 +806,12 @@ def check_visibility(project, attribute):
             if attribute_data_value is not None:
                 if operator == "==":
                     if comparison_value_type == "boolean":
-                        return attribute_data_value == True if attribute_data_value is not None else False
+                        return safe_bool(attribute_data_value) == True if safe_bool(attribute_data_value) is not None else False
                     else:
                         return attribute_data_value == comparison_value
                 elif operator == "!=":
                     if comparison_value_type == "boolean":
-                        return attribute_data_value == False if attribute_data_value is not None else False
+                        return safe_bool(attribute_data_value) == False if safe_bool(attribute_data_value) is not None else False
                     else:
                         return attribute_data_value != comparison_value
         except Exception as ex:
