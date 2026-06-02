@@ -727,7 +727,7 @@ class Project(models.Model):
         return results
 
     # Generate or update schedule for project
-    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None, timeline_save=False):
+    def update_deadlines(self, user=None, initial=False, preview_attributes={}, confirmed_fields={}, timing_metrics=None, timeline_save=False, old_subtype=None):
         # CRITICAL: Use for_record_existence=True to get ALL deadlines for this subtype.
         # This ensures ProjectDeadline records are NEVER deleted just because a visibility
         # bool (condition_attribute) is False. Per docs/database_deadline_rules.md and
@@ -759,13 +759,27 @@ class Project(models.Model):
                     deadline=deadline,
                     generated=True
                 )
-                if deadline.deadlinegroup:
-                    vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
-                    if vis_bool and not vis_bool in self.attribute_data:
-                        self.attribute_data[vis_bool] = True if deadline.deadlinegroup.endswith('1') else False
                 generated_deadlines.append(new_project_deadline)
                 project_deadlines.append(new_project_deadline)
         self.deadlines.set(project_deadlines)
+
+        if old_subtype:  # Subtype changed, update visibility booleans for deadlines that have changed
+            old_subtype_deadlines = {dl.abbreviation: dl for dl in self.get_applicable_deadlines(subtype=old_subtype)}
+            new_subtype_deadlines = {dl.abbreviation: dl for dl in self.get_applicable_deadlines(subtype=self.subtype)}
+            for abbreviation, dl in new_subtype_deadlines.items():
+                if abbreviation not in old_subtype_deadlines.keys():
+                    # Set visibility booleans to True
+                    if dl.deadlinegroup:
+                        vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+                        if vis_bool:
+                            self.attribute_data[vis_bool] = True if dl.deadlinegroup.endswith('1') else False
+            for abbreviation, dl in old_subtype_deadlines.items():
+                if abbreviation not in new_subtype_deadlines.keys():
+                    # Set visibility booleans to False
+                    if dl.deadlinegroup:
+                        vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
+                        if vis_bool:
+                            self.attribute_data[vis_bool] = False
 
         # K1 = U1 sync: kaynnistysvaihe_alkaa_pvm always equals projektin_kaynnistys_pvm
         # Per timeline_requirements.md line 899: K1's "Generoitu ehdotus" = U1
