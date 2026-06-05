@@ -821,8 +821,7 @@ def check_visibility(project, attribute):
     return False
 
 
-
-def get_attribute_data_filtered_response(attributes, generated_attributes, ignored, project, use_cached=True):
+def get_attribute_data_filtered_response(attributes, value_choices, generated_attributes, ignored, project, use_cached=True):
     cache_key = f'attribute_data_filtered_{project.pk}'
     response = cache.get(cache_key) if use_cached else None
 
@@ -864,6 +863,9 @@ def get_attribute_data_filtered_response(attributes, generated_attributes, ignor
                             _v = "".join([item["insert"] for item in v["ops"]]).strip() if v else None
                         elif fieldset_attr.value_type == "date":
                             _v = check_format_date(v)
+                        elif fieldset_attr.value_type == "choice":
+                            value_choice = value_choices.get(v, None)
+                            _v = value_choice.value if value_choice else v
                         else:
                             _v = v
                         fieldset_obj[k] = _v
