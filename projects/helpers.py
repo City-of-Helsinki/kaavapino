@@ -791,6 +791,14 @@ def safe_bool(value):
         print(f'Error checking value {value} for boolean conversion')
         return None
 
+
+def format_choices(value_choices, value):
+    if isinstance(value, list):
+        return "; ".join([format_choices(value_choices, v) for v in value])
+    value_choice = value_choices.get(value, None)
+    return value_choice.value if value_choice else value
+
+
 def check_visibility(project, attribute):
     visibility_conditions = attribute.visibility_conditions
     if visibility_conditions is None or len(visibility_conditions) == 0:
@@ -864,8 +872,7 @@ def get_attribute_data_filtered_response(attributes, value_choices, generated_at
                         elif fieldset_attr.value_type == "date":
                             _v = check_format_date(v)
                         elif fieldset_attr.value_type == "choice":
-                            value_choice = value_choices.get(v, None)
-                            _v = value_choice.value if value_choice else v
+                            _v = format_choices(value_choices, v)
                         else:
                             _v = v
                         fieldset_obj[k] = _v
@@ -875,6 +882,8 @@ def get_attribute_data_filtered_response(attributes, value_choices, generated_at
                     response[identifier] = fieldset
             elif attribute.value_type == "user":
                 response[identifier] = get_in_personnel_data(value, "name", True)
+            elif attribute.value_type == "choice":
+                response[identifier] = format_choices(value_choices, value)
             elif attribute.value_type in ["rich_text", "rich_text_short"]:
                 try:
                     response[identifier] = "".join([item["insert"] for item in value["ops"]]).strip()
