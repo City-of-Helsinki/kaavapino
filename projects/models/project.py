@@ -759,6 +759,10 @@ class Project(models.Model):
                     deadline=deadline,
                     generated=True
                 )
+                if deadline.deadlinegroup:
+                    vis_bool = get_dl_vis_bool_name(deadline.deadlinegroup)
+                    if vis_bool and not vis_bool in self.attribute_data:
+                        self.attribute_data[vis_bool] = True if deadline.deadlinegroup.endswith('1') else False
                 generated_deadlines.append(new_project_deadline)
                 project_deadlines.append(new_project_deadline)
         self.deadlines.set(project_deadlines)
