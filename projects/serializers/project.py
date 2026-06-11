@@ -1989,6 +1989,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         ).get("generate_schedule") in ["1", "true", "True"]
         user=self.context["request"].user
 
+        if subtype_changed:
+            self.context['old_subtype'] = instance.subtype
+
         if onhold_changed:
             instance.onhold_at = timezone.now() if onhold else None
 
@@ -2059,6 +2062,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     preview_attributes=attribute_data,
                     confirmed_fields=confirmed_fields,
                     timing_metrics=self.context.get("validation_metrics"),
+                    old_subtype=self.context.get('old_subtype', None),
                 )
             elif should_generate_deadlines:
                 cleared_attributes = {
@@ -2078,6 +2082,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     preview_attributes=attribute_data,
                     confirmed_fields=confirmed_fields,
                     timing_metrics=self.context.get("validation_metrics"),
+                    old_subtype=self.context.get('old_subtype', None),
                 )
             elif should_update_deadlines:
                 # Per docs/timeline_workflow.md and validation.md:
@@ -2089,6 +2094,7 @@ class ProjectSerializer(serializers.ModelSerializer):
                     confirmed_fields=confirmed_fields,
                     timing_metrics=self.context.get("validation_metrics"),
                     timeline_save=timeline_save,
+                    old_subtype=self.context.get('old_subtype', None),
                 )
                 project.deadlines.filter(deadline__attribute__identifier__in=attribute_data.keys())\
                     .update(edited=timezone.now())
