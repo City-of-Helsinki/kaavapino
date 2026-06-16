@@ -267,11 +267,11 @@ def render_template(project, document_template, preview):
     if doc_type == 'docx':
         try:
             template_docx = doc.get_docx()
-            style_names = {style.name for style in template_docx.styles}
-            if "Hyperlinkki" in style_names:
-                hyperlink_style = "Hyperlinkki"
-            elif "Hyperlink" in style_names:
+            style_ids = {s.style_id for s in template_docx.styles}
+            if "Hyperlink" in style_ids:
                 hyperlink_style = "Hyperlink"
+            elif "Hyperlinkki" in style_ids:
+                hyperlink_style = "Hyperlinkki"
         except Exception:
             hyperlink_style = None
 
