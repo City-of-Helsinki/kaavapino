@@ -115,6 +115,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
     try:
         url_id = text_args.get("url_id", None)
         color = text_args.get("color", None)
+        style = text_args.get("style", None)
 
         if isinstance(value, str):
             log.warning(f"Plain string found when processing richtext value: {value} (converted to dict)")
@@ -136,10 +137,11 @@ def get_rich_text_display_value(value, preview=False, **text_args):
             if not attributes:
                 rich_text.add(insert,
                               url_id=url_id,
+                              style=style,
                               color=color
                               )
                 continue
-            _color = get_color(preview, color, attributes)
+            _color = get_color(preview, color)
             _size = attributes.get("size", None)
             _script = attributes.get("script", None)
             _sub = get_sub(_script)
@@ -165,7 +167,8 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                               underline=_underline,
                               strike=_strike,
                               font=_font,
-                              url_id=url_id
+                              url_id=url_id,
+                              style=style,
                               )
 
             prefix = ""
@@ -173,10 +176,13 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                 ordered_counter += 1
                 prefix = f'   {ordered_counter}. '
             elif _is_bulleted:
-                prefix = f'   - '
+                prefix = '   - '
 
             if prefix:
-                rich_text.add(prefix, color=_color)
+                rich_text.add(prefix, 
+                              style=style,
+                              color=_color
+                              )
 
             rich_text.add(insert,
                           color=_color,
@@ -188,7 +194,8 @@ def get_rich_text_display_value(value, preview=False, **text_args):
                           underline=_underline,
                           strike=_strike,
                           font=_font,
-                          url_id=url_id
+                          url_id=url_id,
+                          style=style,
                           )
     except Exception as exc:
         log.error("Error while formatting RichText value", exc)
@@ -196,7 +203,7 @@ def get_rich_text_display_value(value, preview=False, **text_args):
 
     return rich_text
 
-def get_color(preview,color,attributes):
+def get_color(preview,color):
     if preview:
         return color
     else:
@@ -255,6 +262,18 @@ def render_template(project, document_template, preview):
         doc = DocxTemplate(document_template.file)
     elif doc_type == 'xlsx':
         writer = BookWriter(document_template.file)
+
+    hyperlink_style = None
+    if doc_type == 'docx':
+        try:
+            template_docx = doc.get_docx()
+            style_names = {style.name for style in template_docx.styles}
+            if "Hyperlinkki" in style_names:
+                hyperlink_style = "Hyperlinkki"
+            elif "Hyperlink" in style_names:
+                hyperlink_style = "Hyperlink"
+        except Exception:
+            hyperlink_style = None
 
     attribute_data_display = {}
     attribute_element_data = {}
@@ -348,7 +367,7 @@ def render_template(project, document_template, preview):
                 target_property = None
                 target_attribute = None
 
-                if attribute.static_property and not attribute.static_property == "pino_number":
+                if attribute.static_property and attribute.static_property != "pino_number":
                     target_property = attribute.static_property
                 else:
                     target_attribute = get_top_level_attribute(attribute)
@@ -393,9 +412,8 @@ def render_template(project, document_template, preview):
                         text_args["color"] = "#595959"
                         text_args["underline"] = True
                     else:
-                        # For templates made in Finnish version of Word ("Hyperlink" for English)
-                        # Implement language detection later if necessary
-                        text_args["style"] = "Hyperlinkki"
+                        if hyperlink_style:
+                            text_args["style"] = hyperlink_style
             else:
                 text_args = {}
 
