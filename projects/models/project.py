@@ -1486,7 +1486,6 @@ class Project(models.Model):
         updated_attribute_data = {**self.attribute_data, **updated_attributes}
 
         # K1 = U1 sync: kaynnistysvaihe_alkaa_pvm always equals projektin_kaynnistys_pvm
-        # Per timeline_requirements.md line 899: K1's "Generoitu ehdotus" = U1
         if updated_attribute_data.get('projektin_kaynnistys_pvm'):
             updated_attribute_data['kaynnistysvaihe_alkaa_pvm'] = updated_attribute_data['projektin_kaynnistys_pvm']
 
@@ -1495,49 +1494,6 @@ class Project(models.Model):
             if dl.deadlinegroup:
                 vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
                 if vis_bool and vis_bool not in updated_attribute_data:
-                    updated_attribute_data[vis_bool] = True
-        
-        # Respect explicit visibility booleans from frontend (False=deletion).
-        # Don't auto-enable secondary slots (_2,_3,_4) when primary (_1) is disabled.
-        # First, collect which primary vis_bools are explicitly disabled
-        explicitly_disabled_primary = set()
-        for key, value in updated_attributes.items():
-            if key.endswith('_1') and value is False:
-                # Extract base name (e.g. "periaatteet_lautakuntaan" from "periaatteet_lautakuntaan_1")
-                base_name = key[:-2]  # Remove "_1"
-                explicitly_disabled_primary.add(base_name)
-        
-        for dl in project_dls.keys():
-            if not dl.deadlinegroup:
-                continue
-            vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
-            if not vis_bool:
-                continue
-            
-            # If frontend explicitly sent this visibility boolean, respect it - don't override
-            if vis_bool in updated_attributes:
-                continue
-            
-            # Check if this is a secondary slot (_2, _3, _4) whose primary (_1) was explicitly disabled
-            if len(vis_bool) >= 2 and vis_bool[-2] == '_' and vis_bool[-1] in '234':
-                base_name = vis_bool[:-2]  # Remove "_2", "_3", or "_4"
-                if base_name in explicitly_disabled_primary:
-                    continue
-            
-            # Check if date is being provided for this deadline in updated_attributes
-            # BUT: Only auto-enable if the visibility was PREVIOUSLY True in the project.
-            # If it was False, don't auto-enable just because the date exists.
-            if dl.attribute:
-                date_value = updated_attributes.get(dl.attribute.identifier)
-                current_vis = updated_attribute_data.get(vis_bool)
-                # Check what the STORED visibility was before this request
-                stored_vis = self.attribute_data.get(vis_bool)
-                if date_value and not current_vis:
-                    # Only auto-enable if it was previously visible (True) or not yet set (None)
-                    # If it was explicitly False in the database, keep it False
-                    if stored_vis is False:
-                        continue
-                    # Date is being set for a disabled group - enable it
                     updated_attribute_data[vis_bool] = True
 
         # KAAV-3517: Determine which deadlines actually CHANGED value (not just sent by frontend)
