@@ -28,6 +28,7 @@ from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
 from .projectcomment import FieldComment
 
+from projects.serializers.utils import VIS_BOOL_MAP
 
 log = logging.getLogger(__name__)
 
@@ -1496,37 +1497,16 @@ class Project(models.Model):
                 if vis_bool and vis_bool not in updated_attribute_data:
                     updated_attribute_data[vis_bool] = True
 
-        # KAAV-3517: Determine which deadlines actually CHANGED value (not just sent by frontend)
-        # The frontend sends all deadline values, but we only want to enforce distances
-        # on deadlines where the user actually moved them (value differs from current)
-        #
-        # PHASE BOUNDARY FIX: Auto-calculated deadlines (edit_privilege is None) should NEVER
-        # be added to actually_changed. Per AT1.2.1/AT1.2.3, users cannot edit phase start/end
-        # dates - they move automatically. The frontend sends stale values for these, but we
-        # must always recalculate them, not treat them as user changes.
-        auto_calculated_identifiers = {
-            dl.attribute.identifier for dl in project_dls.keys()
-            if dl.attribute and dl.edit_privilege is None
-        }
-        
+        # Determine which values differ from existing values, only apply calculations to those        
         actually_changed = set()
+        vis_bools_enabled = set()
         for key, new_value in updated_attributes.items():
-            # Skip auto-calculated deadlines - they should always be recalculated
-            if key in auto_calculated_identifiers:
-                continue
             old_value = self.attribute_data.get(key)
             old_coerced = self._coerce_date_value(old_value) if old_value else None
             new_coerced = self._coerce_date_value(new_value) if new_value else None
             if old_coerced != new_coerced:
                 actually_changed.add(key)
-
-        # When visibility bool changes False→True (group re-add), treat dates as "changed"
-        # to ensure distance enforcement happens for re-added groups
-        vis_bools_enabled = set()
-        for key, new_value in updated_attributes.items():
-            old_value = self.attribute_data.get(key)
-            # Check if this is a visibility bool that changed from False/None to True
-            if isinstance(new_value, bool) and new_value is True and old_value is not True:
+            if key in VIS_BOOL_MAP.values() and new_value is True and old_value is not True:
                 vis_bools_enabled.add(key)
         
         # For each deadline, if its visibility bool was just enabled, mark its date as "changed"
