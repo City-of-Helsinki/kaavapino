@@ -950,7 +950,6 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
-        timeline_save = request.query_params.get('timeline_save', False)
         # Store the original confirmed_fields before calling update
         # should prevent confirmed fields from moving when updating or validating 
         confirmed_fields = request.data.get('confirmed_fields', [])
@@ -964,7 +963,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         project = self.get_object()
 
         # Get preview deadlines (corrected dates)
-        preview = project.get_preview_deadlines(
+        preview = project.get_preview_deadlines2(
             original_attribute_data,
             project.subtype,
             confirmed_fields,

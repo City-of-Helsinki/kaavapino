@@ -1508,79 +1508,10 @@ class Project(models.Model):
                 actually_changed.add(key)
             if key in VIS_BOOL_MAP.values() and new_value is True and old_value is not True:
                 vis_bools_enabled.add(key)
-        
-        # For each deadline, if its visibility bool was just enabled, mark its date as "changed"
-        for dl in sorted(project_dls.keys(), key=lambda x: x.index):
-            if not dl.deadlinegroup or not dl.attribute:
-                continue
-            vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
-            if vis_bool and vis_bool in vis_bools_enabled:
-                identifier = dl.attribute.identifier
-                
-                # UX80.5.3.7: Confirmed deadlines must never move automatically
-                if identifier in confirmed_fields:
-                    continue
-                
-                # Check for stale date: Group enabled, but date matches stored value
-                current_val = updated_attribute_data.get(identifier)
-                stored_val = self.attribute_data.get(identifier)
-                
-                current_date = self._coerce_date_value(current_val)
-                stored_date = self._coerce_date_value(stored_val)
-                
-                # Only apply calculate_initial() to truly NEW deadlines.
-                # Re-enabled deadlines use distances_to_previous, not initial_calculations.
-                if dl in new_dls and current_date and current_date == stored_date:
-                    # UX80.4.2.3.3.2: Added element moves to initial distance (generoitu ehdotus)
-                    # from its predecessor. Use calculate_initial() for the ADDED element only.
-                    # The forward cascade will handle subsequent elements using distances_to_previous.
-                    initial_date = dl.calculate_initial(self, preview_attributes=updated_attribute_data)
-                    
-                    # SPECIAL CASE (AT1.5.3): Opinions deadline ("viimeistaan_mielipiteet")
-                    # defaults to matching "esillaolo_paattyy" if no initial_calculations exist
-                    if not initial_date and "viimeistaan_mielipiteet" in identifier:
-                        # Find sibling "esillaolo_paattyy" in same group
-                        sibling = next((d for d in project_dls.keys() if d.deadlinegroup == dl.deadlinegroup and "esillaolo_paattyy" in (d.attribute.identifier if d.attribute else "")), None)
-                        if sibling and sibling.attribute:
-                            sib_id = sibling.attribute.identifier
-                            sib_val = updated_attribute_data.get(sib_id) or self.attribute_data.get(sib_id)
-                            if sib_val:
-                                initial_date = self._coerce_date_value(sib_val)
-                    
-                    if initial_date:
-                        updated_attribute_data[identifier] = initial_date
-                        project_dls[dl] = initial_date
-                
-                # RE-ENABLED deadlines (not new, but visibility just enabled): recalculate from predecessor
-                # using distances_to_previous. This fixes stale dates from previous disable.
-                # Only recalculate if current_date == stored_date (user hasn't moved it yet).
-                elif dl not in new_dls and stored_date and current_date == stored_date:
-                    # Recalculate this deadline from its predecessor(s) using distances_to_previous
-                    combined = {**self.attribute_data, **updated_attribute_data}
-                    recalc_target = None
-                    for dist in dl.distances_to_previous.all():
-                        if not dist.check_conditions(combined):
-                            continue
-                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
-                        prev_date = self._coerce_date_value(prev_date)
-                        if not prev_date:
-                            continue
-                        target = self._min_distance_target_date(prev_date, dist, dl)
-                        # Use FIRST matching predecessor (not MAX) for the deadline's own recalculation
-                        if target:
-                            recalc_target = target
-                            break
-                    
-                    if recalc_target and recalc_target != stored_date:
-                        updated_attribute_data[identifier] = recalc_target
-                        project_dls[dl] = recalc_target
-
-                # Re-enabled groups: treat dates as changed to trigger distance enforcement
-                actually_changed.add(identifier)
 
         # Recalculate deadlines with conditional predecessors referencing enabled vis_bools
         if vis_bools_enabled:
-            from projects.models.deadline import DeadlineDistanceConditionAttribute, Attribute as DlAttribute
+            from projects.models.deadline import DeadlineDistanceConditionAttribute
             
             # Find all condition attributes that reference the enabled visibility booleans
             condition_attrs = DeadlineDistanceConditionAttribute.objects.filter(
