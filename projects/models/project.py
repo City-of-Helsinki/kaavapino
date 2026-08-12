@@ -1509,62 +1509,40 @@ class Project(models.Model):
             if key in VIS_BOOL_MAP.values() and new_value is True and old_value is not True:
                 vis_bools_enabled.add(key)
 
-        # Recalculate deadlines with conditional predecessors referencing enabled vis_bools
-        if vis_bools_enabled:
-            from projects.models.deadline import DeadlineDistanceConditionAttribute
-            
-            # Find all condition attributes that reference the enabled visibility booleans
-            condition_attrs = DeadlineDistanceConditionAttribute.objects.filter(
-                attribute__identifier__in=vis_bools_enabled
-            ).select_related('attribute').prefetch_related(
-                'deadline_distances',
-                'deadline_distances__deadline',
-                'deadline_distances__deadline__attribute',
-                'deadline_distances__previous_deadline',
-                'deadline_distances__previous_deadline__attribute',
-            )
-            
-            # Collect all deadlines affected by these conditional distance rules
-            for cond_attr in condition_attrs:
-                for distance in cond_attr.deadline_distances.all():
-                    affected_dl = distance.deadline
-                    if not affected_dl or not affected_dl.attribute:
-                        continue
-                    if affected_dl not in project_dls:
-                        continue
-                    
-                    identifier = affected_dl.attribute.identifier
-                    current_val = updated_attribute_data.get(identifier)
-                    current_date = self._coerce_date_value(current_val)
-                    
-                    if not current_date:
-                        continue
-                    
-                    # Recalculate the minimum target date based on NEW active predecessors
-                    combined = {**self.attribute_data, **updated_attribute_data}
-                    max_target = None
-                    
-                    for dist in affected_dl.distances_to_previous.all():
-                        prev_id = dist.previous_deadline.attribute.identifier if dist.previous_deadline and dist.previous_deadline.attribute else "NO_ID"
-                        cond_result = dist.check_conditions(combined)
-                        if not cond_result:
-                            continue
-                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
-                        prev_date = self._coerce_date_value(prev_date)
-                        if not prev_date:
-                            continue
-                        target = self._min_distance_target_date(prev_date, dist, affected_dl)
-                        if target and (not max_target or target > max_target):
-                            max_target = target
-                    
-                    # If current date is BEFORE new minimum, enforce forward
-                    if max_target and current_date < max_target:
-                        updated_attribute_data[identifier] = max_target
-                        project_dls[affected_dl] = max_target
-                        actually_changed.add(identifier)
-                    elif max_target and identifier not in actually_changed:
-                        actually_changed.add(identifier)
+        def snap_deadline_to_valid_date(dl, value):
+            if not dl.date_type:
+                return value
+            coerced = self._coerce_date_value(value)
+            if not coerced:
+                return value
+            valid_date = dl.date_type.get_closest_valid_date(coerced)
+            if valid_date and valid_date != coerced:
+                return valid_date
+            return value
 
+        def validate_min_distance(dl, value, updated_attribute_data):
+            current_date = self._coerce_date_value(value)
+            if not current_date:
+                return
+            
+            for distance in dl.distances_to_previous.all():
+                combined = {**self.attribute_data, **updated_attribute_data}
+                if not distance.check_conditions(combined):
+                    continue
+                prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
+                prev_date = self._coerce_date_value(prev_date)
+                if not prev_date:
+                    continue
+                enforced_value = self._enforce_distance_requirements(
+                    dl,
+                    value,
+                    preview_attribute_data=updated_attribute_data,
+                )
+                project_dls[dl] = enforced_value
+                updated_attribute_data[dl.attribute.identifier] = enforced_value
+                break
+
+        # Initial enforcement of minimum distances for deadlines that actually changed
         for dl in project_dls.keys():
             if not dl.attribute:
                 continue
@@ -1572,57 +1550,14 @@ class Project(models.Model):
             value = updated_attribute_data.get(dl.attribute.identifier)
             identifier = dl.attribute.identifier
 
-            if value:
-                # Only enforce distances on deadlines that actually changed AND violate minimum
-                if identifier in actually_changed:
-                    current_date = self._coerce_date_value(value)
-                    needs_enforcement = False
+            if not value or not identifier:
+                continue
 
-                    if current_date:
-                        for distance in dl.distances_to_previous.all():
-                            combined = {**self.attribute_data, **updated_attribute_data}
-                            if not distance.check_conditions(combined):
-                                continue
-                            prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
-                            prev_date = self._coerce_date_value(prev_date)
-                            if not prev_date:
-                                continue
-                            min_target = self._min_distance_target_date(prev_date, distance, dl)
-                            if min_target and current_date < min_target:
-                                needs_enforcement = True
-                                break
-
-                    if needs_enforcement:
-                        enforced_value = self._enforce_distance_requirements(
-                            dl,
-                            value,
-                            preview_attribute_data=updated_attribute_data,
-                        )
-                        project_dls[dl] = enforced_value
-                        if enforced_value and enforced_value != value:
-                            updated_attribute_data[dl.attribute.identifier] = enforced_value
-                    else:
-                        # Snap to valid date_type even when distance is satisfied
-                        snapped_value = value
-                        if dl.date_type:
-                            coerced = self._coerce_date_value(value)
-                            if coerced:
-                                valid_date = dl.date_type.get_closest_valid_date(coerced)
-                                if valid_date and valid_date != coerced:
-                                    snapped_value = valid_date
-                                    updated_attribute_data[dl.attribute.identifier] = valid_date
-                        project_dls[dl] = snapped_value
-                else:
-                    # Snap unchanged deadlines to valid date_type
-                    snapped_value = value
-                    if dl.date_type:
-                        coerced = self._coerce_date_value(value)
-                        if coerced:
-                            valid_date = dl.date_type.get_closest_valid_date(coerced)
-                            if valid_date and valid_date != coerced:
-                                snapped_value = valid_date
-                                updated_attribute_data[dl.attribute.identifier] = valid_date
-                    project_dls[dl] = snapped_value
+            if identifier in actually_changed:
+                validate_min_distance(dl, value, updated_attribute_data)
+            snapped = snap_deadline_to_valid_date(dl, value)
+            project_dls[dl] = snapped
+            updated_attribute_data[identifier] = snapped
 
         # Forward cascade: push subsequent deadlines if they violate distance rules
         dl_to_identifier = {dl: dl.attribute.identifier for dl in project_dls.keys() if dl.attribute}
