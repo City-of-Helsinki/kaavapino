@@ -1453,397 +1453,107 @@ class Project(models.Model):
         
         return project_dls
 
-    # WIP refactor of above function
-    def get_preview_deadlines2(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
-        confirmed_fields = confirmed_fields or []
+    def get_preview_deadlines_light(self, updated_attributes, subtype, confirmed_fields=None):
+        '''
+        Lightweight version of get_preview_deadlines
+        todo: Ensure that new deadline creation / deletion is handled properly
+        '''
+        confirmed_fields = set(confirmed_fields or [])
+        preview_data = {**self.attribute_data, **updated_attributes}
 
-        # Use request values over DB values to avoid stale data
-        project_dls = {}
-        for dl in self.deadlines.filter(deadline__subtype=subtype) \
-            .select_related(
-                "deadline", "deadline__phase", "deadline__phase__common_project_phase", "deadline__phase__project_subtype",
-                "deadline__subtype", "deadline__attribute", "deadline__date_type") \
-            .prefetch_related("deadline__initial_calculations","deadline__update_calculations"):
-            deadline = dl.deadline
-            # Use updated value from request if available, otherwise use database value
-            if deadline.attribute and deadline.attribute.identifier in updated_attributes:
-                project_dls[deadline] = updated_attributes[deadline.attribute.identifier]
-            else:
-                project_dls[deadline] = dl.date
-
-        # List deadlines that would be created
-        new_dls = {
-            dl: None
-            for dl in self.get_applicable_deadlines(
-                subtype=subtype,
-                preview_attributes=updated_attributes,
+        # 1-2. Fetch project deadlines for the given subtype, sorted by index.
+        project_deadlines = list(
+            self.deadlines.filter(deadline__subtype=subtype).select_related(
+                "deadline",
+                "deadline__attribute",
+                "deadline__date_type",
+                "deadline__confirmation_attribute",
+            ).prefetch_related(
+                "deadline__distances_to_previous",
+                "deadline__update_calculations",
             )
-            if dl not in project_dls
-        }
-
-        project_dls = {**new_dls, **project_dls}
-
-        # Update attribute-based deadlines
-        updated_attribute_data = {**self.attribute_data, **updated_attributes}
-
-        # K1 = U1 sync: kaynnistysvaihe_alkaa_pvm always equals projektin_kaynnistys_pvm
-        if updated_attribute_data.get('projektin_kaynnistys_pvm'):
-            updated_attribute_data['kaynnistysvaihe_alkaa_pvm'] = updated_attribute_data['projektin_kaynnistys_pvm']
-
-        # Auto-enable visibility for new deadlines
-        for dl in new_dls.keys():
-            if dl.deadlinegroup:
-                vis_bool = get_dl_vis_bool_name(dl.deadlinegroup)
-                if vis_bool and vis_bool not in updated_attribute_data:
-                    updated_attribute_data[vis_bool] = True
-
-        # Determine which values differ from existing values, only apply calculations to those        
-        actually_changed = set()
-        vis_bools_enabled = set()
-        for key, new_value in updated_attributes.items():
-            old_value = self.attribute_data.get(key)
-            old_coerced = self._coerce_date_value(old_value) if old_value else None
-            new_coerced = self._coerce_date_value(new_value) if new_value else None
-            if old_coerced != new_coerced:
-                actually_changed.add(key)
-            if key in VIS_BOOL_MAP.values() and new_value is True and old_value is not True:
-                vis_bools_enabled.add(key)
-
-        def snap_deadline_to_valid_date(dl, value):
-            if not dl.date_type:
-                return value
-            coerced = self._coerce_date_value(value)
-            if not coerced:
-                return value
-            valid_date = dl.date_type.get_closest_valid_date(coerced)
-            if valid_date and valid_date != coerced:
-                return valid_date
-            return value
-
-        def validate_min_distance(dl, value, updated_attribute_data):
-            current_date = self._coerce_date_value(value)
-            if not current_date:
-                return
-            
-            for distance in dl.distances_to_previous.all():
-                combined = {**self.attribute_data, **updated_attribute_data}
-                if not distance.check_conditions(combined):
-                    continue
-                prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
-                prev_date = self._coerce_date_value(prev_date)
-                if not prev_date:
-                    continue
-                enforced_value = self._enforce_distance_requirements(
-                    dl,
-                    value,
-                    preview_attribute_data=updated_attribute_data,
-                )
-                project_dls[dl] = enforced_value
-                updated_attribute_data[dl.attribute.identifier] = enforced_value
-                break
-
-        # Initial enforcement of minimum distances for deadlines that actually changed
-        for dl in project_dls.keys():
-            if not dl.attribute:
-                continue
-
-            value = updated_attribute_data.get(dl.attribute.identifier)
-            identifier = dl.attribute.identifier
-
-            if not value or not identifier:
-                continue
-
-            if identifier in actually_changed:
-                validate_min_distance(dl, value, updated_attribute_data)
-            snapped = snap_deadline_to_valid_date(dl, value)
-            project_dls[dl] = snapped
-            updated_attribute_data[identifier] = snapped
-
-        # Forward cascade: push subsequent deadlines if they violate distance rules
-        dl_to_identifier = {dl: dl.attribute.identifier for dl in project_dls.keys() if dl.attribute}
-        identifier_to_dl = {v: k for k, v in dl_to_identifier.items()}
-        
-        # Track which deadlines were changed (either by user or by enforcement)
-        changed_identifiers = set(actually_changed)
-        
-        # Iterate until no more changes (cascade propagation)
-        # Max iterations = number of deadlines (worst case: linear dependency chain)
-        max_iterations = len(project_dls)
-        iteration = 0
-        for iteration in range(1, max_iterations + 1):
-            new_changes = set()
-            
-            for changed_id in changed_identifiers:
-                if changed_id not in identifier_to_dl:
-                    continue
-                changed_dl = identifier_to_dl[changed_id]
-                changed_date = self._coerce_date_value(updated_attribute_data.get(changed_id))
-                if not changed_date:
-                    continue
-                
-                # Check all deadlines that have a distance rule FROM this deadline
-                for distance in changed_dl.distances_to_next.all():
-                    next_dl = distance.deadline
-                    if not next_dl.attribute:
-                        continue
-                    next_id = next_dl.attribute.identifier
-                    
-                    # Skip if next deadline is not in our working set (not visible/applicable)
-                    if next_dl not in project_dls:
-                        continue
-                    
-                    # Check if distance conditions are met
-                    combined = {**self.attribute_data, **updated_attribute_data}
-                    if not distance.check_conditions(combined):
-                        continue
-                    
-                    next_date = self._coerce_date_value(updated_attribute_data.get(next_id))
-                    if not next_date:
-                        next_date = self._coerce_date_value(project_dls.get(next_dl))
-                    if not next_date:
-                        continue
-                    
-                    # Find maximum minimum target across ALL predecessors
-                    max_min_target = None
-                    for dist in next_dl.distances_to_previous.all():
-                        if not dist.check_conditions(combined):
-                            continue
-                        prev_date = self._resolve_deadline_date(dist.previous_deadline, updated_attribute_data)
-                        prev_date = self._coerce_date_value(prev_date)
-                        if not prev_date:
-                            continue
-                        target = self._min_distance_target_date(prev_date, dist, next_dl)
-                        if target and (not max_min_target or target > max_min_target):
-                            max_min_target = target
-                    
-                    if not max_min_target:
-                        continue
-                    
-                    # Push forward if violating any predecessor distance
-                    if next_date < max_min_target:
-                        enforced_date = self._enforce_distance_requirements(
-                            next_dl,
-                            max_min_target,
-                            preview_attribute_data=updated_attribute_data,
-                        )
-                        if enforced_date and enforced_date != next_date:
-                            updated_attribute_data[next_id] = enforced_date
-                            project_dls[next_dl] = enforced_date
-                            new_changes.add(next_id)
-            
-            if not new_changes:
-                break
-            
-            changed_identifiers = new_changes
-        
-        if max_iterations > 0 and iteration >= max_iterations:
-            log.warning(f"Cascade hit max iterations ({max_iterations}), possible cycle")
-
-        # Generate newly added deadlines
-        calculation_cache = {}
-
-        new_dls_to_calc = [
-            dl for dl in new_dls.keys()
-            if dl.initial_calculations.exists() or dl.default_to_created_at
-        ]
-
-        initial_calc_results = self._set_calculated_deadlines(
-            new_dls_to_calc,
-            None,
-            initial=True,
-            preview=True,
-            preview_attribute_data=updated_attribute_data,
-            confirmed_fields=confirmed_fields,
-            calculation_cache=calculation_cache,
-            timing_metrics=timing_metrics,
-            user_changed_fields=actually_changed,
         )
-        
-        project_dls = {**project_dls, **initial_calc_results}
-        
-        # Propagate initial_calc results so phase boundaries use new inner deadline values
-        for dl, result in initial_calc_results.items():
-            if hasattr(dl, 'attribute') and dl.attribute:
-                identifier = dl.attribute.identifier
-                result_coerced = self._coerce_date_value(result)
-                if result_coerced:
-                    old_val = updated_attribute_data.get(identifier)
-                    old_val_coerced = self._coerce_date_value(old_val)
-                    if old_val_coerced != result_coerced:
-                        updated_attribute_data[identifier] = result_coerced
-        
-        # Recalculate deadlines with update_calculations (exclude user-changed ones)
-        update_dls_to_calc = [
-            dl for dl in project_dls
-            if (dl.update_calculations.exists() or dl.default_to_created_at)
-            and not (dl.attribute and dl.attribute.identifier in actually_changed)
-        ]
+        dl_to_pdl = {pdl.deadline: pdl for pdl in project_deadlines}
+        deadlines = sorted(dl_to_pdl.keys(), key=lambda d: d.index)
 
-        # Unified convergence loop: recalculate phases, enforce distances, cascade
-        max_convergence_iterations = 10
-        
-        # Deadlines processed by update_calculations are "calculated deadlines"
-        calculated_dl_identifiers = {
-            dl.attribute.identifier for dl in update_dls_to_calc 
-            if hasattr(dl, 'attribute') and dl.attribute
+        # 3. Track identifiers whose stored value differs from the request.
+        changed_ids = {
+            identifier
+            for identifier, new_value in updated_attributes.items()
+            if self._coerce_date_value(self.attribute_data.get(identifier))
+            != self._coerce_date_value(new_value)
         }
 
-        for convergence_iteration in range(1, max_convergence_iterations + 1):
-            iteration_changes = set()
-            
-            # Step 1: Recalculate phase boundaries
-            # We MUST clear the cache to ensure new values are used
-            calculation_cache = {}
-            
-            recalc_results = self._set_calculated_deadlines(
-                update_dls_to_calc,
-                None,
-                initial=False,
-                preview=True,
-                preview_attribute_data=updated_attribute_data,
-                confirmed_fields=confirmed_fields,
-                calculation_cache=calculation_cache,
-                timing_metrics=timing_metrics,
-                user_changed_fields=actually_changed,
-            )
-            project_dls = {**project_dls, **recalc_results}
-            
-            # Detect changes from recalculation
-            for dl, new_date in recalc_results.items():
-                if not hasattr(dl, 'attribute') or not dl.attribute:
+        # Seed the result with request values, falling back to the stored date.
+        result = {}
+        for dl, pdl in dl_to_pdl.items():
+            identifier = dl.attribute.identifier if dl.attribute else None
+            if identifier and identifier in updated_attributes:
+                result[dl] = updated_attributes[identifier]
+            else:
+                result[dl] = pdl.date
+
+        # 4. Find the first (by index) changed deadline.
+        first_idx = next(
+            (i for i, dl in enumerate(deadlines)
+             if dl.attribute and dl.attribute.identifier in changed_ids),
+            None,
+        )
+
+        # 5. Walk forward from the first changed deadline.
+        if first_idx is not None:
+            for dl in deadlines[first_idx:]:
+                if not dl.attribute:
                     continue
                 identifier = dl.attribute.identifier
-                old_date = self._coerce_date_value(updated_attribute_data.get(identifier))
-                new_date_coerced = self._coerce_date_value(new_date)
-                
-                # Update if different or if new value is set for the first time
-                if (new_date_coerced and old_date != new_date_coerced) or \
-                   (new_date_coerced and not old_date):
-                    updated_attribute_data[identifier] = new_date_coerced
-                    iteration_changes.add(identifier)
-            
-            # Step 2 & 3: Enforce attribute-only deadlines AND Cascade
-            # We mix these because a push might trigger an enforcement, which triggers a recalc
-            
-            # Start queue with changes from Step 1
-            cascade_queue = iteration_changes.copy()
-            
-            # Also check ALL attribute-only deadlines for violations in every iteration
-            # This catches cases like T3 (attribute-only) needing to move because T2 moved
-            for dl in project_dls.keys():
-                if not hasattr(dl, 'attribute') or not dl.attribute:
+
+                if identifier == "milloin_ehdotuksen_nahtavilla_alkaa_iso":
+                    print("DEBUG: milloin_ehdotuksen_nahtavilla_alkaa_iso is being processed")
+
+                # a. Skip confirmed deadlines.
+                if identifier in confirmed_fields:
                     continue
-                identifier = dl.attribute.identifier
-                if identifier in calculated_dl_identifiers:
-                    continue # Handled by recalc
-                if identifier in cascade_queue:
-                    continue # Already in queue
-                
-                current_date = self._coerce_date_value(updated_attribute_data.get(identifier))
-                if not current_date:
+                conf_attr = dl.confirmation_attribute
+                if conf_attr and preview_data.get(conf_attr.identifier):
                     continue
-                    
-                for distance in dl.distances_to_previous.all():
-                    combined = {**self.attribute_data, **updated_attribute_data}
-                    if not distance.check_conditions(combined):
+
+                # b/c. Recalculate when update_calculations depend on a changed DL.
+                recalculated = False
+                if dl.update_calculations.exists():
+                    depends_on_changed = any(
+                        dep.attribute and dep.attribute.identifier in changed_ids
+                        for dep in dl.update_depends_on
+                    )
+                    if depends_on_changed:
+                        new_date = self._coerce_date_value(
+                            dl.calculate_updated(self, preview_attributes=preview_data)
+                        )
+                        old_date = self._coerce_date_value(result.get(dl))
+                        if new_date and new_date != old_date:
+                            result[dl] = new_date
+                            preview_data[identifier] = new_date
+                            changed_ids.add(identifier)
+                        recalculated = True
+
+                # d. Otherwise enforce minimum distance (no-op if already valid).
+                if not recalculated:
+                    current = result.get(dl)
+                    if current is None:
                         continue
-                    prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
-                    prev_date = self._coerce_date_value(prev_date)
-                    if not prev_date:
-                        continue
-                    min_target = self._min_distance_target_date(prev_date, distance, dl)
-                    if min_target and current_date < min_target:
-                        # Skip confirmed fields
-                        if confirmed_fields and identifier in confirmed_fields:
-                            continue
+                    enforced = self._enforce_distance_requirements(
+                        dl, current, preview_attribute_data=preview_data
+                    )
+                    if enforced and enforced != self._coerce_date_value(current):
+                        result[dl] = enforced
+                        preview_data[identifier] = enforced
+                        changed_ids.add(identifier)
 
-                        cascade_queue.add(identifier)
-                        break
+        # Pass visibility booleans through unchanged.
+        for key, value in preview_data.items():
+            if isinstance(value, bool):
+                result[key] = value
 
-            if cascade_queue:
-                for _ in range(1, 11):
-                    new_cascade_changes = set()
-                    
-                    for changed_id in cascade_queue:
-                        # 1. Enforce self (if not calculated)
-                        changed_dl = identifier_to_dl.get(changed_id)
-                        if not changed_dl:
-                            continue
-                            
-                        current_val = updated_attribute_data.get(changed_id)
-                        current_date = self._coerce_date_value(current_val)
-                        
-                        if changed_id not in calculated_dl_identifiers and current_date:
-
-                            for distance in changed_dl.distances_to_previous.all():
-                                combined = {**self.attribute_data, **updated_attribute_data}
-                                if not distance.check_conditions(combined):
-                                    continue
-                                prev_date = self._resolve_deadline_date(distance.previous_deadline, updated_attribute_data)
-                                prev_date = self._coerce_date_value(prev_date)
-                                if not prev_date:
-                                    continue
-                                min_target = self._min_distance_target_date(prev_date, distance, changed_dl)
-                                if min_target and current_date < min_target:
-                                    if confirmed_fields and changed_id in confirmed_fields:
-                                        continue
-                                    enforced = self._enforce_distance_requirements(changed_dl, min_target, updated_attribute_data)
-                                    if enforced and enforced != current_date:
-                                        updated_attribute_data[changed_id] = enforced
-                                        project_dls[changed_dl] = enforced
-                                        iteration_changes.add(changed_id)
-                                        current_date = enforced 
-                        
-                        # 2. Push dependents (Forward Cascade)
-                        if not current_date:
-                            continue
-
-                        for distance in changed_dl.distances_to_next.all():
-                            next_dl = distance.deadline
-                            if not next_dl.attribute:
-                                continue
-                            next_id = next_dl.attribute.identifier
-                            if next_dl not in project_dls:
-                                continue
-                            
-                            combined = {**self.attribute_data, **updated_attribute_data}
-                            if not distance.check_conditions(combined):
-                                continue
-                                
-                            next_val = updated_attribute_data.get(next_id)
-                            if not next_val:
-                                next_val = project_dls.get(next_dl)
-                                
-                            next_date = self._coerce_date_value(next_val)
-                            if not next_date:
-                                continue
-                                
-                            min_target = self._min_distance_target_date(current_date, distance, next_dl)
-                            if min_target and next_date < min_target:
-                                if confirmed_fields and next_id in confirmed_fields:
-                                    continue
-                                new_cascade_changes.add(next_id)
-                                iteration_changes.add(next_id)
-                                updated_attribute_data[next_id] = min_target
-                                project_dls[next_dl] = min_target
-
-                    if not new_cascade_changes:
-                        break
-                    cascade_queue = new_cascade_changes
-
-            # Check if converged
-            if not iteration_changes:
-                break
-        
-        if convergence_iteration >= max_convergence_iterations:
-            log.warning(f"Convergence hit max iterations ({max_convergence_iterations})")
-
-        # Add visibility booleans
-        for identifier, value in updated_attribute_data.items():
-            if type(value) == bool:
-                project_dls[identifier] = value
-        
-        return project_dls
+        return result
 
 
     @property
