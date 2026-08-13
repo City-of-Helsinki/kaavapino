@@ -412,9 +412,8 @@ def render_template(project, document_template, preview):
                         text_args["color"] = "#595959"
                         text_args["underline"] = True
                     else:
-                        # For templates made in Finnish version of Word ("Hyperlink" for English)
-                        # Implement language detection later if necessary
-                        text_args["style"] = "Hyperlinkki"
+                        if hyperlink_style:
+                            text_args["style"] = hyperlink_style
             else:
                 text_args = {}
 
