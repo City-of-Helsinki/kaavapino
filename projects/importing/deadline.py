@@ -49,6 +49,8 @@ DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edellisee
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 DEADLINE_GROUP = "(v1.1) ryhmä"
 
+SHOULD_BE_IMPORTED = "rivi koskee versiota 1.1"
+
 # Date type row indices
 DATETYPE_NAME_INDEX = 0
 DATETYPE_EXCLUDE_TYPE_INDEX = 1
@@ -357,6 +359,7 @@ class DeadlineImporter:
         logger.info(f"Creating deadlines for {subtype}")
 
         for i, row in enumerate(rows):
+
             abbreviation = row[self.column_index[DEADLINE_ABBREVIATION]]
             attribute = row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]
             confirmation_attribute = row[self.column_index[DEADLINE_CONFIRMATION_ATTRIBUTE_IDENTIFIER]]
@@ -483,7 +486,7 @@ class DeadlineImporter:
                 return condition_attributes, not_condition_attributes
 
             if " and " in cond:
-                for c in cond.split("and"):
+                for c in cond.split(" and "):
                     res = get_attribute_conditions(c)
                     condition_attributes.extend(res[0])
                     not_condition_attributes.extend(res[1])
@@ -554,7 +557,9 @@ class DeadlineImporter:
 
                 # Other valid conditions are saved as Attribute relations later
                 for cond in attribute_conds:
-                    condition_attributes, not_condition_attributes = get_attribute_conditions(cond)
+                    cond_attrs, not_cond_attrs = get_attribute_conditions(cond)
+                    condition_attributes.extend(cond_attrs)
+                    not_condition_attributes.extend(not_cond_attrs)
 
                 try:
                     constant = int(re.findall(constant_regex, calc)[0])
