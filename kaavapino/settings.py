@@ -249,8 +249,6 @@ OIDC_API_TOKEN_AUTH = {
     "API_AUTHORIZATION_FIELD": "authorization.permissions.scopes"
 }
 
-SESSION_SERIALIZER = 'django.contrib.sessions.serializers.PickleSerializer'
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

@@ -2,7 +2,7 @@ from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin, S
 from django import forms
 from django.apps import apps
 from django.contrib import admin, messages
-from django.contrib.gis.admin import OSMGeoAdmin
+from django.contrib.gis.admin import GISModelAdmin
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -241,7 +241,7 @@ class ProjectPhaseLogInline(admin.TabularInline):
 
 
 @admin.register(Project)
-class ProjectAdmin(OSMGeoAdmin):
+class ProjectAdmin(GISModelAdmin):
     list_display = ("name", "created_at", "modified_at")
     readonly_fields = (
         "name",
