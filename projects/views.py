@@ -954,6 +954,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         # should prevent confirmed fields from moving when updating or validating 
         confirmed_fields = request.data.get('confirmed_fields', [])
         original_attribute_data = request.data.get('attribute_data', {})
+        locked_group = request.data.get('locked_group', None)
 
         if not fake:
             # Actual update logic that saves to db
@@ -963,11 +964,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         project = self.get_object()
 
         # Get preview deadlines (corrected dates)
-        preview = project.get_preview_deadlines_light(
-            original_attribute_data,
-            project.subtype,
-            confirmed_fields,
-        )
+        try:
+            preview = project.get_preview_deadlines_light(
+                original_attribute_data,
+                project.subtype,
+                confirmed_fields,
+                locked_group=locked_group,
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc), "locked_group": locked_group}, status=status.HTTP_400_BAD_REQUEST)
 
         # Build result from preview values
         result_attribute_data = {}

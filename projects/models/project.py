@@ -1453,10 +1453,9 @@ class Project(models.Model):
         
         return project_dls
 
-    def get_preview_deadlines_light(self, updated_attributes, subtype, confirmed_fields=None):
+    def get_preview_deadlines_light(self, updated_attributes, subtype, confirmed_fields=None, locked_group=None):
         '''
         Lightweight version of get_preview_deadlines
-        todo: Ensure that new deadline creation / deletion is handled properly
         '''
         confirmed_fields = set(confirmed_fields or [])
         preview_data = {**self.attribute_data, **updated_attributes}
@@ -1507,9 +1506,6 @@ class Project(models.Model):
                     continue
                 identifier = dl.attribute.identifier
 
-                if identifier == "milloin_ehdotuksen_nahtavilla_alkaa_iso":
-                    print("DEBUG: milloin_ehdotuksen_nahtavilla_alkaa_iso is being processed")
-
                 # a. Skip confirmed deadlines.
                 if identifier in confirmed_fields:
                     continue
@@ -1519,6 +1515,7 @@ class Project(models.Model):
 
                 # b/c. Recalculate when update_calculations depend on a changed DL.
                 recalculated = False
+                new_date = None
                 if dl.update_calculations.exists():
                     depends_on_changed = any(
                         dep.attribute and dep.attribute.identifier in changed_ids
@@ -1528,11 +1525,6 @@ class Project(models.Model):
                         new_date = self._coerce_date_value(
                             dl.calculate_updated(self, preview_attributes=preview_data)
                         )
-                        old_date = self._coerce_date_value(result.get(dl))
-                        if new_date and new_date != old_date:
-                            result[dl] = new_date
-                            preview_data[identifier] = new_date
-                            changed_ids.add(identifier)
                         recalculated = True
 
                 # d. Otherwise enforce minimum distance (no-op if already valid).
@@ -1540,13 +1532,16 @@ class Project(models.Model):
                     current = result.get(dl)
                     if current is None:
                         continue
-                    enforced = self._enforce_distance_requirements(
+                    new_date = self._enforce_distance_requirements(
                         dl, current, preview_attribute_data=preview_data
                     )
-                    if enforced and enforced != self._coerce_date_value(current):
-                        result[dl] = enforced
-                        preview_data[identifier] = enforced
-                        changed_ids.add(identifier)
+    
+                if new_date and new_date != self._coerce_date_value(result.get(dl)):
+                    if locked_group and locked_group == dl.deadlinegroup:
+                        raise ValueError(f"Change prevented due to '{locked_group}' being locked.")
+                    result[dl] = new_date
+                    preview_data[identifier] = new_date
+                    changed_ids.add(identifier)
 
         # Pass visibility booleans through unchanged.
         for key, value in preview_data.items():
