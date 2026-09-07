@@ -63,6 +63,7 @@ from projects.models import (
     OverviewFilterAttribute,
     ProjectPriority,
     DateType,
+    ExternalReportLink,
 )
 from projects.models.attribute import AttributeLock, FieldSetAttribute, AttributeValueChoice
 from projects.models.utils import create_identifier
@@ -1682,6 +1683,19 @@ class ReportViewSet(ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path="external_link",
+        url_name="external_link",
+    )
+    def external_link(self, request):
+        link = ExternalReportLink.objects.first()
+        return Response({"url": link.url if link else None})
 
 
 class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
