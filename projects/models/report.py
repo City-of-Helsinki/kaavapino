@@ -612,6 +612,21 @@ class ReportFilterAttributeChoice(models.Model):
         return f"{self.report_filter}: {self.name}"
 
 
+class ExternalReportLink(models.Model):
+    """Singleton holding the link to the external portal where report documents are stored."""
+    url = models.URLField(
+        verbose_name=_("external report portal url"),
+        help_text=_("Link to the external website where report documents are stored."),
+    )
+
+    class Meta:
+        verbose_name = _("external report link")
+        verbose_name_plural = _("external report link")
+
+    def __str__(self):
+        return self.url
+
+
 # Register auditlog for models
 from auditlog.registry import auditlog
 auditlog.register(Report)
@@ -619,3 +634,4 @@ auditlog.register(ReportColumn)
 auditlog.register(ReportColumnPostfix)
 auditlog.register(ReportFilter)
 auditlog.register(ReportFilterAttributeChoice)
+auditlog.register(ExternalReportLink)

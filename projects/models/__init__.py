@@ -62,4 +62,5 @@ from .report import (  # noqa
     ReportColumnPostfix,
     ReportFilter,
     ReportFilterAttributeChoice,
+    ExternalReportLink,
 )

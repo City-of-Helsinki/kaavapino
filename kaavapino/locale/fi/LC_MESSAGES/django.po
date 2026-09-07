@@ -1106,6 +1106,18 @@ msgstr "raportti"
 msgid "reports"
 msgstr "raportit"
 
+#: projects/models/report.py:618
+msgid "external report portal url"
+msgstr "ulkoisen raporttisivuston osoite"
+
+#: projects/models/report.py:619
+msgid "Link to the external website where report documents are stored."
+msgstr "Linkki ulkoiseen verkkosivustoon, jossa raporttidokumentit sijaitsevat."
+
+#: projects/models/report.py:623 projects/models/report.py:624
+msgid "external report link"
+msgstr "ulkoinen raporttilinkki"
+
 #: projects/models/report.py:71 sitecontent/models.py:31
 msgid "title"
 msgstr "otsikko"

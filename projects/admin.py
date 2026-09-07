@@ -15,6 +15,7 @@ from projects.models import (
     ReportColumnPostfix,
     ReportFilter,
     ReportFilterAttributeChoice,
+    ExternalReportLink,
     Deadline,
     AutomaticDate,
     ForcedDate,
@@ -438,6 +439,17 @@ class ReportAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("name",)
     inlines = (ReportColumnInline,)
     readonly_fields = ("previewable",)
+
+
+@admin.register(ExternalReportLink)
+class ExternalReportLinkAdmin(admin.ModelAdmin):
+    list_display = ("url",)
+
+    def has_add_permission(self, request):
+        # Singleton: only allow a single entry.
+        if ExternalReportLink.objects.exists():
+            return False
+        return super().has_add_permission(request)
 
 
 class ReportFilterAttributeChoiceInline(admin.TabularInline):
