@@ -1597,18 +1597,13 @@ class ReportViewSet(ReadOnlyModelViewSet):
 
     def _get_tietopyynto_project_queryset(self, filters, params):
         projects = None
+        report_filters = {f.identifier: params.get(f.identifier) for f in filters}
         for report_filter in filters:
-            filter_value = params.get(report_filter.identifier)
-            if isinstance(filter_value, str):
-                filter_value = filter_value.strip()
-
-            if not filter_value:
-                continue
-
-            projects = report_filter.filter_data_request(
-                filter_value,
+            projects = report_filter.filter_tietopyynto_data_request(
+                report_filters,
                 queryset=projects if projects is not None else Project.objects.all(),
             )
+            break  # We are simultaneously filtering with both identifiers (etunimi, sukunimi) so skip further loops
 
         return projects if projects is not None else Project.objects.all()
 
