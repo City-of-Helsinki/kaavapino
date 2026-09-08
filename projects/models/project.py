@@ -1576,7 +1576,18 @@ class Project(models.Model):
         search_fields.add(Value(self.user, output_field=models.TextField()))
         search_fields.add(Value(self.user.ad_id, output_field=models.TextField()))
 
-        self.vector_column = SearchVector(*list(search_fields))
+        # Normalize search_fields
+        normalized_search_fields = set()
+        for search_field in search_fields:
+            normalized_value = (str(search_field).lower()
+                                .replace(" ", "")
+                                .replace("-", "")
+                                .replace("_", "")
+                                .replace(".", "")
+                                )
+            normalized_search_fields.add(Value(normalized_value, output_field=models.TextField()))
+
+        self.vector_column = SearchVector(*list(normalized_search_fields))
 
         super(Project, self).save(*args, **kwargs)
         if not self.pino_number:

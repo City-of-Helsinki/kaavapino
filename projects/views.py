@@ -302,6 +302,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         def escape_tsquery(term):
             return re.sub(r'([&|!:()*])', r'\\\1', term)
 
+        # Normalize search string
+        search = search.lower().replace(" ", "").replace("-", "").replace("_", "").replace(".", "")
+
         # Add 'like' condition for partial matching of single lexeme even
         # it prevents bitmap heap scan of gin index. This might be removed
         # if it creates performance issues in the future
