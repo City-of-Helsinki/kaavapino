@@ -666,6 +666,7 @@ class ExternalReportLink(models.Model):
     url = models.URLField(
         verbose_name=_("external report portal url"),
         help_text=_("Link to the external website where report documents are stored."),
+        max_length=1024
     )
 
     class Meta:
