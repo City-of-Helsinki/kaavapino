@@ -69,6 +69,8 @@ from users.helpers import get_graph_api_access_token
 
 log = logging.getLogger(__name__)
 
+# Ignore min_distance errors for dates before 1.1.2025
+ignore_before_date = datetime.date(2025, 1, 1)
 
 class SectionData(NamedTuple):
     section: ProjectPhaseSection
@@ -98,7 +100,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_under_min_distance_next(self, projectdeadline):
-        if not projectdeadline.date:
+        if not projectdeadline.date or projectdeadline.date < ignore_before_date:
             return False
 
         next_deadlines = projectdeadline.deadline.distances_to_next.all()\
@@ -120,7 +122,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
                 continue
 
             # Ignore if next date is not set
-            if not next_date:
+            if not next_date or next_date < ignore_before_date:
                 continue
 
             # Ignore if next date is not supposed to be visible
@@ -141,7 +143,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
 
     @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_under_min_distance_previous(self, projectdeadline):
-        if not projectdeadline.date:
+        if not projectdeadline.date or projectdeadline.date < ignore_before_date:
             return False
 
         prev_deadlines = projectdeadline.deadline.distances_to_previous.all()\
@@ -164,7 +166,7 @@ class ProjectDeadlineSerializer(serializers.Serializer):
                 continue
 
             # Ignore if previous date is not set
-            if not prev_date:
+            if not prev_date or prev_date < ignore_before_date:
                 continue
 
             if prev_distance.date_type:
