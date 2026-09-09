@@ -107,7 +107,7 @@ JWT_AUTH = {
 }
 DOCUMENT_EDIT_URL_FORMAT = os.environ.get('DOCUMENT_EDIT_URL_FORMAT')
 
-DATABASES = {"default": env.db(engine='kaavapino.db_wrapper')}
+DATABASES = {"default": env.db()}
 
 if env("DATABASE_PASSWORD"):
     DATABASES["default"]["PASSWORD"] = env("DATABASE_PASSWORD")
