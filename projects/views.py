@@ -3,6 +3,7 @@ import csv
 import re
 from datetime import datetime, timedelta, date
 import logging
+from urllib.parse import unquote
 
 from django.contrib.postgres.search import SearchVector
 from django.conf import settings
@@ -303,7 +304,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
             return re.sub(r'([&|!:()*])', r'\\\1', term)
 
         # Normalize search string
-        search = search.lower().replace(" ", "").replace("-", "").replace("_", "").replace(".", "")
+        search = unquote(search).lower().replace(" ", "").replace("-", "").replace("_", "").replace(".", "")
 
         # Add 'like' condition for partial matching of single lexeme even
         # it prevents bitmap heap scan of gin index. This might be removed
