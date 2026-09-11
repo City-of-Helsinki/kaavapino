@@ -557,9 +557,9 @@ class DeadlineImporter:
 
                 # Other valid conditions are saved as Attribute relations later
                 for cond in attribute_conds:
-                    cond_attrs, not_cond_attrs = get_attribute_conditions(cond)
-                    condition_attributes.extend(cond_attrs)
-                    not_condition_attributes.extend(not_cond_attrs)
+                    _condition_attributes, _not_condition_attributes = get_attribute_conditions(cond)
+                    condition_attributes.extend(_condition_attributes)
+                    not_condition_attributes.extend(_not_condition_attributes)
 
                 try:
                     constant = int(re.findall(constant_regex, calc)[0])
