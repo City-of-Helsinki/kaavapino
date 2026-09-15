@@ -8,19 +8,24 @@ jobs:
 
     services:
       postgres:
-        image: postgis/postgis:13-3.1
+        image: postgis/postgis:18-3.6
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_pass
         ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       
       redis:
         image: redis:7-alpine
         ports: ['6379:6379']
 
     env:
-      DATABASE_URL: postgres://test_user:test_pass@localhost:5432/test_db
+      DATABASE_URL: postgis://test_user:test_pass@localhost:5432/test_db
       DJANGO_SETTINGS_MODULE: kaavapino.settings
       SECRET_KEY: dummy  # Required by Django
       ALLOWED_HOSTS: "*"
@@ -37,7 +42,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.12"
 
       - name: Install GeoDjango packages
         run: |
