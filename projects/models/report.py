@@ -373,6 +373,55 @@ class ReportFilter(models.Model):
                             return True
         return False
 
+    def filter_tietopyynto_data_request(self, filters, queryset):
+        # Hardcoded for now
+        etunimi = filters.get("etunimi", None)
+        sukunimi = filters.get("sukunimi", None)
+
+        projects = set()
+        for project in queryset:
+            if project in projects:
+                continue
+
+            for attr in self.attributes.all():
+                try:
+                    parent_attribute = FieldSetAttribute.objects.get(attribute_target=attr).attribute_source
+                    fieldset_value = project.attribute_data.get(parent_attribute.identifier, None)
+                    if not fieldset_value:
+                        continue
+
+                    for element in fieldset_value:
+                        fieldset_keys = element.keys()
+                        for key, value in element.items():
+                            if key != attr.identifier:
+                                continue
+
+                            if "etunimi" in key:
+                                sukunimi_identifier = key.replace("etunimi", "sukunimi")
+                                if sukunimi_identifier in fieldset_keys:
+                                    sukunimi_value = element[sukunimi_identifier]
+                                    if (not etunimi or self._contains(etunimi, attr, value)) and (not sukunimi or self._contains(sukunimi, attr, sukunimi_value)):
+                                        projects.add(project)
+                                        break
+                            elif "sukunimi" in key:
+                                etunimi_identifier = key.replace("sukunimi", "etunimi")
+                                if etunimi_identifier in fieldset_keys:
+                                    etunimi_value = element[etunimi_identifier]
+                                    if (not sukunimi or self._contains(sukunimi, attr, value)) and (not etunimi or self._contains(etunimi, attr, etunimi_value)):
+                                        projects.add(project)
+                                        break
+                            else:
+                                if (not etunimi or self._contains(etunimi, attr, value)) and (not sukunimi or self._contains(sukunimi, attr, value)):
+                                    projects.add(project)
+                                    break
+
+                except FieldSetAttribute.DoesNotExist:
+                    if ((not etunimi or self._contains(etunimi, attr, project.attribute_data.get(attr.identifier, None)))
+                            and (not sukunimi or self._contains(sukunimi, attr, project.attribute_data.get(attr.identifier, None)))):
+                        projects.add(project)
+                        break
+        return projects
+
     def filter_data_request(self, filter_value, queryset):
         projects = set()
         for project in queryset:
@@ -612,6 +661,22 @@ class ReportFilterAttributeChoice(models.Model):
         return f"{self.report_filter}: {self.name}"
 
 
+class ExternalReportLink(models.Model):
+    """Singleton holding the link to the external portal where report documents are stored."""
+    url = models.URLField(
+        verbose_name=_("external report portal url"),
+        help_text=_("Link to the external website where report documents are stored."),
+        max_length=1024
+    )
+
+    class Meta:
+        verbose_name = _("external report link")
+        verbose_name_plural = _("external report link")
+
+    def __str__(self):
+        return self.url
+
+
 # Register auditlog for models
 from auditlog.registry import auditlog
 auditlog.register(Report)
@@ -619,3 +684,4 @@ auditlog.register(ReportColumn)
 auditlog.register(ReportColumnPostfix)
 auditlog.register(ReportFilter)
 auditlog.register(ReportFilterAttributeChoice)
+auditlog.register(ExternalReportLink)

@@ -2,7 +2,7 @@ from adminsortable2.admin import SortableAdminMixin, SortableInlineAdminMixin, S
 from django import forms
 from django.apps import apps
 from django.contrib import admin, messages
-from django.contrib.gis.admin import OSMGeoAdmin
+from django.contrib.gis.admin import GISModelAdmin
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -15,6 +15,7 @@ from projects.models import (
     ReportColumnPostfix,
     ReportFilter,
     ReportFilterAttributeChoice,
+    ExternalReportLink,
     Deadline,
     AutomaticDate,
     ForcedDate,
@@ -241,7 +242,7 @@ class ProjectPhaseLogInline(admin.TabularInline):
 
 
 @admin.register(Project)
-class ProjectAdmin(OSMGeoAdmin):
+class ProjectAdmin(GISModelAdmin):
     list_display = ("name", "created_at", "modified_at")
     readonly_fields = (
         "name",
@@ -438,6 +439,17 @@ class ReportAdmin(admin.ModelAdmin, SortableAdminBase):
     list_display = ("name",)
     inlines = (ReportColumnInline,)
     readonly_fields = ("previewable",)
+
+
+@admin.register(ExternalReportLink)
+class ExternalReportLinkAdmin(admin.ModelAdmin):
+    list_display = ("url",)
+
+    def has_add_permission(self, request):
+        # Singleton: only allow a single entry.
+        if ExternalReportLink.objects.exists():
+            return False
+        return super().has_add_permission(request)
 
 
 class ReportFilterAttributeChoiceInline(admin.TabularInline):

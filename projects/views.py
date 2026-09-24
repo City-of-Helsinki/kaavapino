@@ -3,6 +3,7 @@ import csv
 import re
 from datetime import datetime, timedelta, date
 import logging
+from urllib.parse import unquote
 
 from django.contrib.postgres.search import SearchVector
 from django.conf import settings
@@ -63,6 +64,7 @@ from projects.models import (
     OverviewFilterAttribute,
     ProjectPriority,
     DateType,
+    ExternalReportLink,
 )
 from projects.models.attribute import AttributeLock, FieldSetAttribute, AttributeValueChoice
 from projects.models.utils import create_identifier
@@ -300,6 +302,9 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
     def _search(self, search, queryset):
         def escape_tsquery(term):
             return re.sub(r'([&|!:()*])', r'\\\1', term)
+
+        # Normalize search string
+        search = unquote(search).lower().replace(" ", "").replace("-", "").replace("_", "").replace(".", "")
 
         # Add 'like' condition for partial matching of single lexeme even
         # it prevents bitmap heap scan of gin index. This might be removed
@@ -1596,18 +1601,13 @@ class ReportViewSet(ReadOnlyModelViewSet):
 
     def _get_tietopyynto_project_queryset(self, filters, params):
         projects = None
+        report_filters = {f.identifier: params.get(f.identifier) for f in filters}
         for report_filter in filters:
-            filter_value = params.get(report_filter.identifier)
-            if isinstance(filter_value, str):
-                filter_value = filter_value.strip()
-
-            if not filter_value:
-                continue
-
-            projects = report_filter.filter_data_request(
-                filter_value,
+            projects = report_filter.filter_tietopyynto_data_request(
+                report_filters,
                 queryset=projects if projects is not None else Project.objects.all(),
             )
+            break  # We are simultaneously filtering with both identifiers (etunimi, sukunimi) so skip further loops
 
         return projects if projects is not None else Project.objects.all()
 
@@ -1682,6 +1682,19 @@ class ReportViewSet(ReadOnlyModelViewSet):
     def list(self, request, *args, **kwargs):
         self.serializer_class = ReportSerializer
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    @action(
+        methods=["get"],
+        detail=False,
+        url_path="external_link",
+        url_name="external_link",
+    )
+    def external_link(self, request):
+        link = ExternalReportLink.objects.first()
+        return Response({"url": link.url if link else None})
 
 
 class DeadlineSchemaViewSet(viewsets.ReadOnlyModelViewSet):
