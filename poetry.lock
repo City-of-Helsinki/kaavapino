@@ -42,16 +42,6 @@ astroid = ["astroid (>=2,<5)"]
 test = ["astroid (>=2,<5)", "pytest (<9.0)", "pytest-cov", "pytest-xdist"]
 
 [[package]]
-name = "atomicwrites"
-version = "1.4.1"
-description = "Atomic file writes."
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
-files = [
-    {file = "atomicwrites-1.4.1.tar.gz", hash = "sha256:81b2c9071a49367a7f770170e5eec8cb66567cfbbc8c73d20ce5ca4a8d71cf11"},
-]
-
-[[package]]
 name = "attrs"
 version = "26.1.0"
 description = "Classes Without Boilerplate"
@@ -1692,6 +1682,8 @@ files = [
     {file = "lxml-6.1.2-cp38-cp38-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:af6585a466cee2c5a524f7fffc591844bd604a29fdd9cade964f548512b5ef7e"},
     {file = "lxml-6.1.2-cp38-cp38-manylinux_2_28_i686.whl", hash = "sha256:841630176c15fa5d3c5cd6f755435d3c5540a82e1dd2a7de1799401f92ee6d24"},
     {file = "lxml-6.1.2-cp38-cp38-musllinux_1_2_x86_64.whl", hash = "sha256:215bb3cc4be015ccac3c7d4f25eb7b941f857fe5b02c0e3504cca61f7fb12455"},
+    {file = "lxml-6.1.2-cp38-cp38-win32.whl", hash = "sha256:7c687fd8e558c7d169f6f1987b696f37824d3a097f291bffd0ab4a2ea2307dfb"},
+    {file = "lxml-6.1.2-cp38-cp38-win_amd64.whl", hash = "sha256:69df1856cb6c065e5bfd23adcc7408bfa6dcf32b0018373a99b0769bd86e2256"},
     {file = "lxml-6.1.2-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:2dcc69e307e0916c7a0b552212010938d02a664d29b6bda75ab2bc5fa487c861"},
     {file = "lxml-6.1.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:243ecef7cb7415766dd742336cd5b8361a84c6f297e2773c865b783724cbbe74"},
     {file = "lxml-6.1.2-cp39-cp39-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:08f0c9ed7cded07c5e798b17c9c25bbba5d0650c8ff0a7f65f84c634966f0f10"},
@@ -2150,17 +2142,6 @@ files = [
 tests = ["pytest"]
 
 [[package]]
-name = "py"
-version = "1.11.0"
-description = "library with cross-python path, ini-parsing, io, code, log facilities"
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
-files = [
-    {file = "py-1.11.0-py2.py3-none-any.whl", hash = "sha256:607c53218732647dff4acdfcd50cb62615cedf612e72d1724fb1a0cc6405b378"},
-    {file = "py-1.11.0.tar.gz", hash = "sha256:51c75c4126074b472f746a24399ad32f6053d1b34b68d2fa41e558e6f4a98719"},
-]
-
-[[package]]
 name = "pyasn1"
 version = "0.6.4"
 description = "Pure-Python implementation of ASN.1 types and DER/BER/CER codecs (X.208)"
@@ -2298,27 +2279,23 @@ files = [
 
 [[package]]
 name = "pytest"
-version = "6.2.5"
+version = "7.4.4"
 description = "pytest: simple powerful testing with Python"
 optional = false
-python-versions = ">=3.6"
+python-versions = ">=3.7"
 files = [
-    {file = "pytest-6.2.5-py3-none-any.whl", hash = "sha256:7310f8d27bc79ced999e760ca304d69f6ba6c6649c0b60fb0e04a4a77cacc134"},
-    {file = "pytest-6.2.5.tar.gz", hash = "sha256:131b36680866a76e6781d13f101efb86cf674ebb9762eb70d3082b6f29889e89"},
+    {file = "pytest-7.4.4-py3-none-any.whl", hash = "sha256:b090cdf5ed60bf4c45261be03239c2c1c22df034fbffe691abe93cd80cea01d8"},
+    {file = "pytest-7.4.4.tar.gz", hash = "sha256:2cf0005922c6ace4a3e2ec8b4080eb0d9753fdc93107415332f50ce9e7994280"},
 ]
 
 [package.dependencies]
-atomicwrites = {version = ">=1.0", markers = "sys_platform == \"win32\""}
-attrs = ">=19.2.0"
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
 iniconfig = "*"
 packaging = "*"
 pluggy = ">=0.12,<2.0"
-py = ">=1.8.2"
-toml = "*"
 
 [package.extras]
-testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
+testing = ["argcomplete", "attrs (>=19.2.0)", "hypothesis (>=3.56)", "mock", "nose", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
 
 [[package]]
 name = "pytest-cov"
@@ -2490,6 +2467,13 @@ description = "YAML parser and emitter for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
+    {file = "PyYAML-6.0.3-cp38-cp38-macosx_10_13_x86_64.whl", hash = "sha256:c2514fceb77bc5e7a2f7adfaa1feb2fb311607c9cb518dbc378688ec73d8292f"},
+    {file = "PyYAML-6.0.3-cp38-cp38-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9c57bb8c96f6d1808c030b1687b9b5fb476abaa47f0db9c0101f5e9f394e97f4"},
+    {file = "PyYAML-6.0.3-cp38-cp38-manylinux2014_s390x.manylinux_2_17_s390x.manylinux_2_28_s390x.whl", hash = "sha256:efd7b85f94a6f21e4932043973a7ba2613b059c4a000551892ac9f1d11f5baf3"},
+    {file = "PyYAML-6.0.3-cp38-cp38-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:22ba7cfcad58ef3ecddc7ed1db3409af68d023b7f940da23c6c2a1890976eda6"},
+    {file = "PyYAML-6.0.3-cp38-cp38-musllinux_1_2_x86_64.whl", hash = "sha256:6344df0d5755a2c9a276d4473ae6b90647e216ab4757f8426893b5dd2ac3f369"},
+    {file = "PyYAML-6.0.3-cp38-cp38-win32.whl", hash = "sha256:3ff07ec89bae51176c0549bc4c63aa6202991da2d9a6129d7aef7f1407d3f295"},
+    {file = "PyYAML-6.0.3-cp38-cp38-win_amd64.whl", hash = "sha256:5cf4e27da7e3fbed4d6c3d8e797387aaad68102272f8f9752883bc32d61cb87b"},
     {file = "pyyaml-6.0.3-cp310-cp310-macosx_10_13_x86_64.whl", hash = "sha256:214ed4befebe12df36bcc8bc2b64b396ca31be9304b8f59e25c11cf94a4c033b"},
     {file = "pyyaml-6.0.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:02ea2dfa234451bbb8772601d7b8e426c2bfa197136796224e50e35a78777956"},
     {file = "pyyaml-6.0.3-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b30236e45cf30d2b8e7b3e85881719e98507abed1011bf463a8fa23e9c3e98a8"},
@@ -3055,17 +3039,6 @@ pure-eval = "*"
 tests = ["cython", "littleutils", "pygments", "pytest", "typeguard"]
 
 [[package]]
-name = "toml"
-version = "0.10.2"
-description = "Python Library for Tom's Obvious, Minimal Language"
-optional = false
-python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
-files = [
-    {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
-    {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
-]
-
-[[package]]
 name = "traitlets"
 version = "5.16.1"
 description = "Traitlets Python configuration system"
@@ -3222,4 +3195,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.12,<=3.14"
-content-hash = "87f3254317dd26305d8c06cf6532903ca5acef105d95d8238b5c10fa52aaa910"
+content-hash = "dfc6a73e93c7b9cfb24b217b279751839c656b215f47a09199698643fc7b3428"
