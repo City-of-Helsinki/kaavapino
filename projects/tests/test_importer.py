@@ -101,3 +101,44 @@ def test_get_attribute_row_identifier():
     assert ai._get_attribute_row_identifier(mock_rows[6]) == "whitespace"
     assert ai._get_attribute_row_identifier(mock_rows[7]) == "attribute_7"
     assert ai._get_attribute_row_identifier(mock_rows[8]) == "attribute_8"
+
+def test_parse_condition():
+    ai = AttributeImporter()
+    assert ai._parse_condition("oas_mielipiteet_maara > 0") == {
+        "variable": "oas_mielipiteet_maara",
+        "operator": ">",
+        "comparison_value": "0",
+        "comparison_value_type": "number",
+    }
+    assert ai._parse_condition("jarjestetaan_luonnosvaiheessa_tilaisuus_3") == {
+        "variable": "jarjestetaan_luonnosvaiheessa_tilaisuus_3",
+        "operator": "==",
+        "comparison_value": True,
+        "comparison_value_type": "boolean",
+    }
+    assert ai._parse_condition("!maanomistus_kaupunki") == {
+        "variable": "maanomistus_kaupunki",
+        "operator": "!=",
+        "comparison_value": True,
+        "comparison_value_type": "boolean",
+    }
+    assert ai._parse_condition("kaavaprosessin_kokoluokka in [\"L\", \"XL\"]") == {
+        "variable": "kaavaprosessin_kokoluokka",
+        "operator": "in",
+        "comparison_value": '["L", "XL"]',
+        "comparison_value_type": "list<string>",
+    }
+    assert ai._parse_condition("kaavaprosessin_kokoluokka not in [\"S\", \"M\"]") == {
+        "variable": "kaavaprosessin_kokoluokka",
+        "operator": "not in",
+        "comparison_value": '["S", "M"]',
+        "comparison_value_type": "list<string>",
+    }
+    assert ai._parse_condition("lautakunta_paatti_ehdotus == \"paatos_kaavaehdotuksesta_asia_jai_poydalle\"") == {
+        "variable": "lautakunta_paatti_ehdotus",
+        "operator": "==",
+        "comparison_value": "paatos_kaavaehdotuksesta_asia_jai_poydalle",
+        "comparison_value_type": "string",
+    }
+
+
