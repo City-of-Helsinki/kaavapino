@@ -2,7 +2,12 @@ import pytest
 
 from projects.models import CommonProjectPhase, Attribute
 from projects.importing import AttributeImporter
-from projects.importing.attribute import ATTRIBUTE_NAME, ATTRIBUTE_TYPE
+from projects.importing.attribute import (
+    ATTRIBUTE_NAME,
+    ATTRIBUTE_PHASE_COLUMNS,
+    ATTRIBUTE_TYPE,
+    Phases,
+)
 
 def get_mock_excel_rows(test_objects: list):
     """ Helper for generating mock Excel rows from a list of test objects.
@@ -101,6 +106,100 @@ def test_get_attribute_row_identifier():
     assert ai._get_attribute_row_identifier(mock_rows[6]) == "whitespace"
     assert ai._get_attribute_row_identifier(mock_rows[7]) == "attribute_7"
     assert ai._get_attribute_row_identifier(mock_rows[8]) == "attribute_8"
+
+
+def test_get_attribute_locations_parses_nested_location():
+    phase_columns = ATTRIBUTE_PHASE_COLUMNS[Phases.START]
+    rows = get_mock_excel_rows([
+        {
+            phase_columns[0]: "Section",
+            phase_columns[1]: "Section ingress",
+            phase_columns[2]: "1.2.3:4",
+        }
+    ])
+    ai = AttributeImporter()
+    ai._set_row_indexes(rows[0])
+
+    assert ai._get_attribute_locations(rows[1], Phases.START.value) == {
+        "label": "Section",
+        "ingress": "Section ingress",
+        "section_location": 10000,
+        "field_location": 20000,
+        "child_locations": [34000],
+    }
+
+
+def test_get_attribute_locations_without_child_location():
+    phase_columns = ATTRIBUTE_PHASE_COLUMNS[Phases.OAS]
+    rows = get_mock_excel_rows([
+        {
+            phase_columns[0]: "Section",
+            phase_columns[1]: None,
+            phase_columns[2]: "2.5",
+        }
+    ])
+    ai = AttributeImporter()
+    ai._set_row_indexes(rows[0])
+
+    assert ai._get_attribute_locations(rows[1], Phases.OAS.value) == {
+        "label": "Section",
+        "ingress": None,
+        "section_location": 20000,
+        "field_location": 50000,
+        "child_locations": [],
+    }
+
+
+@pytest.mark.parametrize("location", [None, "invalid"])
+def test_get_attribute_locations_returns_none_for_invalid_location(location):
+    phase_columns = ATTRIBUTE_PHASE_COLUMNS[Phases.REVISED_PROPOSAL]
+    rows = get_mock_excel_rows([
+        {
+            phase_columns[0]: "Section",
+            phase_columns[1]: None,
+            phase_columns[2]: location,
+        }
+    ])
+    ai = AttributeImporter()
+    ai._set_row_indexes(rows[0])
+
+    assert ai._get_attribute_locations(rows[1], Phases.REVISED_PROPOSAL.value) is None
+
+
+def test_get_attribute_locations_returns_none_for_unknown_phase():
+    ai = AttributeImporter()
+    ai.column_index = {}
+
+    assert ai._get_attribute_locations([], "Unknown phase") is None
+
+
+@pytest.mark.parametrize(
+    ("locations", "expected_index"),
+    [
+        ({"field_location": 20000, "child_locations": []}, 20000),
+        ({"field_location": 20000, "child_locations": [34000]}, 23400),
+        ({"field_location": 20000, "child_locations": [30000, 4000]}, 23040),
+    ],
+)
+def test_calculate_index_preserves_field_and_nested_child_positions(
+    locations, expected_index
+):
+    assert AttributeImporter.calculate_index(locations) == expected_index
+
+
+@pytest.mark.parametrize(
+    ("locations", "expected_index"),
+    [
+        ([], 0),
+        (["1"], 1000),
+        (["1", "2", "3"], 1203),
+        (["2", "5", "1", "7"], 2508),
+    ],
+)
+def test_calculate_deadline_index_scales_each_position_by_depth(
+    locations, expected_index
+):
+    assert AttributeImporter.calculate_deadline_index(locations) == expected_index
 
 def test_parse_condition():
     ai = AttributeImporter()
@@ -249,3 +348,7 @@ def test_parse_autofill_readonly():
     assert ai._parse_autofill_readonly("Automaattiseti muodostunutta tietoa ei voi muokata") == True
     assert ai._parse_autofill_readonly("kyllä") == False
     assert ai._parse_autofill_readonly("") == False
+
+
+def test_get_attribute_locations():
+    pass
