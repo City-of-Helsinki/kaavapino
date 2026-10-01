@@ -6,6 +6,7 @@ from projects.importing.attribute import (
     ATTRIBUTE_NAME,
     ATTRIBUTE_PHASE_COLUMNS,
     ATTRIBUTE_TYPE,
+    ATTRIBUTE_IDENTIFIER,
     Phases,
 )
 
@@ -81,13 +82,9 @@ def test_row_part_of_fieldset():
     assert ai._row_part_of_fieldset(mock_rows[2]) is False
 
 def test_get_attribute_row_identifier():
-    from projects.importing.attribute import ATTRIBUTE_IDENTIFIER, ATTRIBUTE_NAME
     mock_rows = get_mock_excel_rows([
         {ATTRIBUTE_IDENTIFIER: "single"},
         {ATTRIBUTE_IDENTIFIER: "multiple_word_identifier"},
-        {ATTRIBUTE_IDENTIFIER: "with-dash"},
-        {ATTRIBUTE_IDENTIFIER: "invalid identifier"},
-        {ATTRIBUTE_IDENTIFIER: "v´+ery1nv<lid"},
         {ATTRIBUTE_IDENTIFIER: " whitespace "},
         {ATTRIBUTE_NAME: "Attribute 7"},
         {ATTRIBUTE_NAME: "Attribute-8"}
@@ -97,16 +94,24 @@ def test_get_attribute_row_identifier():
     ai._set_row_indexes(mock_rows[0])
     assert ai._get_attribute_row_identifier(mock_rows[1]) == "single"
     assert ai._get_attribute_row_identifier(mock_rows[2]) == "multiple_word_identifier"
+    assert ai._get_attribute_row_identifier(mock_rows[3]) == "whitespace"
+    assert ai._get_attribute_row_identifier(mock_rows[4]) == "attribute_7"
+    assert ai._get_attribute_row_identifier(mock_rows[5]) == "attribute_8"
+
+def test_get_attribute_row_identifier_throws_on_invalid():
+    mock_rows = get_mock_excel_rows([
+        {ATTRIBUTE_IDENTIFIER: "with-dash"},
+        {ATTRIBUTE_IDENTIFIER: "invalid identifier"},
+        {ATTRIBUTE_IDENTIFIER: "v´+ery1nv<lid"},
+    ])
+    ai = AttributeImporter()
+    ai._set_row_indexes(mock_rows[0])
+    with pytest.raises(ValueError):
+        ai._get_attribute_row_identifier(mock_rows[1])
+    with pytest.raises(ValueError):
+        ai._get_attribute_row_identifier(mock_rows[2])
     with pytest.raises(ValueError):
         ai._get_attribute_row_identifier(mock_rows[3])
-    with pytest.raises(ValueError):
-        ai._get_attribute_row_identifier(mock_rows[4])
-    with pytest.raises(ValueError):
-        ai._get_attribute_row_identifier(mock_rows[5])
-    assert ai._get_attribute_row_identifier(mock_rows[6]) == "whitespace"
-    assert ai._get_attribute_row_identifier(mock_rows[7]) == "attribute_7"
-    assert ai._get_attribute_row_identifier(mock_rows[8]) == "attribute_8"
-
 
 def test_get_attribute_locations_parses_nested_location():
     phase_columns = ATTRIBUTE_PHASE_COLUMNS[Phases.START]
@@ -200,6 +205,77 @@ def test_calculate_deadline_index_scales_each_position_by_depth(
     locations, expected_index
 ):
     assert AttributeImporter.calculate_deadline_index(locations) == expected_index
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("value_type", [Attribute.TYPE_INTEGER, Attribute.TYPE_DECIMAL])
+def test_generated_calculation_accepts_existing_numeric_inputs(value_type):
+    Attribute.objects.create(
+        name="Area",
+        identifier="calculation_area",
+        value_type=value_type,
+    )
+    Attribute.objects.create(
+        name="Units",
+        identifier="calculation_units",
+        value_type=value_type,
+    )
+    Attribute.objects.create(
+        name="Calculated total",
+        identifier="calculated_total",
+        value_type=value_type,
+        generated=True,
+        calculations=["calculation_area", "+", "calculation_units"],
+    )
+    # Does not throw an exception because all input attributes exist and are numeric
+    AttributeImporter()._validate_generated_attributes()
+
+
+@pytest.mark.django_db
+def test_generated_calculation_rejects_missing_input_attribute():
+    Attribute.objects.create(
+        name="Calculated total",
+        identifier="calculated_total",
+        value_type=Attribute.TYPE_INTEGER,
+        generated=True,
+        calculations=["missing_input", "+", "also_missing"],
+    )
+    ai = AttributeImporter()
+    with pytest.raises(Exception, match="Could not add attribute calculated_total"):
+        ai._validate_generated_attributes()
+
+
+@pytest.mark.django_db
+def test_generated_calculation_rejects_non_numeric_input_attribute():
+    Attribute.objects.create(
+        name="Description",
+        identifier="calculation_description",
+        value_type=Attribute.TYPE_SHORT_STRING,
+    )
+    Attribute.objects.create(
+        name="Calculated total",
+        identifier="calculated_total",
+        value_type=Attribute.TYPE_INTEGER,
+        generated=True,
+        calculations=["calculation_description"],
+    )
+
+    ai = AttributeImporter()
+    with pytest.raises(Exception, match="Could not add attribute calculated_total"):
+        ai._validate_generated_attributes()
+
+
+@pytest.mark.django_db
+def test_non_generated_calculation_is_not_validated_by_importer():
+    Attribute.objects.create(
+        name="Calculated total",
+        identifier="not_generated_total",
+        value_type=Attribute.TYPE_INTEGER,
+        generated=False,
+        calculations=["missing_input"],
+    )
+
+    AttributeImporter()._validate_generated_attributes()
 
 def test_parse_condition():
     ai = AttributeImporter()
@@ -348,7 +424,3 @@ def test_parse_autofill_readonly():
     assert ai._parse_autofill_readonly("Automaattiseti muodostunutta tietoa ei voi muokata") == True
     assert ai._parse_autofill_readonly("kyllä") == False
     assert ai._parse_autofill_readonly("") == False
-
-
-def test_get_attribute_locations():
-    pass
