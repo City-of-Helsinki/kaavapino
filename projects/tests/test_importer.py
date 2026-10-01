@@ -4,12 +4,49 @@ from openpyxl import Workbook
 from projects.models import Attribute, AttributeValueChoice, CommonProjectPhase
 from projects.importing import AttributeImporter
 from projects.importing.attribute import (
+    ATTRIBUTE_API_VISIBILITY,
+    ATTRIBUTE_ASSISTIVE_TEXT,
+    ATTRIBUTE_BROADCAST_CHANGES,
+    ATTRIBUTE_CHARACTER_LIMIT,
     ATTRIBUTE_CHOICES_REF,
+    ATTRIBUTE_DATA_RETENTION,
+    ATTRIBUTE_EDIT_PRIVILEGE,
+    ATTRIBUTE_ERROR,
+    ATTRIBUTE_ERROR_TEXT,
+    ATTRIBUTE_FIELD_ROLE,
+    ATTRIBUTE_FIELD_SUBROLE,
+    ATTRIBUTE_FIELDSET_TOTAL,
+    ATTRIBUTE_GROUP,
+    ATTRIBUTE_HIGHLIGHT_GROUP,
+    ATTRIBUTE_IDENTIFIER,
+    ATTRIBUTE_LINKED_FIELDS,
+    ATTRIBUTE_MULTIPLE_CHOICE,
     ATTRIBUTE_NAME,
     ATTRIBUTE_PHASE_COLUMNS,
+    ATTRIBUTE_PLACEHOLDER,
+    ATTRIBUTE_RELATED_FIELDS,
+    ATTRIBUTE_REQUIRED,
+    ATTRIBUTE_RULE_AUTOFILL,
+    ATTRIBUTE_RULE_AUTOFILL_READONLY,
+    ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY,
+    ATTRIBUTE_RULE_UPDATE_AUTOFILL,
+    ATTRIBUTE_SEARCHABLE,
+    ATTRIBUTE_SUBGROUP,
     ATTRIBUTE_TYPE,
-    ATTRIBUTE_IDENTIFIER,
+    ATTRIBUTE_UNIT,
+    ATTRIBUTE_VALIDATION_REGEX,
+    ATTRIBUTE_VIEW_PRIVILEGE,
+    CALCULATIONS_COLUMN,
+    CHOICE_OPTIONS_SHEET_NAME,
     CHOICES_SHEET_NAME,
+    EXT_DATA_AD_KEY,
+    EXT_DATA_PARENT_KEY_ATTRIBUTE,
+    EXT_DATA_SOURCE,
+    EXT_DATA_SOURCE_KEY,
+    HELP_IMG_LINK,
+    HELP_LINK,
+    HELP_TEXT,
+    PUBLIC_ATTRIBUTE,
     Phases,
 )
 
@@ -313,6 +350,132 @@ def test_attribute_choice_identifier_change_reuses_matching_legacy_choice():
         existing_choice.index,
         existing_choice.legacy_identifier,
     ) == ("new_draft", display_value, 1, legacy_identifier)
+
+
+# Every column `_create_attributes` reads from a row, in header order.
+ATTRIBUTE_ROW_COLUMNS = [
+    ATTRIBUTE_NAME,
+    ATTRIBUTE_IDENTIFIER,
+    ATTRIBUTE_TYPE,
+    ATTRIBUTE_CHOICES_REF,
+    ATTRIBUTE_UNIT,
+    ATTRIBUTE_BROADCAST_CHANGES,
+    ATTRIBUTE_REQUIRED,
+    ATTRIBUTE_DATA_RETENTION,
+    ATTRIBUTE_MULTIPLE_CHOICE,
+    ATTRIBUTE_SEARCHABLE,
+    ATTRIBUTE_RELATED_FIELDS,
+    ATTRIBUTE_LINKED_FIELDS,
+    ATTRIBUTE_RULE_CONDITIONAL_VISIBILITY,
+    ATTRIBUTE_RULE_AUTOFILL,
+    ATTRIBUTE_RULE_AUTOFILL_READONLY,
+    ATTRIBUTE_RULE_UPDATE_AUTOFILL,
+    ATTRIBUTE_CHARACTER_LIMIT,
+    ATTRIBUTE_VALIDATION_REGEX,
+    ATTRIBUTE_HIGHLIGHT_GROUP,
+    ATTRIBUTE_EDIT_PRIVILEGE,
+    ATTRIBUTE_VIEW_PRIVILEGE,
+    ATTRIBUTE_ERROR,
+    ATTRIBUTE_PLACEHOLDER,
+    ATTRIBUTE_ASSISTIVE_TEXT,
+    ATTRIBUTE_ERROR_TEXT,
+    ATTRIBUTE_FIELD_ROLE,
+    ATTRIBUTE_FIELD_SUBROLE,
+    ATTRIBUTE_FIELDSET_TOTAL,
+    ATTRIBUTE_GROUP,
+    ATTRIBUTE_SUBGROUP,
+    ATTRIBUTE_API_VISIBILITY,
+    PUBLIC_ATTRIBUTE,
+    HELP_TEXT,
+    HELP_LINK,
+    HELP_IMG_LINK,
+    EXT_DATA_SOURCE,
+    EXT_DATA_SOURCE_KEY,
+    EXT_DATA_PARENT_KEY_ATTRIBUTE,
+    EXT_DATA_AD_KEY,
+    CALCULATIONS_COLUMN,
+]
+
+
+def build_attribute_row(overrides):
+    """Build one spreadsheet-style attribute row, defaulting every column
+    `_create_attributes` reads so each test only has to override what it cares about."""
+    values = {column: None for column in ATTRIBUTE_ROW_COLUMNS}
+    values[ATTRIBUTE_IDENTIFIER] = ""
+    values.update(overrides)
+    return [values[column] for column in ATTRIBUTE_ROW_COLUMNS]
+
+
+def make_attribute_importer():
+    workbook = Workbook()
+    choice_options_sheet = workbook.active
+    choice_options_sheet.title = CHOICE_OPTIONS_SHEET_NAME
+    # _get_values_by_identifier reads this sheet on every import, even when no row
+    # in the import references a choice list.
+    choice_options_sheet.append(["#", "unused_identifier", "unused_value"])
+
+    importer = AttributeImporter()
+    importer.workbook = workbook
+    importer._set_row_indexes(ATTRIBUTE_ROW_COLUMNS)
+    return importer
+
+
+@pytest.mark.django_db
+def test_create_attributes_creates_updates_and_deletes_stale_attribute_in_one_import():
+    existing_attribute = Attribute.objects.create(
+        name="Old name",
+        identifier="existing_attr",
+        value_type=Attribute.TYPE_SHORT_STRING,
+        required=False,
+        public=False,
+    )
+    AttributeValueChoice.objects.create(
+        attribute=existing_attribute,
+        identifier="existing_choice",
+        value="Existing choice",
+        index=0,
+    )
+    stale_attribute = Attribute.objects.create(
+        name="Stale attribute",
+        identifier="stale_attr",
+        value_type=Attribute.TYPE_SHORT_STRING,
+    )
+
+    rows = [
+        build_attribute_row({
+            ATTRIBUTE_NAME: "Updated name",
+            ATTRIBUTE_IDENTIFIER: "existing_attr",
+            ATTRIBUTE_TYPE: "Kokonaisluvun syöttö.",
+            ATTRIBUTE_REQUIRED: "kyllä",
+            PUBLIC_ATTRIBUTE: "kyllä",
+        }),
+        build_attribute_row({
+            ATTRIBUTE_NAME: "Brand new attribute",
+            ATTRIBUTE_IDENTIFIER: "new_attr",
+            ATTRIBUTE_TYPE: "Kokonaisluvun syöttö.",
+        }),
+    ]
+
+    importer = make_attribute_importer()
+    result = importer._create_attributes(rows)
+
+    assert result["created"] == 1
+    assert result["updated"] == 1
+    assert result["deleted"] == 1
+
+    existing_attribute.refresh_from_db()
+    assert existing_attribute.name == "Updated name"
+    assert existing_attribute.value_type == Attribute.TYPE_INTEGER
+    assert existing_attribute.required is True
+    assert existing_attribute.public is True
+    # Row had no choices reference, so _create_attributes must clear old choices.
+    assert existing_attribute.value_choices.count() == 0
+
+    new_attribute = Attribute.objects.get(identifier="new_attr")
+    assert new_attribute.name == "Brand new attribute"
+    assert new_attribute.value_type == Attribute.TYPE_INTEGER
+
+    assert not Attribute.objects.filter(identifier="stale_attr").exists()
 
 
 @pytest.mark.django_db
