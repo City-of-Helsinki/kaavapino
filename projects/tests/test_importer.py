@@ -1,11 +1,20 @@
 import pytest
 from openpyxl import Workbook
 
-from projects.models import Attribute, AttributeValueChoice, CommonProjectPhase
+from projects.models import (
+    Attribute,
+    AttributeAutoValue,
+    AttributeAutoValueMapping,
+    AttributeValueChoice,
+    CommonProjectPhase,
+    ProjectSubtype,
+)
 from projects.importing import AttributeImporter
 from projects.importing.attribute import (
     ATTRIBUTE_API_VISIBILITY,
     ATTRIBUTE_ASSISTIVE_TEXT,
+    ATTRIBUTE_AUTO_VALUE_KEY_FIELD,
+    ATTRIBUTE_AUTO_VALUE_MAPPING,
     ATTRIBUTE_BROADCAST_CHANGES,
     ATTRIBUTE_CHARACTER_LIMIT,
     ATTRIBUTE_CHOICES_REF,
@@ -41,12 +50,15 @@ from projects.importing.attribute import (
     CHOICES_SHEET_NAME,
     DEFAULT_SHEET_NAME,
     EXT_DATA_AD_KEY,
+    EXT_DATA_AD_SOURCE,
+    EXT_DATA_KEY_ATTRIBUTE,
     EXT_DATA_PARENT_KEY_ATTRIBUTE,
     EXT_DATA_SOURCE,
     EXT_DATA_SOURCE_KEY,
     HELP_IMG_LINK,
     HELP_LINK,
     HELP_TEXT,
+    PROJECT_SIZE,
     PUBLIC_ATTRIBUTE,
     AttributeImporterException,
     Phases,
@@ -478,6 +490,91 @@ def test_create_attributes_creates_updates_and_deletes_stale_attribute_in_one_im
     assert new_attribute.value_type == Attribute.TYPE_INTEGER
 
     assert not Attribute.objects.filter(identifier="stale_attr").exists()
+
+
+def build_key_relation_row(overrides):
+    """Build one row with only the columns `_create_attribute_key_relations` reads."""
+    columns = [
+        ATTRIBUTE_IDENTIFIER,
+        EXT_DATA_KEY_ATTRIBUTE,
+        EXT_DATA_AD_SOURCE,
+        ATTRIBUTE_AUTO_VALUE_KEY_FIELD,
+        ATTRIBUTE_AUTO_VALUE_MAPPING,
+    ]
+    values = {column: None for column in columns}
+    values[ATTRIBUTE_IDENTIFIER] = ""
+    values.update(overrides)
+    return columns, [values[column] for column in columns]
+
+
+@pytest.mark.django_db
+def test_create_attribute_key_relations_wires_and_translates_auto_value_mapping():
+    key_source_attr = Attribute.objects.create(name="Key source", identifier="key_source_attr")
+    ad_source_attr = Attribute.objects.create(name="AD source", identifier="ad_source_attr")
+    selected_role = Attribute.objects.create(
+        name="Selected role", identifier="selected_role", value_type=Attribute.TYPE_CHOICE
+    )
+    AttributeValueChoice.objects.create(attribute=selected_role, identifier="role_a", value="Role A", index=0)
+    AttributeValueChoice.objects.create(attribute=selected_role, identifier="role_b", value="Role B", index=1)
+    contact_person = Attribute.objects.create(name="Contact person", identifier="contact_person")
+
+    # Stale relation that must be cleared since it isn't part of this import.
+    stale_attr = Attribute.objects.create(
+        name="Stale", identifier="stale_attr_with_old_key", key_attribute=key_source_attr
+    )
+    # Stale auto-value mapping that must be removed since it isn't referenced by this import.
+    stale_target = Attribute.objects.create(name="Stale target", identifier="stale_target_attr")
+    stale_auto_attr = AttributeAutoValue.objects.create(
+        value_attribute=stale_target, key_attribute=selected_role
+    )
+    stale_mapping = AttributeAutoValueMapping.objects.create(
+        auto_attr=stale_auto_attr, key_str="role_a", value_str="Old contact"
+    )
+
+    columns, row = build_key_relation_row({
+        ATTRIBUTE_IDENTIFIER: "contact_person",
+        EXT_DATA_KEY_ATTRIBUTE: "key_source_attr",
+        EXT_DATA_AD_SOURCE: "ad_source_attr",
+        ATTRIBUTE_AUTO_VALUE_KEY_FIELD: "selected_role",
+        ATTRIBUTE_AUTO_VALUE_MAPPING: '"Role A": "Contact A"; "Role B": "Contact B"',
+    })
+    ai = AttributeImporter()
+    ai._set_row_indexes(columns)
+    ai._create_attribute_key_relations([row])
+
+    contact_person.refresh_from_db()
+    assert contact_person.key_attribute_id == key_source_attr.id
+    assert contact_person.ad_key_attribute_id == ad_source_attr.id
+
+    auto_attr = AttributeAutoValue.objects.get(value_attribute=contact_person)
+    assert auto_attr.key_attribute_id == selected_role.id
+    # Mapping keys use value_choice identifiers, translated from the sheet's display text.
+    mappings = {m.key_str: m.value_str for m in auto_attr.value_map.all()}
+    assert mappings == {"role_a": "Contact A", "role_b": "Contact B"}
+
+    stale_attr.refresh_from_db()
+    assert stale_attr.key_attribute is None
+    assert not AttributeAutoValue.objects.filter(pk=stale_auto_attr.pk).exists()
+    assert not AttributeAutoValueMapping.objects.filter(pk=stale_mapping.pk).exists()
+
+
+@pytest.mark.django_db
+def test_create_subtypes_orders_by_size_and_dedupes_case_insensitively(f_project_type):
+    rows = get_mock_excel_rows([
+        {PROJECT_SIZE: "XL"},
+        {PROJECT_SIZE: "M, XS"},
+        {PROJECT_SIZE: "m"},  # duplicate of "M" in different case, must not create a second subtype
+        {PROJECT_SIZE: "kaikki"},  # applies to every subtype, must not create a subtype of its own
+    ])
+    ai = AttributeImporter()
+    ai.project_type = f_project_type
+    ai._set_row_indexes(rows[0])
+
+    subtypes = ai.create_subtypes(rows[1:])
+
+    assert [s.name for s in subtypes] == ["XS", "M", "XL"]
+    assert [s.index for s in subtypes] == [0, 1, 2]
+    assert ProjectSubtype.objects.filter(project_type=f_project_type).count() == 3
 
 
 @pytest.mark.parametrize(
