@@ -39,6 +39,7 @@ from projects.importing.attribute import (
     CALCULATIONS_COLUMN,
     CHOICE_OPTIONS_SHEET_NAME,
     CHOICES_SHEET_NAME,
+    DEFAULT_SHEET_NAME,
     EXT_DATA_AD_KEY,
     EXT_DATA_PARENT_KEY_ATTRIBUTE,
     EXT_DATA_SOURCE,
@@ -47,6 +48,7 @@ from projects.importing.attribute import (
     HELP_LINK,
     HELP_TEXT,
     PUBLIC_ATTRIBUTE,
+    AttributeImporterException,
     Phases,
 )
 
@@ -476,6 +478,78 @@ def test_create_attributes_creates_updates_and_deletes_stale_attribute_in_one_im
     assert new_attribute.value_type == Attribute.TYPE_INTEGER
 
     assert not Attribute.objects.filter(identifier="stale_attr").exists()
+
+
+@pytest.mark.parametrize(
+    ("cell_content", "expected_subtypes"),
+    [
+        (None, ["kaikki"]),
+        ("", ["kaikki"]),
+        ("kaikki", ["kaikki"]),
+        ("XL", ["xl"]),
+        ("S, M, L", ["s", "m", "l"]),
+        ("XS,XL", ["xs", "xl"]),
+    ],
+)
+def test_get_subtypes_from_cell_parses_project_size_lists(cell_content, expected_subtypes):
+    ai = AttributeImporter()
+    assert ai.get_subtypes_from_cell(cell_content) == expected_subtypes
+
+
+@pytest.mark.parametrize(
+    ("calculations_string", "expected"),
+    [
+        (None, (False, None)),
+        ("ei", (False, None)),
+        ("kerrosala", (True, ["kerrosala"])),
+        (
+            "kerrosala + lisakerrosala - varattu_kerrosala",
+            (True, ["kerrosala", "+", "lisakerrosala", "-", "varattu_kerrosala"]),
+        ),
+    ],
+)
+def test_get_generated_calculations_tokenizes_formula_string(calculations_string, expected):
+    ai = AttributeImporter()
+    ai._set_row_indexes([CALCULATIONS_COLUMN])
+    assert ai._get_generated_calculations([calculations_string]) == expected
+
+
+def test_extract_data_from_workbook_raises_for_missing_sheet():
+    workbook = Workbook()
+    ai = AttributeImporter(options={"sheet": "Nonexistent sheet"})
+
+    with pytest.raises(AttributeImporterException):
+        ai._extract_data_from_workbook(workbook)
+
+
+def test_extract_data_from_workbook_raises_for_unexpected_a1_value():
+    workbook = Workbook()
+    workbook.active.title = DEFAULT_SHEET_NAME
+    workbook.active.append(["Not the expected header"])
+    ai = AttributeImporter(options={})
+
+    with pytest.raises(AttributeImporterException):
+        ai._extract_data_from_workbook(workbook)
+
+
+def test_extract_data_from_workbook_returns_rows_after_header():
+    workbook = Workbook()
+    workbook.active.title = DEFAULT_SHEET_NAME
+    workbook.active.append([ATTRIBUTE_NAME, ATTRIBUTE_TYPE])
+    workbook.active.append(["Attribute 1", "date"])
+    workbook.active.append(["Attribute 2", "text"])
+    ai = AttributeImporter(options={})
+
+    rows = ai._extract_data_from_workbook(workbook)
+
+    assert rows == [["Attribute 1", "date"], ["Attribute 2", "text"]]
+
+
+def test_open_workbook_raises_importer_exception_for_missing_file():
+    ai = AttributeImporter()
+
+    with pytest.raises(AttributeImporterException):
+        ai._open_workbook("/nonexistent/path/does-not-exist.xlsx")
 
 
 @pytest.mark.django_db
