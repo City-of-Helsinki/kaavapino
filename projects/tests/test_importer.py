@@ -7,6 +7,12 @@ from projects.models import (
     AttributeAutoValueMapping,
     AttributeValueChoice,
     CommonProjectPhase,
+    Deadline,
+    ProjectPhaseDeadlineSection,
+    ProjectPhaseDeadlineSectionAttribute,
+    ProjectPhase,
+    ProjectPhaseSection,
+    ProjectPhaseSectionAttribute,
     ProjectSubtype,
 )
 from projects.importing import AttributeImporter
@@ -19,6 +25,7 @@ from projects.importing.attribute import (
     ATTRIBUTE_CHARACTER_LIMIT,
     ATTRIBUTE_CHOICES_REF,
     ATTRIBUTE_DATA_RETENTION,
+    ATTRIBUTE_DEADLINE_SECTION_COLUMNS,
     ATTRIBUTE_EDIT_PRIVILEGE,
     ATTRIBUTE_ERROR,
     ATTRIBUTE_ERROR_TEXT,
@@ -58,10 +65,10 @@ from projects.importing.attribute import (
     HELP_IMG_LINK,
     HELP_LINK,
     HELP_TEXT,
+    Phases,
     PROJECT_SIZE,
     PUBLIC_ATTRIBUTE,
     AttributeImporterException,
-    Phases,
 )
 
 def get_mock_excel_rows(test_objects: list):
@@ -259,6 +266,168 @@ def test_calculate_deadline_index_scales_each_position_by_depth(
     locations, expected_index
 ):
     assert AttributeImporter.calculate_deadline_index(locations) == expected_index
+
+
+@pytest.mark.django_db
+def test_phase_sections_rebuild_and_link_only_attributes_for_matching_subtype(
+    f_project_subtype, f_project_phase_1
+):
+    section_columns = ATTRIBUTE_PHASE_COLUMNS[Phases.START]
+    existing_section = ProjectPhaseSection.objects.create(
+        phase=f_project_phase_1,
+        name="Obsolete section",
+        index=90000,
+    )
+    attributes = {
+        identifier: Attribute.objects.create(
+            name=identifier.replace("_", " "),
+            identifier=identifier,
+            value_type=Attribute.TYPE_SHORT_STRING,
+        )
+        for identifier in ["phase_field_m_first", "phase_field_xl", "phase_field_m_second"]
+    }
+    rows = get_mock_excel_rows(
+        [
+            {
+                ATTRIBUTE_IDENTIFIER: "phase_field_m_first",
+                PROJECT_SIZE: "M",
+                section_columns[0]: "Project overview",
+                section_columns[1]: "Intro text",
+                section_columns[2]: "1.2.3.4",
+            },
+            {
+                ATTRIBUTE_IDENTIFIER: "phase_field_xl",
+                PROJECT_SIZE: "XL",
+                section_columns[0]: "Project overview",
+                section_columns[1]: "Intro text",
+                section_columns[2]: "1.2.3.5",
+            },
+            {
+                ATTRIBUTE_IDENTIFIER: "phase_field_m_second",
+                PROJECT_SIZE: "M",
+                section_columns[0]: "Project overview",
+                section_columns[1]: "Intro text",
+                section_columns[2]: "1.2.3.6",
+            },
+        ]
+    )
+    importer = AttributeImporter()
+    importer._set_row_indexes(rows[0])
+
+    importer._create_sections(rows[1:], f_project_subtype)
+    importer._create_attribute_section_links(rows[1:], f_project_subtype)
+
+    sections = list(f_project_phase_1.sections.all())
+    assert len(sections) == 1
+    section = sections[0]
+    assert (section.name, section.ingress, section.index) == (
+        "Project overview",
+        "Intro text",
+        10000,
+    )
+    assert not ProjectPhaseSection.objects.filter(pk=existing_section.pk).exists()
+
+    links = list(
+        ProjectPhaseSectionAttribute.objects.filter(section=section)
+        .order_by("index")
+        .values_list("attribute__identifier", "index")
+    )
+    assert links == [
+        ("phase_field_m_first", 23400),
+        ("phase_field_m_second", 23600),
+    ]
+    assert "phase_field_xl" not in [attribute_id for attribute_id, _ in links]
+
+
+@pytest.mark.django_db
+def test_deadline_sections_assign_owner_admin_roles_and_filter_other_subtypes(
+    f_project_type, f_project_subtype, f_project_phase_1
+):
+    f_project_subtype.name = "M"
+    f_project_subtype.save(update_fields=["name"])
+    other_subtype = ProjectSubtype.objects.create(
+        name="XS",
+        project_type=f_project_type,
+        index=1,
+    )
+    other_phase = ProjectPhase.objects.create(
+        common_project_phase=f_project_phase_1.common_project_phase,
+        project_subtype=other_subtype,
+        index=0,
+    )
+    admin_attribute = Attribute.objects.create(
+        name="Admin date",
+        identifier="deadline_admin_date",
+        value_type=Attribute.TYPE_DATE,
+    )
+    owner_attribute = Attribute.objects.create(
+        name="Owner date",
+        identifier="deadline_owner_date",
+        value_type=Attribute.TYPE_DATE,
+    )
+    excluded_attribute = Attribute.objects.create(
+        name="Other subtype date",
+        identifier="deadline_other_subtype_date",
+        value_type=Attribute.TYPE_DATE,
+    )
+    Deadline.objects.create(
+        abbreviation="ADM",
+        attribute=admin_attribute,
+        phase=f_project_phase_1,
+        subtype=f_project_subtype,
+    )
+    Deadline.objects.create(
+        abbreviation="OWN",
+        attribute=owner_attribute,
+        phase=f_project_phase_1,
+        subtype=f_project_subtype,
+    )
+    Deadline.objects.create(
+        abbreviation="XS",
+        attribute=excluded_attribute,
+        phase=other_phase,
+        subtype=other_subtype,
+    )
+    columns = [
+        ATTRIBUTE_IDENTIFIER,
+        PROJECT_SIZE,
+        ATTRIBUTE_DEADLINE_SECTION_COLUMNS["admin"],
+        ATTRIBUTE_DEADLINE_SECTION_COLUMNS["owner"],
+    ]
+    rows = get_mock_excel_rows(
+        [
+            {
+                ATTRIBUTE_IDENTIFIER: "deadline_admin_date",
+                PROJECT_SIZE: "M",
+                ATTRIBUTE_DEADLINE_SECTION_COLUMNS["admin"]: "Käynnistys; 1.2.3",
+            },
+            {
+                ATTRIBUTE_IDENTIFIER: "deadline_owner_date",
+                PROJECT_SIZE: "M",
+                ATTRIBUTE_DEADLINE_SECTION_COLUMNS["owner"]: "Käynnistys; 2.3.4",
+            },
+            {
+                ATTRIBUTE_IDENTIFIER: "deadline_other_subtype_date",
+                PROJECT_SIZE: "XS",
+                ATTRIBUTE_DEADLINE_SECTION_COLUMNS["admin"]: "Käynnistys; 3.4.5",
+            },
+        ]
+    )
+    importer = AttributeImporter()
+    importer._set_row_indexes(columns)
+
+    importer._create_deadline_sections(rows[1:], f_project_subtype)
+
+    section = ProjectPhaseDeadlineSection.objects.get(phase=f_project_phase_1)
+    assignments = {
+        item.attribute.identifier: (item.admin_field, item.owner_field, item.index)
+        for item in ProjectPhaseDeadlineSectionAttribute.objects.filter(section=section)
+    }
+    assert assignments == {
+        "deadline_admin_date": (True, False, 1203),
+        "deadline_owner_date": (False, True, 2304),
+    }
+    assert not ProjectPhaseDeadlineSection.objects.filter(phase=other_phase).exists()
 
 
 def make_choice_importer(choice_rows, choices_ref):
