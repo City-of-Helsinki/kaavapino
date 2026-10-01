@@ -1,12 +1,15 @@
 import pytest
+from openpyxl import Workbook
 
-from projects.models import CommonProjectPhase, Attribute
+from projects.models import Attribute, AttributeValueChoice, CommonProjectPhase
 from projects.importing import AttributeImporter
 from projects.importing.attribute import (
+    ATTRIBUTE_CHOICES_REF,
     ATTRIBUTE_NAME,
     ATTRIBUTE_PHASE_COLUMNS,
     ATTRIBUTE_TYPE,
     ATTRIBUTE_IDENTIFIER,
+    CHOICES_SHEET_NAME,
     Phases,
 )
 
@@ -205,6 +208,111 @@ def test_calculate_deadline_index_scales_each_position_by_depth(
     locations, expected_index
 ):
     assert AttributeImporter.calculate_deadline_index(locations) == expected_index
+
+
+def make_choice_importer(choice_rows, choices_ref):
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = CHOICES_SHEET_NAME
+    for choice_row in choice_rows:
+        worksheet.append(choice_row)
+
+    importer = AttributeImporter()
+    importer.workbook = workbook
+    rows = get_mock_excel_rows([{ATTRIBUTE_CHOICES_REF: choices_ref}])
+    importer._set_row_indexes(rows[0])
+    return importer, rows[1]
+
+
+@pytest.mark.django_db
+def test_attribute_choices_use_referenced_column():
+    attribute = Attribute.objects.create(
+        name="Status",
+        identifier="choice_status",
+        value_type=Attribute.TYPE_CHOICE,
+    )
+    importer, row = make_choice_importer(
+        [
+            ["Other list", "Status"],
+            ["other_value", "draft"],
+            ["other_approved", "approved"],
+            ["ignored", None],
+            ["must_not_be_imported", None],
+        ],
+        "Status",
+    )
+
+    created_count = importer._create_attribute_choices(
+        attribute,
+        row,
+        {"draft": "Draft", "approved": "Approved"},
+    )
+
+    choices = list(
+        attribute.value_choices.order_by("index").values_list(
+            "identifier", "value", "index"
+        )
+    )
+    assert created_count == 2
+    assert choices == [("draft", "Draft", 1), ("approved", "Approved", 2)]
+
+
+@pytest.mark.django_db
+def test_attribute_choices_accept_slash_separated_identifiers_without_column():
+    attribute = Attribute.objects.create(
+        name="Boolean-like choice",
+        identifier="choice_boolean_like",
+        value_type=Attribute.TYPE_CHOICE,
+    )
+    importer, row = make_choice_importer([["Unused column"], ["unused"]], "yes/no")
+
+    created_count = importer._create_attribute_choices(attribute, row, {})
+
+    choices = list(
+        attribute.value_choices.order_by("index").values_list(
+            "identifier", "value", "index"
+        )
+    )
+    assert created_count == 2
+    assert choices == [("yes", "yes", 0), ("no", "no", 1)]
+
+
+@pytest.mark.django_db
+def test_attribute_choice_identifier_change_reuses_matching_legacy_choice():
+    attribute = Attribute.objects.create(
+        name="Status",
+        identifier="choice_status_legacy",
+        value_type=Attribute.TYPE_CHOICE,
+    )
+    importer, row = make_choice_importer(
+        [["Status"], ["new_draft"]],
+        "Status",
+    )
+    display_value = "Draft"
+    legacy_identifier = importer._get_identifier_for_value(display_value)
+    existing_choice = AttributeValueChoice.objects.create(
+        attribute=attribute,
+        identifier="old_draft",
+        legacy_identifier=legacy_identifier,
+        value=display_value,
+        index=0,
+    )
+
+    created_count = importer._create_attribute_choices(
+        attribute,
+        row,
+        {"new_draft": display_value},
+    )
+
+    existing_choice.refresh_from_db()
+    assert created_count == 0
+    assert attribute.value_choices.count() == 1
+    assert (
+        existing_choice.identifier,
+        existing_choice.value,
+        existing_choice.index,
+        existing_choice.legacy_identifier,
+    ) == ("new_draft", display_value, 1, legacy_identifier)
 
 
 @pytest.mark.django_db
