@@ -1,7 +1,8 @@
 import pytest
 
+from projects.models import CommonProjectPhase, Attribute
 from projects.importing import AttributeImporter
-from projects.models import CommonProjectPhase
+from projects.importing.attribute import ATTRIBUTE_NAME, ATTRIBUTE_TYPE
 
 def get_mock_excel_rows(test_objects: list):
     """ Helper for generating mock Excel rows from a list of test objects.
@@ -51,7 +52,6 @@ def test_set_row_indexes():
     assert ai.column_index["editable"] == 2
 
 def test_check_if_row_valid():
-    from projects.importing.attribute import ATTRIBUTE_NAME, ATTRIBUTE_TYPE
     mock_rows = get_mock_excel_rows([
         {ATTRIBUTE_NAME: "Attribute 1", ATTRIBUTE_TYPE: "date", "editable": "Kyllä"},
         {ATTRIBUTE_NAME: "Attribute 2", "editable": "Kyllä" },
@@ -141,4 +141,111 @@ def test_parse_condition():
         "comparison_value_type": "string",
     }
 
+def test_parse_autofill_rule():
+    ai = AttributeImporter()
 
+    # Test rule for autofilling a value with a simple "ei" condition
+    assert ai._parse_autofill_rule("ei", Attribute.TYPE_SHORT_STRING) == None
+
+    # Test rule for autofilling a hardcoded value
+    assert ai._parse_autofill_rule("{% if !maanomistus_kaupunki %} 0 {% endif %}", Attribute.TYPE_INTEGER) == [
+        {
+            "variables": [],
+            "conditions": [
+                {
+                    "variable": "maanomistus_kaupunki",
+                    "operator": "!=",
+                    "comparison_value": True,
+                    "comparison_value_type": "boolean",
+                }
+            ],
+            "then_branch": "0",
+            "else_branch": None
+        }
+    ]
+    # Test rule for autofilling a value based on a variable
+    assert ai._parse_autofill_rule("{{milta_ulkopuolisilta_pyydetaan_lausunto}} {% if milta_ulkopuolisilta_pyydetaan_lausunto %} {% endif %}", Attribute.TYPE_CHOICE) == [
+        {
+            "variables": ["milta_ulkopuolisilta_pyydetaan_lausunto"],
+            "conditions": [
+                {
+                    "variable": "milta_ulkopuolisilta_pyydetaan_lausunto",
+                    "operator": "==",
+                    "comparison_value": True,
+                    "comparison_value_type": "boolean",
+                }
+            ],
+            "then_branch": "",
+            "else_branch": None
+        }
+    ]
+    # Test rule for autofilling a value based on multiple conditions
+    assert ai._parse_autofill_rule("{% if periaatteet_mielipiteet_maara > 0 or oas_mielipiteet_maara > 0 %} kyllä {% endif %}",
+        Attribute.TYPE_CHOICE
+    ) == [
+        {
+            "variables": [],
+            "conditions": [
+                {
+                    "variable": "periaatteet_mielipiteet_maara",
+                    "operator": ">",
+                    "comparison_value": '0',
+                    "comparison_value_type": "number",
+                },
+            ],
+            "then_branch": "kylla",
+            "else_branch": None
+        },
+        {
+            "variables": [],
+            "conditions": [
+                {
+                    "variable": "oas_mielipiteet_maara",
+                    "operator": ">",
+                    "comparison_value": '0',
+                    "comparison_value_type": "number",
+                },
+            ],
+            "then_branch": "kylla",
+            "else_branch": None
+        },
+    ]
+    # Test boolean conversion kylla/ei to True/False
+    assert ai._parse_autofill_rule("{% if condition %} kyllä {% endif %}", Attribute.TYPE_BOOLEAN) == [
+        {
+            "variables": [],
+            "conditions": [
+                {
+                    "variable": "condition",
+                    "operator": "==",
+                    "comparison_value": True,
+                    "comparison_value_type": "boolean",
+                }
+            ],
+            "then_branch": True,
+            "else_branch": None
+        }
+    ]
+    assert ai._parse_autofill_rule("{% if !condition %} ei {% endif %}", Attribute.TYPE_BOOLEAN) == [
+        {
+            "variables": [],
+            "conditions": [
+                {
+                    "variable": "condition",
+                    "operator": "!=",
+                    "comparison_value": True,
+                    "comparison_value_type": "boolean",
+                }
+            ],
+            "then_branch": False,
+            "else_branch": None
+        }
+    ]
+
+def test_parse_autofill_readonly():
+    # Tests parsing rules for "is autofilled column editable"- column
+    ai = AttributeImporter()
+    assert ai._parse_autofill_readonly("ei") == True
+    assert ai._parse_autofill_readonly("Automaattiseti muodostunutta tietoa ei voi muokata") == True
+    assert ai._parse_autofill_readonly("kyllä") == False
+    assert ai._parse_autofill_readonly("") == False
