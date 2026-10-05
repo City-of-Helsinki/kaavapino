@@ -2,13 +2,20 @@ from types import SimpleNamespace
 
 import pytest
 
-from projects.models import Attribute, FieldSetAttribute
+from projects.models import (
+	Attribute,
+	AttributeAutoValue,
+	AttributeAutoValueMapping,
+	FieldSetAttribute,
+)
 from projects.helpers import (
 	check_visibility,
 	get_attribute_data,
 	get_attribute_data_filtered_response,
 	get_fieldset_path,
 	get_flat_attribute_data,
+	sanitize_attribute_data_filter_result,
+	set_automatic_attributes,
 	set_attribute_data,
 )
 
@@ -211,7 +218,7 @@ def test_nested_attribute_data_helpers_round_trip_values_at_distinct_fieldset_in
 
 
 @pytest.mark.django_db
-def test_flat_attribute_data_collects_values_from_repeated_fieldset_entries():
+def test_flat_attribute_data_collects_values_from_repeated_fieldset_entries(monkeypatch):
 	fieldset = Attribute.objects.create(
 		name="People",
 		identifier="flat_people",
@@ -237,8 +244,215 @@ def test_flat_attribute_data_collects_values_from_repeated_fieldset_entries():
 		],
 	}
 
+    # Ensure that the cache is bypassed for this test
+	monkeypatch.setattr(
+		"projects.helpers.cache.get_or_set",
+		lambda cache_key, default: default,
+	)
+
 	flat = get_flat_attribute_data(data, {})
 
 	assert flat["flat_person_name"] == ["Ada", "Grace"]
 	assert flat["flat_person_age"] == [36, 85]
 	assert flat["pinonumero"] == ["helpers-flat-test-001"]
+
+
+@pytest.mark.django_db
+def test_automatic_attribute_uses_matching_scalar_key_mapping():
+	key_attribute = Attribute.objects.create(
+		name="Selected role",
+		identifier="automatic_role_key",
+		value_type=Attribute.TYPE_CHOICE,
+	)
+	value_attribute = Attribute.objects.create(
+		name="Contact person",
+		identifier="automatic_contact_person",
+		value_type=Attribute.TYPE_SHORT_STRING,
+	)
+	auto_value = AttributeAutoValue.objects.create(
+		key_attribute=key_attribute,
+		value_attribute=value_attribute,
+	)
+	AttributeAutoValueMapping.objects.create(
+		auto_attr=auto_value,
+		key_str="planning_contact",
+		value_str="Ada Lovelace",
+	)
+	attribute_data = {"automatic_role_key": "planning_contact"}
+
+	set_automatic_attributes(attribute_data)
+
+	assert attribute_data == {
+		"automatic_role_key": "planning_contact",
+		"automatic_contact_person": "Ada Lovelace",
+	}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("key", ["unmapped_role", None, ""])
+def test_automatic_attribute_leaves_existing_value_when_key_has_no_mapping(key):
+	key_attribute = Attribute.objects.create(
+		name="Selected role",
+		identifier="automatic_missing_role_key",
+		value_type=Attribute.TYPE_CHOICE,
+	)
+	value_attribute = Attribute.objects.create(
+		name="Contact person",
+		identifier="automatic_existing_contact",
+		value_type=Attribute.TYPE_SHORT_STRING,
+	)
+	AttributeAutoValue.objects.create(
+		key_attribute=key_attribute,
+		value_attribute=value_attribute,
+	)
+	attribute_data = {
+		"automatic_missing_role_key": key,
+		"automatic_existing_contact": "Manually entered value",
+	}
+
+	set_automatic_attributes(attribute_data)
+
+	assert attribute_data["automatic_existing_contact"] == "Manually entered value"
+
+
+@pytest.mark.django_db
+def test_automatic_attribute_maps_each_repeated_fieldset_entry_independently():
+	fieldset = Attribute.objects.create(
+		name="People",
+		identifier="automatic_people",
+		value_type=Attribute.TYPE_FIELDSET,
+	)
+	key_attribute = Attribute.objects.create(
+		name="Role",
+		identifier="automatic_person_role",
+		value_type=Attribute.TYPE_CHOICE,
+	)
+	value_attribute = Attribute.objects.create(
+		name="Contact",
+		identifier="automatic_person_contact",
+		value_type=Attribute.TYPE_SHORT_STRING,
+	)
+	FieldSetAttribute.objects.create(
+		attribute_source=fieldset,
+		attribute_target=key_attribute,
+	)
+	FieldSetAttribute.objects.create(
+		attribute_source=fieldset,
+		attribute_target=value_attribute,
+	)
+	auto_value = AttributeAutoValue.objects.create(
+		key_attribute=key_attribute,
+		value_attribute=value_attribute,
+	)
+	AttributeAutoValueMapping.objects.create(
+		auto_attr=auto_value,
+		key_str="planner",
+		value_str="Ada",
+	)
+	AttributeAutoValueMapping.objects.create(
+		auto_attr=auto_value,
+		key_str="reviewer",
+		value_str="Grace",
+	)
+	attribute_data = {
+		"automatic_people": [
+			{"automatic_person_role": "planner"},
+			{"automatic_person_role": "reviewer"},
+		]
+	}
+
+	set_automatic_attributes(attribute_data)
+
+	assert attribute_data["automatic_people"] == [
+		{
+			"automatic_person_role": "planner",
+			"automatic_person_contact": "Ada",
+		},
+		{
+			"automatic_person_role": "reviewer",
+			"automatic_person_contact": "Grace",
+		},
+	]
+
+
+def test_sanitizer_aggregates_applicant_fieldset_and_removes_source():
+	applicants = SimpleNamespace(
+		identifier="hakija_fieldset",
+		value_type=Attribute.TYPE_FIELDSET,
+	)
+	attribute_data = {
+		"hakija_fieldset": [
+			{
+				"hakija_yritys": "Example Ltd",
+				"hakijalta_perittava_maksu_oas": "12.5",
+				"hakijalta_perittava_maksu_ehdotus": "not a number",
+				"hakijalta_perittava_maksu": 3,
+				"laskutuspyynto_oas": "2026-02-03",
+			},
+			{
+				"hakijan_etunimi_yksityishenkilo": "Ada",
+				"hakijan_sukunimi_yksityishenkilo": "Lovelace",
+				"hakijalta_perittava_maksu_oas": "7.5",
+				"hakijalta_perittava_maksu_ehdotus": "2",
+				"hakijalta_perittava_maksu": "4",
+				"laskutuspyynto_oas": None,
+				"laskutuspyynto_ehdotus": "2026-12-01",
+			},
+		]
+	}
+
+	result = sanitize_attribute_data_filter_result(
+		{"hakija_fieldset": applicants},
+		attribute_data,
+	)
+
+	assert result == {
+		"hakija_taho": "Hakija yritys: Example Ltd; Hakija yksityishenkilö",
+		"hakijalta_perittava_maksu_oas": 20,
+		"hakijalta_perittava_maksu_ehdotus": 2,
+		"hakijalta_perittava_maksu": 7,
+		"kaavaprojekti_maksu_yhteensa": 29,
+		"laskutuspyynto_oas": "03.02.2026",
+		"laskutuspyynto_ehdotus": "01.12.2026",
+		"laskutuspyynto_hyvaksymisen_jalkeen": "",
+	}
+
+
+@pytest.mark.parametrize(
+	("value_type", "value", "expected"),
+	[
+		(Attribute.TYPE_DATE, "2026-10-05", "05.10.2026"),
+		(Attribute.TYPE_DATE, "not-a-date", "not-a-date"),
+		(Attribute.TYPE_CHOICE, ["small", "large"], "small; large"),
+		(Attribute.TYPE_CHOICE, "small", "small"),
+	],
+)
+def test_sanitizer_formats_date_and_choice_values(value_type, value, expected):
+	attribute = SimpleNamespace(identifier="sanitized_value", value_type=value_type)
+
+	result = sanitize_attribute_data_filter_result(
+		{"sanitized_value": attribute},
+		{"sanitized_value": value},
+	)
+
+	assert result["sanitized_value"] == expected
+
+
+def test_sanitizer_joins_nonempty_values_in_supported_staff_fieldsets():
+	staff = SimpleNamespace(
+		identifier="kaavoittaja_fieldset",
+		value_type=Attribute.TYPE_FIELDSET,
+	)
+	attribute_data = {
+		"kaavoittaja_fieldset": [
+			{"name": "Ada", "role": "Planner", "empty": ""},
+			{"name": "Grace", "role": None},
+		]
+	}
+
+	result = sanitize_attribute_data_filter_result(
+		{"kaavoittaja_fieldset": staff},
+		attribute_data,
+	)
+
+	assert result["kaavoittaja_fieldset"] == "Ada, Planner; Grace"
