@@ -10,10 +10,16 @@ from projects.models import (
 )
 from projects.helpers import (
 	check_visibility,
+	check_format_date,
+	format_choices,
 	get_attribute_data,
 	get_attribute_data_filtered_response,
+	get_attribute_lock_data,
+	get_file_type,
 	get_fieldset_path,
 	get_flat_attribute_data,
+	safe_bool,
+	safe_float,
 	sanitize_attribute_data_filter_result,
 	set_automatic_attributes,
 	set_attribute_data,
@@ -456,3 +462,97 @@ def test_sanitizer_joins_nonempty_values_in_supported_staff_fieldsets():
 	)
 
 	assert result["kaavoittaja_fieldset"] == "Ada, Planner; Grace"
+
+
+@pytest.mark.parametrize(
+	("filename", "expected"),
+	[
+		("plan.docx", "docx"),
+		("archive.backup.xlsx", "xlsx"),
+		("README", "README"),
+		("hidden.", ""),
+	],
+)
+def test_get_file_type_returns_final_filename_component(filename, expected):
+	assert get_file_type(filename) == expected
+
+
+@pytest.mark.parametrize(
+	("identifier", "expected"),
+	[
+		(
+			"person_fieldset[2]",
+			{
+				"fieldset_attribute_identifier": "person_fieldset",
+				"fieldset_attribute_index": "2",
+			},
+		),
+		("project_name", {"attribute_identifier": "project_name"}),
+		(
+			"person_fieldset[2][3]",
+			{
+				"fieldset_attribute_identifier": "person_fieldset",
+				"fieldset_attribute_index": "2",
+			},
+		),
+	],
+)
+def test_get_attribute_lock_data_parses_regular_and_fieldset_identifiers(
+	identifier, expected
+):
+	assert get_attribute_lock_data(identifier) == expected
+
+
+@pytest.mark.parametrize(
+	("date_value", "expected"),
+	[
+		("2026-10-05", "05.10.2026"),
+		("not-a-date", "not-a-date"),
+		("2026-02-30", "2026-02-30"),
+		(None, None),
+	],
+)
+def test_check_format_date_formats_iso_dates_and_preserves_invalid_values(
+	date_value, expected
+):
+	assert check_format_date(date_value) == expected
+
+
+@pytest.mark.parametrize(
+	("value", "expected"),
+	[
+		(3, 3.0),
+		("-1.25", -1.25),
+		("invalid", 0.0),
+		(None, 0.0),
+	],
+)
+def test_safe_float_returns_zero_for_non_numeric_values(value, expected):
+	assert safe_float(value) == expected
+
+
+@pytest.mark.parametrize(
+	("value", "expected"),
+	[
+		(True, True),
+		(False, False),
+		("TRUE", True),
+		("false", False),
+		("2026-10-05", True),
+		("", False),
+		(None, True),
+	],
+)
+def test_safe_bool_handles_boolean_strings_and_truthy_nonempty_values(value, expected):
+	assert safe_bool(value) is expected
+
+
+def test_format_choices_translates_nested_lists_and_preserves_unknown_values():
+	choices = {
+		"small": SimpleNamespace(value="Small"),
+		"large": SimpleNamespace(value="Large"),
+	}
+
+	assert format_choices(choices, ["small", ["large", "unknown"]]) == (
+		"Small; Large; unknown"
+	)
