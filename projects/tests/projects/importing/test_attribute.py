@@ -8,17 +8,29 @@ from projects.models import (
     AttributeValueChoice,
     CommonProjectPhase,
     Deadline,
+    DocumentLinkFieldSet,
+    DocumentLinkSection,
+    FieldSetAttribute,
     ProjectPhaseDeadlineSection,
     ProjectPhaseDeadlineSectionAttribute,
     ProjectPhase,
+    ProjectPhaseFieldSetAttributeIndex,
     ProjectPhaseSection,
     ProjectPhaseSectionAttribute,
+    ProjectCardSection,
+    ProjectCardSectionAttribute,
+    ProjectFloorAreaSection,
+    ProjectFloorAreaSectionAttribute,
+    ProjectFloorAreaSectionAttributeMatrixCell,
+    ProjectFloorAreaSectionAttributeMatrixStructure,
     ProjectSubtype,
 )
+from projects.models.attribute import AttributeCategorization
 from projects.importing import AttributeImporter
 from projects.importing.attribute import (
     ATTRIBUTE_API_VISIBILITY,
     ATTRIBUTE_ASSISTIVE_TEXT,
+    ATTRIBUTE_CATEGORIZATION_COLUMNS,
     ATTRIBUTE_AUTO_VALUE_KEY_FIELD,
     ATTRIBUTE_AUTO_VALUE_MAPPING,
     ATTRIBUTE_BROADCAST_CHANGES,
@@ -26,6 +38,10 @@ from projects.importing.attribute import (
     ATTRIBUTE_CHOICES_REF,
     ATTRIBUTE_DATA_RETENTION,
     ATTRIBUTE_DEADLINE_SECTION_COLUMNS,
+    ATTRIBUTE_FIELDSET,
+    ATTRIBUTE_FLOOR_AREA_SECTION,
+    ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW,
+    ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL,
     ATTRIBUTE_EDIT_PRIVILEGE,
     ATTRIBUTE_ERROR,
     ATTRIBUTE_ERROR_TEXT,
@@ -52,6 +68,13 @@ from projects.importing.attribute import (
     ATTRIBUTE_UNIT,
     ATTRIBUTE_VALIDATION_REGEX,
     ATTRIBUTE_VIEW_PRIVILEGE,
+    CARD_SECTION_NAME,
+    CARD_SECTION_LOCATION,
+    CARD_SECTION_DATE_FORMAT,
+    CARD_SHOW_ON_MOBILE,
+    CARD_EXTERNAL_DOCUMENT_FIELDS,
+    CARD_EXTERNAL_DOCUMENT_SECTION,
+    CARD_EXTERNAL_DOCUMENT_SECTION_INDEX,
     CALCULATIONS_COLUMN,
     CHOICE_OPTIONS_SHEET_NAME,
     CHOICES_SHEET_NAME,
@@ -1035,3 +1058,237 @@ def test_parse_autofill_readonly():
     assert ai._parse_autofill_readonly("Automaattiseti muodostunutta tietoa ei voi muokata") == True
     assert ai._parse_autofill_readonly("kyllä") == False
     assert ai._parse_autofill_readonly("") == False
+
+
+@pytest.mark.django_db
+def test_document_link_import_replaces_old_links_and_skips_unconfigured_rows():
+    fieldset = Attribute.objects.create(name="Documents", identifier="documents")
+    document_name = Attribute.objects.create(name="Name", identifier="document_name")
+    document_link = Attribute.objects.create(name="Link", identifier="document_link")
+    old_fieldset = Attribute.objects.create(name="Old documents", identifier="old_documents")
+    old_section = DocumentLinkSection.objects.create(name="Old", index=0)
+    DocumentLinkFieldSet.objects.create(
+        section=old_section,
+        fieldset_attribute=old_fieldset,
+        document_name_attribute=document_name,
+        document_link_attribute=document_link,
+    )
+
+    rows = get_mock_excel_rows([
+        {
+            ATTRIBUTE_IDENTIFIER: "documents",
+            CARD_EXTERNAL_DOCUMENT_SECTION: "Planning documents",
+            CARD_EXTERNAL_DOCUMENT_SECTION_INDEX: 3,
+            CARD_EXTERNAL_DOCUMENT_FIELDS: "document_name;;document_link",
+        },
+        {
+            ATTRIBUTE_IDENTIFIER: "old_documents",
+            CARD_EXTERNAL_DOCUMENT_SECTION: None,
+            CARD_EXTERNAL_DOCUMENT_SECTION_INDEX: None,
+            CARD_EXTERNAL_DOCUMENT_FIELDS: None,
+        },
+    ])
+    importer = AttributeImporter()
+    importer._set_row_indexes(rows[0])
+
+    importer._create_document_link_sections(rows[1:])
+
+    link_set = DocumentLinkFieldSet.objects.get()
+    assert DocumentLinkSection.objects.get(pk=link_set.section_id).name == "Planning documents"
+    assert link_set.fieldset_attribute == fieldset
+    assert link_set.document_name_attribute == document_name
+    assert link_set.document_custom_name_attribute is None
+    assert link_set.document_link_attribute == document_link
+
+
+@pytest.mark.django_db
+def test_card_section_import_preserves_order_and_visibility_and_skips_empty_rows():
+    attribute = Attribute.objects.create(name="Project name", identifier="card_project_name")
+    obsolete_attribute = Attribute.objects.create(name="Obsolete", identifier="card_obsolete")
+    obsolete_section = ProjectCardSection.objects.create(name="Obsolete section", index=9)
+    ProjectCardSectionAttribute.objects.create(
+        attribute=obsolete_attribute,
+        section=obsolete_section,
+    )
+    rows = get_mock_excel_rows([
+        {
+            ATTRIBUTE_IDENTIFIER: "card_project_name",
+            CARD_SECTION_NAME: "Perustiedot",
+            CARD_SECTION_LOCATION: "2.4",
+            CARD_SECTION_DATE_FORMAT: "updated",
+            CARD_SHOW_ON_MOBILE: "ei",
+        },
+        {
+            ATTRIBUTE_IDENTIFIER: "card_obsolete",
+            CARD_SECTION_NAME: "ei",
+            CARD_SECTION_LOCATION: None,
+            CARD_SECTION_DATE_FORMAT: None,
+            CARD_SHOW_ON_MOBILE: None,
+        },
+    ])
+    importer = AttributeImporter()
+    importer._set_row_indexes(rows[0])
+
+    importer._create_card_sections(rows[1:])
+
+    section = ProjectCardSection.objects.get()
+    section_attribute = ProjectCardSectionAttribute.objects.get()
+    assert (section.name, section.index, section.key) == ("Perustiedot", 2, "perustiedot")
+    assert section_attribute.attribute == attribute
+    assert (section_attribute.index, section_attribute.date_format, section_attribute.show_on_mobile) == (
+        4,
+        "updated",
+        False,
+    )
+
+
+@pytest.mark.django_db
+def test_fieldset_import_links_nested_children_and_keeps_unindexed_children_unindexed(
+    f_project_subtype, f_project_phase_1
+):
+    section_columns = ATTRIBUTE_PHASE_COLUMNS[Phases.START]
+    fieldset = Attribute.objects.create(name="Contacts", identifier="contact_fieldset")
+    nested_child = Attribute.objects.create(name="Nested contact", identifier="nested_contact")
+    direct_child = Attribute.objects.create(name="Direct contact", identifier="direct_contact")
+    rows = get_mock_excel_rows([
+        {
+            ATTRIBUTE_IDENTIFIER: "nested_contact",
+            ATTRIBUTE_FIELDSET: "contact_fieldset",
+            section_columns[0]: "Contacts",
+            section_columns[1]: None,
+            section_columns[2]: "1.2.3:4",
+        },
+        {
+            ATTRIBUTE_IDENTIFIER: "direct_contact",
+            ATTRIBUTE_FIELDSET: "contact_fieldset",
+            section_columns[0]: "Contacts",
+            section_columns[1]: None,
+            section_columns[2]: "1.2",
+        },
+    ])
+    importer = AttributeImporter()
+    importer._set_row_indexes(rows[0])
+
+    importer._create_fieldset_links(f_project_subtype, rows[1:])
+
+    links = {
+        link.attribute_target_id: link
+        for link in FieldSetAttribute.objects.filter(attribute_source=fieldset)
+    }
+    assert set(links) == {nested_child.pk, direct_child.pk}
+    assert ProjectPhaseFieldSetAttributeIndex.objects.filter(
+        attribute=links[nested_child.pk],
+        phase=f_project_phase_1,
+        index=34000,
+    ).exists()
+    assert not ProjectPhaseFieldSetAttributeIndex.objects.filter(
+        attribute=links[direct_child.pk],
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_floor_area_import_filters_subtypes_and_builds_matrix_cells(f_project_subtype):
+    f_project_subtype.name = "M"
+    f_project_subtype.save(update_fields=["name"])
+    section = ProjectFloorAreaSection.objects.create(
+        project_subtype=f_project_subtype,
+        name="Building area",
+        index=1,
+    )
+    included = Attribute.objects.create(name="Area matrix", identifier="included_area_matrix")
+    other_subtype = Attribute.objects.create(name="XL area", identifier="xl_area")
+    excluded = Attribute.objects.create(name="Excluded area", identifier="excluded_area")
+    rows = get_mock_excel_rows([
+        {
+            ATTRIBUTE_IDENTIFIER: "included_area_matrix",
+            PROJECT_SIZE: "M",
+            ATTRIBUTE_FLOOR_AREA_SECTION: "Building area",
+            ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW: "Residential\nCommercial",
+            ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL: "New\nExisting",
+        },
+        {
+            ATTRIBUTE_IDENTIFIER: "xl_area",
+            PROJECT_SIZE: "XL",
+            ATTRIBUTE_FLOOR_AREA_SECTION: "Building area",
+            ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW: "ei",
+            ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL: "ei",
+        },
+        {
+            ATTRIBUTE_IDENTIFIER: "excluded_area",
+            PROJECT_SIZE: "M",
+            ATTRIBUTE_FLOOR_AREA_SECTION: "ei",
+            ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_ROW: "ei",
+            ATTRIBUTE_FLOOR_AREA_SECTION_MATRIX_CELL: "ei",
+        },
+    ])
+    importer = AttributeImporter()
+    importer._set_row_indexes(rows[0])
+
+    importer._create_floor_area_attribute_section_links(rows[1:], f_project_subtype)
+
+    section_attributes = list(
+        ProjectFloorAreaSectionAttribute.objects.filter(section=section).order_by("index")
+    )
+    assert [(item.attribute, item.index) for item in section_attributes] == [(included, 0)]
+    structure = ProjectFloorAreaSectionAttributeMatrixStructure.objects.get(section=section)
+    assert structure.row_names == ["Residential", "Commercial"]
+    assert structure.column_names == ["New", "Existing"]
+    cells = set(
+        ProjectFloorAreaSectionAttributeMatrixCell.objects.filter(
+            attribute=section_attributes[0]
+        ).values_list("row", "column")
+    )
+    assert cells == {(0, 0), (0, 1), (1, 0), (1, 1)}
+    assert other_subtype not in [item.attribute for item in section_attributes]
+    assert excluded not in [item.attribute for item in section_attributes]
+
+
+@pytest.mark.django_db
+def test_attribute_categorization_import_updates_values_and_removes_stale_rows():
+    attribute = Attribute.objects.create(name="Project scale", identifier="project_scale")
+    phase_by_name = {
+        phase.value: CommonProjectPhase.objects.create(name=phase.value)
+        for phase in Phases
+    }
+    start_phase = phase_by_name[Phases.START.value]
+    existing = AttributeCategorization.objects.create(
+        attribute=attribute,
+        common_project_phase=start_phase,
+        includes_principles=False,
+        includes_draft=False,
+        value="Old value",
+    )
+    stale = AttributeCategorization.objects.create(
+        attribute=attribute,
+        common_project_phase=phase_by_name[Phases.OAS.value],
+        includes_principles=False,
+        includes_draft=False,
+        value="Stale value",
+    )
+    start_column = ATTRIBUTE_CATEGORIZATION_COLUMNS[0][0]
+    columns = list(dict.fromkeys(
+        [ATTRIBUTE_IDENTIFIER]
+        + [column for column, _, _ in ATTRIBUTE_CATEGORIZATION_COLUMNS]
+    ))
+    row_values = {column: None for column in columns}
+    row_values[ATTRIBUTE_IDENTIFIER] = "project_scale"
+    row_values[start_column] = "Scale category"
+    rows = get_mock_excel_rows([row_values])
+    importer = AttributeImporter()
+    importer._set_row_indexes(rows[0])
+
+    importer._create_attribute_categorizations(rows[1:])
+
+    existing.refresh_from_db()
+    assert existing.value == "Scale category"
+    start_categorizations = AttributeCategorization.objects.filter(
+        attribute=attribute,
+        common_project_phase=start_phase,
+    )
+    assert set(start_categorizations.values_list("includes_principles", "includes_draft")) == {
+        (False, False),
+        (False, True),
+        (True, False),
+        (True, True),
+    }
+    assert not AttributeCategorization.objects.filter(pk=stale.pk).exists()
