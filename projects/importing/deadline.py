@@ -692,7 +692,7 @@ class DeadlineImporter:
                         )
                         continue
 
-                    cond = cond[0]
+                    cond = " or ".join(cond)
                     if cond and cond[:25] == "kaavaprosessin_kokoluokka":
                         subtypes = re.findall(
                             r"XS|S|M|L|XL",
