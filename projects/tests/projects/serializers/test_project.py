@@ -4,7 +4,15 @@ import logging
 import pytest
 from rest_framework.exceptions import ValidationError
 
-from projects.models import Attribute, Deadline, ProjectDeadline
+from projects.models import (
+    Attribute,
+    CommonProjectPhase,
+    Deadline,
+    ProjectDeadline,
+    ProjectPhase,
+    ProjectPhaseSection,
+    ProjectPhaseSectionAttribute,
+)
 from projects.serializers.project import ProjectSerializer
 
 
@@ -18,13 +26,33 @@ class _FakeRequest:
         self.query_params = {}
 
 
-def _make_serializer(project, attribute_data, extra_context=None, validate=None):
+def _make_serializer(
+    project, attribute_data, extra_context=None, validate=None, request_user=None,
+):
     data = {"attribute_data": attribute_data}
     if validate is not None:
         data["validate_attribute_data"] = validate
-    request = _FakeRequest(data=data, user=project.user)
+    request = _FakeRequest(data=data, user=request_user or project.user)
     context = {"request": request, **(extra_context or {})}
     return ProjectSerializer(instance=project, context=context)
+
+
+def _attach_attribute_to_phase(project, attribute, index):
+    common_phase = CommonProjectPhase.objects.create(name=f"Phase {index}")
+    phase = ProjectPhase.objects.create(
+        common_project_phase=common_phase,
+        project_subtype=project.subtype,
+        index=index,
+    )
+    section = ProjectPhaseSection.objects.create(
+        phase=phase,
+        name=f"Section {index}",
+    )
+    ProjectPhaseSectionAttribute.objects.create(
+        attribute=attribute,
+        section=section,
+    )
+    return phase
 
 
 @pytest.mark.django_db
@@ -56,6 +84,111 @@ def test_accepts_valid_value_for_existing_section_attribute(
     )
 
     assert result == {"short_string_attr": "hello"}
+
+
+@pytest.mark.django_db
+def test_drops_attribute_from_locked_past_phase(
+    f_project, f_long_string_attribute
+):
+    _attach_attribute_to_phase(f_project, f_long_string_attribute, index=2)
+    f_project.phase = _attach_attribute_to_phase(
+        f_project, Attribute.objects.create(
+            name="Current phase field",
+            identifier="current_phase_field",
+            value_type=Attribute.TYPE_SHORT_STRING,
+        ),
+        index=4,
+    )
+    f_project.save()
+    identifier = f_long_string_attribute.identifier
+    attribute_data = {identifier: "attempted edit"}
+    serializer = _make_serializer(f_project, attribute_data)
+
+    result = serializer._validate_attribute_data(
+        attribute_data, {}, f_project.user, False,
+    )
+
+    assert identifier not in result
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("field_phase_index", [4, 5])
+def test_accepts_current_and_upcoming_phase_attributes(
+    f_project, f_long_string_attribute, field_phase_index
+):
+    f_project.phase = _attach_attribute_to_phase(
+        f_project, f_long_string_attribute, index=4,
+    )
+    f_project.save()
+    if field_phase_index != 4:
+        _attach_attribute_to_phase(
+            f_project, f_long_string_attribute, index=field_phase_index,
+        )
+    identifier = f_long_string_attribute.identifier
+    attribute_data = {identifier: "allowed edit"}
+    serializer = _make_serializer(f_project, attribute_data)
+
+    result = serializer._validate_attribute_data(
+        attribute_data, {}, f_project.user, False,
+    )
+
+    assert result[identifier] == "allowed edit"
+
+
+@pytest.mark.django_db
+def test_owner_edit_override_allows_locked_past_phase_field(
+    f_project, f_long_string_attribute
+):
+    _attach_attribute_to_phase(f_project, f_long_string_attribute, index=2)
+    f_project.phase = _attach_attribute_to_phase(
+        f_project,
+        Attribute.objects.create(
+            name="Current phase field",
+            identifier="current_phase_field",
+            value_type=Attribute.TYPE_SHORT_STRING,
+        ),
+        index=4,
+    )
+    f_project.owner_edit_override = True
+    f_project.save()
+    identifier = f_long_string_attribute.identifier
+    attribute_data = {identifier: "owner edit"}
+    serializer = _make_serializer(f_project, attribute_data)
+
+    result = serializer._validate_attribute_data(
+        attribute_data, {}, f_project.user, owner_edit_override=True,
+    )
+
+    assert result[identifier] == "owner edit"
+
+
+@pytest.mark.django_db
+def test_owner_edit_override_does_not_allow_other_users_to_edit_past_phase(
+    f_project, f_long_string_attribute, f_user2
+):
+    _attach_attribute_to_phase(f_project, f_long_string_attribute, index=2)
+    f_project.phase = _attach_attribute_to_phase(
+        f_project,
+        Attribute.objects.create(
+            name="Current phase field",
+            identifier="current_phase_field",
+            value_type=Attribute.TYPE_SHORT_STRING,
+        ),
+        index=4,
+    )
+    f_project.owner_edit_override = True
+    f_project.save()
+    identifier = f_long_string_attribute.identifier
+    attribute_data = {identifier: "unauthorized edit"}
+    serializer = _make_serializer(
+        f_project, attribute_data, request_user=f_user2,
+    )
+
+    result = serializer._validate_attribute_data(
+        attribute_data, {}, f_project.user, owner_edit_override=True,
+    )
+
+    assert identifier not in result
 
 
 @pytest.mark.django_db

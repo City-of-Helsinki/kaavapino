@@ -1613,7 +1613,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         min_phase_index = current_phase.index if current_phase else 1
 
         try:
-            is_owner = self.context["request"].user == self.user
+            is_owner = user is not None and user == self.context["request"].user
             if owner_edit_override and is_owner:
                 min_phase_index = 1
         except AttributeError:
