@@ -28,6 +28,7 @@ from .attribute import Attribute, FieldSetAttribute
 from .deadline import Deadline
 from .projectcomment import FieldComment
 
+from projects.serializers.utils import VIS_BOOL_MAP
 
 log = logging.getLogger(__name__)
 
@@ -1451,6 +1452,104 @@ class Project(models.Model):
                 project_dls[identifier] = value
         
         return project_dls
+
+    def get_preview_deadlines_light(self, updated_attributes, subtype, confirmed_fields=None, locked_group=None):
+        '''
+        Lightweight version of get_preview_deadlines
+        '''
+        confirmed_fields = set(confirmed_fields or [])
+        preview_data = {**self.attribute_data, **updated_attributes}
+
+        # 1-2. Fetch project deadlines for the given subtype, sorted by index.
+        project_deadlines = list(
+            self.deadlines.filter(deadline__subtype=subtype).select_related(
+                "deadline",
+                "deadline__attribute",
+                "deadline__date_type",
+                "deadline__confirmation_attribute",
+            ).prefetch_related(
+                "deadline__distances_to_previous",
+                "deadline__update_calculations",
+            )
+        )
+        dl_to_pdl = {pdl.deadline: pdl for pdl in project_deadlines}
+        deadlines = sorted(dl_to_pdl.keys(), key=lambda d: d.index)
+
+        # 3. Track identifiers whose stored value differs from the request.
+        changed_ids = {
+            identifier
+            for identifier, new_value in updated_attributes.items()
+            if self._coerce_date_value(self.attribute_data.get(identifier))
+            != self._coerce_date_value(new_value)
+        }
+
+        # Seed the result with request values, falling back to the stored date.
+        result = {}
+        for dl, pdl in dl_to_pdl.items():
+            identifier = dl.attribute.identifier if dl.attribute else None
+            if identifier and identifier in updated_attributes:
+                result[dl] = updated_attributes[identifier]
+            else:
+                result[dl] = pdl.date
+
+        # 4. Find the first (by index) changed deadline.
+        first_idx = next(
+            (i for i, dl in enumerate(deadlines)
+             if dl.attribute and dl.attribute.identifier in changed_ids),
+            None,
+        )
+
+        # 5. Walk forward from the first changed deadline.
+        if first_idx is not None:
+            for dl in deadlines[first_idx:]:
+                if not dl.attribute:
+                    continue
+                identifier = dl.attribute.identifier
+
+                # a. Skip confirmed deadlines.
+                if identifier in confirmed_fields:
+                    continue
+                conf_attr = dl.confirmation_attribute
+                if conf_attr and preview_data.get(conf_attr.identifier):
+                    continue
+
+                # b/c. Recalculate when update_calculations depend on a changed DL.
+                recalculated = False
+                new_date = None
+                if dl.update_calculations.exists():
+                    depends_on_changed = any(
+                        dep.attribute and dep.attribute.identifier in changed_ids
+                        for dep in dl.update_depends_on
+                    )
+                    if depends_on_changed:
+                        new_date = self._coerce_date_value(
+                            dl.calculate_updated(self, preview_attributes=preview_data)
+                        )
+                        recalculated = True
+
+                # d. Otherwise enforce minimum distance (no-op if already valid).
+                if not recalculated:
+                    current = result.get(dl)
+                    if current is None:
+                        continue
+                    new_date = self._enforce_distance_requirements(
+                        dl, current, preview_attribute_data=preview_data
+                    )
+    
+                if new_date and new_date != self._coerce_date_value(result.get(dl)):
+                    if locked_group and locked_group == dl.deadlinegroup:
+                        raise ValueError(f"Change prevented due to '{locked_group}' being locked.")
+                    result[dl] = new_date
+                    preview_data[identifier] = new_date
+                    changed_ids.add(identifier)
+
+        # Pass visibility booleans through unchanged.
+        for key, value in preview_data.items():
+            if isinstance(value, bool):
+                result[key] = value
+
+        return result
+
 
     @property
     def type(self):
