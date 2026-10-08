@@ -54,10 +54,8 @@ def arithmetic_eval(s):
     def _eval(node):
         if isinstance(node, ast.Expression):
             return _eval(node.body)
-        elif isinstance(node, ast.Str):
-            return node.s
-        elif isinstance(node, ast.Num):
-            return node.n
+        elif isinstance(node, ast.Constant):
+            return node.value
         elif isinstance(node, ast.BinOp):
             return binOps[type(node.op)](_eval(node.left), _eval(node.right))
         elif isinstance(node, ast.UnaryOp):  # <operator> <operand> e.g., -1

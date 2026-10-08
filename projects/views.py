@@ -600,7 +600,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # Can't go backwards in time
         if start_date > end_date:
-            [start_date, end_date] = [start_date, end_date]
+            [start_date, end_date] = [end_date, start_date]
 
         return (start_date, end_date, end_date.year)
 
