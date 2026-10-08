@@ -227,10 +227,10 @@ def test_create_deadline_relations_persists_minimum_distance_direction_and_condi
 	assert forward.distance_from_previous == 13
 	assert forward.index == 0
 	assert forward.condition_operator == "and"
-	assert [
+	assert {
 		(condition.attribute, condition.negate)
 		for condition in forward.condition_attributes.all()
-	] == [(condition_attribute, False), (not_condition_attribute, True)]
+	} == {(condition_attribute, False), (not_condition_attribute, True)}
 
 	assert reverse.deadline == previous_deadline
 	assert reverse.previous_deadline == current_deadline

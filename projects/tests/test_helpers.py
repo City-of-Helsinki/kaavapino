@@ -81,7 +81,11 @@ def test_visibility_succeeds_when_a_later_alternative_condition_matches():
 
 
 @pytest.mark.django_db
-def test_filtered_response_excludes_hidden_fields_and_deleted_fieldset_entries(f_project):
+def test_filtered_response_excludes_hidden_fields_and_deleted_fieldset_entries(
+	f_project, settings
+):
+	# CI has no .env, so the URL format is otherwise None.
+	settings.DOCUMENT_EDIT_URL_FORMAT = "http://localhost:3000/projects/<pk>/edit"
 	visible = Attribute.objects.create(
 		name="Visible text",
 		identifier="visible_text",
