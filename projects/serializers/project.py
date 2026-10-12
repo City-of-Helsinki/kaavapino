@@ -2167,17 +2167,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         for identifier, value in attribute_data.items():
             existing_value = instance_attribute_date.get(identifier, None)
 
+            old_file = None
             if not value and not existing_value:
                 old_file = ProjectAttributeFile.objects \
                     .filter(
                         project=project,
                         archived_at=None,
                         attribute__identifier=identifier,
+                        fieldset_path_str=f"{prefix}{identifier}" if prefix else None,
                     ).order_by("-created_at").first()
                 if old_file:
-                    existing_value = old_file.description
+                    existing_value = old_file.description or None
 
-            if value != existing_value:
+            if value != existing_value or old_file is not None:
                 updated_attribute_values[identifier] = {
                     "old": existing_value,
                     "new": value,
