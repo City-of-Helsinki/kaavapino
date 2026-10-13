@@ -2274,9 +2274,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             if not old_value and not new_value:
                 change_string = ""
             else:
-                old_value = old_value or "<tyhjä>"
-                new_value = new_value or "<tyhjä>"
-                change_string = f"\n{old_value} -> {new_value}"
+                old_value_str = old_value or "<tyhjä>"
+                new_value_str = new_value or "<tyhjä>"
+                change_string = f"\n{old_value_str} -> {new_value_str}"
             ProjectComment.objects.create(
                 project=project,
                 generated=True,
