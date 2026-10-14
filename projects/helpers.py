@@ -811,17 +811,26 @@ def check_visibility(project, attribute):
             comparison_value = condition["comparison_value"]
 
             attribute_data_value = project.attribute_data.get(variable, None)
-            if attribute_data_value is not None:
-                if operator == "==":
-                    if comparison_value_type == "boolean":
-                        return safe_bool(attribute_data_value) == True if safe_bool(attribute_data_value) is not None else False
-                    else:
-                        return attribute_data_value == comparison_value
-                elif operator == "!=":
-                    if comparison_value_type == "boolean":
-                        return safe_bool(attribute_data_value) == False if safe_bool(attribute_data_value) is not None else False
-                    else:
-                        return attribute_data_value != comparison_value
+            if attribute_data_value is None:
+                continue
+
+            if operator == "==":
+                if comparison_value_type == "boolean":
+                    converted_value = safe_bool(attribute_data_value)
+                    matches = converted_value is True
+                else:
+                    matches = attribute_data_value == comparison_value
+            elif operator == "!=":
+                if comparison_value_type == "boolean":
+                    converted_value = safe_bool(attribute_data_value)
+                    matches = converted_value is False
+                else:
+                    matches = attribute_data_value != comparison_value
+            else:
+                matches = False
+
+            if matches:
+                return True
         except Exception as ex:
             log.error(f"Error on visibility check for attribute: {attribute.identifier}", ex)
             return True

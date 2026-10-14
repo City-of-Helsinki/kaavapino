@@ -408,7 +408,13 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         try:
             file = request.data["file"]
-            clamav_client.scan(file.name, file.file)
+            file_bytes = file.file
+
+            # Large files are uploaded as TemporaryUploadedFile and need to be opened from the temporary file path
+            if hasattr(file, 'temporary_file_path'):
+                file_bytes = open(file.temporary_file_path(), 'rb')
+
+            clamav_client.scan(file.name, file_bytes)
 
             context = self.get_serializer_context()
             serializer = ProjectFileSerializer(data=request.data, context=context)
@@ -594,7 +600,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # Can't go backwards in time
         if start_date > end_date:
-            [start_date, end_date] = [start_date, end_date]
+            [start_date, end_date] = [end_date, start_date]
 
         return (start_date, end_date, end_date.year)
 
