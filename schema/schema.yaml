@@ -456,6 +456,116 @@ paths:
               schema:
                 type: string
           description: ''
+  /v1/emails/:
+    get:
+      operationId: v1_emails_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEmailMessageList'
+          description: ''
+  /v1/emails/{id}/:
+    get:
+      operationId: v1_emails_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this email template.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailMessage'
+          description: ''
+  /v1/emails/send_email/:
+    post:
+      operationId: v1_emails_send_email_create
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: object
+          additionalProperties: {}
+        description: Context to use with the template (List of key-value pairs matching
+          template fields)
+      - in: query
+        name: message
+        schema:
+          type: string
+        description: Message to be sent (Optional if using template and context)
+      - in: query
+        name: scheduled_time
+        schema:
+          type: string
+        description: Scheduled time to send the message at
+      - in: query
+        name: subject
+        schema:
+          type: string
+        description: Subject of the email message
+        required: true
+      - in: query
+        name: template_id
+        schema:
+          type: string
+        description: Id of the template to use. Templates can be edited in Django
+          admin
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailMessage'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmailMessage'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmailMessage'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/footer/:
     get:
       operationId: v1_footer_list
@@ -1645,62 +1755,6 @@ paths:
               schema:
                 type: string
           description: ''
-  /v1/projects/send_email/:
-    post:
-      operationId: v1_projects_send_email_create
-      parameters:
-      - in: query
-        name: context
-        schema:
-          type: object
-          additionalProperties: {}
-        description: Context to use with the template (List of key-value pairs matching
-          template fields)
-      - in: query
-        name: message
-        schema:
-          type: string
-        description: Message to be sent (Optional if using template and context)
-      - in: query
-        name: scheduled_time
-        schema:
-          type: string
-        description: Scheduled time to send the message at
-      - in: query
-        name: subject
-        schema:
-          type: string
-        description: Subject of the email message
-        required: true
-      - in: query
-        name: template_id
-        schema:
-          type: string
-        description: Id of the template to use. Templates can be edited in Django
-          admin
-      tags:
-      - v1
-      security:
-      - cookieAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: ''
-        '400':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                type: string
-          description: ''
   /v1/projectsubtypes/:
     get:
       operationId: v1_projectsubtypes_list
@@ -2233,6 +2287,47 @@ components:
       - name
       - phases
       - preview_file
+    EmailMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        recipient:
+          type: string
+          maxLength: 255
+        subject:
+          type: string
+        message:
+          type: string
+        template:
+          type: integer
+          nullable: true
+        template_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+          description: ID of the EmailTemplate to use
+        context:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          description: Template context variables as JSON object
+        scheduled_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'ISO 8601 format: 2024-12-31T14:30:00Z or 2024-12-31T14:30:00+02:00'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - message
+      - recipient
+      - subject
     ExternalDocuments:
       type: object
       properties:
@@ -2449,6 +2544,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DocumentTemplate'
+    PaginatedEmailMessageList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailMessage'
     PaginatedFieldCommentList:
       type: object
       required:
