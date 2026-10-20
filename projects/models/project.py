@@ -15,6 +15,7 @@ from django.core.serializers.json import DjangoJSONEncoder, json
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.expressions import Value
 from django.urls import reverse_lazy
+from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 from django.utils.functional import cached_property
 from private_storage.fields import PrivateFileField
@@ -2246,6 +2247,62 @@ class FieldCommentFieldsetPathLocation(FieldsetPathLocation):
         unique_together = ("index", "target")
 
 
+class EmailTemplate(models.Model):
+    """Email templates that are used when sending certain types of emails.
+    """
+
+    name = models.CharField(max_length=255, verbose_name=_("name"), unique=True)
+    slug = models.SlugField(editable=False, max_length=255)
+
+    def get_upload_subfolder(self):
+        return ["email_templates", self.slug]
+
+    file = PrivateFileField(
+        "File",
+        storage=KaavapinoPrivateStorage(
+            base_url=reverse_lazy(
+                "serve_private_email_template_file", kwargs={"path": ""}
+            ),
+            url_postfix="email_templates",
+        ),
+        upload_subfolder=get_upload_subfolder,
+        max_length=255,
+    )
+
+    admin_description = "Sähköpostipohjien hallintaa"
+
+    class Meta:
+        verbose_name = _("email template")
+        verbose_name_plural = _("email templates")
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        return super().save(*args, **kwargs)
+
+
+class EmailMessage(models.Model):
+    """EmailMessage represents an email message that can be sent or scheduled for later.
+    """
+    recipient = models.CharField(max_length=255, verbose_name=_("recipient"))
+    subject = models.TextField(verbose_name=_("subject"))
+    message = models.TextField(verbose_name=_("message"))
+    template = models.ForeignKey(
+        EmailTemplate,
+        verbose_name=_("template"),
+        related_name="messages",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
+    context = models.JSONField(verbose_name=_("context"), blank=True, null=True, default=dict)
+    scheduled_time = models.DateTimeField(verbose_name=_("scheduled time"), null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+
+
 # Register auditlog for models
 from auditlog.registry import auditlog
 #auditlog.register(BaseAttributeMatrixStructure)
@@ -2275,3 +2332,4 @@ auditlog.register(ProjectPhaseDeadlineSection)
 auditlog.register(FieldsetPathLocation)
 auditlog.register(ProjectAttributeFileFieldsetPathLocation)
 auditlog.register(FieldCommentFieldsetPathLocation)
+auditlog.register(EmailTemplate)
