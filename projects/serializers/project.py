@@ -52,6 +52,8 @@ from projects.models import (
     OverviewFilter,
     DocumentTemplate,
     FieldSetAttribute,
+    EmailMessage,
+    EmailTemplate,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -2634,3 +2636,83 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             old_file.save()
 
         return new_file
+
+
+class EmailMessageSerializer(serializers.ModelSerializer):
+    template_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text="ID of the EmailTemplate to use"
+    )
+    scheduled_time = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+        help_text="ISO 8601 format: 2024-12-31T14:30:00Z or 2024-12-31T14:30:00+02:00"
+    )
+    context = serializers.JSONField(
+        required=False,
+        allow_null=True,
+        default=dict,
+        help_text="Template context variables as JSON object"
+    )
+
+    class Meta:
+        model = EmailMessage
+        fields = ['id', 'recipient', 'subject', 'message', 'template', 'template_id', 'context', 'scheduled_time', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate_recipient(self, value):
+        """
+        Validate and normalize recipient.
+        Converts User ID to email if applicable.
+        """
+        from users.models import User
+
+        # Try to convert to User email if it's a user ID
+        try:
+            user = User.objects.get(id=int(value))
+            return user.email
+        except (User.DoesNotExist, ValueError):
+            # Not a user ID, treat as email address(es)
+            pass
+
+        if not value or "@" not in value:
+            raise serializers.ValidationError(f"Recipient {value} is not a valid email address")
+
+        return value
+
+    def validate_scheduled_time(self, value):
+        """Ensure scheduled time is in the future"""
+        if value and value < timezone.now():
+            raise serializers.ValidationError("Scheduled time must be in the future")
+        return value
+
+    def validate_template_id(self, value):
+        """Validate template exists"""
+
+        if value:
+            try:
+                EmailTemplate.objects.get(id=value)
+            except EmailTemplate.DoesNotExist:
+                raise serializers.ValidationError(f"EmailTemplate with id {value} does not exist")
+        return value
+
+    def validate(self, attrs):
+        """
+        Cross-field validation.
+        Handle template_id to template conversion.
+        """
+
+        # Convert template_id to template object
+        template_id = attrs.pop('template_id', None)
+        if template_id:
+            attrs['template'] = EmailTemplate.objects.get(id=template_id)
+
+        # Ensure template is provided if context is provided
+        if attrs.get('context') and not attrs.get('template'):
+            raise serializers.ValidationError(
+                "Template is required when context is provided"
+            )
+
+        return attrs

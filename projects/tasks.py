@@ -12,9 +12,10 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from projects.exporting.report import render_report_to_response
-from projects.models import Project, Report, DataRetentionPlan, Attribute, FieldSetAttribute, AttributeValueChoice
+from projects.models import Project, Report, DataRetentionPlan, Attribute, FieldSetAttribute, AttributeValueChoice, EmailMessage
 from projects.serializers.project import ProjectDeadlineSerializer
 from projects.helpers import set_kaavoitus_api_data_in_attribute_data, get_attribute_data_filtered_response
+from projects.mail import mail_client
 
 logger = logging.getLogger(__name__)
 
@@ -154,3 +155,14 @@ def cache_attribute_data_filtered():
 
     for project in projects:
         get_attribute_data_filtered_response(attributes, value_choices, generated_attributes, ignored, project, use_cached=False)
+
+
+def send_scheduled_emails():
+    now = timezone.now()
+    messages = EmailMessage.objects.filter(scheduled_time__lte=now)
+    for message in messages:
+        try:
+            mail_client.send_email_message(message)
+        except Exception as e:
+            logger.error(e)
+        message.delete()  # If sending fails, new EmailMessage object is created so this can be safely deleted

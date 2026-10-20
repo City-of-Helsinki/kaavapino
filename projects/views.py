@@ -1,3 +1,5 @@
+from typing import Union
+
 import pytz
 import csv
 import re
@@ -95,6 +97,7 @@ from projects.serializers.project import (
     OverviewFilterSerializer,
     SimpleProjectSerializer,
     ProjectPrioritySerializer,
+    EmailMessageSerializer,
 )
 from projects.serializers.projectschema import (
     SimpleAttributeSerializer,
@@ -117,6 +120,7 @@ from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateS
 from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
+from projects.mail import mail_client, MailException
 from PIL import Image
 
 log = logging.getLogger(__name__)
@@ -958,6 +962,95 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         except Exception as exc:
             log.error("Error in projects/attribute_data %s", exc)
             return Response("Error", status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="subject",
+                type=str,
+                description="Subject of the email message",
+                required=True
+            ),
+            OpenApiParameter(
+                name="recipient",
+                type=Union[str, int],
+                description="Recipient of the email message (Either user id or email address)",
+                required=True
+            ),
+            OpenApiParameter(
+                name="message",
+                type=str,
+                description="Message to be sent (Optional if using template and context)",
+                required=False
+            ),
+            OpenApiParameter(
+                name="scheduled_time",
+                type=str,
+                description="Scheduled time to send the message at",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="template_id",
+                type=str,
+                description="Id of the template to use. Templates can be edited in Django admin",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="context",
+                type=dict,
+                description="Context to use with the template (List of key-value pairs matching template fields)",
+            ),
+        ],
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="send_email",
+        url_name="send_email"
+    )
+    def send_email(self, request):
+        serializer = EmailMessageSerializer(data=request.data)
+        if serializer.is_valid():
+            # All validation passed, data is clean
+            validated_data = serializer.validated_data
+
+            try:
+                if validated_data.get('scheduled_time'):
+                    # Save scheduled EmailMessage to be sent later
+                    serializer.save()
+                    return Response("Email scheduled successfully", status=status.HTTP_200_OK)
+                else:
+                    # Send immediately
+                    template = validated_data.get('template')
+                    if template:
+                        mail_client.send_template_to_email(
+                            validated_data['recipient'],
+                            validated_data['subject'],
+                            validated_data['message'],
+                            template,
+                            validated_data.get('context')
+                        )
+                    else:
+                        mail_client.send_mail_to_email(
+                            validated_data['recipient'],
+                            validated_data['subject'],
+                            validated_data['message']
+                        )
+                    return Response("Email sent", status=status.HTTP_200_OK)
+            except MailException as exc:
+                log.error("Error in send_mail, %s", exc)
+                return Response("Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            except Exception as exc:
+                log.error("Error in send_mail, %s", exc)
+                return Response("Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)

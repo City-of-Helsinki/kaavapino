@@ -50,6 +50,8 @@ from .project import (  # noqa
     ProjectAttributeFileFieldsetPathLocation,
     FieldCommentFieldsetPathLocation,
     CommonProjectPhase,
+    EmailTemplate,
+    EmailMessage
 )
 from .projectcomment import (  # noqa
     ProjectComment,
