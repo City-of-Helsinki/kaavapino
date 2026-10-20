@@ -65,6 +65,7 @@ env = environ.Env(
     MAIL_WHITELIST=(list, []),
     MAIL_HOST=(str, ""),
     MAIL_PORT=(int, 25),
+    MAIL_DEFAULT_FROM=(str, "kaavapino@localhost"),
 )
 
 env_file = project_root(".env")
