@@ -355,7 +355,7 @@ def render_template(project, document_template, preview):
 
         if display_value is None or display_value == "":
             empty = True
-            if preview:
+            if preview and attribute.required:
                 display_value = "Tieto puuttuu"
 
         if attribute.value_type == Attribute.TYPE_LONG_STRING:

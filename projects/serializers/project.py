@@ -1615,7 +1615,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         min_phase_index = current_phase.index if current_phase else 1
 
         try:
-            is_owner = self.context["request"].user == self.user
+            is_owner = user is not None and user == self.context["request"].user
             if owner_edit_override and is_owner:
                 min_phase_index = 1
         except AttributeError:
@@ -2169,17 +2169,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         for identifier, value in attribute_data.items():
             existing_value = instance_attribute_date.get(identifier, None)
 
+            old_file = None
             if not value and not existing_value:
                 old_file = ProjectAttributeFile.objects \
                     .filter(
                         project=project,
                         archived_at=None,
                         attribute__identifier=identifier,
+                        fieldset_path_str=f"{prefix}{identifier}" if prefix else None,
                     ).order_by("-created_at").first()
                 if old_file:
-                    existing_value = old_file.description
+                    existing_value = old_file.description or None
 
-            if value != existing_value:
+            if value != existing_value or old_file is not None:
                 updated_attribute_values[identifier] = {
                     "old": existing_value,
                     "new": value,
@@ -2274,9 +2276,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             if not old_value and not new_value:
                 change_string = ""
             else:
-                old_value = old_value or "<tyhjä>"
-                new_value = new_value or "<tyhjä>"
-                change_string = f"\n{old_value} -> {new_value}"
+                old_value_str = old_value or "<tyhjä>"
+                new_value_str = new_value or "<tyhjä>"
+                change_string = f"\n{old_value_str} -> {new_value_str}"
             ProjectComment.objects.create(
                 project=project,
                 generated=True,
