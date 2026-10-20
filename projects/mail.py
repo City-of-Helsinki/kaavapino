@@ -128,16 +128,14 @@ class MailClient:
     WHITELIST: List[str] = None
 
     def __init__(self):
-        if not settings.MAIL_HOST and not settings.MAIL_PORT:
-            log.warning("MAIL_HOST and MAIL_PORT not defined in settings -- Mail Client not enabled")
+        if not settings.EMAIL_HOST and not settings.EMAIL_PORT:
+            log.warning("EMAIL_HOST and EMAIL_PORT not defined in settings -- Mail Client not enabled")
             return
-        if not settings.MAIL_ENVIRONMENT:
-            log.warning("MAIL_ENVIRONMENT not defined in settings -- Mail Client not enabled")
+        if not settings.EMAIL_ENVIRONMENT:
+            log.warning("EMAIL_ENVIRONMENT not defined in settings -- Mail Client not enabled")
             return
-        self.HOST = settings.MAIL_HOST
-        self.PORT = settings.MAIL_PORT
-        self.ENVIRONMENT = settings.MAIL_ENVIRONMENT
-        self.WHITELIST = settings.MAIL_WHITELIST
+        self.ENVIRONMENT = settings.EMAIL_ENVIRONMENT
+        self.WHITELIST = settings.EMAIL_WHITELIST
 
     # --- General ---
 
