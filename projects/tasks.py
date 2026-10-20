@@ -160,6 +160,10 @@ def cache_attribute_data_filtered():
 def send_scheduled_emails():
     now = timezone.now()
     messages = EmailMessage.objects.filter(scheduled_time__lte=now)
+    if not messages:
+        return
+
+    logger.info(f"Sending {len(messages)} scheduled emails")
     for message in messages:
         try:
             mail_client.send_email_message(message)

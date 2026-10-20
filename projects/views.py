@@ -58,6 +58,7 @@ from projects.models import (
     ProjectSubtype,
     ProjectAttributeFile,
     DocumentTemplate,
+    EmailTemplate,
     Attribute,
     Report,
     Deadline,
@@ -1600,6 +1601,22 @@ class DocumentTemplateDownloadView(
     slug_field = "file"
     slug_url_kwarg = "path"
     url_path_postfix = "document_templates"
+
+    def get_queryset(self):
+        # Queryset that is allowed to be downloaded
+        return self.model.objects.all()
+
+    def can_access_file(self, private_file):
+        return self.request.user.has_privilege("admin")
+
+
+class EmailTemplateDownloadView(
+    PrivateDownloadViewSetMixin, PrivateStorageDetailView
+):
+    model = EmailTemplate
+    slug_field = "file"
+    slug_url_kwarg = "path"
+    url_path_postfix = "email_templates"
 
     def get_queryset(self):
         # Queryset that is allowed to be downloaded

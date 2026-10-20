@@ -74,6 +74,11 @@ urlpatterns = [
         project_views.DocumentTemplateDownloadView.as_view(),
         name="serve_private_document_template_file",
     ),
+    re_path(
+        r"{}email_templates/(?P<path>.*)$".format(MEDIA_URL),
+        project_views.EmailTemplateDownloadView.as_view(),
+        name="serve_private_email_template_file",
+    ),
     # OpenAPI 3 documentation with Swagger UI:
     path('schema/', SpectacularAPIView.as_view(), name='schema'),
     # Optional UI:

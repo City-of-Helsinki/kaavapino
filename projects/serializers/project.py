@@ -2702,7 +2702,6 @@ class EmailMessageSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        Cross-field validation.
         Handle template_id to template conversion.
         """
 
@@ -2710,11 +2709,5 @@ class EmailMessageSerializer(serializers.ModelSerializer):
         template_id = attrs.pop('template_id', None)
         if template_id:
             attrs['template'] = EmailTemplate.objects.get(id=template_id)
-
-        # Ensure template is provided if context is provided
-        if attrs.get('context') and not attrs.get('template'):
-            raise serializers.ValidationError(
-                "Template is required when context is provided"
-            )
 
         return attrs

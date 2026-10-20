@@ -2252,6 +2252,7 @@ class EmailTemplate(models.Model):
     """
 
     name = models.CharField(max_length=255, verbose_name=_("name"), unique=True)
+    slug = models.SlugField(editable=False, max_length=255)
 
     def get_upload_subfolder(self):
         return ["email_templates", self.slug]
@@ -2259,6 +2260,9 @@ class EmailTemplate(models.Model):
     file = PrivateFileField(
         "File",
         storage=KaavapinoPrivateStorage(
+            base_url=reverse_lazy(
+                "serve_private_email_template_file", kwargs={"path": ""}
+            ),
             url_postfix="email_templates",
         ),
         upload_subfolder=get_upload_subfolder,
@@ -2275,7 +2279,8 @@ class EmailTemplate(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        self.slug = slugify(self.name)
+        if not self.slug:
+            self.slug = slugify(self.name)
         return super().save(*args, **kwargs)
 
 
@@ -2284,14 +2289,16 @@ class EmailMessage(models.Model):
     """
     recipient = models.CharField(max_length=255, verbose_name=_("recipient"))
     subject = models.TextField(verbose_name=_("subject"))
-    message = models.TextField(verbose_name=_("text content"))
+    message = models.TextField(verbose_name=_("message"))
     template = models.ForeignKey(
         EmailTemplate,
         verbose_name=_("template"),
         related_name="messages",
         on_delete=models.CASCADE,
+        blank=True,
+        null=True,
     )
-    context = models.JSONField(verbose_name=_("context"))
+    context = models.JSONField(verbose_name=_("context"), blank=True, null=True, default=dict)
     scheduled_time = models.DateTimeField(verbose_name=_("scheduled time"), null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
 
