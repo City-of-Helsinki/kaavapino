@@ -160,7 +160,7 @@ class MailClient:
 
     def send_template_to_email(self, email: str, subject: str, message: str, template: EmailTemplate, context: Dict[str, Any] = None):
         if self.ENVIRONMENT == "production" or email.lower() in self.WHITELIST:
-            async_task('projects.mail._send_template_mail', email, subject, message, template, context)
+            async_task('projects.mail._send_template_message', email, subject, message, template, context)
         else:
             log.info(f"Email not sent to {email} (environment: {self.ENVIRONMENT}, not in whitelist)")
 
