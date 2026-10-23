@@ -736,6 +736,12 @@ class Attribute(models.Model):
                     for item in value
                 ]
             return [self._get_single_display_value(v) for v in value]
+        elif isinstance(value, dict) and self.automatic_value:
+            value_choices = {k.identifier: k.value for k in AttributeValueChoice.objects.filter(attribute=self.automatic_value.key_attribute)}
+            _value = ""
+            for k, v in value.items():
+                _value += f"{value_choices.get(k, k)}\n{v}\n\n"
+            return _value
         else:
             return self._get_single_display_value(value)
 
