@@ -34,6 +34,8 @@ from projects.models.project import (
     ProjectFloorAreaSectionAttributeMatrixCell,
     ProjectSubtype,
     ProjectDeadline,
+    EmailMessage,
+    EmailTemplate,
 )
 from .exporting import get_document_response
 from .models import (
@@ -710,6 +712,16 @@ class ProjectComment(admin.ModelAdmin):
 class DataRetentionPlanAdmin(admin.ModelAdmin):
     def get_model_perms(self, request):
         return {}
+
+
+@admin.register(EmailMessage)
+class EmailMessageAdmin(admin.ModelAdmin):
+    list_display = ("subject", "scheduled_time", "created_at")
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "file")
 
 
 admin.site.index_template = "admin/kaavapino_index.html"

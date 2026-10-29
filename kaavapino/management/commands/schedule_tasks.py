@@ -57,7 +57,14 @@ class Command(BaseCommand):
                     "schedule_type": Schedule.CRON,
                     "cron": "0 6,12 * * *"
                 }
-            }
+            },
+            {
+                "func": "projects.tasks.send_scheduled_emails",
+                "defaults": {
+                    "schedule_type": Schedule.CRON,
+                    "cron": "*/1 * * * *"
+                }
+            },
         ]
         for schedule in schedules:
             if options.get("overwrite"):

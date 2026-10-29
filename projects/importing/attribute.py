@@ -640,91 +640,89 @@ class AttributeImporter:
         )
         return self._get_identifier_for_value(row[self.column_index[ATTRIBUTE_NAME]])
 
-    def _create_attributes(self, rows: Iterable[Sequence[str]]):
-        def parse_condition(condition):
-            condition = re.split(r"\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
+    def _parse_condition(self, condition):
+        condition = re.split(r"\s+(not in|in|\=\=|\!\=|\>|\<)+\s+", condition)
 
-            if len(condition) == 1:
-                negate = condition[0][0] == "!"
-                condition = [
-                    condition[0][1:] if negate else condition[0],
-                    "!=" if negate else "==",
-                    True,
-                ]
-                value = condition[2]
-                value_type = "boolean"
+        if len(condition) == 1:
+            negate = condition[0][0] == "!"
+            condition = [
+                condition[0][1:] if negate else condition[0],
+                "!=" if negate else "==",
+                True,
+            ]
+            value = condition[2]
+            value_type = "boolean"
 
+        else:
+            value = condition[2]
+            if value[0] == '"':
+                value = value[1:]
+
+            if value[-1] == '"':
+                value = value[:-1]
+
+            if value[0] == "[" and value[-1] == "]":
+                try:
+                    [int(i) for i in re.split(r",\s+", value[1:-1])]
+                    value_type = "list<number>"
+                except ValueError:
+                    value_type = "list<string>"
             else:
-                value = condition[2]
-                if value[0] == '"':
-                    value = value[1:]
+                try:
+                    int(value)
+                    value_type = "number"
+                except ValueError:
+                    value_type = "string"
 
-                if value[-1] == '"':
-                    value = value[:-1]
+        return {
+            "variable": condition[0],
+            "operator": condition[1],
+            "comparison_value": value,
+            "comparison_value_type": value_type,
+        }
+    
+    def _parse_autofill_rule(self, rule, type):
+        if rule == "ei":
+            return None
 
-                if value[0] == "[" and value[-1] == "]":
-                    try:
-                        [int(i) for i in re.split(r",\s+", value[1:-1])]
-                        value_type = "list<number>"
-                    except ValueError:
-                        value_type = "list<string>"
-                else:
-                    try:
-                        int(value)
-                        value_type = "number"
-                    except ValueError:
-                        value_type = "string"
+        variables = re.findall(r"^\{\{(.*)\}\}", rule)
+        thens = re.findall(r"\{%+\sif.*?%\}\s*(.*?)\s*\{% endif %\}", rule)
+        conditions = re.findall(r"\{%\s*if\s*(.*?)\s*%\}.*?\{%\s*endif\s*%\}", rule)
 
-            return {
-                "variable": condition[0],
-                "operator": condition[1],
-                "comparison_value": value,
-                "comparison_value_type": value_type,
-            }
+        branches = []
 
-        def parse_autofill_rule(rule, type):
-            if rule == "ei":
-                return None
+        for (then, condition) in zip(thens, conditions):
+            if type == Attribute.TYPE_CHOICE:
+                then = self._get_identifier_for_value(str(then))
+            elif type == Attribute.TYPE_BOOLEAN and then == "kyllä":
+                then = True
+            elif type == Attribute.TYPE_BOOLEAN and then == "ei":
+                then = False
 
-            # TODO: make a more general implementation for including fields if cases become more complex
-            variables = re.findall(r"^\{\{(.*)\}\}", rule)
-            thens = re.findall(r"\{%+\sif.*?%\}\s*(.*?)\s*\{% endif %\}", rule)
-            conditions = re.findall(r"\{%\s*if\s*(.*?)\s*%\}.*?\{%\s*endif\s*%\}", rule)
+            new_branches = [
+                {
+                    "variables": variables,
+                    "conditions": [
+                        self._parse_condition(condition_and)
+                        for condition_and
+                        in re.split(r"\sand+\s", condition_or)
+                    ],
+                    "then_branch": then,
+                    "else_branch": None
+                }
+                for condition_or in re.split(r"\sor+\s", condition)
+            ]
+            branches += new_branches
 
-            branches = []
+        return branches
 
-            for (then, condition) in zip(thens, conditions):
-                if type == Attribute.TYPE_CHOICE:
-                    then = self._get_identifier_for_value(str(then))
-                elif type == Attribute.TYPE_BOOLEAN and then == "kyllä":
-                    then = True
-                elif type == Attribute.TYPE_BOOLEAN and then == "ei":
-                    then = False
+    def _parse_autofill_readonly(self, rule):
+        if rule == "ei" or \
+            (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
+            return True
+        return False
 
-                new_branches = [
-                    {
-                        "variables": variables,
-                        "conditions": [
-                            parse_condition(condition_and)
-                            for condition_and
-                            in re.split(r"\sand+\s", condition_or)
-                        ],
-                        "then_branch": then,
-                        "else_branch": None
-                    }
-                    for condition_or in re.split(r"\sor+\s", condition)
-                ]
-                branches += new_branches
-
-            return branches
-
-        def parse_autofill_readonly(rule):
-            if rule == "ei" or \
-                (rule and rule.startswith("Automaattiseti muodostunutta tietoa ei voi muokata")):
-                return True
-
-            return False
-
+    def _create_attributes(self, rows: Iterable[Sequence[str]]):
         logger.info("\nCreating attributes...")
 
         existing_attribute_ids = set(
@@ -766,12 +764,12 @@ class AttributeImporter:
             if len(re.findall(r"ei\s*\{%\s*endif\s*%\}", visibility_row)):
                 visibility_conditions = []
                 hide_conditions = [
-                    parse_condition(condition)
+                    self._parse_condition(condition)
                     for condition in conditions
                 ]
             else:
                 visibility_conditions = [
-                    parse_condition(condition)
+                    self._parse_condition(condition)
                     for condition in conditions
                 ]
                 hide_conditions = []
@@ -859,11 +857,11 @@ class AttributeImporter:
 
             # autofill
             try:
-                autofill_rule = parse_autofill_rule(
+                autofill_rule = self._parse_autofill_rule(
                     row[self.column_index[ATTRIBUTE_RULE_AUTOFILL]],
                     value_type,
                 )
-                autofill_readonly = parse_autofill_readonly(
+                autofill_readonly = self._parse_autofill_readonly(
                     row[self.column_index[ATTRIBUTE_RULE_AUTOFILL_READONLY]]
                 )
             except TypeError:

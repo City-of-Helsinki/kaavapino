@@ -415,6 +415,7 @@ class DeadlineImporter:
                 r"XS|S|M|L|XL",
                 re.split(r"\s*==\s*|\s+in\s+", split_cell[0])[-1],
             )
+            cond_attr_identifiers = []
             if len(split_cell) < 2 or subtype.name in subtypes:
                 cond_attr_identifiers = re.findall(
                     r"\{%\s*if\s*(.*?)\s*%\}",
@@ -695,7 +696,7 @@ class DeadlineImporter:
                         )
                         continue
 
-                    cond = cond[0]
+                    cond = " or ".join(cond)
                     if cond and cond[:25] == "kaavaprosessin_kokoluokka":
                         subtypes = re.findall(
                             r"XS|S|M|L|XL",
@@ -731,6 +732,7 @@ class DeadlineImporter:
                 r"XS|S|M|L|XL",
                 re.split(r"\s*==\s*|\s+in\s+", split_cell[0])[-1],
             )
+            cond_attr_identifiers = []
             if len(split_cell) < 2 or subtype.name in subtypes:
                 cond_attr_identifiers = self._parse_conditions(
                     deadline_attribute_condition_row

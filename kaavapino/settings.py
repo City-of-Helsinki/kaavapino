@@ -61,6 +61,13 @@ env = environ.Env(
     AUDIT_LOG_ES_USERNAME=(str, ""),
     AUDIT_LOG_ES_PASSWORD=(str, ""),
     AUDIT_LOG_ES_INDEX=(str, ""),
+    EMAIL_ENVIRONMENT=(str, ""),
+    EMAIL_WHITELIST=(list, []),
+    EMAIL_HOST=(str, ""),
+    EMAIL_PORT=(int, 25),
+    DEFAULT_FROM_EMAIL=(str, "kaavapino@localhost"),
+    EMAIL_USE_TLS=(bool, True),
+    EMAIL_USE_SSL=(bool, False),
 )
 
 env_file = project_root(".env")
@@ -88,6 +95,16 @@ GRAPH_API_BASE_URL = os.environ.get("GRAPH_API_BASE_URL")
 GRAPH_API_APPLICATION_ID = os.environ.get("GRAPH_API_APPLICATION_ID")
 GRAPH_API_TENANT_ID = os.environ.get("GRAPH_API_TENANT_ID")
 GRAPH_API_CLIENT_SECRET = os.environ.get("GRAPH_API_CLIENT_SECRET")
+
+# Email settings
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_ENVIRONMENT = os.environ.get("EMAIL_ENVIRONMENT")
+EMAIL_WHITELIST = os.environ.get("EMAIL_WHITELIST", default="").split(",")
+EMAIL_HOST = os.environ.get("EMAIL_HOST")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", default=25))
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", default="kaavapino@localhost")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").lower() == "true"
 
 SOCIAL_AUTH_TUNNISTAMO_AUTH_EXTRA_ARGUMENTS = {'ui_locales': 'fi'}
 
@@ -137,8 +154,6 @@ CACHES = {
         "KEY_PREFIX": "kaavapino_api",
     }
 }
-
-vars().update(env.email_url())  # EMAIL_BACKEND etc.
 
 STATIC_URL = env.str("STATIC_URL")
 MEDIA_URL = env.str("MEDIA_URL")

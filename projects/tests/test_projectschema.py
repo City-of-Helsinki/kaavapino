@@ -34,6 +34,7 @@ class TestAttributeSchemaSerializer:
             {
                 "label": "{} {}".format(f_user.first_name, f_user.last_name),
                 "value": f_user.pk,
+                "index": 0
             }
         ]
 
@@ -46,8 +47,8 @@ class TestAttributeSchemaSerializer:
     ):
         asserted_value_choices = f_choice_attribute.value_choices.all()
         asserted_choices = []
-        for choice in asserted_value_choices:
-            asserted_choices.append({"label": choice.value, "value": choice.identifier})
+        for index, choice in enumerate(asserted_value_choices):
+            asserted_choices.append({"label": choice.value, "value": choice.identifier,"index": index})
 
         choices = AttributeSchemaSerializer._get_attribute_choices(
             f_choice_attribute

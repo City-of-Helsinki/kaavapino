@@ -52,6 +52,8 @@ from projects.models import (
     OverviewFilter,
     DocumentTemplate,
     FieldSetAttribute,
+    EmailMessage,
+    EmailTemplate,
 )
 from projects.models.project import ProjectAttributeMultipolygonGeometry
 from projects.permissions.media_file_permissions import (
@@ -1613,7 +1615,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         min_phase_index = current_phase.index if current_phase else 1
 
         try:
-            is_owner = self.context["request"].user == self.user
+            is_owner = user is not None and user == self.context["request"].user
             if owner_edit_override and is_owner:
                 min_phase_index = 1
         except AttributeError:
@@ -2167,17 +2169,19 @@ class ProjectSerializer(serializers.ModelSerializer):
         for identifier, value in attribute_data.items():
             existing_value = instance_attribute_date.get(identifier, None)
 
+            old_file = None
             if not value and not existing_value:
                 old_file = ProjectAttributeFile.objects \
                     .filter(
                         project=project,
                         archived_at=None,
                         attribute__identifier=identifier,
+                        fieldset_path_str=f"{prefix}{identifier}" if prefix else None,
                     ).order_by("-created_at").first()
                 if old_file:
-                    existing_value = old_file.description
+                    existing_value = old_file.description or None
 
-            if value != existing_value:
+            if value != existing_value or old_file is not None:
                 updated_attribute_values[identifier] = {
                     "old": existing_value,
                     "new": value,
@@ -2272,9 +2276,9 @@ class ProjectSerializer(serializers.ModelSerializer):
             if not old_value and not new_value:
                 change_string = ""
             else:
-                old_value = old_value or "<tyhjä>"
-                new_value = new_value or "<tyhjä>"
-                change_string = f"\n{old_value} -> {new_value}"
+                old_value_str = old_value or "<tyhjä>"
+                new_value_str = new_value or "<tyhjä>"
+                change_string = f"\n{old_value_str} -> {new_value_str}"
             ProjectComment.objects.create(
                 project=project,
                 generated=True,
@@ -2634,3 +2638,76 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             old_file.save()
 
         return new_file
+
+
+class EmailMessageSerializer(serializers.ModelSerializer):
+    template_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text="ID of the EmailTemplate to use"
+    )
+    scheduled_time = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+        help_text="ISO 8601 format: 2024-12-31T14:30:00Z or 2024-12-31T14:30:00+02:00"
+    )
+    context = serializers.JSONField(
+        required=False,
+        allow_null=True,
+        default=dict,
+        help_text="Template context variables as JSON object"
+    )
+
+    class Meta:
+        model = EmailMessage
+        fields = ['id', 'recipient', 'subject', 'message', 'template', 'template_id', 'context', 'scheduled_time', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate_recipient(self, value):
+        """
+        Validate and normalize recipient.
+        Converts User ID to email if applicable.
+        """
+        from users.models import User
+
+        # Try to convert to User email if it's a user ID
+        try:
+            user = User.objects.get(id=int(value))
+            return user.email
+        except (User.DoesNotExist, ValueError):
+            # Not a user ID, treat as email address(es)
+            pass
+
+        if not value or "@" not in value:
+            raise serializers.ValidationError(f"Recipient {value} is not a valid email address")
+
+        return value
+
+    def validate_scheduled_time(self, value):
+        """Ensure scheduled time is in the future"""
+        if value and value < timezone.now():
+            raise serializers.ValidationError("Scheduled time must be in the future")
+        return value
+
+    def validate_template_id(self, value):
+        """Validate template exists"""
+
+        if value:
+            try:
+                EmailTemplate.objects.get(id=value)
+            except EmailTemplate.DoesNotExist:
+                raise serializers.ValidationError(f"EmailTemplate with id {value} does not exist")
+        return value
+
+    def validate(self, attrs):
+        """
+        Handle template_id to template conversion.
+        """
+
+        # Convert template_id to template object
+        template_id = attrs.pop('template_id', None)
+        if template_id:
+            attrs['template'] = EmailTemplate.objects.get(id=template_id)
+
+        return attrs
