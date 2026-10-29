@@ -2,6 +2,7 @@ import datetime
 import itertools
 import logging
 import time
+import warnings
 
 from actstream import action
 from actstream.models import Action as ActStreamAction
@@ -863,6 +864,9 @@ class Project(models.Model):
         
         return project_dls
 
+    # Obsolete after deadline locking update, delete after new version has been in prod for some time
+    # Replaced by get_preview_deadlines_light
+    @warnings.deprecated()
     def get_preview_deadlines(self, updated_attributes, subtype, confirmed_fields=None, timing_metrics=None):
         confirmed_fields = confirmed_fields or []
 
