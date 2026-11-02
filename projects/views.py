@@ -1110,7 +1110,7 @@ class AttributeViewSet(viewsets.ReadOnlyModelViewSet):
             log.error("Unknown error, no attribute or fieldset_attribute exists")
             return HttpResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        if attribute_lock and (datetime.now(timezone.utc) - attribute_lock.timestamp).total_seconds() >= 900:  # 15 min
+        if attribute_lock and (timezone.now() - attribute_lock.timestamp).total_seconds() >= 900:  # 15 min
             attribute_lock.delete()
             attribute_lock = None
 
