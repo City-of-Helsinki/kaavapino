@@ -648,20 +648,23 @@ class PptxTemplate:
 
         if paragraph.runs:
             template = self.env.parse(original_text)
-            vars = self.get_cleaned_context_variables(template)
+            context_vars = self.get_cleaned_context_variables(template)
             rendered = self.clean_empty_lines(rendered)
             paragraph.runs[0].text = rendered
 
-            if len(vars) == 1:
-                link_data = self.element_data.get(vars.pop())
+            if len(context_vars) == 1:
+                link_data = self.element_data.get(context_vars.pop())
                 if link_data:
-                    font = paragraph.runs[0].font
                     paragraph.runs[0].hyperlink.address = link_data['url_id']
 
-        # Clean up potential empty paragraph
+        # At least one paragraph in each text body is required, else doc may be appear corrupted
         if not paragraph.text.strip():
             p = paragraph._p
-            p.getparent().remove(p)
+            parent = p.getparent()
+            if len(parent.findall(p.tag)) > 1:
+                parent.remove(p)
+            else:
+                paragraph.clear()
 
     def clean_empty_lines(self, rendered_text):
         return '\n'.join([txt for txt in rendered_text.split('\n') if txt.strip()])
