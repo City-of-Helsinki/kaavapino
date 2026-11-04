@@ -3,6 +3,9 @@ import threading
 
 import datetime
 import io
+import os
+import subprocess
+import tempfile
 from html import escape
 import logging
 import jinja2
@@ -220,7 +223,7 @@ def get_super(_script):
     else:
         return False
 
-def render_template(project, document_template, preview):
+def render_template(project, document_template, preview, result_type=None):
 
     def fetch_relevant_attributes(doc):
         cached_vars = cache.get(f"document_template_variables:{doc.template_file.path}", None)
@@ -526,9 +529,24 @@ def render_template(project, document_template, preview):
 
     if doc_type == 'docx':
         try:
-            doc.render(attribute_data_display, jinja_env)
-            output = io.BytesIO()
-            doc.save(output)
+            if result_type == 'pdf':
+                doc.render(attribute_data_display, jinja_env)
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    docx_path = os.path.join(temp_dir, "document.docx")
+                    pdf_path = os.path.join(temp_dir, "document.pdf")
+                    doc.save(docx_path)
+                    subprocess.run(
+                        ["soffice", "--headless", "--convert-to", "pdf", docx_path, "--outdir", temp_dir],
+                        check=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+                    with open(pdf_path, "rb") as f:
+                        output = io.BytesIO(f.read())
+            else:
+                doc.render(attribute_data_display, jinja_env)
+                output = io.BytesIO()
+                doc.save(output)
         except Exception as exc:
             log.error('Error while rendering document', exc)
     elif doc_type == 'xlsx':
