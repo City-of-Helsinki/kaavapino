@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.postgres.fields import ArrayField
 from django.core.serializers.json import DjangoJSONEncoder
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db import models, transaction
 from django.utils.translation import gettext_lazy as _
 
@@ -736,12 +736,15 @@ class Attribute(models.Model):
                     for item in value
                 ]
             return [self._get_single_display_value(v) for v in value]
-        elif isinstance(value, dict) and self.automatic_value:
-            value_choices = {k.identifier: k.value for k in AttributeValueChoice.objects.filter(attribute=self.automatic_value.key_attribute)}
-            _value = ""
-            for k, v in value.items():
-                _value += f"{value_choices.get(k, k)}\n{v}\n\n"
-            return _value
+        elif isinstance(value, dict):
+            try:
+                value_choices = {k.identifier: k.value for k in AttributeValueChoice.objects.filter(attribute=self.automatic_value.key_attribute)}
+                _value = ""
+                for k, v in value.items():
+                    _value += f"{value_choices.get(k, k)}\n{v}\n\n"
+                return _value
+            except ObjectDoesNotExist:  # self.automatic_value does not exist
+                return self._get_single_display_value(value)
         else:
             return self._get_single_display_value(value)
 
