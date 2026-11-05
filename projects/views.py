@@ -1420,6 +1420,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
         filename = request.query_params.get("filename")
+        result_type = request.query_params.get("result_type", None)
         document_template = self.get_object()
 
         if filename is None:
@@ -1429,18 +1430,18 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
-        doc_type = get_file_type(document_template.file.path)
+        doc_type = result_type or get_file_type(document_template.file.path)
 
         preview = \
             True if request.query_params.get("preview") in TRUE \
-            else False
+                else False
 
-        immediate =  \
+        immediate = \
             True if request.query_params.get("immediate") in TRUE \
-            else False
+                else False
 
         if immediate:
-            document = render_template(self.project, document_template, preview)
+            document = render_template(self.project, document_template, preview, result_type)
             if document and document != "error":
                 response = HttpResponse(
                     document,
@@ -1482,7 +1483,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
 
         document_task = async_task(
             render_template,
-            self.project, document_template, preview,
+            self.project, document_template, preview, result_type,
         )
 
         return Response(

@@ -35,7 +35,12 @@ RUN rm /etc/rhsm-host && \
         gdal \
         geos \
         nc \
-        vim && \
+        vim \
+        libreoffice-headless \
+        libreoffice-writer \
+        liberation-sans-fonts \
+        liberation-serif-fonts \
+        liberation-mono-fonts && \
     # Remove entitlements and Subscription Manager configs
     rm -rf /etc/pki/entitlement 
     # && \
