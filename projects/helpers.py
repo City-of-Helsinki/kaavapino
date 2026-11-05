@@ -929,6 +929,7 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
 
         if attribute.value_type == "fieldset":
             if attribute.identifier == "hakija_fieldset":
+                hakijoita_yhteensa = 0
                 hakija_taho = []
                 hakijalta_perittava_maksu_oas = []
                 hakijalta_perittava_maksu_ehdotus = []
@@ -938,6 +939,11 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                 laskutuspyynto_hyvaksymisen_jalkeen = []
 
                 for item in value:
+                    if item.get("_deleted", False):
+                        continue
+
+                    hakijoita_yhteensa += 1
+
                     if "hakija_yritys" in item.keys():
                         hakija_taho.append(f"Hakija yritys: {item.get('hakija_yritys', 'N/A')}")
                     elif "hakijan_etunimi_yksityishenkilo" in item.keys() and "hakijan_sukunimi_yksityishenkilo" in item.keys():
@@ -961,6 +967,7 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
                         if val:
                             laskutuspyynto_hyvaksymisen_jalkeen.append(check_format_date(val))
 
+                attribute_data["hakijoita_yhteensa"] = hakijoita_yhteensa
                 attribute_data["hakija_taho"] = "; ".join(hakija_taho)
                 attribute_data["hakijalta_perittava_maksu_oas"] = sum(hakijalta_perittava_maksu_oas)
                 attribute_data["hakijalta_perittava_maksu_ehdotus"] = sum(hakijalta_perittava_maksu_ehdotus)
@@ -973,13 +980,20 @@ def sanitize_attribute_data_filter_result(attributes, attribute_data):
 
                 attribute_data.pop("hakija_fieldset", None)
             elif attribute.identifier == "hakemus_fieldset":
+                hakemuksia_yhteensa = 0
                 hakemuksen_saapumispaivamaara = []
                 for item in value:
+                    if item.get("_deleted", False):
+                        continue
+
+                    hakemuksia_yhteensa += 1
+
                     if "hakemuksen_saapumispaivamaara" in item.keys():
                         val = item.get('hakemuksen_saapumispaivamaara', None)
                         if val:
                             hakemuksen_saapumispaivamaara.append(check_format_date(val))
 
+                attribute_data["hakemuksia_yhteensa"] = hakemuksia_yhteensa
                 attribute_data["hakemuksen_saapumispaivamaara"] = "; ".join(hakemuksen_saapumispaivamaara)
                 attribute_data.pop("hakemus_fieldset", None)
             elif attribute.identifier == "investointi_kustannukset_muu_fieldset":
