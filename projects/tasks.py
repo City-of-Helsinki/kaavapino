@@ -12,10 +12,12 @@ from django.http import HttpResponse
 from django.utils import timezone
 
 from projects.exporting.report import render_report_to_response
-from projects.models import Project, Report, DataRetentionPlan, Attribute, FieldSetAttribute, AttributeValueChoice, EmailMessage
+from projects.models import Project, Report, DataRetentionPlan, Attribute, FieldSetAttribute, AttributeValueChoice, \
+    EmailMessage, AttributeAutoValue, AttributeAutoValueMapping
 from projects.serializers.project import ProjectDeadlineSerializer
 from projects.helpers import set_kaavoitus_api_data_in_attribute_data, get_attribute_data_filtered_response
 from projects.mail import mail_client
+from users.helpers import get_graph_api_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -170,3 +172,119 @@ def send_scheduled_emails():
         except Exception as e:
             logger.error(e)
         message.delete()  # If sending fails, new EmailMessage object is created so this can be safely deleted
+
+office_location_map = {
+    "Läntinen alueyksikkö": "lantinen_alueyksikko",
+    "Pohjoinen alueyksikkö": "pohjoinen_alueyksikko",
+    "Itäinen alueyksikkö": "itainen_alueyksikko",
+    "Eteläinen alueyksikkö": "etelainen_alueyksikko",
+    "Asemakaavakoordinointi": "asemakaavakoordinointiyksikko",
+    "Länsisatama - Kalasatama": "lansisatama_kalasatama_tiimi",
+    "Länsilounas": "lansilounas_tiimi",
+    "Länsiluode": "lansiluode_tiimi",
+    "Pohjoiskoillinen": "pohjoiskoillinen_tiimi",
+    "Keskipohjoinen": "keskipohjoinen_tiimi",
+    "Itäkaakko": "itakaakko_tiimi",
+    "Itäkoillinen": "itakoillinen_tiimi",
+    "Asemakaavallinen erityissuunnittelu": "asemakaavallinen_erityissuunnittelu_tiimi",
+    "Kantakaupunki": "kantakaupunki_tiimi",
+    "Keskusta": "keskusta_tiimi",
+    "Asemakaavaprosessi": "asemakaavaprosessi_tiimi",
+}
+
+job_title_map = {
+    "Yksikön päällikkö": "yksikön päällikkö",
+    "Tiimipäällikkö": "tiimipäällikkö",
+}
+
+def update_mapped_personnel():
+    logger.info("Updating AttributeAutoValueMapping personnel")
+    token = get_graph_api_access_token()
+    if not token:
+        logger.error("Cannot get access token")
+        return
+
+    base_url = f"{settings.GRAPH_API_BASE_URL}/v1.0/users/"
+
+    query_params = []
+
+    #Correctly format `$filter` conditions
+    filter_conditions = ["endsWith(mail, '@hel.fi')"]
+
+    title_filter = " or ".join(
+        [f"jobTitle eq '{t}'" for t in ['Yksikön päällikkö', 'Tiimipäällikkö']]
+    )
+    filter_conditions.append(f"({title_filter})")
+
+    company_filter = " or ".join(
+        [f"companyName eq '{c}'" for c in ['KYMP']]
+    )
+    filter_conditions.append(f"({company_filter})")
+
+    office_location_filter = " or ".join(
+        [f"officeLocation eq '{o}'" for o in office_location_map.keys()]
+    )
+    filter_conditions.append(f"({office_location_filter})")
+
+    if filter_conditions:
+        query_params.append(f"$filter=({' and '.join(filter_conditions)})")
+
+    query_params.append("$count=true")
+    query_params.append(
+        "$select=id,givenName,surname,mobilePhone,businessPhones,companyName,mail,jobTitle,officeLocation"
+    )
+
+    url = base_url + ("?" + "&".join(query_params) if query_params else "")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "ConsistencyLevel": "eventual",
+    }
+
+    results = []
+    next_url = url
+
+    # Fetch pages until we have enough or run out
+    while next_url:
+        response = requests.get(next_url, headers=headers)
+
+        if response.status_code == 401:
+            logger.error("Kaavapino server not authorized to access users")
+            return
+        elif response.status_code != 200:
+            logger.error("Request failed")
+            return
+
+        data = response.json()
+        page = data.get("value", [])
+        results.extend(page)
+        next_url = data.get("@odata.nextLink")
+
+    # Check that required AttributeAutoValue exists
+    key_attribute = Attribute.objects.get(identifier="vastuuyksikko")
+    value_attribute = Attribute.objects.get(identifier="vastuu_paallikon_nimi")
+
+    attribute_auto_value, _created = AttributeAutoValue.objects.get_or_create(key_attribute=key_attribute, value_attribute=value_attribute)
+
+    if _created:
+        logger.info(f"AttributeAutoValue created for key_attribute={key_attribute} and value_attribute={value_attribute}")
+
+    for person in results:
+        office_location = person.get("officeLocation")
+        first_name = person.get("givenName")
+        surname = person.get("surname")
+        job_title = person.get("jobTitle")
+
+        if office_location:
+            office_location = office_location_map.get(office_location)
+            if office_location:
+                new_value_str = f"{first_name} {surname}, {job_title_map.get(job_title, job_title)}"
+                try:
+                    value = AttributeAutoValueMapping.objects.get(auto_attr=attribute_auto_value, key_str=office_location)
+                    if value.value_str != new_value_str:
+                        logger.info(f"Updating AttributeAutoValueMapping for {office_location}, {value.value_str} -> {new_value_str}")
+                        value.value_str = new_value_str
+                        value.save()
+                except AttributeAutoValueMapping.DoesNotExist:
+                    AttributeAutoValueMapping.objects.create(auto_attr=attribute_auto_value, key_str=office_location, value_str=new_value_str)
+                    logger.info(f"Created AttributeAutoValueMapping for {office_location}, {new_value_str}")
