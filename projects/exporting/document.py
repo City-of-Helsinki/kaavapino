@@ -49,6 +49,25 @@ def _get_raw_value(value, attribute):
         return value
 
 
+def sort_fieldset_display_items(display_items, fieldset_value):
+    """
+    Sorts rendered fieldset rows (dicts with the original "index") into display order.
+    Rows may define their position in "_order"; rows without it (e.g. data saved before
+    ordering was supported) fall back to their index.
+    """
+    fieldset_value = fieldset_value if isinstance(fieldset_value, list) else []
+
+    def sort_key(display_item):
+        index = display_item["index"]
+        fieldset_item = fieldset_value[index] if index < len(fieldset_value) else None
+        order = fieldset_item.get("_order") if isinstance(fieldset_item, dict) else None
+        if isinstance(order, bool) or not isinstance(order, int):
+            order = index
+        return (order, index)
+
+    display_items.sort(key=sort_key)
+
+
 def _set_fieldset_path(fieldset_path, attribute_data_display, identifier, value):
     parent = fieldset_path[0]["parent"].identifier
     index = fieldset_path[0]["index"]
@@ -316,6 +335,7 @@ def render_template(project, document_template, preview, result_type=None):
                     fieldset_object["index"] = index
                     result.append(fieldset_object)
 
+            sort_fieldset_display_items(result, value)
             return (result, value, element_data, None)
         elif attribute.multiple_choice and not ignore_multiple_choice:
             value = value or []
@@ -471,6 +491,7 @@ def render_template(project, document_template, preview, result_type=None):
         ) \
         .distinct("fieldset_path_str", "attribute__pk", "project__pk")
 
+    fieldset_parents_with_files = set()
     for attribute_file in attribute_files:
         # only image formats supported by docx/pptx can be used
         image_formats = [
@@ -518,6 +539,14 @@ def render_template(project, document_template, preview, result_type=None):
                 attribute_file.attribute.identifier,
                 display_value,
             )
+            fieldset_parents_with_files.add(attribute_file.fieldset_path[0]["parent"].identifier)
+
+    # _set_fieldset_path may have appended rows, restore display order
+    for parent_identifier in fieldset_parents_with_files:
+        sort_fieldset_display_items(
+            attribute_data_display[parent_identifier],
+            attribute_data.get(parent_identifier),
+        )
 
     # Add preview information to attribute_data_display so that it can be used as condition in documents
     attribute_data_display.update({'is_preview': preview})
