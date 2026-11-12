@@ -490,7 +490,7 @@ class DateType(models.Model):
         if cached_result is not None:
             return cached_result
 
-        listed_dates = self.dates or []
+        listed_dates = list(self.dates) if self.dates else []
         forced_dates_remove = [date.original_date for date in self.forced_dates.all() if date.original_date]
         forced_dates_add = [date.new_date for date in self.forced_dates.all() if date.new_date]
         base_dates = []
@@ -528,7 +528,7 @@ class DateType(models.Model):
             ], self.business_days_only)
         else:
             result = self._filter_date_list(
-                listed_dates + base_dates,
+                list(dict.fromkeys(listed_dates + base_dates)),
                 self.business_days_only,
             )
 
@@ -556,52 +556,37 @@ class DateType(models.Model):
         ))) * reverse
 
     def valid_days_from(self, orig_date, days):
-        year = orig_date.year
-        dates = sorted(self.get_dates(year))
-
         is_valid = self.is_valid_date(orig_date)
 
         if days == 0:
-            if is_valid:
-                return orig_date
-            else:
-                return None
+            return orig_date if is_valid else None
 
-        if days < 0:
-            dates = [date for date in dates if date <= orig_date]
-            dates.reverse()
+        forward = days > 0
+        remaining = abs(days)
+        # If orig_date is itself valid, it occupies index 0 without counting
+        # towards the offset, so the target sits one index further out.
+        target_index = remaining if is_valid else remaining - 1
+
+        year = orig_date.year
+        if forward:
+            dates = sorted(date for date in self.get_dates(year) if date >= orig_date)
         else:
-            dates = [date for date in dates if date >= orig_date]
+            dates = sorted(
+                (date for date in self.get_dates(year) if date <= orig_date),
+                reverse=True,
+            )
 
-        # Handle the case where there aren't enough days left in the year
-        while abs(days) > len(dates):
-            if days < 0:
-                days += len(dates)
-                year -= 1
-            else:
-                days -= len(dates)
-                year += 1
+        # Keep pulling in subsequent (or preceding) years until the target index exists
+        while len(dates) <= target_index:
+            year = year + 1 if forward else year - 1
 
             # Give up after ten years
             if abs(year - orig_date.year) >= 10:
                 return None
 
-            dates = sorted(self.get_dates(year))
+            dates += sorted(self.get_dates(year), reverse=not forward)
 
-            if days < 0:
-                dates.reverse()
-
-        if not is_valid:
-            # Special case to prevent using last index
-            if days == 0:
-                return dates[days]
-
-            return dates[abs(days) - 1]
-
-        if len(dates) == abs(days):
-            return dates[abs(days) - 1]
-
-        return dates[abs(days)]
+        return dates[target_index]
 
     def is_valid_date(self, date):
         return date in self.get_dates(date.year)
