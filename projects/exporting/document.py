@@ -63,7 +63,7 @@ def sort_fieldset_display_items(display_items, fieldset_value):
         order = fieldset_item.get("_order") if isinstance(fieldset_item, dict) else None
         if isinstance(order, bool) or not isinstance(order, int):
             order = index
-        return (order, index)
+        return order, index
 
     display_items.sort(key=sort_key)
 

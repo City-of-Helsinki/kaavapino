@@ -80,7 +80,7 @@ def test_display_items_sorting_tolerates_missing_or_short_raw_data():
     assert [item["index"] for item in display_items] == [3, 0]
 
 
-@pytest.fixture()
+@pytest.fixture
 def fieldset_section(f_fieldset_attribute, project, project_phase_section_attribute_factory):
     ppsa = project_phase_section_attribute_factory(attribute=f_fieldset_attribute)
     project.phase = ppsa.section.phase
@@ -92,7 +92,7 @@ def _section_serializer(section):
     return create_section_serializer(section, {"request": Request(HttpRequest())})
 
 
-@pytest.mark.django_db()
+@pytest.mark.django_db
 def test_section_serializer_keeps_fieldset_order_and_omits_it_for_legacy_rows(
     f_fieldset_attribute, fieldset_section
 ):
@@ -115,7 +115,7 @@ def test_section_serializer_keeps_fieldset_order_and_omits_it_for_legacy_rows(
     assert "_order" not in rows[2]
 
 
-@pytest.mark.django_db()
+@pytest.mark.django_db
 @pytest.mark.parametrize("invalid_order", [-1, "first", 1.5])
 def test_section_serializer_rejects_invalid_fieldset_order(
     f_fieldset_attribute, fieldset_section, invalid_order
@@ -130,7 +130,7 @@ def test_section_serializer_rejects_invalid_fieldset_order(
     assert not _section_serializer(fieldset_section)(data=data).is_valid()
 
 
-@pytest.mark.django_db()
+@pytest.mark.django_db
 def test_fieldset_order_and_tombstones_survive_attribute_data_round_trip(
     f_fieldset_attribute, project, fieldset_section
 ):
