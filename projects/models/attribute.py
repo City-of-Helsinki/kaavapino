@@ -638,7 +638,7 @@ class Attribute(models.Model):
             processed_entity = {}
             processed_entity_has_files = False
             for key, val in listitem.items():
-                if key == "_deleted":
+                if key in ("_deleted", "_order"):
                     processed_entity[key] = val
                     continue
 

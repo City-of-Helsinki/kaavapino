@@ -271,6 +271,11 @@ def create_fieldset_field_data(attribute, validation, project, preview, is_fake_
         required=False,
         default=False,
     )
+    serializer_fields["_order"] = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+    )
     field_arguments["required"] = False
 
     serializer = type("FieldSetSerializer", (serializers.Serializer,), {})

@@ -417,6 +417,7 @@ def test_sanitizer_aggregates_applicant_fieldset_and_removes_source():
 	)
 
 	assert result == {
+		"hakijoita_yhteensa": 2,
 		"hakija_taho": "Hakija yritys: Example Ltd; Hakija yksityishenkilö",
 		"hakijalta_perittava_maksu_oas": 20,
 		"hakijalta_perittava_maksu_ehdotus": 2,
