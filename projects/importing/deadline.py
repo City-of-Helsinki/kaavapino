@@ -357,6 +357,7 @@ class DeadlineImporter:
         logger.info(f"Creating deadlines for {subtype}")
 
         for i, row in enumerate(rows):
+
             abbreviation = row[self.column_index[DEADLINE_ABBREVIATION]]
             attribute = row[self.column_index[DEADLINE_ATTRIBUTE_IDENTIFIER]]
             confirmation_attribute = row[self.column_index[DEADLINE_CONFIRMATION_ATTRIBUTE_IDENTIFIER]]
@@ -484,7 +485,7 @@ class DeadlineImporter:
                 return condition_attributes, not_condition_attributes
 
             if " and " in cond:
-                for c in cond.split("and"):
+                for c in cond.split(" and "):
                     res = get_attribute_conditions(c)
                     condition_attributes.extend(res[0])
                     not_condition_attributes.extend(res[1])
