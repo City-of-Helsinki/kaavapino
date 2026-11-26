@@ -1,3 +1,5 @@
+from typing import Union
+
 import pytz
 import csv
 import re
@@ -56,6 +58,7 @@ from projects.models import (
     ProjectSubtype,
     ProjectAttributeFile,
     DocumentTemplate,
+    EmailTemplate,
     Attribute,
     Report,
     Deadline,
@@ -95,6 +98,7 @@ from projects.serializers.project import (
     OverviewFilterSerializer,
     SimpleProjectSerializer,
     ProjectPrioritySerializer,
+    EmailMessageSerializer,
 )
 from projects.serializers.projectschema import (
     SimpleAttributeSerializer,
@@ -117,6 +121,7 @@ from projects.serializers.deadline import DeadlineSerializer, DeadlineValidDateS
 from projects.serializers.utils import should_display_deadline
 from sitecontent.models import ListViewAttributeColumn
 from projects.clamav import clamav_client, FileScanException, FileInfectedException
+from projects.mail import mail_client, MailException
 from PIL import Image
 
 log = logging.getLogger(__name__)
@@ -961,11 +966,11 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         fake = request.query_params.get('fake', False)
-        timeline_save = request.query_params.get('timeline_save', False)
         # Store the original confirmed_fields before calling update
         # should prevent confirmed fields from moving when updating or validating 
         confirmed_fields = request.data.get('confirmed_fields', [])
         original_attribute_data = request.data.get('attribute_data', {})
+        locked_group = request.data.get('locked_group', None)
 
         if not fake:
             # Actual update logic that saves to db
@@ -975,11 +980,15 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
         project = self.get_object()
 
         # Get preview deadlines (corrected dates)
-        preview = project.get_preview_deadlines(
-            original_attribute_data,
-            project.subtype,
-            confirmed_fields,
-        )
+        try:
+            preview = project.get_preview_deadlines(
+                original_attribute_data,
+                project.subtype,
+                confirmed_fields,
+                locked_group=locked_group,
+            )
+        except ValueError as exc:
+            return Response({"error": str(exc), "locked_group": locked_group}, status=status.HTTP_400_BAD_REQUEST)
 
         # Build result from preview values
         result_attribute_data = {}
@@ -1415,6 +1424,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         task_id = request.query_params.get("task")
         filename = request.query_params.get("filename")
+        result_type = request.query_params.get("result_type", None)
         document_template = self.get_object()
 
         if filename is None:
@@ -1424,18 +1434,18 @@ class DocumentViewSet(ReadOnlyModelViewSet):
                 timezone.now().date(),
             )
 
-        doc_type = get_file_type(document_template.file.path)
+        doc_type = result_type or get_file_type(document_template.file.path)
 
         preview = \
             True if request.query_params.get("preview") in TRUE \
-            else False
+                else False
 
-        immediate =  \
+        immediate = \
             True if request.query_params.get("immediate") in TRUE \
-            else False
+                else False
 
         if immediate:
-            document = render_template(self.project, document_template, preview)
+            document = render_template(self.project, document_template, preview, result_type)
             if document and document != "error":
                 response = HttpResponse(
                     document,
@@ -1477,7 +1487,7 @@ class DocumentViewSet(ReadOnlyModelViewSet):
 
         document_task = async_task(
             render_template,
-            self.project, document_template, preview,
+            self.project, document_template, preview, result_type,
         )
 
         return Response(
@@ -1507,6 +1517,117 @@ class DocumentTemplateDownloadView(
     slug_field = "file"
     slug_url_kwarg = "path"
     url_path_postfix = "document_templates"
+
+    def get_queryset(self):
+        # Queryset that is allowed to be downloaded
+        return self.model.objects.all()
+
+    def can_access_file(self, private_file):
+        return self.request.user.has_privilege("admin")
+
+
+class EmailViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = EmailTemplate.objects.none()
+    permission_classes = [IsAuthenticated]
+    serializer_class = EmailMessageSerializer
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="subject",
+                type=str,
+                description="Subject of the email message",
+                required=True
+            ),
+            OpenApiParameter(
+                name="recipient",
+                type=Union[str, int],
+                description="Recipient of the email message (Either user id or email address)",
+                required=True
+            ),
+            OpenApiParameter(
+                name="message",
+                type=str,
+                description="Message to be sent (Optional if using template and context)",
+                required=False
+            ),
+            OpenApiParameter(
+                name="scheduled_time",
+                type=str,
+                description="Scheduled time to send the message at",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="template_id",
+                type=str,
+                description="Id of the template to use. Templates can be edited in Django admin",
+                required=False,
+            ),
+            OpenApiParameter(
+                name="context",
+                type=dict,
+                description="Context to use with the template (List of key-value pairs matching template fields)",
+            ),
+        ],
+        responses={
+            200: OpenApiTypes.STR,
+            400: OpenApiTypes.STR,
+            500: OpenApiTypes.STR
+        },
+    )
+    @action(
+        methods=["post"],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path="send_email",
+        url_name="send_email"
+    )
+    def send_email(self, request):
+        serializer = EmailMessageSerializer(data=request.data)
+        if serializer.is_valid():
+            # All validation passed, data is clean
+            validated_data = serializer.validated_data
+
+            try:
+                if validated_data.get('scheduled_time'):
+                    # Save scheduled EmailMessage to be sent later
+                    serializer.save()
+                    return Response("Email scheduled successfully", status=status.HTTP_200_OK)
+                else:
+                    # Send immediately
+                    template = validated_data.get('template')
+                    if template:
+                        mail_client.send_template_to_email(
+                            validated_data['recipient'],
+                            validated_data['subject'],
+                            validated_data['message'],
+                            template,
+                            validated_data.get('context')
+                        )
+                    else:
+                        mail_client.send_mail_to_email(
+                            validated_data['recipient'],
+                            validated_data['subject'],
+                            validated_data['message']
+                        )
+                    return Response("Email sent", status=status.HTTP_200_OK)
+            except MailException as exc:
+                log.error("Error in send_mail, %s", exc)
+                return Response("Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            except Exception as exc:
+                log.error("Error in send_mail, %s", exc)
+                return Response("Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class EmailTemplateDownloadView(
+    PrivateDownloadViewSetMixin, PrivateStorageDetailView
+):
+    model = EmailTemplate
+    slug_field = "file"
+    slug_url_kwarg = "path"
+    url_path_postfix = "email_templates"
 
     def get_queryset(self):
         # Queryset that is allowed to be downloaded

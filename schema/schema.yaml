@@ -56,6 +56,7 @@ paths:
           - br
           - bs
           - ca
+          - ckb
           - cs
           - cy
           - da
@@ -108,6 +109,7 @@ paths:
           - ml
           - mn
           - mr
+          - ms
           - my
           - nb
           - ne
@@ -135,6 +137,7 @@ paths:
           - tr
           - tt
           - udm
+          - ug
           - uk
           - ur
           - uz
@@ -407,6 +410,162 @@ paths:
               schema:
                 $ref: '#/components/schemas/Deadline'
           description: ''
+  /v1/deadlines/date_types/:
+    get:
+      operationId: v1_deadlines_date_types_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeadlineValidDate'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+  /v1/deadlines/validate/:
+    get:
+      operationId: v1_deadlines_validate_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeadlineValidation'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+  /v1/emails/:
+    get:
+      operationId: v1_emails_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEmailMessageList'
+          description: ''
+  /v1/emails/{id}/:
+    get:
+      operationId: v1_emails_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this email template.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailMessage'
+          description: ''
+  /v1/emails/send_email/:
+    post:
+      operationId: v1_emails_send_email_create
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: object
+          additionalProperties: {}
+        description: Context to use with the template (List of key-value pairs matching
+          template fields)
+      - in: query
+        name: message
+        schema:
+          type: string
+        description: Message to be sent (Optional if using template and context)
+      - in: query
+        name: scheduled_time
+        schema:
+          type: string
+        description: Scheduled time to send the message at
+      - in: query
+        name: subject
+        schema:
+          type: string
+        description: Subject of the email message
+        required: true
+      - in: query
+        name: template_id
+        schema:
+          type: string
+        description: Id of the template to use. Templates can be edited in Django
+          admin
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailMessage'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmailMessage'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmailMessage'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/footer/:
     get:
       operationId: v1_footer_list
@@ -529,6 +688,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectPhase'
+          description: ''
+  /v1/ping/:
+    get:
+      operationId: v1_ping_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
           description: ''
   /v1/projects/:
     get:
@@ -1180,6 +1353,39 @@ paths:
       responses:
         '204':
           description: No response body
+  /v1/projects/{id}/attribute_data_filtered/:
+    get:
+      operationId: v1_projects_attribute_data_filtered_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this projekti.
+        required: true
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/projects/{id}/external_documents/:
     get:
       operationId: v1_projects_external_documents_retrieve
@@ -1348,6 +1554,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentTemplate'
           description: ''
+  /v1/projects/attribute_data/:
+    get:
+      operationId: v1_projects_attribute_data_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/projects/overview/by_subtype/:
     get:
       operationId: v1_projects_overview_by_subtype_retrieve
@@ -1468,6 +1700,16 @@ paths:
               schema:
                 type: string
           description: ''
+  /v1/projects/pino_numbers/:
+    get:
+      operationId: v1_projects_pino_numbers_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
   /v1/projects/priorities/:
     get:
       operationId: v1_projects_priorities_list
@@ -1651,6 +1893,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/Report'
           description: ''
+  /v1/reports/external_link/:
+    get:
+      operationId: v1_reports_external_link_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
   /v1/schemas/:
     get:
       operationId: v1_schemas_retrieve
@@ -1695,6 +1952,26 @@ paths:
       responses:
         '200':
           description: No response body
+  /v1/status/:
+    get:
+      operationId: v1_status_retrieve
+      tags:
+      - v1
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
+        '503':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: ''
   /v1/targetfloorareas/:
     get:
       operationId: v1_targetfloorareas_retrieve
@@ -1760,7 +2037,10 @@ components:
           type: string
         value:
           type: string
+        index:
+          type: integer
       required:
+      - index
       - label
       - value
     AttributeLock:
@@ -1789,9 +2069,6 @@ components:
         user_email:
           type: string
           readOnly: true
-        timestamp:
-          type: string
-          format: date-time
         owner:
           type: string
           readOnly: true
@@ -1803,7 +2080,6 @@ components:
       - fieldset_attribute_index
       - owner
       - project_name
-      - timestamp
       - user_email
       - user_name
     Comment:
@@ -1868,6 +2144,22 @@ components:
           maxLength: 10
       required:
       - name
+    DateType:
+      type: object
+      properties:
+        identifier:
+          type: string
+        name:
+          type: string
+        dates:
+          type: array
+          items:
+            type: string
+            format: date
+      required:
+      - dates
+      - identifier
+      - name
     Deadline:
       type: object
       properties:
@@ -1903,11 +2195,14 @@ components:
           type: string
         warning_min_distance_next:
           type: string
+        deadlinegroup:
+          type: string
       required:
       - abbreviation
       - attribute
       - date_type
       - deadline_types
+      - deadlinegroup
       - error_date_type_mismatch
       - error_min_distance_previous
       - error_past_due
@@ -1917,6 +2212,41 @@ components:
       - phase_id
       - phase_name
       - warning_min_distance_next
+    DeadlineValidDate:
+      type: object
+      properties:
+        date_types:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/DateType'
+      required:
+      - date_types
+    DeadlineValidation:
+      type: object
+      properties:
+        identifier:
+          type: string
+        project:
+          type: string
+        date:
+          type: string
+        error_reason:
+          type: string
+        suggested_date:
+          type: string
+          format: date
+        conflicting_deadline:
+          type: string
+        conflicting_deadline_abbreviation:
+          type: string
+      required:
+      - conflicting_deadline
+      - conflicting_deadline_abbreviation
+      - date
+      - error_reason
+      - identifier
+      - project
+      - suggested_date
     DocumentTemplate:
       type: object
       properties:
@@ -1957,6 +2287,47 @@ components:
       - name
       - phases
       - preview_file
+    EmailMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        recipient:
+          type: string
+          maxLength: 255
+        subject:
+          type: string
+        message:
+          type: string
+        template:
+          type: integer
+          nullable: true
+        template_id:
+          type: integer
+          writeOnly: true
+          nullable: true
+          description: ID of the EmailTemplate to use
+        context:
+          type: object
+          additionalProperties: {}
+          nullable: true
+          description: Template context variables as JSON object
+        scheduled_time:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'ISO 8601 format: 2024-12-31T14:30:00Z or 2024-12-31T14:30:00+02:00'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - message
+      - recipient
+      - subject
     ExternalDocuments:
       type: object
       properties:
@@ -2039,7 +2410,7 @@ components:
           maxLength: 255
         url:
           type: string
-          maxLength: 255
+          maxLength: 511
       required:
       - link_text
       - url
@@ -2106,6 +2477,9 @@ components:
       - value_type
     PaginatedCommentList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2126,6 +2500,9 @@ components:
             $ref: '#/components/schemas/Comment'
     PaginatedDeadlineList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2146,6 +2523,9 @@ components:
             $ref: '#/components/schemas/Deadline'
     PaginatedDocumentTemplateList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2164,8 +2544,34 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DocumentTemplate'
+    PaginatedEmailMessageList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailMessage'
     PaginatedFieldCommentList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2186,6 +2592,9 @@ components:
             $ref: '#/components/schemas/FieldComment'
     PaginatedFooterSectionList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2206,6 +2615,9 @@ components:
             $ref: '#/components/schemas/FooterSection'
     PaginatedOverviewFilterList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2226,6 +2638,9 @@ components:
             $ref: '#/components/schemas/OverviewFilter'
     PaginatedProjectCardSchemaList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2246,6 +2661,9 @@ components:
             $ref: '#/components/schemas/ProjectCardSchema'
     PaginatedProjectListList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2266,6 +2684,9 @@ components:
             $ref: '#/components/schemas/ProjectList'
     PaginatedProjectOnMapOverviewList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2286,6 +2707,9 @@ components:
             $ref: '#/components/schemas/ProjectOnMapOverview'
     PaginatedProjectPhaseList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2306,6 +2730,9 @@ components:
             $ref: '#/components/schemas/ProjectPhase'
     PaginatedProjectPriorityList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2326,6 +2753,9 @@ components:
             $ref: '#/components/schemas/ProjectPriority'
     PaginatedProjectSubtypeList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2346,6 +2776,9 @@ components:
             $ref: '#/components/schemas/ProjectSubtype'
     PaginatedProjectTypeList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2366,6 +2799,9 @@ components:
             $ref: '#/components/schemas/ProjectType'
     PaginatedReportList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2386,6 +2822,9 @@ components:
             $ref: '#/components/schemas/Report'
     PaginatedSimpleAttributeList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2406,6 +2845,9 @@ components:
             $ref: '#/components/schemas/SimpleAttribute'
     PaginatedUserList:
       type: object
+      required:
+      - count
+      - results
       properties:
         count:
           type: integer
@@ -2835,10 +3277,17 @@ components:
           readOnly: true
         generated:
           type: boolean
+        edited:
+          type: string
+          format: date-time
+        editable:
+          type: boolean
       required:
       - abbreviation
       - date
       - deadline
+      - editable
+      - edited
       - generated
       - is_under_min_distance_next
       - is_under_min_distance_previous
@@ -3188,7 +3637,13 @@ components:
           type: string
         name:
           type: string
+        field_roles:
+          type: string
+        field_subroles:
+          type: string
       required:
+      - field_roles
+      - field_subroles
       - label
       - name
     SimpleProject:

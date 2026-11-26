@@ -3,6 +3,9 @@ import threading
 
 import datetime
 import io
+import os
+import subprocess
+import tempfile
 from html import escape
 import logging
 import jinja2
@@ -44,6 +47,25 @@ def _get_raw_value(value, attribute):
         return datetime.datetime.strptime(value, "%Y-%m-%d").date()
     else:
         return value
+
+
+def sort_fieldset_display_items(display_items, fieldset_value):
+    """
+    Sorts rendered fieldset rows (dicts with the original "index") into display order.
+    Rows may define their position in "_order"; rows without it (e.g. data saved before
+    ordering was supported) fall back to their index.
+    """
+    fieldset_value = fieldset_value if isinstance(fieldset_value, list) else []
+
+    def sort_key(display_item):
+        index = display_item["index"]
+        fieldset_item = fieldset_value[index] if index < len(fieldset_value) else None
+        order = fieldset_item.get("_order") if isinstance(fieldset_item, dict) else None
+        if isinstance(order, bool) or not isinstance(order, int):
+            order = index
+        return order, index
+
+    display_items.sort(key=sort_key)
 
 
 def _set_fieldset_path(fieldset_path, attribute_data_display, identifier, value):
@@ -220,7 +242,7 @@ def get_super(_script):
     else:
         return False
 
-def render_template(project, document_template, preview):
+def render_template(project, document_template, preview, result_type=None):
 
     def fetch_relevant_attributes(doc):
         cached_vars = cache.get(f"document_template_variables:{doc.template_file.path}", None)
@@ -313,6 +335,7 @@ def render_template(project, document_template, preview):
                     fieldset_object["index"] = index
                     result.append(fieldset_object)
 
+            sort_fieldset_display_items(result, value)
             return (result, value, element_data, None)
         elif attribute.multiple_choice and not ignore_multiple_choice:
             value = value or []
@@ -468,6 +491,7 @@ def render_template(project, document_template, preview):
         ) \
         .distinct("fieldset_path_str", "attribute__pk", "project__pk")
 
+    fieldset_parents_with_files = set()
     for attribute_file in attribute_files:
         # only image formats supported by docx/pptx can be used
         image_formats = [
@@ -515,6 +539,14 @@ def render_template(project, document_template, preview):
                 attribute_file.attribute.identifier,
                 display_value,
             )
+            fieldset_parents_with_files.add(attribute_file.fieldset_path[0]["parent"].identifier)
+
+    # _set_fieldset_path may have appended rows, restore display order
+    for parent_identifier in fieldset_parents_with_files:
+        sort_fieldset_display_items(
+            attribute_data_display[parent_identifier],
+            attribute_data.get(parent_identifier),
+        )
 
     # Add preview information to attribute_data_display so that it can be used as condition in documents
     attribute_data_display.update({'is_preview': preview})
@@ -526,9 +558,24 @@ def render_template(project, document_template, preview):
 
     if doc_type == 'docx':
         try:
-            doc.render(attribute_data_display, jinja_env)
-            output = io.BytesIO()
-            doc.save(output)
+            if result_type == 'pdf':
+                doc.render(attribute_data_display, jinja_env)
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    docx_path = os.path.join(temp_dir, "document.docx")
+                    pdf_path = os.path.join(temp_dir, "document.pdf")
+                    doc.save(docx_path)
+                    subprocess.run(
+                        ["soffice", "--headless", "--convert-to", "pdf", docx_path, "--outdir", temp_dir],
+                        check=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                    )
+                    with open(pdf_path, "rb") as f:
+                        output = io.BytesIO(f.read())
+            else:
+                doc.render(attribute_data_display, jinja_env)
+                output = io.BytesIO()
+                doc.save(output)
         except Exception as exc:
             log.error('Error while rendering document', exc)
     elif doc_type == 'xlsx':
@@ -648,20 +695,23 @@ class PptxTemplate:
 
         if paragraph.runs:
             template = self.env.parse(original_text)
-            vars = self.get_cleaned_context_variables(template)
+            context_vars = self.get_cleaned_context_variables(template)
             rendered = self.clean_empty_lines(rendered)
             paragraph.runs[0].text = rendered
 
-            if len(vars) == 1:
-                link_data = self.element_data.get(vars.pop())
+            if len(context_vars) == 1:
+                link_data = self.element_data.get(context_vars.pop())
                 if link_data:
-                    font = paragraph.runs[0].font
                     paragraph.runs[0].hyperlink.address = link_data['url_id']
 
-        # Clean up potential empty paragraph
+        # At least one paragraph in each text body is required, else doc may be appear corrupted
         if not paragraph.text.strip():
             p = paragraph._p
-            p.getparent().remove(p)
+            parent = p.getparent()
+            if len(parent.findall(p.tag)) > 1:
+                parent.remove(p)
+            else:
+                paragraph.clear()
 
     def clean_empty_lines(self, rendered_text):
         return '\n'.join([txt for txt in rendered_text.split('\n') if txt.strip()])
