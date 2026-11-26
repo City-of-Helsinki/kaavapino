@@ -981,7 +981,7 @@ class ProjectViewSet(NestedViewSetMixin, viewsets.ModelViewSet):
 
         # Get preview deadlines (corrected dates)
         try:
-            preview = project.get_preview_deadlines_light(
+            preview = project.get_preview_deadlines(
                 original_attribute_data,
                 project.subtype,
                 confirmed_fields,

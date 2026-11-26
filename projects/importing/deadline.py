@@ -49,8 +49,6 @@ DEADLINE_ERROR_MIN_DISTANCE_PREV = "virheilmoitus, jos minimietäisyys edellisee
 DEADLINE_WARNING_MIN_DISTANCE_NEXT = "virheilmoitus, jos minimietäisyys seuraavaan etappiin ei täyty , kun käyttäjä editoi aikataulua "
 DEADLINE_GROUP = "(v1.1) ryhmä"
 
-SHOULD_BE_IMPORTED = "rivi koskee versiota 1.1"
-
 # Date type row indices
 DATETYPE_NAME_INDEX = 0
 DATETYPE_EXCLUDE_TYPE_INDEX = 1
